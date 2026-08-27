@@ -1,9 +1,11 @@
-import type { Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
-export async function navigateInsideApp(page: Page, path: string) {
+export async function navigateInsideApp(page: Page, path: string, ready?: Locator) {
   await page.evaluate((nextPath) => {
     window.history.pushState({}, '', nextPath)
     window.dispatchEvent(new PopStateEvent('popstate'))
   }, path)
-  await page.waitForURL((url) => url.pathname === path.split('?')[0])
+  const expectedPath = path.split('?')[0]
+  await expect.poll(() => new URL(page.url()).pathname).toBe(expectedPath)
+  if (ready) await expect(ready).toBeVisible()
 }

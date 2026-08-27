@@ -73,6 +73,7 @@ test('pessoas, família, aniversários, busca e importações privadas funcionam
   await page.reload()
   await page.getByLabel('Senha').fill(password)
   await page.getByRole('button', { name: 'Entrar' }).click()
-  await navigateInsideApp(page, '/app/pessoas')
+  await expect(page.getByRole('heading', { name: 'Visão do distrito' })).toBeVisible()
+  await navigateInsideApp(page, '/app/pessoas', page.getByRole('heading', { name: 'Pessoas', exact: true }))
   await expect(page.getByText('Pessoa Sol Fictícia')).toBeVisible()
 })
