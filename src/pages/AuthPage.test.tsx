@@ -1,0 +1,105 @@
+import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AccountRecord } from '../db/types'
+import { AuthPage } from './AuthPage'
+
+const authState = vi.hoisted(() => ({
+  account: null as AccountRecord | null,
+  recoveryCode: null as string | null,
+  register: vi.fn(),
+  unlock: vi.fn(),
+  recover: vi.fn(),
+  clearRecoveryCode: vi.fn(),
+}))
+
+vi.mock('../auth/AuthVaultContext', () => ({
+  useAuthVault: () => ({
+    account: authState.account,
+    recoveryCode: authState.recoveryCode,
+    register: authState.register,
+    unlock: authState.unlock,
+    recover: authState.recover,
+    clearRecoveryCode: authState.clearRecoveryCode,
+  }),
+}))
+
+describe('tela de acesso', () => {
+  afterEach(cleanup)
+
+  beforeEach(() => {
+    authState.account = null
+    authState.recoveryCode = null
+    vi.clearAllMocks()
+  })
+
+  it('mostra a apresentação e envia o formulário de criação de conta', async () => {
+    const user = userEvent.setup()
+    render(<AuthPage />)
+
+    expect(screen.getByRole('heading', { name: /seu ministério organizado\.\s*seus dados, só seus\./i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Crie sua conta' })).toBeInTheDocument()
+    expect(screen.getByLabelText('E-mail')).toHaveAttribute('type', 'email')
+    expect(screen.getByLabelText(/Senha/)).toHaveAttribute('type', 'password')
+    expect(screen.getByText('Mínimo de 12 caracteres')).toBeInTheDocument()
+    expect(screen.queryByText(/criptografia|cofre|chave mestra|AES|servidor|sincronização|IndexedDB|ambiente de desenvolvimento/i)).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText('E-mail'), 'conta-criacao@exemplo.test')
+    await user.type(screen.getByLabelText(/Senha/), 'Senha-Ficticia-2026')
+    await user.click(screen.getByRole('button', { name: 'Criar conta' }))
+
+    expect(authState.register).toHaveBeenCalledWith('conta-criacao@exemplo.test', 'Senha-Ficticia-2026')
+  })
+
+  it('alterna por teclado entre as abas e envia o formulário de entrada', async () => {
+    const user = userEvent.setup()
+    authState.account = {
+      id: 'conta-entrada-ficticia',
+      email: 'conta-entrada@exemplo.test',
+      createdAt: '2026-08-23T00:00:00.000Z',
+      authMode: 'local-development',
+    }
+    render(<AuthPage />)
+
+    const enterTab = screen.getByRole('tab', { name: 'Entrar' })
+    enterTab.focus()
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByRole('heading', { name: 'Crie sua conta' })).toBeInTheDocument()
+    await user.keyboard('{ArrowLeft}')
+
+    expect(screen.getByRole('heading', { name: 'Entre na sua conta' })).toBeInTheDocument()
+    expect(screen.getByLabelText('E-mail')).toHaveAttribute('type', 'email')
+    expect(screen.getByLabelText(/Senha/)).toHaveAttribute('type', 'password')
+    expect(screen.getByRole('tab', { name: 'Entrar' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Entrar' })).toHaveFocus()
+
+    await user.type(screen.getByLabelText(/Senha/), 'Senha-Ficticia-2026')
+    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(authState.unlock).toHaveBeenCalledWith('conta-entrada@exemplo.test', 'Senha-Ficticia-2026')
+  })
+
+  it('oferece recuperação de acesso somente quando já existe uma conta', async () => {
+    const user = userEvent.setup()
+    authState.account = {
+      id: 'conta-ficticia',
+      email: 'conta-ficticia@exemplo.test',
+      createdAt: '2026-08-23T00:00:00.000Z',
+      authMode: 'local-development',
+    }
+    render(<AuthPage />)
+
+    expect(screen.getByRole('button', { name: 'Usar chave de recuperação' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Usar chave de recuperação' }))
+
+    expect(screen.getByRole('heading', { name: 'Recupere o acesso' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Chave de recuperação')).toBeRequired()
+    expect(screen.getByLabelText(/Senha da conta/)).toHaveAttribute('type', 'password')
+    expect(screen.getByRole('button', { name: 'Recuperar acesso' })).toBeInTheDocument()
+    expect(screen.queryByRole('tablist', { name: 'Acesso' })).not.toBeInTheDocument()
+  })
+
+  it('não oferece recuperação antes de existir uma conta', () => {
+    render(<AuthPage />)
+    expect(screen.queryByRole('button', { name: 'Usar chave de recuperação' })).not.toBeInTheDocument()
+  })
+})

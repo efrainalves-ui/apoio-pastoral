@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Apoio Pastoral">
+  <rect width="512" height="512" fill="#173f35"/>
+  <circle cx="256" cy="256" r="145" fill="#225447"/>
+  <path d="M256 352c-60-33-103-80-103-132 0-42 28-69 64-69 17 0 31 6 39 19 9-13 23-19 40-19 36 0 63 27 63 69 0 52-43 99-103 132Z" fill="#f5f3ed"/>
+  <path d="M256 184v136M218 229h76" fill="none" stroke="#173f35" stroke-width="22" stroke-linecap="round"/>
+  <path d="M181 342c28 18 51 26 75 26s47-8 75-26" fill="none" stroke="#d9a441" stroke-width="12" stroke-linecap="round"/>
+</svg>

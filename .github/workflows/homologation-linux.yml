@@ -1,0 +1,69 @@
+name: Homologação interna (Linux)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Verificações e E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+      # A homologação não se conecta a serviços remotos nem usa credenciais.
+      VITE_DISABLE_SYNC: 'true'
+
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v4
+
+      - name: Configurar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependências limpas
+        run: pnpm install --frozen-lockfile
+
+      - name: Instalar navegador do Playwright
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: TypeScript
+        run: pnpm exec tsc --noEmit
+
+      - name: Testes unitários
+        run: pnpm exec vitest run --maxWorkers=1
+
+      - name: Build
+        run: pnpm build
+
+      - name: Verificação PWA
+        run: pnpm verify:pwa
+
+      - name: Testes E2E Playwright
+        run: pnpm test:e2e
+
+      - name: Guardar evidências E2E em falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-evidencias
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7
