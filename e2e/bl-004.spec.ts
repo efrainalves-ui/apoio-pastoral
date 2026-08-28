@@ -57,6 +57,7 @@ test('distrito e igreja continuam disponíveis offline', async ({ page, context 
   await page.reload()
   await page.getByLabel('Senha').fill(password)
   await page.getByRole('button', { name: 'Entrar' }).click()
+  await expect(page.getByRole('heading', { name: 'Visão do distrito', exact: true })).toBeVisible()
   await openDistrict(page)
   await expect(page.getByRole('heading', { name: 'Distrito E2E Fictício' })).toBeVisible()
   await expect(page.getByText('Ponto Modelo Fictício')).toBeVisible()

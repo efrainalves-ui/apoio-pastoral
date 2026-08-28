@@ -30,6 +30,8 @@ describe('edição visual dos registros missionários', () => {
     await missionaryService.saveClass(auth.account!.id, auth.masterKey!, { churchId: church.id, teacherId: leader.id, assistantId: null, ageGroup: 'adults', participantIds: [leader.id] })
     const group = await missionaryService.saveSmallGroup(auth.account!.id, auth.masterKey!, { churchId: church.id, name: 'PG Visual Fictício', leaderId: leader.id, associateId: null, host: 'Casa Fictícia', address: '', day: 'terça', time: '19:00', participantIds: [leader.id], active: true })
     await missionaryService.saveUapg(auth.account!.id, auth.masterKey!, { churchId: church.id, name: 'UAPG Visual Fictícia', smallGroupId: group.id, notes: '', active: true })
+    const updateSmallGroup = vi.spyOn(MissionaryService.prototype, 'updateSmallGroup')
+    const removeRecord = vi.spyOn(MissionaryService.prototype, 'remove')
 
     const user = userEvent.setup(); render(<MemoryRouter><CommunityGroupsPage /></MemoryRouter>)
     expect(await screen.findByText('Classe Adultos')).toBeInTheDocument(); expect(screen.getByText('PG Visual Fictício')).toBeInTheDocument(); expect(screen.getByText('UAPG Visual Fictícia')).toBeInTheDocument()
@@ -41,12 +43,17 @@ describe('edição visual dos registros missionários', () => {
     expect(within(editCard).getByRole('combobox', { name: 'Líder' })).toHaveValue(leader.id)
     await user.clear(name); await user.type(name, 'PG Visual Editado'); await user.click(within(editCard).getByRole('button', { name: 'Salvar alterações' }))
 
+    expect(updateSmallGroup).toHaveBeenCalledOnce()
+    await updateSmallGroup.mock.results[0]!.value
+    expect(await screen.findByText('Alterações salvas.')).toBeInTheDocument()
     expect(await screen.findByText('PG Visual Editado')).toBeInTheDocument()
     expect((await missionaryService.listSmallGroups(auth.account!.id, auth.masterKey!))[0]).toMatchObject({ id: group.id, leaderId: leader.id, name: 'PG Visual Editado' })
 
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const editedRow = screen.getByText('PG Visual Editado').closest<HTMLElement>('.entity-row')!
     await user.click(within(editedRow).getByRole('button', { name: 'Remover' }))
-    expect(confirm).toHaveBeenCalledOnce(); await waitFor(() => expect(screen.queryByText('PG Visual Editado')).not.toBeInTheDocument())
+    expect(confirm).toHaveBeenCalledOnce(); expect(removeRecord).toHaveBeenCalledOnce(); await removeRecord.mock.results[0]!.value
+    expect(await screen.findByText('Registro removido.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('PG Visual Editado')).not.toBeInTheDocument())
   }, 15_000)
 })
