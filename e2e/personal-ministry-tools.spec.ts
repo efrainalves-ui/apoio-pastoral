@@ -16,17 +16,21 @@ async function openMenuOnMobile(page: Page, projectName: string) {
   if (projectName === 'mobile-chromium') await page.getByRole('button', { name: 'Abrir menu' }).click()
 }
 
+function mainNavigation(page: Page) {
+  return page.getByLabel('Navegação principal', { exact: true })
+}
+
 test('pedidos de oração, leitura e cerimônias são acessíveis no computador e no celular', async ({ page }, testInfo) => {
   await registerAndEnter(page)
 
   await openMenuOnMobile(page, testInfo.project.name)
-  await page.getByRole('link', { name: 'Pedidos de Oração', exact: true }).click()
+  await mainNavigation(page).getByRole('link', { name: 'Pedidos de Oração', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Pedidos de Oração' })).toBeVisible()
   await page.getByRole('button', { name: 'Novo pedido' }).click()
   await expect(page.getByText('Pedido sem identificação')).toBeVisible()
 
   await openMenuOnMobile(page, testInfo.project.name)
-  await page.getByRole('link', { name: 'Leitura', exact: true }).click()
+  await mainNavigation(page).getByRole('link', { name: 'Leitura', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Leitura' })).toBeVisible()
   await page.getByRole('button', { name: 'Adicionar livro' }).first().click()
   await page.getByLabel('Título').fill('Livro Fictício E2E')
@@ -35,7 +39,7 @@ test('pedidos de oração, leitura e cerimônias são acessíveis no computador 
   await expect(page.getByRole('heading', { name: 'Livro Fictício E2E' })).toBeVisible()
 
   await openMenuOnMobile(page, testInfo.project.name)
-  await page.getByRole('link', { name: 'Agenda', exact: true }).click()
+  await mainNavigation(page).getByRole('link', { name: 'Agenda', exact: true }).click()
   await page.getByRole('link', { name: 'Novo compromisso' }).click()
   const category = page.getByLabel('Categoria')
   for (const label of ['Batismo', 'Santa Ceia', 'Casamento', 'Dedicação de criança']) {

@@ -18,12 +18,14 @@ async function registerAndPrepareChurch(page: Page) {
   await page.getByLabel('Nome da igreja *').fill('Igreja Fictícia de Navegação')
   await page.getByLabel('Tipo *').selectOption('organized_church')
   await page.getByRole('button', { name: 'Salvar igreja' }).click()
+  await expect(page.getByRole('heading', { name: 'Igreja Fictícia de Navegação', exact: true })).toBeVisible()
 
   for (const name of ['Ana Fictícia', 'Bruno Fictício', 'Carla Fictícia']) {
     await navigateInsideApp(page, '/app/pessoas/nova', page.getByLabel('Nome completo *'))
     await page.getByLabel('Nome completo *').fill(name)
     await page.getByLabel('Igreja *').selectOption({ label: 'Igreja Fictícia de Navegação' })
     await page.getByRole('button', { name: 'Salvar pessoa' }).click()
+    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
   }
 }
 

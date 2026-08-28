@@ -53,7 +53,7 @@ test('pessoas, família, aniversários, busca e importações privadas funcionam
   await page.getByRole('button', { name: 'Confirmar e aplicar' }).click()
   await expect(page.getByRole('heading', { name: 'Importação concluída' })).toBeVisible()
 
-  await navigateInsideApp(page, '/app/aniversarios', page.getByRole('heading', { name: 'Aniversariantes' }))
+  await navigateInsideApp(page, '/app/aniversarios', page.getByRole('heading', { name: 'Aniversariantes', exact: true }))
   await expect(page.getByText('Pessoa Sol Fictícia')).toBeVisible()
   await page.getByRole('button', { name: 'Criar mensagem' }).click()
   await expect(page.getByLabel('Mensagem')).toHaveValue(/Pessoa/)

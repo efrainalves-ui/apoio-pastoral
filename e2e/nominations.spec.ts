@@ -16,6 +16,7 @@ async function prepare(page: Page) {
   await page.getByLabel('Nome da igreja *').fill('Igreja Fictícia de Nomeações')
   await page.getByLabel('Tipo *').selectOption('organized_church')
   await page.getByRole('button', { name: 'Salvar igreja' }).click()
+  await expect(page.getByRole('heading', { name: 'Igreja Fictícia de Nomeações', exact: true })).toBeVisible()
 
   for (const name of [
     'Pessoa Fictícia Alfa',
@@ -25,6 +26,7 @@ async function prepare(page: Page) {
     await navigateInsideApp(page, '/app/pessoas/nova', page.getByLabel('Nome completo *'))
     await page.getByLabel('Nome completo *').fill(name)
     await page.getByRole('button', { name: 'Salvar pessoa' }).click()
+    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
   }
 }
 

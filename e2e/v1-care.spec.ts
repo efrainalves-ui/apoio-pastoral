@@ -20,15 +20,18 @@ async function foundation(page: Page) {
   await page.getByLabel(/Nome da igreja/).fill('Igreja Esperança Fictícia')
   await page.getByLabel(/Tipo/).selectOption('organized_church')
   await page.getByRole('button', { name: 'Salvar igreja' }).click()
+  await expect(page.getByRole('heading', { name: 'Igreja Esperança Fictícia', exact: true })).toBeVisible()
   await navigateInsideApp(page, '/app/pessoas/nova', page.getByLabel(/Nome completo/))
   await page.getByLabel(/Nome completo/).fill('Pessoa Cuidado Fictícia')
   await page.getByLabel(/Igreja/).selectOption({ label: 'Igreja Esperança Fictícia' })
   await page.getByRole('button', { name: 'Salvar pessoa' }).click()
+  await expect(page.getByRole('heading', { name: 'Pessoa Cuidado Fictícia', exact: true })).toBeVisible()
   await navigateInsideApp(page, '/app/familias/nova', page.getByLabel(/Nome da família/))
   await page.getByLabel(/Nome da família/).fill('Família Cuidado Fictícia')
   await page.getByLabel(/Igreja principal/).selectOption({ label: 'Igreja Esperança Fictícia' })
   await page.getByText('Pessoa Cuidado Fictícia').click()
   await page.getByRole('button', { name: 'Salvar família' }).click()
+  await expect(page.getByRole('heading', { name: 'Família Cuidado Fictícia', exact: true })).toBeVisible()
 }
 
 test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento offline', async ({ page, context }) => {
