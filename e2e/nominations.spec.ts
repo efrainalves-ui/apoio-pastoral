@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { navigateInsideApp } from './navigation'
 
 async function prepare(page: Page) {
   await page.goto('/acesso')
@@ -21,8 +22,7 @@ async function prepare(page: Page) {
     'Pessoa Fictícia Beta',
     'Pessoa Fictícia Gama',
   ]) {
-    await page.locator('a[href="/app/pessoas"]').first().click()
-    await page.getByRole('link', { name: 'Nova pessoa' }).click()
+    await navigateInsideApp(page, '/app/pessoas/nova', page.getByLabel('Nome completo *'))
     await page.getByLabel('Nome completo *').fill(name)
     await page.getByRole('button', { name: 'Salvar pessoa' }).click()
   }
@@ -30,8 +30,10 @@ async function prepare(page: Page) {
 
 test('jornada completa e confidencial da Comissão de Nomeações', async ({ page }) => {
   await prepare(page)
-  await page.locator('a[href="/app/comissoes"]').first().click()
+  await navigateInsideApp(page, '/app/comissoes', page.getByRole('heading', { name: 'Comissões', exact: true }))
+  await expect(page.getByLabel('Igreja')).toContainText('Igreja Fictícia de Nomeações')
   await page.getByRole('link', { name: 'Abrir Nomeações' }).click()
+  await expect(page.getByLabel('Igreja')).toContainText('Igreja Fictícia de Nomeações')
   await page.getByRole('button', { name: 'Preparar demonstração fictícia de Nomeações' }).click()
 
   await expect(page.getByRole('heading', { name: /Nomeações/ })).toBeVisible()
@@ -48,7 +50,7 @@ test('jornada completa e confidencial da Comissão de Nomeações', async ({ pag
   await expect(page.getByText(/Recomendação aprovada/)).toBeVisible()
 
   await page.getByRole('button', { name: 'Reuniões' }).click()
-  await expect(page.getByText(/Registro confidencial/)).toBeVisible()
+  await expect(page.getByText('Registro confidencial', { exact: true })).toBeVisible()
   await expect(page.getByText(/Na Agenda/)).toBeVisible()
 
   await page.getByRole('button', { name: 'Relatório e objeções' }).click()

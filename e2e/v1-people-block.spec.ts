@@ -18,7 +18,7 @@ async function register(page: Page) {
 }
 
 async function createDistrictAndChurch(page: Page) {
-  await navigateInsideApp(page, '/app/distrito')
+  await navigateInsideApp(page, '/app/distrito', page.getByRole('heading', { name: 'Distrito Pessoas Fictício' }))
   await page.getByRole('link', { name: 'Nova igreja' }).click()
   await page.getByLabel(/Nome da igreja/).fill('Igreja Aurora Fictícia')
   await page.getByLabel(/Tipo/).selectOption('organized_church')
@@ -31,7 +31,7 @@ test('pessoas, família, aniversários, busca e importações privadas funcionam
   await createDistrictAndChurch(page)
 
   const now = new Date(); const birthday = `1990-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  await navigateInsideApp(page, '/app/pessoas/nova')
+  await navigateInsideApp(page, '/app/pessoas/nova', page.getByLabel(/Nome completo/))
   await page.getByLabel(/Nome completo/).fill('Pessoa Sol Fictícia')
   await page.getByLabel('Data de nascimento').fill(birthday)
   await page.getByLabel(/Igreja/).selectOption({ label: 'Igreja Aurora Fictícia' })
@@ -39,30 +39,30 @@ test('pessoas, família, aniversários, busca e importações privadas funcionam
   await page.getByRole('button', { name: 'Salvar pessoa' }).click()
   await expect(page.getByRole('heading', { name: 'Pessoa Sol Fictícia' })).toBeVisible()
 
-  await navigateInsideApp(page, '/app/familias/nova')
+  await navigateInsideApp(page, '/app/familias/nova', page.getByLabel(/Nome da família/))
   await page.getByLabel(/Nome da família/).fill('Família Sol Fictícia')
   await page.getByLabel(/Igreja principal/).selectOption({ label: 'Igreja Aurora Fictícia' })
   await page.getByText('Pessoa Sol Fictícia').click()
   await page.getByRole('button', { name: 'Salvar família' }).click()
   await expect(page.getByRole('heading', { name: 'Família Sol Fictícia' })).toBeVisible()
 
-  await navigateInsideApp(page, '/app/pessoas/importar')
+  await navigateInsideApp(page, '/app/pessoas/importar', page.getByRole('heading', { name: 'Importar lista de membros' }))
   await page.getByRole('button', { name: 'Usar importação fictícia simulada' }).click()
   await expect(page.getByRole('heading', { name: 'Confira antes de salvar' })).toBeVisible()
   await page.getByRole('checkbox').check()
   await page.getByRole('button', { name: 'Confirmar e aplicar' }).click()
   await expect(page.getByRole('heading', { name: 'Importação concluída' })).toBeVisible()
 
-  await navigateInsideApp(page, '/app/aniversarios')
+  await navigateInsideApp(page, '/app/aniversarios', page.getByRole('heading', { name: 'Aniversariantes' }))
   await expect(page.getByText('Pessoa Sol Fictícia')).toBeVisible()
   await page.getByRole('button', { name: 'Criar mensagem' }).click()
   await expect(page.getByLabel('Mensagem')).toHaveValue(/Pessoa/)
 
-  await navigateInsideApp(page, '/app/busca')
+  await navigateInsideApp(page, '/app/busca', page.getByRole('heading', { name: 'Busca global' }))
   await page.getByLabel(/Pessoa, família, igreja ou WhatsApp/).fill('Família Sol')
   await expect(page.getByText('Família Sol Fictícia')).toBeVisible()
 
-  await navigateInsideApp(page, '/app/fidelidade')
+  await navigateInsideApp(page, '/app/fidelidade', page.getByRole('heading', { name: 'Fidelidade nos dízimos' }))
   await page.getByRole('button', { name: 'Usar importação fictícia simulada' }).click()
   await expect(page.getByRole('heading', { name: 'Conferir fidelidade' })).toBeVisible()
   await page.getByRole('checkbox').check()

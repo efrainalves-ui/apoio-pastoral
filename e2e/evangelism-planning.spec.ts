@@ -11,14 +11,15 @@ async function registerWithFictitiousDistrict(page: Page) {
   await page.getByRole('button', { name: 'Continuar' }).click()
   await page.getByRole('button', { name: 'Cadastrar manualmente' }).click()
   await page.getByRole('link', { name: 'Ir para o início' }).click()
-  await navigateInsideApp(page, '/app/distrito/igrejas/nova')
+  await navigateInsideApp(page, '/app/distrito/igrejas/nova', page.getByLabel(/Nome da igreja/))
   await page.getByLabel(/Nome da igreja/).fill('Igreja Modelo Fictícia')
   await page.getByRole('button', { name: 'Salvar igreja' }).click()
+  await expect(page.getByRole('heading', { name: 'Igreja Modelo Fictícia' })).toBeVisible()
 }
 
 test('planeja uma meta e uma campanha integradas no computador e no celular', async ({ page }) => {
   await registerWithFictitiousDistrict(page)
-  await navigateInsideApp(page, '/app/planejamento')
+  await navigateInsideApp(page, '/app/planejamento', page.getByText('Igreja Modelo Fictícia', { exact: true }))
   await expect(page.getByRole('heading', { name: 'Planejamento Anual' })).toBeVisible()
   await page.getByRole('link', { name: 'Nova meta' }).click()
   await page.getByLabel('Título').fill('Meta Anual Fictícia')
@@ -55,7 +56,7 @@ test('planeja uma meta e uma campanha integradas no computador e no celular', as
   await page.getByRole('button', { name: 'Adicionar item' }).click()
   await expect(page.getByText('Material fictício')).toBeVisible()
 
-  await navigateInsideApp(page, '/app/agenda')
+  await navigateInsideApp(page, '/app/agenda', page.getByRole('heading', { name: 'Agenda', exact: true }))
   await expect(page.getByText('Campanha Fictícia Integrada').first()).toBeVisible()
   const horizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
   expect(horizontalOverflow).toBe(false)

@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
+import { navigateInsideApp } from './navigation'
 
 const email = 'pastor.teste@example.invalid'
 const password = 'senha-ficticia-segura-2026'
@@ -70,8 +71,8 @@ test('continua disponível offline depois do primeiro carregamento', async ({ pa
   await expect(page.getByRole('heading', { name: 'Entre na sua conta' })).toBeVisible()
   await page.getByLabel('Senha').fill(password)
   await page.getByRole('button', { name: 'Entrar' }).click()
-  await page.getByRole('link', { name: 'Agenda' }).last().click()
-  await expect(page.getByText('Compromisso Offline Fictício')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Visão do distrito' })).toBeVisible()
+  await navigateInsideApp(page, '/app/agenda', page.getByText('Compromisso Offline Fictício'))
 })
 
 test('manifesto e service worker tornam a PWA instalável', async ({ page }) => {

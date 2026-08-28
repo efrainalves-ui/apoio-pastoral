@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { navigateInsideApp } from './navigation'
 
 const email = 'bl004.e2e@example.invalid'
 const password = 'senha-ficticia-bl004-2026'
@@ -17,7 +18,7 @@ async function register(page: Page) {
 }
 
 async function openDistrict(page: Page) {
-  await page.locator('a[href="/app/distrito"]:visible').click()
+  await navigateInsideApp(page, '/app/distrito', page.getByRole('heading', { name: 'Distrito E2E Fictício' }))
 }
 
 async function createDistrictAndChurch(page: Page) {

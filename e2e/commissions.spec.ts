@@ -20,7 +20,7 @@ async function registerAndPrepareChurch(page: Page) {
   await page.getByRole('button', { name: 'Salvar igreja' }).click()
 
   for (const name of ['Ana Fictícia', 'Bruno Fictício', 'Carla Fictícia']) {
-    await navigateInsideApp(page, '/app/pessoas/nova')
+    await navigateInsideApp(page, '/app/pessoas/nova', page.getByLabel('Nome completo *'))
     await page.getByLabel('Nome completo *').fill(name)
     await page.getByLabel('Igreja *').selectOption({ label: 'Igreja Fictícia de Navegação' })
     await page.getByRole('button', { name: 'Salvar pessoa' }).click()
@@ -41,7 +41,8 @@ async function configureChurch(page: Page) {
 
 test('cartões e criação de reuniões conduzem ao fluxo correto', async ({ page }) => {
   await registerAndPrepareChurch(page)
-  await navigateInsideApp(page, '/app/comissoes')
+  await navigateInsideApp(page, '/app/comissoes', page.getByRole('heading', { name: 'Comissões', exact: true }))
+  await expect(page.getByLabel('Igreja')).toContainText('Igreja Fictícia de Navegação')
 
   await expect(page.getByRole('button', { name: 'Preparar demonstração fictícia completa' })).toHaveCount(0)
   const boardCard = page.getByRole('link', { name: 'Abrir Comissão Diretiva' })
