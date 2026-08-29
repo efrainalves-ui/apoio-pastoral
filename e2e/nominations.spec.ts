@@ -59,7 +59,7 @@ test('jornada completa e confidencial da Comissão de Nomeações', async ({ pag
   await expect(page.getByText(/versão 2/)).toBeVisible()
   await expect(page.locator('.public-report')).not.toContainText('dizimista')
   await expect(page.locator('.public-report')).not.toContainText('confidencial')
-  await expect(page.getByText('Relatório alterado')).toBeVisible()
+  await expect(page.locator('.entity-row small').filter({ hasText: 'Relatório alterado' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Votação oficial' }).click()
   await expect(page.getByText('Relatório aprovado').first()).toBeVisible()

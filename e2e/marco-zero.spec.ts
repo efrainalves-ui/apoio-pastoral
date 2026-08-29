@@ -66,6 +66,7 @@ test('continua disponível offline depois do primeiro carregamento', async ({ pa
   await page.getByRole('link', { name: 'Novo compromisso' }).click()
   await page.getByLabel('Título').fill('Compromisso Offline Fictício')
   await page.getByRole('button', { name: 'Salvar compromisso' }).click()
+  await expect(page.getByText('Compromisso Offline Fictício')).toBeVisible()
   await context.setOffline(true)
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Entre na sua conta' })).toBeVisible()

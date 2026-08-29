@@ -32,6 +32,7 @@ async function registerAndPrepareChurch(page: Page) {
 async function configureChurch(page: Page) {
   await page.getByRole('link', { name: 'Configurar igreja' }).click()
   await expect(page.getByText('Depois de salvar, você voltará automaticamente para criar a reunião.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Salvar configuração' })).toBeEnabled()
   await page.getByLabel('Quórum da Comissão Diretiva').fill('2')
   await page.getByLabel('Quórum da Reunião Administrativa').fill('3')
   await page.getByRole('checkbox', { name: 'Ana Fictícia' }).check()

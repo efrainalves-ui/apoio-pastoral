@@ -13,6 +13,7 @@ async function registerWithFictitiousDistrict(page: Page) {
   await page.getByRole('link', { name: 'Ir para o início' }).click()
   await navigateInsideApp(page, '/app/distrito/igrejas/nova', page.getByLabel(/Nome da igreja/))
   await page.getByLabel(/Nome da igreja/).fill('Igreja Modelo Fictícia')
+  await page.getByLabel(/Tipo/).selectOption('organized_church')
   await page.getByRole('button', { name: 'Salvar igreja' }).click()
   await expect(page.getByRole('heading', { name: 'Igreja Modelo Fictícia' })).toBeVisible()
 }
