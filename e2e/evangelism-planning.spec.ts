@@ -50,7 +50,7 @@ test('planeja uma meta e uma campanha integradas no computador e no celular', as
   await page.getByLabel('Prazo').last().fill('2026-09-01')
   await page.getByText('Aparecer como lembrete na Agenda').click()
   await page.getByRole('button', { name: 'Criar tarefa' }).click()
-  await expect(page.getByText('Preparar recepção fictícia')).toBeVisible()
+  await expect(page.locator('.campaign-task-list article').filter({ hasText: 'Preparar recepção fictícia' })).toBeVisible()
 
   await page.getByLabel('Descrição', { exact: true }).fill('Material fictício')
   await page.getByLabel('Valor', { exact: true }).fill('120')

@@ -36,13 +36,13 @@ async function foundation(page: Page) {
 
 test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento offline', async ({ page, context }) => {
   await foundation(page)
-  const appointment = new Date(); appointment.setDate(appointment.getDate() + (appointment.getDay() === 0 ? 2 : 1)); if (appointment.getDay() === 1) appointment.setDate(appointment.getDate() + 1); appointment.setHours(14, 0, 0, 0); const end = new Date(appointment); end.setHours(15)
+  const appointment = new Date(); if (appointment.getDay() === 1) appointment.setDate(appointment.getDate() + 1); appointment.setHours(14, 0, 0, 0); const end = new Date(appointment); end.setHours(15)
   await navigateInsideApp(page, '/app/agenda/novo', page.getByLabel('Título'))
   await page.getByLabel('Título').fill('Visita Agendada Fictícia')
   await page.getByLabel('Início').fill(localInput(appointment))
   await page.getByLabel('Término').fill(localInput(end))
   await page.getByRole('button', { name: 'Salvar compromisso' }).click()
-  await expect(page.getByText('Visita Agendada Fictícia')).toBeVisible()
+  await expect(page.getByRole('link', { name: /Abrir Visita Agendada Fictícia/ })).toBeVisible()
   await navigateInsideApp(page, '/app/cuidados', page.getByText('Família Cuidado Fictícia', { exact: true }))
   await page.getByLabel('Nome da rodada').fill('Rodada Cuidado Fictícia')
   await page.getByText('Família Cuidado Fictícia').click()
