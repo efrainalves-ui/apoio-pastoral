@@ -5,6 +5,12 @@ import { navigateInsideApp } from './navigation'
 const email = 'pastor.teste@example.invalid'
 const password = 'senha-ficticia-segura-2026'
 
+function localDateTime(date: Date): string {
+  const value = new Date(date)
+  value.setMinutes(value.getMinutes() - value.getTimezoneOffset())
+  return value.toISOString().slice(0, 16)
+}
+
 async function register(page: Page) {
   await page.goto('/acesso')
   await page.getByLabel('E-mail').fill(email)
@@ -65,7 +71,17 @@ test('continua disponível offline depois do primeiro carregamento', async ({ pa
   await register(page)
   await page.getByRole('link', { name: 'Novo compromisso' }).click()
   await page.getByLabel('Título').fill('Compromisso Offline Fictício')
-  await page.getByRole('button', { name: 'Salvar compromisso' }).click()
+  const appointment = new Date()
+  do appointment.setDate(appointment.getDate() + 1)
+  while (appointment.getDay() === 1)
+  appointment.setHours(14, 0, 0, 0)
+  const appointmentEnd = new Date(appointment)
+  appointmentEnd.setHours(15)
+  await page.getByLabel('Início').fill(localDateTime(appointment))
+  await page.getByLabel('Término').fill(localDateTime(appointmentEnd))
+  const saveAppointment = page.getByRole('button', { name: 'Salvar compromisso' })
+  await expect(saveAppointment).toBeEnabled()
+  await saveAppointment.click()
   await expect(page.getByText('Compromisso Offline Fictício')).toBeVisible()
   await context.setOffline(true)
   await page.reload()

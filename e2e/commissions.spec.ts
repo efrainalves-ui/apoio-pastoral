@@ -45,7 +45,8 @@ async function configureChurch(page: Page) {
 test('cartões e criação de reuniões conduzem ao fluxo correto', async ({ page }) => {
   await registerAndPrepareChurch(page)
   await navigateInsideApp(page, '/app/comissoes', page.getByRole('heading', { name: 'Comissões', exact: true }))
-  await expect(page.getByLabel('Igreja', { exact: true })).toContainText('Igreja Fictícia de Navegação')
+  const commissionChurch = page.getByRole('combobox', { name: /^Igreja(?:$|\s)/ })
+  await expect(commissionChurch).toContainText('Igreja Fictícia de Navegação')
 
   await expect(page.getByRole('button', { name: 'Preparar demonstração fictícia completa' })).toHaveCount(0)
   const boardCard = page.getByRole('link', { name: 'Abrir Comissão Diretiva' })

@@ -33,9 +33,10 @@ async function prepare(page: Page) {
 test('jornada completa e confidencial da Comissão de Nomeações', async ({ page }) => {
   await prepare(page)
   await navigateInsideApp(page, '/app/comissoes', page.getByRole('heading', { name: 'Comissões', exact: true }))
-  await expect(page.getByLabel('Igreja', { exact: true })).toContainText('Igreja Fictícia de Nomeações')
+  const nominationsChurch = page.getByRole('combobox', { name: /^Igreja(?:$|\s)/ })
+  await expect(nominationsChurch).toContainText('Igreja Fictícia de Nomeações')
   await page.getByRole('link', { name: 'Abrir Nomeações' }).click()
-  await expect(page.getByLabel('Igreja', { exact: true })).toContainText('Igreja Fictícia de Nomeações')
+  await expect(nominationsChurch).toContainText('Igreja Fictícia de Nomeações')
   await page.getByRole('button', { name: 'Preparar demonstração fictícia de Nomeações' }).click()
 
   await expect(page.getByRole('heading', { name: /Nomeações/ })).toBeVisible()

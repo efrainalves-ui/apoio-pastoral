@@ -48,7 +48,7 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   await page.getByText('Família Cuidado Fictícia').click()
   await page.getByRole('button', { name: 'Iniciar rodada' }).click()
   await expect(page.getByText('0 de 1 famílias visitadas')).toBeVisible()
-  const visitChurch = page.getByLabel('Igreja', { exact: true })
+  const visitChurch = page.getByRole('combobox', { name: /^Igreja(?:$|\s)/ })
   await navigateInsideApp(page, '/app/visitas/nova', visitChurch)
   await visitChurch.selectOption({ label: 'Igreja Esperança Fictícia' })
   await expect(page.getByLabel('Cadastro visitado')).toContainText('Família Cuidado Fictícia')
