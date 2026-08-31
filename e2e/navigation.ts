@@ -1,26 +1,33 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 
+async function isInsideViewport(page: Page, locator: Locator): Promise<boolean> {
+  const [box, viewport] = await Promise.all([locator.boundingBox(), Promise.resolve(page.viewportSize())])
+  if (!box || !viewport) return false
+
+  const centerX = box.x + box.width / 2
+  const centerY = box.y + box.height / 2
+  return centerX >= 0 && centerX <= viewport.width && centerY >= 0 && centerY <= viewport.height
+}
+
 async function clickVisibleLink(page: Page, path: string): Promise<boolean> {
   const links = page.locator(`a[href="${path}"]`)
   for (let index = 0; index < await links.count(); index += 1) {
     const link = links.nth(index)
-    if (await link.isVisible()) {
+    if (await link.isVisible() && await isInsideViewport(page, link)) {
       await link.click()
       return true
     }
   }
 
   const openMenu = page.getByRole('button', { name: 'Abrir menu' })
-  const sidebarLink = page.getByLabel('Navegação principal', { exact: true }).locator(`a[href="${path}"]`)
+  const sidebar = page.getByLabel('Navegação principal', { exact: true })
+  const sidebarLink = sidebar.locator(`a[href="${path}"]`)
   if (await sidebarLink.count() > 0 && await openMenu.isVisible()) {
     await openMenu.click()
-    for (let index = 0; index < await sidebarLink.count(); index += 1) {
-      const link = sidebarLink.nth(index)
-      if (await link.isVisible()) {
-        await link.click()
-        return true
-      }
-    }
+    await expect(sidebar).toHaveClass(/sidebar--open/)
+    await expect(sidebarLink.first()).toBeInViewport({ ratio: 1 })
+    await sidebarLink.first().click()
+    return true
   }
 
   return false
