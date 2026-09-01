@@ -21,6 +21,8 @@ import {
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { GlobalSearchField } from './GlobalSearchField'
+import { QuickActions } from './QuickActions'
 import { Button } from './ui/Button'
 
 const primaryNav = [
@@ -40,7 +42,16 @@ const primaryNav = [
   { to: '/app/mais', label: 'Mais', icon: MoreHorizontal },
 ]
 
-const mobileNav = primaryNav.filter(({ label }) => ['Início', 'Agenda', 'Pessoas e famílias', 'Visitas e cuidados', 'Mais'].includes(label))
+// A Bíblia do Produto define estas cinco entradas, nesta ordem, com rótulos
+// curtos para caber no celular. Visitas e cuidados continua a um toque pelo
+// Início, por "Mais" e pelos vínculos de cada pessoa e família.
+const mobileNav = [
+  { to: '/app', label: 'Início', icon: Home, end: true },
+  { to: '/app/agenda', label: 'Agenda', icon: CalendarDays, end: false },
+  { to: '/app/pessoas', label: 'Pessoas', icon: Users, end: false },
+  { to: '/app/distrito', label: 'Distrito', icon: Church, end: false },
+  { to: '/app/mais', label: 'Mais', icon: MoreHorizontal, end: false },
+]
 
 export function AppShell() {
   const { account, lock } = useAuthVault()
@@ -77,10 +88,12 @@ export function AppShell() {
       </aside>
       {open && <button className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setOpen(false)} />}
       <div className="app-main">
-        <header className="mobile-header">
-          <button className="icon-button" aria-label="Abrir menu" onClick={() => setOpen(true)}><Menu /></button>
-          <span>Apoio Pastoral</span>
-          <button className="icon-button" aria-label="Sair" onClick={leave}><LogOut /></button>
+        <header className="app-header">
+          <button className="icon-button app-header__menu" aria-label="Abrir menu" onClick={() => setOpen(true)}><Menu /></button>
+          <span className="app-header__brand">Apoio Pastoral</span>
+          <GlobalSearchField />
+          <QuickActions />
+          <button className="icon-button app-header__leave" aria-label="Sair" onClick={leave}><LogOut /></button>
         </header>
         <main id="conteudo" className="content" tabIndex={-1}><Outlet /></main>
         <nav className="bottom-nav" aria-label="Navegação principal móvel">

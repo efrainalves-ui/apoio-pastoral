@@ -5,8 +5,8 @@ import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { EncryptedMutation } from '../db/repository'
 import type { VaultRecord } from '../db/types'
-import { agendaText, canDeliberate, minutesText, voteNumber, voteResult } from './core'
-import type { CommissionAgendaItem, CommissionConfigData, CommissionEntity, CommissionMeetingData, CommissionTaskData, TaskStatus } from './types'
+import { agendaText, canDeliberate, minutesText, presidentMayBreakTie, tieBreakNote, voteNumber, voteResult } from './core'
+import type { CommissionAgendaItem, CommissionConfigData, CommissionEntity, CommissionMeetingData, CommissionTaskData, TaskStatus, PresidentTieBreak } from './types'
 
 const now = () => new Date().toISOString()
 
@@ -69,7 +69,7 @@ export class CommissionService {
     return { id, ...normalized }
   }
 
-  async confirmVote(accountId: string, masterKey: CryptoKey, meetingId: string, itemId: string, favorable: number, against: number, abstentions: number): Promise<CommissionEntity<CommissionMeetingData>> {
+  async confirmVote(accountId: string, masterKey: CryptoKey, meetingId: string, itemId: string, favorable: number, against: number, abstentions: number, presidentVoted = false, presidentTieBreak: PresidentTieBreak = null): Promise<CommissionEntity<CommissionMeetingData>> {
     const meeting = await this.meeting(accountId, masterKey, meetingId)
     if (!meeting) throw new Error('Reunião não encontrada.')
     if (meeting.finalizedAt) throw new Error('A ata finalizada está protegida e não pode ser alterada.')
@@ -84,14 +84,21 @@ export class CommissionService {
     if (favorable + against + abstentions > present) throw new Error('O total de votos não pode superar as pessoas com direito a voto.')
     const hasQuorum = canDeliberate(present, quorum)
     if (!hasQuorum && item.decisionType !== 'record') throw new Error('Não há quórum para deliberar este assunto.')
-    const result = voteResult(favorable, against, abstentions, hasQuorum, item.decisionType === 'record')
+    // RN-025: o voto de qualidade do presidente só entra em empate e só se ele
+    // ainda não tiver votado na contagem comum.
+    if (presidentTieBreak && !presidentMayBreakTie(favorable, against, presidentVoted)) {
+      throw new Error(presidentVoted
+        ? 'O presidente já votou nesta contagem e não pode votar de novo para desempatar.'
+        : 'O voto de desempate do presidente só vale quando a votação termina empatada.')
+    }
+    const result = voteResult(favorable, against, abstentions, hasQuorum, item.decisionType === 'record', presidentTieBreak)
     const sequence = meeting.kind === 'board' ? config.nextBoardVote : config.nextAdministrativeVote
     const numbered = result === 'approved' || result === 'recorded'
     const number = numbered ? voteNumber(config.year, sequence) : undefined
     const timestamp = now()
     const agenda = meeting.agenda.map((entry) => entry.id === itemId ? {
       ...entry,
-      vote: { favorable, against, abstentions, result, ...(number ? { voteNumber: number } : {}), finalText: entry.proposal, confirmedAt: timestamp },
+      vote: { favorable, against, abstentions, result, ...(number ? { voteNumber: number } : {}), finalText: entry.proposal, confirmedAt: timestamp, presidentVoted, presidentTieBreak },
     } : entry)
     const meetingData: CommissionMeetingData = { ...meeting, agenda, updatedAt: timestamp }
     const configData: CommissionConfigData = {
@@ -187,6 +194,6 @@ export class CommissionService {
 
   minutesDocument(meeting: CommissionEntity<CommissionMeetingData>, churchName: string, quorum: number, personName: (id: string) => string = (id) => id): string {
     const present = meeting.participantIds.length + meeting.votingGuestNames.length
-    return [churchName, meeting.kind === 'board' ? 'Ata da Comissão Diretiva' : 'Ata da Reunião Administrativa', `Data: ${meeting.date} · Horário: ${meeting.time || 'a confirmar'} · Local: ${meeting.location || 'a confirmar'}`, `Presidente: ${personName(meeting.presidentId)} · Secretário(a): ${personName(meeting.secretaryId)}`, `Participantes: ${meeting.participantIds.map(personName).join(', ') || 'Nenhum informado'}`, `Quórum: ${present} presentes com voto; mínimo ${quorum}. ${canDeliberate(present, quorum) ? 'Quórum confirmado.' : 'Sem quórum.'}`, ...meeting.agenda.filter((item) => item.vote).map((item) => `${item.vote?.voteNumber ?? 'Decisão sem número'} · ${minutesText(item)}\nFavoráveis: ${item.vote?.favorable}; contrários: ${item.vote?.against}; abstenções: ${item.vote?.abstentions}. Resultado: ${item.vote?.result}.`), meeting.notes ? `Observações: ${meeting.notes}` : '', `Assinaturas:\n${personName(meeting.presidentId)} — Presidente\n${personName(meeting.secretaryId)} — Secretário(a)`].filter(Boolean).join('\n\n')
+    return [churchName, meeting.kind === 'board' ? 'Ata da Comissão Diretiva' : 'Ata da Reunião Administrativa', `Data: ${meeting.date} · Horário: ${meeting.time || 'a confirmar'} · Local: ${meeting.location || 'a confirmar'}`, `Presidente: ${personName(meeting.presidentId)} · Secretário(a): ${personName(meeting.secretaryId)}`, `Participantes: ${meeting.participantIds.map(personName).join(', ') || 'Nenhum informado'}`, `Quórum: ${present} presentes com voto; mínimo ${quorum}. ${canDeliberate(present, quorum) ? 'Quórum confirmado.' : 'Sem quórum.'}`, ...meeting.agenda.filter((item) => item.vote).map((item) => `${item.vote?.voteNumber ?? 'Decisão sem número'} · ${minutesText(item)}\nFavoráveis: ${item.vote?.favorable}; contrários: ${item.vote?.against}; abstenções: ${item.vote?.abstentions}. Resultado: ${item.vote?.result}.${item.vote?.presidentTieBreak ? `\n${tieBreakNote(item.vote.presidentTieBreak)}` : ''}`), meeting.notes ? `Observações: ${meeting.notes}` : '', `Assinaturas:\n${personName(meeting.presidentId)} — Presidente\n${personName(meeting.secretaryId)} — Secretário(a)`].filter(Boolean).join('\n\n')
   }
 }

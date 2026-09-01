@@ -46,14 +46,10 @@ Repita a seção inteira em cada aparelho.
 |---|---|---|---|
 | 4.1 | Sem rede nos dois, editar o **mesmo** registro no computador e no celular | Ambos aceitam a edição localmente | Algum trava ou perde a edição |
 | 4.2 | Religar a rede e sincronizar os dois | O aplicativo sinaliza o conflito e preserva as duas versões | Uma versão desaparece sem aviso |
-| 4.3 | Abrir Sincronização nos dois aparelhos | Cada um mostra a contagem em "Revisões pendentes" e o aviso de alterações concorrentes | O conflito não é sinalizado |
-| 4.4 | Conferir o registro local em cada aparelho | Cada aparelho continua mostrando a própria versão, intacta | Alguma versão foi substituída sem aviso |
-
-> **Limite conhecido desta versão.** O aplicativo preserva e sinaliza o conflito,
-> mas ainda não tem uma tela para escolher qual versão prevalece. A versão
-> concorrente fica guardada para revisão e nada é apagado. Registre o conflito
-> na evidência da rodada e siga em frente; decidir como resolvê-lo pela
-> interface é um passo posterior.
+| 4.3 | Abrir Sincronização e clicar em "Revisar agora" | A tela mostra as duas versões lado a lado, com um resumo legível de cada uma | Alguma versão não aparece ou vem em linguagem técnica |
+| 4.4 | Escolher "Manter as duas" | As duas passam a existir como registros separados | Alguma versão some |
+| 4.5 | Em um novo conflito, escolher "Ficar com a do outro aparelho" | A versão escolhida passa a valer e a outra continua guardada no histórico | A versão preterida é apagada |
+| 4.6 | Conferir o histórico de revisões | Mostra quantas revisões já foram resolvidas | O histórico não registra nada |
 
 ## 5. Revogação de dispositivo
 

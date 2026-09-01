@@ -1,6 +1,6 @@
 import { ArrowLeft, Church, Search, UserRound, UsersRound } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Card } from '../components/ui/Card'
 import { DistrictService } from '../district/service'
@@ -13,7 +13,7 @@ import { normalizePersonName, normalizePhone } from '../people/validation'
 
 const peopleService = new PeopleService(); const familyService = new FamilyService(); const districtService = new DistrictService()
 export function SearchPage() {
-  const { account, masterKey } = useAuthVault(); const [people, setPeople] = useState<PersonEntity[]>([]); const [families, setFamilies] = useState<FamilyEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [query, setQuery] = useState(''); const [loading, setLoading] = useState(true)
+  const { account, masterKey } = useAuthVault(); const [people, setPeople] = useState<PersonEntity[]>([]); const [families, setFamilies] = useState<FamilyEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [params] = useSearchParams(); const [query, setQuery] = useState(params.get('termo') ?? ''); const [loading, setLoading] = useState(true)
   const load = useCallback(async () => { if (!account || !masterKey) return; const district = await districtService.getDistrict(account.id, masterKey); const [nextPeople, nextFamilies, nextChurches] = await Promise.all([peopleService.listPeople(account.id, masterKey), familyService.listFamilies(account.id, masterKey), district ? districtService.listChurches(account.id, masterKey, district.id) : []]); setPeople(nextPeople); setFamilies(nextFamilies); setChurches(nextChurches); setLoading(false) }, [account, masterKey]); useEffect(() => { void load() }, [load])
   const results = useMemo(() => { const text = normalizePersonName(query); const phone = normalizePhone(query); if (text.length < 2 && phone.length < 3) return { people: [], families: [], churches: [] }; return { people: people.filter((person) => normalizePersonName(person.name).includes(text) || Boolean(phone && person.whatsapp.includes(phone))), families: families.filter((family) => normalizePersonName(family.name).includes(text)), churches: churches.filter((church) => normalizePersonName(church.name).includes(text)) } }, [churches, families, people, query]); const total = results.people.length + results.families.length + results.churches.length
   if (loading) return <div className="app-loading">Preparando busca local…</div>

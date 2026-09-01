@@ -65,7 +65,12 @@ export interface SyncConflictRecord {
   remoteOperation: 'upsert' | 'delete'
   remotePayload: CipherEnvelope
   createdAt: string
-  status: 'pending'
+  status: 'pending' | 'resolved'
+  /** Escolha do pastor ao resolver; a versão preterida continua guardada aqui. */
+  choice?: 'keep_local' | 'keep_remote' | 'keep_both'
+  resolvedAt?: string
+  localPayload?: CipherEnvelope
+  keptRecordId?: string
 }
 
 export interface MigrationRecord {

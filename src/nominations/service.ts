@@ -7,7 +7,7 @@ import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { VaultRecord } from '../db/types'
 import type { PersonEntity } from '../people/types'
-import { COMMON_OFFICES, candidateReady, fidelityNeedsReview, internalVote, officeDefault, publicReport, publicReportText } from './core'
+import { COMMON_OFFICES, candidateReady, defaultFinalReport, defaultMeetingAgenda, defaultMeetingMinutes, fidelityNeedsReview, internalVote, officeDefault, publicReport, publicReportText } from './core'
 import type { CandidateStatus, NominationCandidate, NominationFormation, NominationMeeting, NominationObjection, NominationOfficialVote, NominationOffice, NominationProcessData, NominationProcessEntity, NominationReportVersion, NominationStatus, NominationTask, ObjectionDecision, OfficialVenue, OfficialVoteMode } from './types'
 
 const now = () => new Date().toISOString()
@@ -98,6 +98,31 @@ export class NominationService {
   }
 
   reportText(churchName: string, process: NominationProcessEntity, report: NominationReportVersion): string { return publicReportText(churchName, process, report) }
+  /** Modelo de pauta: usa o texto salvo pelo pastor ou o modelo pastoral padrão. */
+  meetingAgendaTemplate(churchName: string, process: NominationProcessEntity, meeting: NominationMeeting, personName: (id: string) => string): string {
+    return meeting.agendaTemplate?.trim() ? meeting.agendaTemplate : defaultMeetingAgenda(churchName, process, meeting, personName)
+  }
+
+  /** Modelo de ata: usa o texto salvo pelo pastor ou o modelo pastoral padrão. */
+  meetingMinutesTemplate(churchName: string, process: NominationProcessEntity, meeting: NominationMeeting, personName: (id: string) => string): string {
+    return meeting.minutesTemplate?.trim() ? meeting.minutesTemplate : defaultMeetingMinutes(churchName, process, meeting, personName)
+  }
+
+  /** Modelo do relatório final: usa o texto salvo pelo pastor ou o padrão. */
+  finalReportTemplate(churchName: string, process: NominationProcessEntity, report: NominationReportVersion): string {
+    return report.reportTemplate?.trim() ? report.reportTemplate : defaultFinalReport(churchName, process, report)
+  }
+
+  async saveMeetingTemplates(accountId: string, masterKey: CryptoKey, processId: string, meetingId: string, patch: { agendaTemplate?: string; minutesTemplate?: string }): Promise<NominationProcessEntity> {
+    const process = await this.required(accountId, masterKey, processId)
+    return this.persist(accountId, masterKey, { ...process, meetings: process.meetings.map((meeting) => meeting.id === meetingId ? { ...meeting, ...patch } : meeting) })
+  }
+
+  async saveReportTemplate(accountId: string, masterKey: CryptoKey, processId: string, reportId: string, text: string): Promise<NominationProcessEntity> {
+    const process = await this.required(accountId, masterKey, processId)
+    return this.persist(accountId, masterKey, { ...process, reports: process.reports.map((report) => report.id === reportId ? { ...report, reportTemplate: text } : report) })
+  }
+
   internalAgenda(process: NominationProcessEntity, meeting: NominationMeeting, personName: (id: string) => string): string { return [`Comissão de Nomeações - ${process.period}`, `Data: ${meeting.date} · ${meeting.time || 'horário a definir'} · ${meeting.location || 'local a definir'}`, `Presidente: ${personName(meeting.presidentId)} · Secretário(a): ${personName(meeting.secretaryId)}`, `Quórum: ${meeting.participantIds.length} presentes; mínimo ${meeting.quorum}`, ...meeting.agenda.map((item, index) => `${index + 1}. ${item}`)].join('\n\n') }
   internalRecord(process: NominationProcessEntity, meeting: NominationMeeting, personName: (id: string) => string): string { return [`Registro confidencial - Comissão de Nomeações - ${process.period}`, `Data: ${meeting.date} · ${meeting.time || 'horário a definir'} · ${meeting.location || 'local a definir'}`, `Participantes: ${meeting.participantIds.map(personName).join(', ')}`, `Quórum: ${meeting.participantIds.length} presentes; mínimo ${meeting.quorum}`, meeting.confidentialNotes ? `Observações confidenciais: ${meeting.confidentialNotes}` : '', ...process.candidates.filter((candidate) => candidate.vote).map((candidate) => `${personName(candidate.personId)}: ${candidate.vote?.favorable} favoráveis, ${candidate.vote?.against} contrários, ${candidate.vote?.abstentions} abstenções; resultado ${decisionText(candidate.vote?.result ?? 'deferred')}.`), `Assinaturas: ${personName(meeting.presidentId)} e ${personName(meeting.secretaryId)}`].filter(Boolean).join('\n\n') }
   officialAgenda(process: NominationProcessEntity, vote: NominationOfficialVote): string { return [`Votação oficial - Comissão de Nomeações`, `Período: ${process.period}`, `Data: ${vote.date} · ${vote.time || 'horário a definir'} · ${vote.location || 'local a definir'}`, `PROPÕE-SE aprovar e registrar o relatório da Comissão de Nomeações para o período ${process.period}.`].join('\n\n') }

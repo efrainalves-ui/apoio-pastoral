@@ -1,5 +1,6 @@
 import { Cloud, CloudOff, RefreshCw, ShieldCheck } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { currentDeviceId } from '../auth/device'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -56,7 +57,7 @@ export function SyncPage() {
       <Card title="Sincronização manual" action={navigator.onLine ? <Cloud /> : <CloudOff />}>
         <p className="card-copy">{transport.name === 'disabled' ? 'A sincronização não está habilitada. Suas informações permanecem somente neste dispositivo.' : 'Se houver uma interrupção, as alterações pendentes serão mantidas para uma nova tentativa.'}</p>
         {summary && <div className="alert alert--success" role="status">Envio: {summary.pushed}. Recebimento: {summary.pulled}. Conflitos: {summary.conflicts}.</div>}
-        {conflicts > 0 && <div className="alert alert--warning" role="status">Há alterações concorrentes preservadas para revisão. Nenhuma versão foi apagada automaticamente.</div>}
+        {conflicts > 0 && <div className="alert alert--warning" role="status">Há alterações concorrentes preservadas para revisão. Nenhuma versão foi apagada automaticamente. <Link className="text-link" to="/app/sincronizacao/conflitos">Revisar agora</Link></div>}
         {error && <div className="alert alert--error" role="alert">{error}</div>}
         <Button onClick={() => void synchronize()} disabled={busy || transport.name === 'disabled'} icon={<RefreshCw className={busy ? 'spin' : ''} size={18} />}>{transport.name === 'disabled' ? 'Sincronização desativada' : busy ? 'Sincronizando…' : 'Sincronizar agora'}</Button>
       </Card>

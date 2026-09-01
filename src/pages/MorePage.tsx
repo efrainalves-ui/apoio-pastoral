@@ -1,4 +1,4 @@
-import { ArchiveRestore, BookHeart, Cake, CalendarRange, ChevronRight, Cloud, FileText, FileUp, Heart, HeartHandshake, Library, LockKeyhole, Megaphone, Search, ShieldCheck, UsersRound, WalletCards } from 'lucide-react'
+import { ArchiveRestore, BookHeart, Cake, CalendarRange, ChevronRight, Cloud, FileText, FileUp, GitCompare, Heart, HeartHandshake, Library, LockKeyhole, Megaphone, Search, ShieldCheck, UsersRound, WalletCards } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/ui/Card'
 
@@ -29,6 +29,8 @@ const groups = [
     { to: '/app/backup', icon: ArchiveRestore, title: 'Backup', detail: 'Criar ou restaurar uma cópia' },
     { to: '/app/seguranca', icon: LockKeyhole, title: 'Segurança', detail: 'Senha e dispositivos' },
     { to: '/app/sincronizacao', icon: Cloud, title: 'Sincronização', detail: 'Acompanhe suas atualizações' },
+    { to: '/app/sincronizacao/conflitos', icon: GitCompare, title: 'Revisar alterações concorrentes', detail: 'Escolha o que fica quando dois aparelhos mudam o mesmo registro' },
+    { to: '/app/visitas', icon: HeartHandshake, title: 'Visitas e cuidados', detail: 'Rodadas, acompanhamentos e visitas' },
   ] },
 ]
 

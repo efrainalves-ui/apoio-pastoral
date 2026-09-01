@@ -1,6 +1,6 @@
 import { requiredMajority, voteResult } from '../commissions/core'
 import type { PersonEntity } from '../people/types'
-import type { NominationCandidate, NominationOffice, NominationProcessData, NominationReportVersion } from './types'
+import type { NominationCandidate, NominationMeeting, NominationOffice, NominationProcessData, NominationReportVersion } from './types'
 
 export const COMMON_OFFICES: Array<{ area: string; title: string; vacancies: number }> = [
   { area: 'Anciãos', title: 'Ancião(ã)', vacancies: 2 }, { area: 'Secretaria', title: 'Secretário(a)', vacancies: 1 }, { area: 'Tesouraria', title: 'Tesoureiro(a)', vacancies: 1 }, { area: 'Diaconato', title: 'Diácono/Diaconisa', vacancies: 4 },
@@ -17,3 +17,72 @@ export function processMetrics(process: NominationProcessData) { const active = 
 export function publicReport(process: NominationProcessData, people: PersonEntity[]): Omit<NominationReportVersion, 'id' | 'version' | 'createdAt'> { const lines = process.candidates.filter(candidateReady).map((candidate) => ({ officeId: candidate.officeId, officeTitle: process.offices.find((office) => office.id === candidate.officeId)?.title ?? 'Cargo', personId: candidate.personId, personName: people.find((person) => person.id === candidate.personId)?.name ?? 'Pessoa cadastrada' })); const openOffices = process.offices.filter((office) => office.status === 'open' && lines.filter((line) => line.officeId === office.id).length < office.vacancies).map((office) => office.title); return { presentationDate: '', officialVoteDate: '', lines, openOffices, publicNote: '' } }
 export function publicReportText(churchName: string, process: NominationProcessData, report: NominationReportVersion): string { return [churchName, 'Relatório da Comissão de Nomeações', `Período: ${process.period}`, report.presentationDate ? `Data de apresentação: ${report.presentationDate}` : 'Data de apresentação: a definir', ...report.lines.map((line) => `${line.officeTitle}: ${line.personName}`), ...(report.openOffices.length ? ['Vagas ainda abertas:', ...report.openOffices.map((office) => `- ${office}`)] : []), report.publicNote].filter(Boolean).join('\n\n') }
 export function officeDefault(area: string, title: string, vacancies = 1): NominationOffice { return { id: crypto.randomUUID(), area, title, vacancies, multiplePeople: vacancies > 1, description: '', status: 'open', indicatedByOtherCommittee: false, officialStatus: 'pending' } }
+
+/**
+ * Modelos pastorais padrão da Comissão de Nomeações.
+ *
+ * A estrutura segue a prática descrita no Manual da Igreja: a comissão prepara
+ * a lista de indicados, ouve os membros que queiram sugerir ou objetar, e o
+ * relatório é apresentado à igreja em duas leituras antes da votação. As
+ * discussões da comissão são confidenciais.
+ *
+ * Todo o texto é apenas um ponto de partida: o pastor edita livremente e o que
+ * ele salvar passa a valer no lugar deste modelo.
+ */
+export function defaultMeetingAgenda(churchName: string, process: NominationProcessData, meeting: NominationMeeting, personName: (id: string) => string): string {
+  return [
+    `${churchName} · Comissão de Nomeações`,
+    `Pauta da reunião · Período ${process.period}`,
+    `Data: ${meeting.date || 'a definir'} · Horário: ${meeting.time || 'a definir'} · Local: ${meeting.location || 'a definir'}`,
+    `Presidente: ${personName(meeting.presidentId)} · Secretário(a): ${personName(meeting.secretaryId)}`,
+    `Quórum: ${meeting.participantIds.length} presentes; mínimo ${meeting.quorum}.`,
+    '1. Oração inicial e leitura devocional.',
+    '2. Lembrete de confidencialidade: tudo o que for tratado aqui não sai desta comissão.',
+    '3. Conferência do quórum e das presenças.',
+    '4. Leitura da lista de cargos a preencher no período.',
+    '5. Análise dos nomes indicados, cargo a cargo.',
+    '6. Confirmação de que cada indicado é membro em situação regular e de que a fidelidade foi conferida com discrição.',
+    '7. Audiência dos membros que pediram para sugerir ou objetar, se houver.',
+    '8. Consentimento dos indicados: quem fala com cada pessoa e até quando.',
+    '9. Definição da lista que será apresentada à igreja.',
+    '10. Data da primeira leitura do relatório e prazo para objeções.',
+    ...meeting.agenda.map((item, index) => `${index + 11}. ${item}`),
+    meeting.nextMeetingDate ? `Próxima reunião: ${meeting.nextMeetingDate}` : '',
+    'Oração final.',
+  ].filter(Boolean).join('\n\n')
+}
+
+export function defaultMeetingMinutes(churchName: string, process: NominationProcessData, meeting: NominationMeeting, personName: (id: string) => string): string {
+  return [
+    `${churchName} · Comissão de Nomeações`,
+    `Ata da reunião · Período ${process.period}`,
+    `Data: ${meeting.date || 'a definir'} · Horário: ${meeting.time || 'a definir'} · Local: ${meeting.location || 'a definir'}`,
+    `Presidente: ${personName(meeting.presidentId)} · Secretário(a): ${personName(meeting.secretaryId)}`,
+    `Presentes: ${meeting.participantIds.map(personName).join(', ') || 'a registrar'}`,
+    meeting.guestNames.length ? `Convidados: ${meeting.guestNames.join(', ')}` : '',
+    `Quórum: ${meeting.participantIds.length} presentes; mínimo ${meeting.quorum}. ${meeting.participantIds.length >= meeting.quorum ? 'Quórum confirmado.' : 'Sem quórum.'}`,
+    meeting.openingPrayer ? `Oração inicial: ${meeting.openingPrayer}` : 'Oração inicial: a registrar.',
+    meeting.reflection ? `Reflexão: ${meeting.reflection}` : '',
+    'Decisões por cargo:',
+    ...process.candidates.filter(candidateReady).map((candidate) => `- ${process.offices.find((office) => office.id === candidate.officeId)?.title ?? 'Cargo'}: ${personName(candidate.personId)} — recomendado.`),
+    'Encaminhamentos: quem procura cada indicado para obter o consentimento e até quando.',
+    'Membros ouvidos nesta reunião: registrar apenas que foram ouvidos, sem detalhar o conteúdo.',
+    'A comissão reafirma que suas consultas e discussões são confidenciais.',
+    `Assinaturas:\n${personName(meeting.presidentId)} — Presidente\n${personName(meeting.secretaryId)} — Secretário(a)`,
+  ].filter(Boolean).join('\n\n')
+}
+
+export function defaultFinalReport(churchName: string, process: NominationProcessData, report: NominationReportVersion): string {
+  return [
+    `${churchName} · Comissão de Nomeações`,
+    `Relatório final · Período ${process.period} · Versão ${report.version}`,
+    report.presentationDate ? `Primeira leitura: ${report.presentationDate}` : 'Primeira leitura: a definir',
+    report.officialVoteDate ? `Votação pela igreja: ${report.officialVoteDate}` : 'Votação pela igreja: a definir, uma ou duas semanas após a primeira leitura',
+    'Nomes indicados:',
+    ...report.lines.map((line) => `- ${line.officeTitle}: ${line.personName}`),
+    ...(report.openOffices.length ? ['Cargos ainda em aberto:', ...report.openOffices.map((office) => `- ${office}`)] : []),
+    'Objeções: quem quiser apresentar observações deve procurar o presidente da comissão ou o pastor antes da segunda leitura. A comissão ouvirá cada pessoa e decidirá se muda a recomendação.',
+    'A aprovação de cada nome se dá por maioria dos membros presentes que votarem.',
+    report.publicNote,
+  ].filter(Boolean).join('\n\n')
+}

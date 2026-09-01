@@ -39,7 +39,7 @@ test('jornada completa e confidencial da Comissão de Nomeações', async ({ pag
   await expect(nominationsChurch).toContainText('Igreja Fictícia de Nomeações')
   await page.getByRole('button', { name: 'Preparar demonstração fictícia de Nomeações' }).click()
 
-  await expect(page.getByRole('heading', { name: /Nomeações/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Comissão de Nomeações', exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Formação' }).click()
   await expect(page.getByLabel('Quórum')).toHaveValue('3')

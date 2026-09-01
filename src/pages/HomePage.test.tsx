@@ -18,6 +18,7 @@ vi.mock('../families/service', () => ({ FamilyService: class { listFamilies = se
 vi.mock('../agenda/service', () => ({ AgendaService: class { listEvents = services.listEvents } }))
 vi.mock('../care/service', () => ({ CareService: class { listTasks = services.listTasks; listPrayerRequests = services.listPrayerRequests; listFollowUps = services.listFollowUps; listRounds = services.listRounds } }))
 vi.mock('../evangelism/service', () => ({ EvangelismPlanningService: class { listCampaigns = services.listCampaigns } }))
+vi.mock('../missionary/service', () => ({ MissionaryService: class { listInterests = vi.fn(() => Promise.resolve([])); listStudies = vi.fn(() => Promise.resolve([])) } }))
 
 describe('painel inicial', () => {
   it('mostra o cartão Fidelidade sem valores financeiros', async () => {

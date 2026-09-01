@@ -21,6 +21,7 @@ import { PersonDetailPage } from '../pages/PersonDetailPage'
 import { PersonFormPage } from '../pages/PersonFormPage'
 import { SearchPage } from '../pages/SearchPage'
 import { SecurityPage } from '../pages/SecurityPage'
+import { SyncConflictsPage } from '../pages/SyncConflictsPage'
 import { SyncPage } from '../pages/SyncPage'
 import { SermonsPage } from '../pages/SermonsPage'
 import { SermonFormPage } from '../pages/SermonFormPage'
@@ -134,6 +135,7 @@ export function App() {
         <Route path="distrito/igrejas/:churchId/editar" element={<ChurchFormPage />} />
         <Route path="mais" element={<MorePage />} />
         <Route path="sincronizacao" element={<SyncPage />} />
+        <Route path="sincronizacao/conflitos" element={<SyncConflictsPage />} />
         <Route path="seguranca" element={<SecurityPage />} />
         <Route path="backup" element={<BackupPage />} />
       </Route>

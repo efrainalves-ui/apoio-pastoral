@@ -1,0 +1,109 @@
+import { ArrowLeft, Check, Copy, Laptop, Smartphone } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useAuthVault } from '../auth/AuthVaultContext'
+import { Button } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
+import { ConflictService, type ConflictChoice, type ConflictPreview } from '../sync/conflicts'
+
+const service = new ConflictService()
+
+const choiceLabels: Record<ConflictChoice, string> = {
+  keep_local: 'Ficou a versão deste aparelho',
+  keep_remote: 'Ficou a versão do outro aparelho',
+  keep_both: 'As duas versões foram mantidas',
+}
+
+function shortDate(value: string): string {
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
+}
+
+export function SyncConflictsPage() {
+  const { account, masterKey } = useAuthVault()
+  const [previews, setPreviews] = useState<ConflictPreview[]>([])
+  const [resolvedCount, setResolvedCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  const load = useCallback(async () => {
+    if (!account || !masterKey) return
+    setLoading(true)
+    const pending = await service.listPending(account.id)
+    setPreviews(await Promise.all(pending.map((conflict) => service.preview(conflict, masterKey))))
+    setResolvedCount((await service.listResolved(account.id)).length)
+    setLoading(false)
+  }, [account, masterKey])
+
+  useEffect(() => { void load() }, [load])
+
+  async function choose(conflictId: string, choice: ConflictChoice) {
+    if (!account || !masterKey) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      await service.resolve(account.id, masterKey, conflictId, choice)
+      setNotice(`${choiceLabels[choice]}. A outra continua guardada no histórico.`)
+      await load()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível concluir a revisão.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (loading) return <div className="app-loading" role="status">Abrindo as revisões…</div>
+
+  return (
+    <div className="page-stack page-narrow">
+      <Link className="text-link back-link" to="/app/sincronizacao"><ArrowLeft />Voltar à sincronização</Link>
+      <header className="page-hero">
+        <div>
+          <p className="eyebrow">Sincronização</p>
+          <h1>Revisar alterações concorrentes</h1>
+          <p>O mesmo registro foi alterado em dois aparelhos. Nada foi apagado: escolha o que deve ficar valendo.</p>
+        </div>
+      </header>
+
+      {error && <div className="alert alert--error" role="alert">{error}</div>}
+      {notice && <div className="alert alert--success" role="status">{notice}</div>}
+
+      {previews.length === 0
+        ? <Card title="Nenhuma revisão pendente"><div className="empty-state"><Check /><strong>Está tudo alinhado</strong><span>Quando o mesmo registro for alterado em dois aparelhos, ele aparece aqui para você decidir.</span></div></Card>
+        : previews.map((preview) => (
+          <Card key={preview.id} eyebrow={preview.kind} title={`Alteração de ${shortDate(preview.createdAt)}`}>
+            <div className="conflict-sides">
+              <article>
+                <h3><Laptop aria-hidden="true" />Neste aparelho</h3>
+                <small>Versão {preview.local.version}</small>
+                <p className="preserved-text">{preview.local.summary}</p>
+              </article>
+              <article>
+                <h3><Smartphone aria-hidden="true" />No outro aparelho</h3>
+                <small>Versão {preview.remote.version}</small>
+                <p className="preserved-text">{preview.remote.summary}</p>
+              </article>
+            </div>
+
+            <p className="card-copy">A versão que não ficar ativa continua guardada e protegida, para você consultar depois.</p>
+
+            <div className="form-actions">
+              <Button disabled={busy} onClick={() => void choose(preview.id, 'keep_local')} icon={<Laptop />}>Ficar com a deste aparelho</Button>
+              <Button variant="secondary" disabled={busy || preview.remoteIsDeletion || !preview.remote.available} onClick={() => void choose(preview.id, 'keep_remote')} icon={<Smartphone />}>Ficar com a do outro aparelho</Button>
+              <Button variant="secondary" disabled={busy || preview.remoteIsDeletion || !preview.remote.available} onClick={() => void choose(preview.id, 'keep_both')} icon={<Copy />}>Manter as duas</Button>
+            </div>
+
+            {preview.remoteIsDeletion && <p className="card-copy">O outro aparelho apagou este registro. Se você mantiver a versão daqui, ela continua valendo.</p>}
+          </Card>
+        ))}
+
+      {resolvedCount > 0 && (
+        <Card title="Histórico de revisões">
+          <p className="card-copy">
+            {resolvedCount === 1 ? '1 revisão já resolvida.' : `${resolvedCount} revisões já resolvidas.`} As versões preteridas continuam guardadas e protegidas neste aparelho.
+          </p>
+        </Card>
+      )}
+    </div>
+  )
+}
