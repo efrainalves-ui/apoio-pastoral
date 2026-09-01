@@ -38,7 +38,7 @@ export function SyncPage() {
     setBusy(true)
     setError('')
     try {
-      setSummary(await service.synchronize(account.id, currentDeviceId()))
+      setSummary(await service.synchronize(account.id, currentDeviceId(account.id)))
       await refresh()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível sincronizar.')

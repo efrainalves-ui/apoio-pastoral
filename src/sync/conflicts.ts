@@ -218,14 +218,14 @@ export class ConflictService {
 
       if (choice === 'keep_remote') {
         const envelope = await encryptPayload(masterKey, payload, conflict.recordId)
-        await this.repository.saveEncrypted(accountId, currentDeviceId(), conflict.recordId, envelope, recordType)
+        await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), conflict.recordId, envelope, recordType)
         keptRecordId = conflict.recordId
       } else {
         // Guarda a versão do outro aparelho como um registro novo e separado,
         // para que as duas continuem existindo lado a lado.
         const novoId = crypto.randomUUID()
         const envelope = await encryptPayload(masterKey, payload, novoId)
-        await this.repository.saveEncrypted(accountId, currentDeviceId(), novoId, envelope, recordType)
+        await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), novoId, envelope, recordType)
         keptRecordId = novoId
       }
     }

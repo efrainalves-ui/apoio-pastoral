@@ -46,7 +46,7 @@ export class CommissionService {
       updatedAt: now(),
     }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'commission_config', data }, id)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), id, envelope, 'commission_config')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'commission_config')
     return { id, ...data }
   }
 
@@ -65,7 +65,7 @@ export class CommissionService {
     if (current?.finalizedAt) throw new Error('A ata finalizada está protegida e não pode ser alterada.')
     const normalized = { ...data, agenda: [...data.agenda].sort((a, b) => a.order - b.order).map((item, index) => ({ ...item, order: index + 1 })) }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'commission_meeting', data: normalized }, id)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), id, envelope, 'commission_meeting')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'commission_meeting')
     return { id, ...normalized }
   }
 
@@ -113,7 +113,7 @@ export class CommissionService {
       const configEnvelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'commission_config', data: configData }, config.id)
       mutations.push({ recordId: config.id, envelope: configEnvelope, recordType: 'commission_config' })
     }
-    await this.repository.applyEncryptedMutations(accountId, currentDeviceId(), mutations)
+    await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
     return { id: meeting.id, ...meetingData }
   }
 
@@ -160,7 +160,7 @@ export class CommissionService {
     const id = crypto.randomUUID(); const timestamp = now()
     const data: CommissionTaskData = { churchId: meeting.churchId, meetingId: meeting.id, agendaItemId: item.id, kind: meeting.kind, title: item.title, responsibleId: item.responsibleId, dueDate: item.dueDate, status: 'pending', createdAt: timestamp, updatedAt: timestamp }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'commission_task', data }, id)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), id, envelope, 'commission_task')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'commission_task')
     return { id, ...data }
   }
 
@@ -169,7 +169,7 @@ export class CommissionService {
     if (!task) throw new Error('Pendência não encontrada.')
     const data: CommissionTaskData = { ...task, status, updatedAt: now() }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'commission_task', data }, taskId)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), taskId, envelope, 'commission_task')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), taskId, envelope, 'commission_task')
     return { id: taskId, ...data }
   }
 
@@ -184,7 +184,7 @@ export class CommissionService {
     })
     const data: CommissionTaskData = { ...task, agendaEventId: event.id, updatedAt: now() }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'commission_task', data }, task.id)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), task.id, envelope, 'commission_task')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), task.id, envelope, 'commission_task')
     return { id: task.id, ...data }
   }
 

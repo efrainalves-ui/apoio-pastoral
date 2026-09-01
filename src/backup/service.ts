@@ -65,7 +65,7 @@ export class BackupService {
       if (!Array.isArray(contents.records) || !contents.records.every(validPortable)) throw new Error('invalid-backup')
       if (new Set(contents.records.map(({ id }) => id)).size !== contents.records.length) throw new Error('invalid-backup')
       const mutations: EncryptedMutation[] = await Promise.all(contents.records.map(async (record) => ({ recordId: record.id, recordType: record.recordType, envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: record.type, data: record.data }, record.id) })))
-      await this.repo.applyEncryptedMutations(accountId, currentDeviceId(), mutations)
+      await this.repo.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
       return { recordCount: contents.records.length }
     } catch (reason) {
       if (reason instanceof Error && reason.message === 'account-mismatch') throw new Error('Este backup pertence a outra conta e não pode ser misturado com os dados atuais.', { cause: reason })

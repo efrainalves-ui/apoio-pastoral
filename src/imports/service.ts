@@ -174,7 +174,7 @@ export class ImportService {
     const batchData: ImportBatchData = { kind: preview.kind, modelVersion: preview.kind === 'fidelity' ? 3 : 1, fileHash: preview.fileHash, source: preview.kind === 'members' ? 'PDF local de membros' : 'PDF local de fidelidade', status: 'applied', createdAt: appliedAt, appliedAt, summary, churchCounts: preview.churchCounts, issues: preview.issues, undo: { createdPersonIds: prepared.filter(({ previousData }) => !previousData).map(({ personId }) => personId), previousPeople: prepared.filter(({ previousData }) => previousData).map(({ personId, previousData }) => ({ id: personId, data: previousData! })) } }
     const mutations: EncryptedMutation[] = await Promise.all(prepared.map(async ({ personId, nextData }) => ({ recordId: personId, recordType: 'person' as const, envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: 'person', data: nextData }, personId) })))
     mutations.push({ recordId: batchId, recordType: 'import_batch', envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: 'import_batch', data: batchData }, batchId) })
-    await this.repository.applyEncryptedMutations(accountId, currentDeviceId(), mutations)
+    await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
     return { batch: { id: batchId, ...batchData }, people: prepared.map(({ personId, nextData }) => ({ id: personId, ...nextData })) }
   }
 
@@ -201,7 +201,7 @@ export class ImportService {
     const { id: _id, ...existingBatchData } = batch; void _id
     const storedBatch: ImportBatchData = { ...existingBatchData, status: 'undone', undoneAt: now }
     mutations.push({ recordId: batch.id, recordType: 'import_batch', envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: 'import_batch', data: storedBatch }, batch.id) })
-    await this.repository.applyEncryptedMutations(accountId, currentDeviceId(), mutations)
+    await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
     return { id: batch.id, ...storedBatch }
   }
 }

@@ -6,7 +6,7 @@ import { encryptPayload, generateMasterKey } from '../crypto/vault'
 import { db } from '../db/database'
 
 const auth = vi.hoisted(() => ({ account: null as { id: string; email: string } | null, masterKey: null as CryptoKey | null }))
-vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => ({ ...auth }) }))
+vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => ({ accounts: [], ...auth }) }))
 
 import { NewDistrictPage } from './NewDistrictPage'
 

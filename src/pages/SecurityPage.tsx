@@ -74,7 +74,7 @@ export function SecurityPage() {
       <Card title="Dispositivos" eyebrow="Controle de acesso" action={<Laptop />}>
         <div className="device-list">
           {devices.map((device) => {
-            const isCurrent = device.id === currentDeviceId()
+            const isCurrent = device.id === currentDeviceId(account?.id ?? '')
             const aguardando = device.status === 'pending'
             const situacao = device.status === 'active' ? 'Ativo' : aguardando ? 'Aguardando confirmação' : 'Revogado'
             return <div className="device-row" key={device.id}><span className="device-row__icon">{device.label.includes('móvel') ? <Smartphone /> : <Laptop />}</span><div><strong>{device.label}</strong><small>{isCurrent ? 'Este dispositivo' : aguardando ? <>Confira o código <span className="device-row__code">{deviceConfirmationCode(device.id)}</span> nesse aparelho</> : 'Dispositivo autorizado'} · visto {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date(device.lastSeenAt))}</small></div><StatusPill tone={device.status === 'active' ? 'success' : 'warning'}>{situacao}</StatusPill>{!isCurrent && aguardando && <Button onClick={() => void approve(device.id)}>Confirmar</Button>}{!isCurrent && device.status !== 'revoked' && <Button variant="danger" onClick={() => void revoke(device.id)}>{aguardando ? 'Recusar' : 'Revogar'}</Button>}</div>

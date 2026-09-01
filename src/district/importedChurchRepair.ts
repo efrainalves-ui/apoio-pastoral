@@ -59,7 +59,7 @@ export class ImportedChurchRepairService {
       const tombstone = await encryptPayload(masterKey, { schemaVersion: 1, type: 'church_tombstone', data: { deletedAt: now } }, source.id)
       mutations.push({ recordId: source.id, recordType: 'church', operation: 'delete', envelope: tombstone })
     }
-    if (mutations.length) await this.repository.applyEncryptedMutations(accountId, currentDeviceId(), mutations)
+    if (mutations.length) await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
     return { corrected: planned.filter((item) => !item.mergeIntoId).length, merged: planned.filter((item) => item.mergeIntoId).length, warnings: corrections.filter((item) => item.warning).length }
   }
 }

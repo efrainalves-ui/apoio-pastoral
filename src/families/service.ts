@@ -50,7 +50,7 @@ export class FamilyService {
     const id = crypto.randomUUID(); const now = new Date().toISOString()
     const data: FamilyData = { name: input.name.trim(), primaryChurchId: input.primaryChurchId, memberIds: [...input.memberIds], address: input.address.trim(), notes: input.notes.trim(), history: [{ id: crypto.randomUUID(), at: now, event: 'created' }], createdAt: now, updatedAt: now }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'family', data }, id)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), id, envelope, 'family')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'family')
     return { id, ...data }
   }
 
@@ -63,7 +63,7 @@ export class FamilyService {
     if (current.name !== input.name.trim() || current.primaryChurchId !== input.primaryChurchId || current.address !== input.address.trim() || current.notes !== input.notes.trim()) history.push({ id: crypto.randomUUID(), at: now, event: 'details_updated' })
     const data: FamilyData = { name: input.name.trim(), primaryChurchId: input.primaryChurchId, memberIds: [...input.memberIds], address: input.address.trim(), notes: input.notes.trim(), history, createdAt: current.createdAt, updatedAt: now }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'family', data }, familyId)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), familyId, envelope, 'family')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), familyId, envelope, 'family')
     return { id: familyId, ...data }
   }
 
@@ -71,6 +71,6 @@ export class FamilyService {
     if (!await this.getFamily(accountId, masterKey, familyId)) throw new Error('Família não encontrada.')
     const deletedAt = new Date().toISOString()
     const tombstone = await encryptPayload(masterKey, { schemaVersion: 1, type: 'family_tombstone', data: { deletedAt } }, familyId)
-    await this.repository.deleteEncrypted(accountId, currentDeviceId(), familyId, tombstone)
+    await this.repository.deleteEncrypted(accountId, currentDeviceId(accountId), familyId, tombstone)
   }
 }

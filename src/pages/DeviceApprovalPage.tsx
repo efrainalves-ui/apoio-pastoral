@@ -14,7 +14,7 @@ export function DeviceApprovalPage({ onApproved }: { onApproved: () => void }) {
   const { account, lock } = useAuthVault()
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState('')
-  const code = deviceConfirmationCode(currentDeviceId())
+  const code = deviceConfirmationCode(currentDeviceId(account?.id ?? ''))
 
   const check = useCallback(async () => {
     if (!account) return

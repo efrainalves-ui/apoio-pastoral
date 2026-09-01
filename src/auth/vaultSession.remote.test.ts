@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createPasswordEnvelope, decryptPayload, encryptPayload, generateMasterKey } from '../crypto/vault'
 import { ApoioDatabase } from '../db/database'
+import { keyEnvelopeId } from '../db/types'
 
 const databases: ApoioDatabase[] = []
 
@@ -51,7 +52,7 @@ describe('entrada remota em novo dispositivo', () => {
 
     expect(result.account).toMatchObject({ id: '00000000-0000-4000-8000-000000000001', authMode: 'supabase' })
     expect(payload).toMatchObject({ type: 'test', data: { fictional: true } })
-    expect(await database.keyEnvelopes.get('password')).toMatchObject({ accountId: result.account.id, envelope })
+    expect(await database.keyEnvelopes.get(keyEnvelopeId(result.account.id, 'password'))).toMatchObject({ accountId: result.account.id, envelope })
     expect(remote.signIn).toHaveBeenCalledTimes(1)
     expect(remote.authorize).toHaveBeenCalledTimes(1)
   })

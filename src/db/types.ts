@@ -7,11 +7,19 @@ export interface AccountRecord {
   authMode: 'local-development' | 'supabase'
 }
 
+export type KeyEnvelopeKind = 'password' | 'recovery'
+
 export interface KeyEnvelopeRecord {
-  id: 'password' | 'recovery'
+  /** `${accountId}:${kind}` — mais de uma conta pode viver no mesmo aparelho. */
+  id: string
+  kind: KeyEnvelopeKind
   accountId: string
   envelope: PasswordKeyEnvelope | RecoveryKeyEnvelope
   updatedAt: string
+}
+
+export function keyEnvelopeId(accountId: string, kind: KeyEnvelopeKind): string {
+  return `${accountId}:${kind}`
 }
 
 export interface DeviceRecord {

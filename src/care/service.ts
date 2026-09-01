@@ -65,7 +65,7 @@ export class CareService {
       const round = (await this.listRounds(accountId, masterKey)).find(({ id }) => id === input.roundId)
       if (round && round.status === 'active' && round.targetFamilyIds.includes(input.targetId)) { const visitedFamilyIds = [...new Set([...round.visitedFamilyIds, input.targetId])]; const completed = round.targetFamilyIds.length > 0 && visitedFamilyIds.length === round.targetFamilyIds.length; const { id: _id, ...existing } = round; void _id; const next: VisitRoundData = { ...existing, visitedFamilyIds, status: completed ? 'completed' : 'active', completedAt: completed ? now : null, updatedAt: now }; mutations.push({ recordId: round.id, recordType: 'visit_round', envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: 'visit_round', data: next }, round.id) }) }
     }
-    await this.repository.applyEncryptedMutations(accountId, currentDeviceId(), mutations)
+    await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
     return { id: visitId, ...visit }
   }
 
@@ -73,20 +73,20 @@ export class CareService {
     const current = await this.getVisit(accountId, masterKey, visitId); if (!current) throw new Error('Visita não encontrada.')
     const now = new Date().toISOString(); const nextVersion: VisitVersion = { ...version, version: current.currentVersion + 1, correctedAt: now, participants: version.participants.map((item) => ({ ...item })), answers: version.answers.map((answer) => ({ ...answer, question: { ...answer.question, options: [...answer.question.options] } })) }
     const { id: _id, ...stored } = current; void _id; const data: VisitData = { ...stored, currentVersion: nextVersion.version, versions: [...current.versions, nextVersion], updatedAt: now }
-    const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'visit', data }, visitId); await this.repository.saveEncrypted(accountId, currentDeviceId(), visitId, envelope, 'visit'); return { id: visitId, ...data }
+    const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'visit', data }, visitId); await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), visitId, envelope, 'visit'); return { id: visitId, ...data }
   }
 
   async createRound(accountId: string, masterKey: CryptoKey, name: string, churchId: string | null, targetFamilyIds: string[]): Promise<VisitRoundEntity> {
     if (!name.trim() || !targetFamilyIds.length) throw new Error('Informe o nome e ao menos uma família para a rodada.')
     const id = crypto.randomUUID(); const now = new Date().toISOString(); const data: VisitRoundData = { name: name.trim(), churchId, targetFamilyIds: [...new Set(targetFamilyIds)], visitedFamilyIds: [], status: 'active', startedAt: now, completedAt: null, createdAt: now, updatedAt: now }
-    const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'visit_round', data }, id); await this.repository.saveEncrypted(accountId, currentDeviceId(), id, envelope, 'visit_round'); return { id, ...data }
+    const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'visit_round', data }, id); await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'visit_round'); return { id, ...data }
   }
 
   async createTask(accountId: string, masterKey: CryptoKey, input: Omit<TaskData, 'status' | 'createdAt' | 'updatedAt'>): Promise<TaskEntity> {
     if (!input.title.trim() || !input.dueAt) throw new Error('Informe o título e o prazo da tarefa.')
     if (input.title.length > 160 || input.description.length > 2_000) throw new Error('Revise o tamanho dos textos da tarefa.')
     const id = crypto.randomUUID(); const now = new Date().toISOString(); const data: TaskData = { ...input, title: input.title.trim(), description: input.description.trim(), status: 'pending', createdAt: now, updatedAt: now }
-    const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'task', data }, id); await this.repository.saveEncrypted(accountId, currentDeviceId(), id, envelope, 'task'); return { id, ...data }
+    const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'task', data }, id); await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'task'); return { id, ...data }
   }
 
   async savePrayerRequest(accountId: string, masterKey: CryptoKey, input: PrayerRequestInput, prayerId?: string): Promise<PrayerRequestEntity> {
@@ -103,7 +103,7 @@ export class CareService {
       updates: current?.updates ?? [], status: current?.status ?? 'active', requestedAt: input.requestedAt, reviewAt: current?.reviewAt ?? input.requestedAt,
       testimony: current?.testimony ?? '', revealed: false, createdAt: current?.createdAt ?? timestamp, updatedAt: timestamp,
     }
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), id, await encryptPayload(masterKey, { schemaVersion: 1, type: 'prayer_request', data }, id), 'prayer_request')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, await encryptPayload(masterKey, { schemaVersion: 1, type: 'prayer_request', data }, id), 'prayer_request')
     return { id, ...data }
   }
 
@@ -112,7 +112,7 @@ export class CareService {
     if (text.trim().length > 500) throw new Error('Use no máximo 500 caracteres na atualização.')
     const timestamp = new Date().toISOString(); const { id, ...stored } = prayer
     const data: PrayerRequestData = { ...stored, updates: [...stored.updates, { id: crypto.randomUUID(), at: timestamp, text: text.trim() }], updatedAt: timestamp }
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), id, await encryptPayload(masterKey, { schemaVersion: 1, type: 'prayer_request', data }, id), 'prayer_request')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, await encryptPayload(masterKey, { schemaVersion: 1, type: 'prayer_request', data }, id), 'prayer_request')
     return { id, ...data }
   }
 
@@ -120,10 +120,10 @@ export class CareService {
     const prayer = (await this.listPrayerRequests(accountId, masterKey)).find(({ id }) => id === prayerId)
     if (!prayer) throw new Error('Pedido não encontrado.')
     const deletedAt = new Date().toISOString(); const tombstone = await encryptPayload(masterKey, { schemaVersion: 1, type: 'prayer_request_tombstone', data: { deletedAt } }, prayerId)
-    await this.repository.deleteEncrypted(accountId, currentDeviceId(), prayerId, tombstone)
+    await this.repository.deleteEncrypted(accountId, currentDeviceId(accountId), prayerId, tombstone)
   }
 
-  async updatePrayer(accountId: string, masterKey: CryptoKey, prayer: PrayerRequestEntity, status: PrayerRequestData['status'], testimony = ''): Promise<void> { const { id, ...stored } = prayer; const data: PrayerRequestData = { ...stored, status, testimony: testimony.trim(), updatedAt: new Date().toISOString() }; await this.repository.saveEncrypted(accountId, currentDeviceId(), id, await encryptPayload(masterKey, { schemaVersion: 1, type: 'prayer_request', data }, id), 'prayer_request') }
-  async updateFollowUp(accountId: string, masterKey: CryptoKey, followUp: FollowUpEntity, status: FollowUpData['status']): Promise<void> { const { id, ...stored } = followUp; const data: FollowUpData = { ...stored, status, updatedAt: new Date().toISOString() }; await this.repository.saveEncrypted(accountId, currentDeviceId(), id, await encryptPayload(masterKey, { schemaVersion: 1, type: 'follow_up', data }, id), 'follow_up') }
-  async updateTask(accountId: string, masterKey: CryptoKey, task: TaskEntity, status: TaskData['status']): Promise<void> { const { id, ...stored } = task; const data: TaskData = { ...stored, status, updatedAt: new Date().toISOString() }; await this.repository.saveEncrypted(accountId, currentDeviceId(), id, await encryptPayload(masterKey, { schemaVersion: 1, type: 'task', data }, id), 'task') }
+  async updatePrayer(accountId: string, masterKey: CryptoKey, prayer: PrayerRequestEntity, status: PrayerRequestData['status'], testimony = ''): Promise<void> { const { id, ...stored } = prayer; const data: PrayerRequestData = { ...stored, status, testimony: testimony.trim(), updatedAt: new Date().toISOString() }; await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, await encryptPayload(masterKey, { schemaVersion: 1, type: 'prayer_request', data }, id), 'prayer_request') }
+  async updateFollowUp(accountId: string, masterKey: CryptoKey, followUp: FollowUpEntity, status: FollowUpData['status']): Promise<void> { const { id, ...stored } = followUp; const data: FollowUpData = { ...stored, status, updatedAt: new Date().toISOString() }; await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, await encryptPayload(masterKey, { schemaVersion: 1, type: 'follow_up', data }, id), 'follow_up') }
+  async updateTask(accountId: string, masterKey: CryptoKey, task: TaskEntity, status: TaskData['status']): Promise<void> { const { id, ...stored } = task; const data: TaskData = { ...stored, status, updatedAt: new Date().toISOString() }; await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, await encryptPayload(masterKey, { schemaVersion: 1, type: 'task', data }, id), 'task') }
 }

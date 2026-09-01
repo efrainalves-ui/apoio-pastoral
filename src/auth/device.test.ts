@@ -16,11 +16,24 @@ const databases: ApoioDatabase[] = []
 afterEach(async () => { localStorage.clear(); await Promise.all(databases.splice(0).map((database) => database.delete())) })
 
 describe('autorização local de dispositivo', () => {
-  it('não vincula o mesmo dispositivo a outra conta', async () => {
+  it('dá um identificador de aparelho por conta, sem uma herdar o da outra', async () => {
     const database = new ApoioDatabase(`device-owner-${crypto.randomUUID()}`); databases.push(database)
-    await authorizeCurrentDevice('conta-ficticia-a', database)
+
+    const a = await authorizeCurrentDevice('conta-ficticia-a', database)
+    const b = await authorizeCurrentDevice('conta-ficticia-b', database)
+
+    expect(a.id).not.toBe(b.id)
+    expect(await database.devices.where('accountId').equals('conta-ficticia-a').count()).toBe(1)
+    expect(await database.devices.where('accountId').equals('conta-ficticia-b').count()).toBe(1)
+  })
+
+  it('recusa reaproveitar o registro de aparelho de outra conta', async () => {
+    const database = new ApoioDatabase(`device-cruzado-${crypto.randomUUID()}`); databases.push(database)
+    const a = await authorizeCurrentDevice('conta-ficticia-a', database)
+    // simula o identificador da conta A caindo na conta B
+    localStorage.setItem('apoio-pastoral:device-id:conta-ficticia-b', a.id)
+
     await expect(authorizeCurrentDevice('conta-ficticia-b', database)).rejects.toThrow('outra conta')
-    expect((await database.devices.toCollection().first())?.accountId).toBe('conta-ficticia-a')
   })
 
   it('não reativa um dispositivo revogado durante novo acesso', async () => {

@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BackupPage } from './BackupPage'
 
-vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => ({ account: null, masterKey: null }) }))
+vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => ({ accounts: [], account: null, masterKey: null }) }))
 afterEach(cleanup)
 
 describe('confirmação visual da restauração', () => {

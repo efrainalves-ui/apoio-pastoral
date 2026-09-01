@@ -9,7 +9,7 @@ import { MissionaryService } from '../missionary/service'
 import { PeopleService } from '../people/service'
 
 const auth = vi.hoisted(() => ({ account: null as { id: string; email: string } | null, masterKey: null as CryptoKey | null }))
-vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => ({ ...auth }) }))
+vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => ({ accounts: [], ...auth }) }))
 
 import { CommunityGroupsPage } from './CommunityGroupsPage'
 

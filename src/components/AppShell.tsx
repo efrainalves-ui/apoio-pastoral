@@ -16,6 +16,7 @@ import {
   WalletCards,
   CalendarRange,
   Megaphone,
+  UsersRound,
   X,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -54,7 +55,7 @@ const mobileNav = [
 ]
 
 export function AppShell() {
-  const { account, lock } = useAuthVault()
+  const { account, lock , switchAccount } = useAuthVault()
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
 
@@ -64,6 +65,12 @@ export function AppShell() {
 
   function leave() {
     if (window.confirm('Deseja sair do Apoio Pastoral neste dispositivo?')) lock()
+  }
+
+  // Trocar de conta não apaga nada: os dados desta conta continuam aqui,
+  // protegidos, e voltam a abrir com a senha dela.
+  function trocarConta() {
+    if (window.confirm('Trocar de conta? Os dados desta conta continuam guardados neste aparelho.')) void switchAccount()
   }
 
   return (
@@ -83,7 +90,10 @@ export function AppShell() {
         </nav>
         <div className="sidebar__footer">
           <div className="account-chip"><span>{account?.email}</span></div>
-          <Button variant="secondary" full onClick={leave} icon={<LogOut size={18} />}>Sair</Button>
+          <div className="sidebar__footer-actions">
+            <Button variant="secondary" onClick={trocarConta} icon={<UsersRound size={18} />}>Trocar conta</Button>
+            <Button variant="secondary" onClick={leave} icon={<LogOut size={18} />}>Sair</Button>
+          </div>
         </div>
       </aside>
       {open && <button className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setOpen(false)} />}

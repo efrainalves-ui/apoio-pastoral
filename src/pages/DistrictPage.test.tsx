@@ -12,7 +12,7 @@ const auth = vi.hoisted(() => ({
 }))
 
 vi.mock('../auth/AuthVaultContext', () => ({
-  useAuthVault: () => ({ ...auth }),
+  useAuthVault: () => ({ accounts: [], ...auth }),
 }))
 
 import { ChurchFormPage } from './ChurchFormPage'

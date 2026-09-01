@@ -4,12 +4,23 @@ import { approveRemoteDevice, ensureRemoteDevice, fetchRemoteDeviceStatus, revok
 
 const DEVICE_ID_KEY = 'apoio-pastoral:device-id'
 
-export function currentDeviceId(): string {
-  const existing = localStorage.getItem(DEVICE_ID_KEY)
-  if (existing) return existing
-  const created = crypto.randomUUID()
-  localStorage.setItem(DEVICE_ID_KEY, created)
-  return created
+/**
+ * Cada conta tem o próprio identificador de aparelho, mesmo no mesmo navegador.
+ * Compartilhar um só permitiria ligar duas contas ao mesmo aparelho no serviço,
+ * o que este aplicativo existe para evitar.
+ */
+export function currentDeviceId(accountId: string): string {
+  const chave = `${DEVICE_ID_KEY}:${accountId}`
+  const existente = localStorage.getItem(chave)
+  if (existente) return existente
+
+  // Conta que já usava este navegador antes de existirem várias: fica com o
+  // mesmo aparelho, para não perder a autorização que já tinha.
+  const legado = localStorage.getItem(DEVICE_ID_KEY)
+  const id = legado ?? crypto.randomUUID()
+  localStorage.setItem(chave, id)
+  if (legado) localStorage.removeItem(DEVICE_ID_KEY)
+  return id
 }
 
 function deviceLabel(): string {
@@ -35,7 +46,7 @@ export async function authorizeCurrentDevice(
   // precisa da confirmação de um aparelho que já estava valendo.
   statusInicial: 'active' | 'pending' = 'active',
 ): Promise<DeviceRecord> {
-  const id = currentDeviceId()
+  const id = currentDeviceId(accountId)
   const existing = await database.devices.get(id)
   if (existing?.accountId !== undefined && existing.accountId !== accountId) {
     throw new Error('Este dispositivo já está vinculado a outra conta.')
@@ -73,7 +84,7 @@ export async function refreshCurrentDeviceStatus(
   database: ApoioDatabase = db,
   readRemoteStatus: RemoteDeviceStatusReader = fetchRemoteDeviceStatus,
 ): Promise<RemoteDeviceStatus | null> {
-  const id = currentDeviceId()
+  const id = currentDeviceId(accountId)
   const remoto = await readRemoteStatus(id)
   if (!remoto) return null
   const local = await database.devices.get(id)

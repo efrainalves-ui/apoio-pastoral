@@ -6,7 +6,7 @@ import {
   openRecoveryEnvelope,
 } from '../crypto/vault'
 import { db, type ApoioDatabase } from '../db/database'
-import type { AccountRecord, KeyEnvelopeRecord } from '../db/types'
+import { keyEnvelopeId, type AccountRecord, type KeyEnvelopeRecord } from '../db/types'
 import { authorizeCurrentDevice } from './device'
 import {
   hasSupabaseConfiguration,
@@ -38,8 +38,10 @@ export async function registerAccount(
 ): Promise<RegistrationResult> {
   validateCredentials(email, password)
   const normalizedEmail = email.trim().toLowerCase()
-  if (await database.accounts.count() > 0) {
-    throw new Error('Já existe uma conta neste dispositivo.')
+  // Mais de uma conta pode viver no mesmo aparelho; cada uma tem cofre, dados,
+  // dispositivos e sincronização próprios. O que não pode é repetir o e-mail.
+  if (await database.accounts.where('email').equals(normalizedEmail).first()) {
+    throw new Error('Esta conta já existe neste aparelho. Entre com a senha dela.')
   }
 
   const id = hasSupabaseConfiguration ? await registerRemoteAccount(normalizedEmail, password) : crypto.randomUUID()
@@ -55,8 +57,8 @@ export async function registerAccount(
   }
 
   const envelopes: KeyEnvelopeRecord[] = [
-    { id: 'password', accountId: id, envelope: passwordEnvelope, updatedAt: now },
-    { id: 'recovery', accountId: id, envelope: recovery.envelope, updatedAt: now },
+    { id: keyEnvelopeId(id, 'password'), kind: 'password', accountId: id, envelope: passwordEnvelope, updatedAt: now },
+    { id: keyEnvelopeId(id, 'recovery'), kind: 'recovery', accountId: id, envelope: recovery.envelope, updatedAt: now },
   ]
 
   await database.transaction('rw', database.accounts, database.keyEnvelopes, database.syncState, async () => {
@@ -86,7 +88,7 @@ export async function unlockAccount(
       account = { id: accountId, email: normalizedEmail, createdAt: new Date().toISOString(), authMode: 'supabase' }
       await database.transaction('rw', database.accounts, database.keyEnvelopes, database.syncState, async () => {
         await database.accounts.put(account!)
-        await database.keyEnvelopes.put({ id: 'password', accountId, envelope, updatedAt: new Date().toISOString() })
+        await database.keyEnvelopes.put({ id: keyEnvelopeId(accountId, 'password'), kind: 'password', accountId, envelope, updatedAt: new Date().toISOString() })
         await database.syncState.put({ accountId, cursor: null, lastSyncedAt: null })
       })
     } else {
@@ -97,7 +99,7 @@ export async function unlockAccount(
     const remoteId = remoteAccountId ?? await signInRemoteAccount(normalizedEmail, password)
     if (remoteId !== account.id) throw new Error('Esta conta não corresponde à conta deste dispositivo.')
   }
-  const envelopeRecord = await database.keyEnvelopes.get('password')
+  const envelopeRecord = await database.keyEnvelopes.get(keyEnvelopeId(account.id, 'password'))
   if (!envelopeRecord || envelopeRecord.accountId !== account.id || envelopeRecord.envelope.kind !== 'password') {
     throw new Error('Este dispositivo precisa ser autorizado com a chave de recuperação.')
   }
@@ -131,17 +133,17 @@ export async function recoverAccount(
     recoveryEnvelope = await fetchRemoteRecoveryEnvelope()
     account = { id: accountId, email: normalizedEmail, createdAt: new Date().toISOString(), authMode: 'supabase' }
     await database.accounts.put(account)
-    await database.keyEnvelopes.put({ id: 'recovery', accountId, envelope: recoveryEnvelope, updatedAt: new Date().toISOString() })
+    await database.keyEnvelopes.put({ id: keyEnvelopeId(accountId, 'recovery'), kind: 'recovery', accountId, envelope: recoveryEnvelope, updatedAt: new Date().toISOString() })
     await database.syncState.put({ accountId, cursor: null, lastSyncedAt: null })
   } else {
-    const recoveryRecord = await database.keyEnvelopes.get('recovery')
+    const recoveryRecord = await database.keyEnvelopes.get(keyEnvelopeId(account?.id ?? '', 'recovery'))
     if (!recoveryRecord || recoveryRecord.accountId !== account?.id || recoveryRecord.envelope.kind !== 'recovery') throw new Error('Envelope de recuperação indisponível.')
     recoveryEnvelope = recoveryRecord.envelope
   }
   if (!account) throw new Error('Conta não encontrada neste dispositivo.')
   const masterKey = await openRecoveryEnvelope(recoveryEnvelope, recoveryCode)
   const passwordEnvelope = await createPasswordEnvelope(masterKey, newPassword)
-  await database.keyEnvelopes.put({ id: 'password', accountId: account.id, envelope: passwordEnvelope, updatedAt: new Date().toISOString() })
+  await database.keyEnvelopes.put({ id: keyEnvelopeId(account.id, 'password'), kind: 'password', accountId: account.id, envelope: passwordEnvelope, updatedAt: new Date().toISOString() })
   if (account.authMode === 'supabase') await storeRemotePasswordEnvelope(passwordEnvelope)
   await authorizeCurrentDevice(account.id, database)
   return { account, masterKey }
@@ -154,7 +156,7 @@ export async function changeVaultPassword(
   database: ApoioDatabase = db,
 ): Promise<CryptoKey> {
   if (newPassword.length < 12) throw new Error('Use uma senha com pelo menos 12 caracteres.')
-  const passwordRecord = await database.keyEnvelopes.get('password')
+  const passwordRecord = await database.keyEnvelopes.get(keyEnvelopeId(account.id, 'password'))
   if (!passwordRecord || passwordRecord.accountId !== account.id || passwordRecord.envelope.kind !== 'password') throw new Error('Envelope de senha indisponível.')
   const masterKey = await openPasswordEnvelope(passwordRecord.envelope, currentPassword)
   const replacement = await createPasswordEnvelope(masterKey, newPassword)
@@ -166,4 +168,9 @@ export async function changeVaultPassword(
 
 export async function findLocalAccount(database: ApoioDatabase = db): Promise<AccountRecord | undefined> {
   return database.accounts.toCollection().first()
+}
+
+/** Contas que já foram abertas neste aparelho, para a tela de troca. */
+export async function listLocalAccounts(database: ApoioDatabase = db): Promise<AccountRecord[]> {
+  return (await database.accounts.toArray()).sort((left, right) => left.email.localeCompare(right.email, 'pt-BR'))
 }

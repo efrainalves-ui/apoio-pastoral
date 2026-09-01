@@ -59,7 +59,7 @@ jobs:
         run: pnpm lint
 
       - name: TypeScript
-        run: pnpm exec tsc --noEmit
+        run: pnpm exec tsc -b
 
       - name: Testes unitários
         run: pnpm exec vitest run --maxWorkers=1

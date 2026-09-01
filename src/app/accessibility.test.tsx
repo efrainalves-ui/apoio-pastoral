@@ -6,6 +6,8 @@ import { App } from './App'
 
 const auth = vi.hoisted(() => ({
   account: null,
+
+  accounts: [],
   masterKey: null,
   initialized: true,
   recoveryCode: null,

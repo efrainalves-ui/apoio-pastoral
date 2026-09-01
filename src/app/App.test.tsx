@@ -5,6 +5,8 @@ import { App, useDistrictPresence } from './App'
 
 const auth = vi.hoisted(() => ({
   account: null as { id: string; email: string } | null,
+
+  accounts: [],
   masterKey: null as CryptoKey | null,
   initialized: true,
   recoveryCode: null,

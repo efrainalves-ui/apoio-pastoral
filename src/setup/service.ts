@@ -46,7 +46,7 @@ export class InitialSetupService {
       const data: PersonData = { name: member.name, birthDate: member.birthDate, whatsapp: '', notes: '', pastoralStatus: 'active', importStatus: 'current', currentChurchId: churchId, memberships: [{ id: crypto.randomUUID(), churchId, source: 'member_import', validFrom: now }], history: [{ id: crypto.randomUUID(), at: now, event: 'created', source: 'Importação inicial' }], incomeStatus: 'unknown', fidelity: null, fidelityHistory: [], createdAt: now, updatedAt: now }
       mutations.push({ recordId, recordType: 'person', envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: 'person', data }, recordId) })
     }
-    await this.repository.applyEncryptedMutations(accountId, currentDeviceId(), mutations)
+    await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
     return { churches: churches.length, people: members.length, birthdays: members.filter(({ birthDate }) => Boolean(birthDate)).length }
   }
 }

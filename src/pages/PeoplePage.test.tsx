@@ -13,7 +13,7 @@ const auth = vi.hoisted(() => ({
   masterKey: null as CryptoKey | null,
 }))
 
-vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => ({ ...auth }) }))
+vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => ({ accounts: [], ...auth }) }))
 
 import { PeoplePage } from './PeoplePage'
 

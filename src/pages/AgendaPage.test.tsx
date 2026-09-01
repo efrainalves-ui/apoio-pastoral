@@ -7,7 +7,7 @@ import { AgendaPage } from './AgendaPage'
 
 const data = vi.hoisted(() => ({ events: [] as AgendaEventEntity[] }))
 
-vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => ({ account: { id: 'agenda-conta-ficticia' }, masterKey: {} as CryptoKey }) }))
+vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => ({ accounts: [], account: { id: 'agenda-conta-ficticia' }, masterKey: {} as CryptoKey }) }))
 vi.mock('../agenda/service', () => ({
   AgendaService: class { listEvents = vi.fn(() => Promise.resolve(data.events)); deleteEvent = vi.fn() },
   mondayRestItems: vi.fn(() => []),

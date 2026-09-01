@@ -44,7 +44,7 @@ export class PeopleService {
       history, incomeStatus: 'unknown', fidelity: null, fidelityHistory: [], createdAt: now, updatedAt: now,
     }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'person', data }, id)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), id, envelope, 'person')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'person')
     return { id, ...data }
   }
 
@@ -81,7 +81,7 @@ export class PeopleService {
       updatedAt: now,
     }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'person', data: stored }, personId)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), personId, envelope, 'person')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), personId, envelope, 'person')
     return { id: personId, ...stored }
   }
 
@@ -96,7 +96,7 @@ export class PeopleService {
       updatedAt: now,
     }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'person', data }, personId)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), personId, envelope, 'person')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), personId, envelope, 'person')
     return { id: personId, ...data }
   }
 
@@ -109,6 +109,6 @@ export class PeopleService {
     }
     const deletedAt = new Date().toISOString()
     const tombstone = await encryptPayload(masterKey, { schemaVersion: 1, type: 'person_tombstone', data: { deletedAt } }, personId)
-    await this.repository.deleteEncrypted(accountId, currentDeviceId(), personId, tombstone)
+    await this.repository.deleteEncrypted(accountId, currentDeviceId(accountId), personId, tombstone)
   }
 }

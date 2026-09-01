@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const auth = vi.hoisted(() => ({
   account: { id: 'restricted-feature-account', email: 'v1@example.invalid' },
+
+  accounts: [],
   masterKey: {} as CryptoKey,
   initialized: true,
   recoveryCode: null as string | null,

@@ -20,7 +20,7 @@ vi.mock('../auth/supabase', () => ({
 }))
 
 vi.mock('../auth/AuthVaultContext', () => ({
-  useAuthVault: () => ({
+  useAuthVault: () => ({ accounts: [],
     account: authState.account,
     recoveryCode: authState.recoveryCode,
     register: authState.register,

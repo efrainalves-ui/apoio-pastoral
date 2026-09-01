@@ -87,7 +87,7 @@ export function useDistrictPresence(): boolean | null {
         const transport = createSyncTransport()
         if (transport.name !== 'disabled') {
           try {
-            await new SyncService(transport).synchronize(account.id, currentDeviceId())
+            await new SyncService(transport).synchronize(account.id, currentDeviceId(account.id))
             district = await districtService.getDistrict(account.id, masterKey)
           } catch { /* segue para a configuração inicial */ }
         }
@@ -114,7 +114,7 @@ function useCurrentDeviceApproval(): { pending: boolean | null; approve: () => v
   useEffect(() => {
     if (!account || !masterKey || recoveryCode) return
     let cancelled = false
-    void db.devices.get(currentDeviceId()).then((device) => {
+    void db.devices.get(currentDeviceId(account.id)).then((device) => {
       if (!cancelled) setPending(device?.accountId === account.id && device.status === 'pending')
     })
     return () => { cancelled = true }

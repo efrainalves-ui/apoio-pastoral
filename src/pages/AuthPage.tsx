@@ -8,7 +8,7 @@ import { Field } from '../components/ui/Field'
 type Mode = 'register' | 'unlock' | 'recover'
 
 export function AuthPage() {
-  const { account, register, unlock, recover, recoveryCode, clearRecoveryCode } = useAuthVault()
+  const { account, accounts, register, unlock, recover, recoveryCode, clearRecoveryCode } = useAuthVault()
   const [mode, setMode] = useState<Mode>(account ? 'unlock' : 'register')
   const [email, setEmail] = useState(account?.email ?? '')
   const [password, setPassword] = useState('')
@@ -78,6 +78,11 @@ export function AuthPage() {
       <section className="auth-panel">
         <div className="auth-form-wrap">
           <h2>{mode === 'register' ? 'Crie sua conta' : mode === 'recover' ? 'Recupere o acesso' : 'Entre na sua conta'}</h2>
+          {mode !== 'recover' && accounts.length > 0 && <div className="account-switcher">
+            <p className="field__hint">Contas neste aparelho</p>
+            <ul>{accounts.map((conta) => <li key={conta.id}><button type="button" className={`account-switcher__option${email.trim().toLowerCase() === conta.email ? ' account-switcher__option--on' : ''}`} onClick={() => { setMode('unlock'); setEmail(conta.email); setPassword(''); setError('') }}>{conta.email}</button></li>)}</ul>
+            <p className="field__hint">Cada conta tem os próprios dados neste aparelho. Escolha uma e informe a senha dela.</p>
+          </div>}
           {mode !== 'recover' && <div className="auth-tabs" role="tablist" aria-label="Acesso">
             <button ref={unlockTab} id="auth-tab-unlock" type="button" role="tab" aria-controls="auth-panel-unlock" aria-selected={mode === 'unlock'} tabIndex={mode === 'unlock' ? 0 : -1} onClick={() => selectMode('unlock')} onKeyDown={moveBetweenTabs}>Entrar</button>
             <button ref={registerTab} id="auth-tab-register" type="button" role="tab" aria-controls="auth-panel-register" aria-selected={mode === 'register'} tabIndex={mode === 'register' ? 0 : -1} onClick={() => selectMode('register')} onKeyDown={moveBetweenTabs}>Criar conta</button>

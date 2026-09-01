@@ -74,7 +74,7 @@ export class AgendaService {
     this.assertNoBlockingConflict(input, await this.listEvents(accountId, masterKey))
     const id = crypto.randomUUID(); const now = new Date().toISOString(); const data: AgendaEventData = { ...input, title: input.title.trim(), notes: input.notes.trim(), createdAt: now, updatedAt: now }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'agenda_event', data }, id)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), id, envelope, 'agenda_event')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'agenda_event')
     return { id, ...data }
   }
 
@@ -84,14 +84,14 @@ export class AgendaService {
     this.assertNoBlockingConflict(input, await this.listEvents(accountId, masterKey), eventId)
     const data: AgendaEventData = { ...input, title: input.title.trim(), notes: input.notes.trim(), createdAt: current.createdAt, updatedAt: new Date().toISOString() }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'agenda_event', data }, eventId)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), eventId, envelope, 'agenda_event')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), eventId, envelope, 'agenda_event')
     return { id: eventId, ...data }
   }
 
   async deleteEvent(accountId: string, masterKey: CryptoKey, eventId: string): Promise<void> {
     if (!await this.getEvent(accountId, masterKey, eventId)) throw new Error('Compromisso não encontrado.')
     const deletedAt = new Date().toISOString(); const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'agenda_event_tombstone', data: { deletedAt } }, eventId)
-    await this.repository.deleteEncrypted(accountId, currentDeviceId(), eventId, envelope)
+    await this.repository.deleteEncrypted(accountId, currentDeviceId(accountId), eventId, envelope)
   }
 
   private assertNoBlockingConflict(input: AgendaEventInput, events: AgendaEventEntity[], editingId?: string): void {

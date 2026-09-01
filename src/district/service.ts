@@ -72,7 +72,7 @@ export class DistrictService {
     const now = new Date().toISOString()
     const data: DistrictData = { name: name.trim(), createdAt: now, updatedAt: now }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'district', data }, id)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), id, envelope, 'district')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'district')
     return { id, ...data }
   }
 
@@ -82,7 +82,7 @@ export class DistrictService {
     if (!district || district.id !== districtId) throw new Error('Distrito não encontrado.')
     const data: DistrictData = { name: name.trim(), createdAt: district.createdAt, updatedAt: new Date().toISOString() }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'district', data }, districtId)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), districtId, envelope, 'district')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), districtId, envelope, 'district')
     return { id: districtId, ...data }
   }
 
@@ -94,7 +94,7 @@ export class DistrictService {
     }
     const deletedAt = new Date().toISOString()
     const tombstone = await encryptPayload(masterKey, { schemaVersion: 1, type: 'district_tombstone', data: { deletedAt } }, districtId)
-    await this.repository.deleteEncrypted(accountId, currentDeviceId(), districtId, tombstone)
+    await this.repository.deleteEncrypted(accountId, currentDeviceId(accountId), districtId, tombstone)
   }
 
   async listChurches(accountId: string, masterKey: CryptoKey, districtId: string): Promise<ChurchEntity[]> {
@@ -127,7 +127,7 @@ export class DistrictService {
       updatedAt: now,
     }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'church', data }, id)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), id, envelope, 'church')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'church')
     return { id, ...data }
   }
 
@@ -177,7 +177,7 @@ export class DistrictService {
       updatedAt: now,
     }
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'church', data }, churchId)
-    await this.repository.saveEncrypted(accountId, currentDeviceId(), churchId, envelope, 'church')
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), churchId, envelope, 'church')
     return { id: churchId, ...data }
   }
 
@@ -186,6 +186,6 @@ export class DistrictService {
     if (!church) throw new Error('Igreja não encontrada.')
     const deletedAt = new Date().toISOString()
     const tombstone = await encryptPayload(masterKey, { schemaVersion: 1, type: 'church_tombstone', data: { deletedAt } }, churchId)
-    await this.repository.deleteEncrypted(accountId, currentDeviceId(), churchId, tombstone)
+    await this.repository.deleteEncrypted(accountId, currentDeviceId(accountId), churchId, tombstone)
   }
 }
