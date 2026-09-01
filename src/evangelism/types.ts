@@ -1,3 +1,4 @@
+import type { GoalArea } from '../goals/areas'
 export const PLANNING_AREAS = ['identity', 'leadership', 'new_generations', 'discipleship'] as const
 export type PlanningArea = (typeof PLANNING_AREAS)[number]
 export const PLANNING_AREA_LABELS: Record<PlanningArea, string> = { identity: 'Identidade', leadership: 'Liderança', new_generations: 'Novas gerações', discipleship: 'Discipulado' }
@@ -14,9 +15,30 @@ export type AnnualGoalStatus = 'planned' | 'in_progress' | 'completed' | 'paused
 export const ANNUAL_GOAL_STATUS_LABELS: Record<AnnualGoalStatus, string> = { planned: 'Planejada', in_progress: 'Em andamento', completed: 'Concluída', paused: 'Pausada', cancelled: 'Cancelada' }
 export interface HistoryEntry { id: string; at: string; message: string }
 export interface PlanningReference { type: 'person' | 'interest' | 'bible_study' | 'visit' | 'prayer_request' | 'missionary_pair' | 'small_group' | 'sabbath_class' | 'uapg'; id: string; label: string }
+export interface GoalChurchTarget { churchId: string; target: number }
+export interface GoalChecklistItem { id: string; label: string; done: boolean }
+export interface GoalActionPlan { what: string; how: string; where: string; who: string; actions: string; checklist: GoalChecklistItem[] }
+export interface GoalBudgetItem { id: string; label: string; planned: number; spent: number }
+export interface GoalProgressEntry { month: string; amount: number }
+
+export const emptyActionPlan = (): GoalActionPlan => ({ what: '', how: '', where: '', who: '', actions: '', checklist: [] })
+
+/**
+ * Os campos do acompanhamento são opcionais de propósito: metas salvas antes
+ * desta etapa continuam abrindo, e o cadastro novo começa só com o essencial.
+ */
 export interface AnnualGoalData {
   title: string; description: string; area: PlanningArea; year: number; churchIds: string[]; responsible: string; dueDate: string; priority: PlanningPriority; status: AnnualGoalStatus; notes: string
   campaignIds: string[]; agendaEventIds: string[]; references: PlanningReference[]; history: HistoryEntry[]; createdAt: string; updatedAt: string
+  startDate?: string
+  target?: number
+  /** Financeiro, Batismos, Estudos Bíblicos ou UAPG, quando a meta se apoia numa delas. */
+  linkedArea?: GoalArea | null
+  churchTargets?: GoalChurchTarget[]
+  actionPlan?: GoalActionPlan
+  budget?: GoalBudgetItem[]
+  budgetNotes?: string
+  progress?: GoalProgressEntry[]
 }
 export interface AnnualGoalEntity extends AnnualGoalData { id: string }
 export type AnnualGoalInput = Omit<AnnualGoalData, 'campaignIds' | 'agendaEventIds' | 'history' | 'createdAt' | 'updatedAt'>

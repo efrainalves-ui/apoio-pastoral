@@ -49,6 +49,7 @@ import { PrayerRequestsPage } from '../pages/PrayerRequestsPage'
 import { ReadingPage } from '../pages/ReadingPage'
 import { AnnualPlanningPage } from '../pages/AnnualPlanningPage'
 import { AnnualGoalPage } from '../pages/AnnualGoalPage'
+import { GoalTrackingPage } from '../pages/GoalTrackingPage'
 import { EvangelismPage } from '../pages/EvangelismPage'
 import { CampaignPage } from '../pages/CampaignPage'
 import { DistrictService } from '../district/service'
@@ -166,7 +167,8 @@ export function App() {
         <Route path="metas/:area" element={<GoalAreaPage />} />
         <Route path="planejamento" element={<AnnualPlanningPage />} />
         <Route path="planejamento/nova" element={<AnnualGoalPage />} />
-        <Route path="planejamento/:goalId" element={<AnnualGoalPage />} />
+        <Route path="planejamento/:goalId" element={<GoalTrackingPage />} />
+        <Route path="planejamento/:goalId/editar" element={<AnnualGoalPage />} />
         <Route path="evangelismo" element={<EvangelismPage />} />
         <Route path="evangelismo/nova" element={<CampaignPage />} />
         <Route path="evangelismo/:campaignId" element={<CampaignPage />} />

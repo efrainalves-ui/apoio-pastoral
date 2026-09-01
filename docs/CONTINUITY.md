@@ -72,7 +72,7 @@ Concluída a criação e restauração de backup local cifrado. O arquivo conté
 
 ## Etapa estável: Planejamento Anual e Evangelismo
 
-- Planejamento Anual organiza metas por ano, igreja, prioridade, situação e pelas áreas Identidade, Liderança, Novas gerações e Discipulado. Inclui calendário mensal, próximas ações, resumo por igreja, histórico, vínculos e cópia revisável para outro ano.
+- Planejamento Anual organiza metas por ano e pelas áreas Identidade, Liderança, Novas gerações e Discipulado. O cadastro pede apenas título, área estratégica, vínculo opcional com Financeiro, Batismos, Estudos Bíblicos ou UAPG, datas de início e fim e quantidade esperada; toda meta é do distrito. Cada meta abre em Acompanhar, com resumo, divisão opcional por igreja, plano de ação, agenda, orçamento próprio e resultado mês a mês. Quando há vínculo, o resultado vem da área correspondente, sem lançamento duplicado. Inclui calendário mensal, próximas ações, resumo por igreja, histórico, vínculos e cópia revisável para outro ano.
 - Evangelismo organiza campanhas, pontos, equipe formada por pessoas já cadastradas, tarefas, checklist editável, orçamento próprio, acompanhamentos e encerramento com relatório PDF local.
 - Uma campanha pode ligar uma meta existente ou criar a meta na mesma confirmação. Campanha, encontros adicionais, pontos e tarefas marcadas entram na Agenda com identificadores persistentes, evitando compromissos duplicados.
 - A edição de um compromisso criado por Evangelismo devolve título, data ou prazo ao registro ligado. A exclusão de uma meta preserva campanhas; a exclusão da campanha preserva a meta e remove somente seus compromissos ligados.

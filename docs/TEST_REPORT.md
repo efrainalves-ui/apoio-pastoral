@@ -179,7 +179,7 @@ Na execução final de 27 de agosto de 2026, o build e o servidor de teste foram
 - uma build de produção foi servida em porta isolada, recebeu um registro fictício, teve o servidor encerrado e foi recarregada pelo service worker; após desbloquear o cofre, o registro cifrado reapareceu offline;
 - manifesto, ícones e `display: standalone` foram verificados pelo script PWA; a confirmação nativa de instalação no sistema operacional continua sendo um teste físico do navegador/plataforma;
 - nenhum erro ou warning foi registrado no console durante a jornada.
-- Planejamento Anual e Evangelismo foram abertos pelo menu; uma meta, campanha, ponto, tarefa e item de orçamento fictícios foram criados, e a Agenda mostrou campanha, ponto e lembrete vinculados sem recadastro.
+- Planejamento Anual e Evangelismo foram abertos pelo menu; uma meta fictícia foi criada com o cadastro simples e acompanhada em seguida — divisão por igreja com aviso de soma diferente, tarefa do plano de ação, item de orçamento da meta e resultado do mês, chegando a 25% da meta. Campanha, ponto, tarefa e item de orçamento fictícios foram criados, e a Agenda mostrou campanha, ponto e lembrete vinculados sem recadastro.
 - a build final foi aberta em origem nova, sem ler armazenamento anterior; a entrada foi conferida em desktop e 390 × 844 sem rolagem horizontal, as abas Entrar/Criar conta e seus rótulos estavam presentes, e a rota protegida de Backup retornou corretamente para a entrada.
 
 ## Pendências de validação externa

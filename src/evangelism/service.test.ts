@@ -26,6 +26,47 @@ function setup() {
   return { database, service: new EvangelismPlanningService(database), agenda: new AgendaService(database) }
 }
 
+describe('Meta do planejamento e Agenda', () => {
+  it('salva a meta simples, sem responsável e sem igreja', async () => {
+    const { service } = setup(); const key = await generateMasterKey()
+    const salva = await service.saveGoal(accountId, key, goal({ churchIds: [], responsible: '', startDate: '2026-01-01', target: 12, linkedArea: 'bible_studies' }))
+    expect(salva).toMatchObject({ target: 12, linkedArea: 'bible_studies', startDate: '2026-01-01', churchIds: [] })
+  })
+
+  it('recusa data de fim anterior ao início', async () => {
+    const { service } = setup(); const key = await generateMasterKey()
+    await expect(service.saveGoal(accountId, key, goal({ startDate: '2026-10-01', dueDate: '2026-09-30' }))).rejects.toThrow(/data de fim/i)
+  })
+
+  it('cria o compromisso na Agenda e não repete o mesmo dia', async () => {
+    const { service, agenda } = setup(); const key = await generateMasterKey()
+    const salva = await service.saveGoal(accountId, key, goal())
+    const evento = { title: 'Encontro Fictício de Duplas', date: '2026-05-10', startTime: '19:00', endTime: '20:30', churchId: null, location: 'Salão Fictício' }
+    const primeiro = await service.createGoalAgendaEvent(accountId, key, salva.id, evento)
+    const segundo = await service.createGoalAgendaEvent(accountId, key, salva.id, evento)
+
+    expect(primeiro.reused).toBe(false)
+    expect(segundo.reused).toBe(true)
+    expect(segundo.eventId).toBe(primeiro.eventId)
+    expect(segundo.goal.agendaEventIds).toEqual([primeiro.eventId])
+    expect(await agenda.listEvents(accountId, key)).toHaveLength(1)
+  })
+
+  it('liga um compromisso existente uma única vez e desliga sem apagar da Agenda', async () => {
+    const { service, agenda } = setup(); const key = await generateMasterKey()
+    const salva = await service.saveGoal(accountId, key, goal())
+    const evento = await agenda.createEvent(accountId, key, { title: 'Reunião Fictícia do Distrito', category: 'meeting', churchId: null, location: '', address: '', visitTarget: 'none', sermonId: null, sermonSnapshot: null, ceremonyDetails: null, linkedSource: null, startAt: '2026-06-02T19:00', endAt: '2026-06-02T20:00', allDay: false, reminderMinutes: 60, notes: '', includeInItinerary: true, mondayException: true })
+
+    await service.linkGoalAgendaEvent(accountId, key, salva.id, evento.id)
+    const ligada = await service.linkGoalAgendaEvent(accountId, key, salva.id, evento.id)
+    expect(ligada.agendaEventIds).toEqual([evento.id])
+
+    const desligada = await service.unlinkGoalAgendaEvent(accountId, key, salva.id, evento.id)
+    expect(desligada.agendaEventIds).toEqual([])
+    expect(await agenda.listEvents(accountId, key)).toHaveLength(1)
+  })
+})
+
 describe('Planejamento Anual e Evangelismo integrados', () => {
   it('cria campanha e meta na mesma confirmação, liga a Agenda e não grava textos legíveis', async () => {
     const { database, service, agenda } = setup(); const key = await generateMasterKey()

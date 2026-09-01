@@ -28,15 +28,38 @@ test('planeja uma meta e uma campanha integradas no computador e no celular', as
   await registerWithFictitiousDistrict(page)
   await navigateInsideApp(page, '/app/planejamento', page.getByText('Igreja Modelo Fictícia', { exact: true }))
   await expect(page.getByRole('heading', { name: 'Planejamento Anual' })).toBeVisible()
-  await page.getByRole('link', { name: 'Nova meta' }).click()
-  await page.getByLabel('Título').fill('Meta Anual Fictícia')
-  await page.getByLabel('Prazo').fill(isoDate(futureDate(90)))
-  await page.getByLabel('Responsável').fill('Responsável Fictício')
-  await page.getByText('Igreja Modelo Fictícia', { exact: true }).click()
-  await page.getByRole('button', { name: 'Salvar meta anual' }).click()
-  await expect(page.getByRole('heading', { name: 'Meta Anual Fictícia' })).toBeVisible()
+  await page.getByRole('link', { name: 'Nova meta do planejamento' }).click()
+  await page.getByLabel('Título').fill('Meta Fictícia do Planejamento')
+  await page.getByLabel('Data de início').fill(isoDate(today()))
+  await page.getByLabel('Data de fim').fill(isoDate(futureDate(90)))
+  await page.getByLabel('Quantidade esperada').fill('12')
+  await page.getByRole('button', { name: 'Salvar meta' }).click()
 
-  await page.getByRole('link', { name: 'Criar campanha', exact: true }).click()
+  // O acompanhamento abre sozinho depois de salvar: a meta é do distrito e as
+  // igrejas, o plano, o orçamento e a agenda entram aqui.
+  await expect(page.getByRole('heading', { name: 'Meta Fictícia do Planejamento' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '1. Resumo' })).toBeVisible()
+
+  await page.getByLabel('Meta de Igreja Modelo Fictícia').fill('5')
+  await page.getByRole('heading', { name: '3. Plano de ação' }).click()
+  await expect(page.getByText('A soma das igrejas está diferente da meta do distrito.')).toBeVisible()
+
+  await page.getByLabel('O que será feito').fill('Visitar as famílias fictícias do distrito')
+  await page.getByLabel('Nova tarefa da lista').fill('Combinar as duplas fictícias')
+  await page.getByRole('button', { name: 'Adicionar' }).click()
+  await expect(page.getByText('Combinar as duplas fictícias')).toBeVisible()
+
+  await page.getByLabel('Item', { exact: true }).fill('Material fictício da meta')
+  await page.getByLabel('Previsto').fill('300')
+  await page.getByLabel('Gasto').fill('120')
+  await page.getByRole('button', { name: 'Somar ao orçamento' }).click()
+  await expect(page.getByText('Previsto R$ 300,00 · Gasto R$ 120,00')).toBeVisible()
+
+  await page.getByLabel('Resultado de Jan').fill('3')
+  await page.getByRole('heading', { name: '6. Acompanhamento' }).click()
+  await expect(page.getByText('25% da meta')).toBeVisible()
+
+  await page.getByRole('link', { name: 'Criar campanha para esta meta' }).click()
   await page.getByLabel('Nome da campanha').fill('Campanha Fictícia Integrada')
   await page.getByLabel('Data de início').fill(isoDate(campaignStart))
   await page.getByLabel('Data de término').fill(isoDate(addDays(campaignStart, 7)))
@@ -44,7 +67,7 @@ test('planeja uma meta e uma campanha integradas no computador e no celular', as
   await page.getByText('Igreja Modelo Fictícia', { exact: true }).click()
   await page.getByRole('button', { name: 'Salvar campanha e Agenda' }).click()
   await expect(page.getByRole('heading', { name: 'Campanha Fictícia Integrada' })).toBeVisible()
-  await expect(page.getByText('Meta Anual Fictícia')).toBeVisible()
+  await expect(page.getByText('Meta Fictícia do Planejamento')).toBeVisible()
 
   await page.getByLabel('Nome do ponto').fill('Ponto Fictício Central')
   await page.locator('#point-date').fill(isoDate(addDays(campaignStart, 1)))
