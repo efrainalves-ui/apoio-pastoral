@@ -51,10 +51,11 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   const visitChurch = page.getByRole('combobox', { name: /^Igreja(?:$|\s)/ })
   await navigateInsideApp(page, '/app/visitas/nova', visitChurch)
   await visitChurch.selectOption({ label: 'Igreja Esperança Fictícia' })
-  await expect(page.getByLabel('Cadastro visitado')).toContainText('Família Cuidado Fictícia')
-  await page.getByLabel('Cadastro visitado').selectOption({ label: 'Família Cuidado Fictícia' })
-  await page.getByLabel(/Agendamento vinculado/).selectOption({ label: 'Visita Agendada Fictícia' })
-  await page.getByLabel('Rodada (opcional)').selectOption({ label: 'Rodada Cuidado Fictícia' })
+  // As perguntas ficam abertas desde o começo, antes de escolher qualquer membro.
+  await expect(page.locator('.question-card').first()).toBeVisible()
+  await page.getByRole('button', { name: 'Pessoa Cuidado Fictícia', exact: true }).click()
+  await page.getByLabel('Agendamento vinculado').selectOption({ label: 'Visita Agendada Fictícia' })
+  await page.getByLabel('Rodada').selectOption({ label: 'Rodada Cuidado Fictícia' })
   // A pergunta é achada pelo texto, como o pastor a lê: o código interno não
   // aparece mais na tela, e responder é tocar no botão.
   const question = page.locator('.question-card').filter({ hasText: 'Você estudou a Bíblia hoje?' })
@@ -80,6 +81,7 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   await page.reload()
   await page.getByLabel('Senha').fill(password)
   await page.getByRole('button', { name: 'Entrar' }).click()
-  await navigateInsideApp(page, '/app/visitas', page.getByText('Família Cuidado Fictícia'))
-  await expect(page.getByText('Família Cuidado Fictícia')).toBeVisible()
+  // A visita passou a ser registrada por membro, então a lista mostra a pessoa.
+  await navigateInsideApp(page, '/app/visitas', page.getByText('Pessoa Cuidado Fictícia'))
+  await expect(page.getByText('Pessoa Cuidado Fictícia')).toBeVisible()
 })

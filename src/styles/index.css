@@ -748,6 +748,19 @@ h1, h2, h3, .brand strong { font-family: ui-rounded, "SF Pro Rounded", Inter, ui
 .conflict-sides h3 svg { width: 18px; height: 18px; color: var(--green-800); }
 .conflict-sides small { color: var(--muted); }
 
+.answer-summary { display: grid; gap: 18px; }
+.answer-summary__question { margin: 2px 0 8px; }
+.answer-summary__average strong { font-size: 1.6rem; }
+.answer-summary__average span { color: var(--muted); }
+.answer-summary__bars { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.answer-summary__bars li { display: grid; grid-template-columns: minmax(56px, auto) 1fr 44px; gap: 10px; align-items: center; }
+.answer-summary__label { overflow-wrap: anywhere; }
+.answer-summary__bar { height: 10px; border-radius: 999px; background: var(--green-50); overflow: hidden; }
+.answer-summary__bar span { display: block; height: 100%; background: var(--green-800); }
+.answer-summary__value { text-align: right; font-variant-numeric: tabular-nums; }
+.visit-members { display: grid; gap: 6px; margin-top: 12px; }
+.visit-members__list { display: flex; flex-wrap: wrap; gap: 8px; }
+
 .sidebar__footer-actions { display: flex; gap: 8px; }
 .sidebar__footer-actions .button { flex: 1; min-width: 0; padding-inline: 10px; }
 

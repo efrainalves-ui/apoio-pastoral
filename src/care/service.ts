@@ -3,6 +3,7 @@ import { decryptPayload, encryptPayload } from '../crypto/vault'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository, type EncryptedMutation } from '../db/repository'
 import type { VaultRecord } from '../db/types'
+import { FamilyService } from '../families/service'
 import { PeopleService } from '../people/service'
 import type { PersonData } from '../people/types'
 import type { FollowUpData, FollowUpEntity, PrayerRequestData, PrayerRequestEntity, PrayerRequestInput, TaskData, TaskEntity, VisitCompletionInput, VisitData, VisitEntity, VisitRoundData, VisitRoundEntity, VisitVersion } from './types'
@@ -20,8 +21,8 @@ function assertCompletion(input: VisitCompletionInput): void {
 function decodeData<T extends CareEntity>(record: VaultRecord, data: unknown): T | null { return record.deletedAt ? null : ({ id: record.id, ...(data as object) } as T) }
 
 export class CareService {
-  private readonly repository: VaultRepository; private readonly people: PeopleService
-  constructor(private readonly database: ApoioDatabase = db) { this.repository = new VaultRepository(database); this.people = new PeopleService(database) }
+  private readonly repository: VaultRepository; private readonly people: PeopleService; private readonly families: FamilyService
+  constructor(private readonly database: ApoioDatabase = db) { this.repository = new VaultRepository(database); this.people = new PeopleService(database); this.families = new FamilyService(database) }
 
   private async list<T extends CareEntity>(accountId: string, masterKey: CryptoKey, recordType: VaultRecord['recordType'], payloadType: string): Promise<T[]> {
     const values: T[] = []
@@ -61,9 +62,14 @@ export class CareService {
       const data: PersonData = { ...stored, incomeStatus: answer.status, history: [...stored.history, { id: crypto.randomUUID(), at: now, event: 'income_status_updated', source: 'Entrevista pastoral' }], updatedAt: now }
       mutations.push({ recordId: person.id, recordType: 'person', envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: 'person', data }, person.id) })
     }
-    if (input.roundId && input.targetType === 'family') {
+    if (input.roundId) {
+      // A visita passou a ser registrada por membro. A rodada continua sendo de
+      // famílias, então a família vem de quem foi visitado.
+      const familyId = input.targetType === 'family'
+        ? input.targetId
+        : (await this.families.listFamilies(accountId, masterKey)).find((family) => family.memberIds.includes(input.targetId))?.id ?? ''
       const round = (await this.listRounds(accountId, masterKey)).find(({ id }) => id === input.roundId)
-      if (round && round.status === 'active' && round.targetFamilyIds.includes(input.targetId)) { const visitedFamilyIds = [...new Set([...round.visitedFamilyIds, input.targetId])]; const completed = round.targetFamilyIds.length > 0 && visitedFamilyIds.length === round.targetFamilyIds.length; const { id: _id, ...existing } = round; void _id; const next: VisitRoundData = { ...existing, visitedFamilyIds, status: completed ? 'completed' : 'active', completedAt: completed ? now : null, updatedAt: now }; mutations.push({ recordId: round.id, recordType: 'visit_round', envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: 'visit_round', data: next }, round.id) }) }
+      if (round && round.status === 'active' && round.targetFamilyIds.includes(familyId)) { const input = { targetId: familyId }; const visitedFamilyIds = [...new Set([...round.visitedFamilyIds, input.targetId])]; const completed = round.targetFamilyIds.length > 0 && visitedFamilyIds.length === round.targetFamilyIds.length; const { id: _id, ...existing } = round; void _id; const next: VisitRoundData = { ...existing, visitedFamilyIds, status: completed ? 'completed' : 'active', completedAt: completed ? now : null, updatedAt: now }; mutations.push({ recordId: round.id, recordType: 'visit_round', envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: 'visit_round', data: next }, round.id) }) }
     }
     await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
     return { id: visitId, ...visit }
