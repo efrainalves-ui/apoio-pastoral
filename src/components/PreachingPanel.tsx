@@ -1,4 +1,4 @@
-import { CalendarClock, Check, MapPin, X } from 'lucide-react'
+import { CalendarClock, Check, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { AgendaService } from '../agenda/service'
 import type { AgendaEventEntity } from '../agenda/types'
@@ -124,7 +124,6 @@ export function PreachingPanel({ sermon, onClose }: { sermon: SermonEntity; onCl
                 <span className={`entity-badge${item.scheduled ? ' entity-badge--soft' : ''}`}>{item.scheduled ? 'Programada' : 'Registrada'}</span>
               </li>
             ))}</ul>}
-          {preachings.length > 0 && <p className="field__hint"><MapPin aria-hidden="true" /> A mesma pregação aparece no histórico da igreja.</p>}
         </div>
       </div>
     </div>

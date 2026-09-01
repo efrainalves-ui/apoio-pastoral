@@ -24,12 +24,13 @@ export function validateAgendaEvent(input: AgendaEventInput): void {
     if (input.category === 'wedding' && !input.churchId && !input.location.trim()) throw new Error('Informe a igreja ou o local do casamento.')
     if (input.category === 'child_dedication' && !input.ceremonyDetails.childPersonId) throw new Error('Escolha a criança da dedicação.')
   }
-  if (isMonday(input.startAt) && !input.mondayException) throw new Error('A segunda-feira é folga. Marque a exceção explicitamente para salvar este compromisso.')
+  // A folga de segunda-feira é um lembrete, não uma trava: quem marca um
+  // compromisso nesse dia sabe o que está fazendo.
 }
 
 export function findAgendaConflicts(candidate: AgendaEventInput, events: AgendaEventEntity[], editingId?: string): AgendaConflict[] {
   const start = new Date(candidate.startAt).getTime(); const end = new Date(candidate.endAt).getTime(); const conflicts: AgendaConflict[] = []
-  if (isMonday(candidate.startAt)) conflicts.push({ kind: 'monday_rest', message: 'Este compromisso é uma exceção à folga de segunda-feira.' })
+  if (isMonday(candidate.startAt)) conflicts.push({ kind: 'monday_rest', message: 'Segunda-feira é seu dia de folga.' })
   for (const event of events) {
     if (event.id === editingId) continue
     const otherStart = new Date(event.startAt).getTime(); const otherEnd = new Date(event.endAt).getTime()

@@ -36,7 +36,9 @@ describe('agenda cifrada', () => {
   })
 
   it('valida segunda-feira, sobreposição e intervalo menor que cinco minutos', () => {
-    expect(() => validateAgendaEvent(input({ startAt: '2026-08-17T14:00', endAt: '2026-08-17T15:00' }))).toThrow('segunda-feira')
+    // A folga de segunda-feira avisa, mas não impede o registro.
+    expect(() => validateAgendaEvent(input({ startAt: '2026-08-17T14:00', endAt: '2026-08-17T15:00' }))).not.toThrow()
+    expect(findAgendaConflicts(input({ startAt: '2026-08-17T14:00', endAt: '2026-08-17T15:00' }), []).map(({ kind }) => kind)).toContain('monday_rest')
     const existing = [{ id: 'event-fixture', ...input(), createdAt: '2026-08-01T00:00:00Z', updatedAt: '2026-08-01T00:00:00Z' }]
     expect(findAgendaConflicts(input({ startAt: '2026-08-18T14:30', endAt: '2026-08-18T15:30' }), existing)[0]?.kind).toBe('overlap')
     expect(findAgendaConflicts(input({ startAt: '2026-08-18T15:03', endAt: '2026-08-18T16:00' }), existing)[0]?.kind).toBe('short_interval')
