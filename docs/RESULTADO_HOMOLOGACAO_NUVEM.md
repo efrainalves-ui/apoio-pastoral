@@ -20,6 +20,12 @@ senhas, chave de recuperação, ciphertext nem conteúdo digitado.
 | Migration | `0001_marco_zero_up.sql` |
 | Projeto | Supabase de homologação, vazio e exclusivo desta rodada |
 
+> Atualização posterior: este resultado descreve a rodada anterior, em que um
+> aparelho novo ainda usava a chave de recuperação. A versão seguinte troca
+> esse acesso por e-mail e senha e exige a migration
+> `0002_password_key_envelopes_up.sql`. A nova rodada deve repetir as seções de
+> entrada, dispositivos e isolamento antes de qualquer uso real.
+
 ## 1. Conexão e escopo
 
 | Verificação | Resultado |

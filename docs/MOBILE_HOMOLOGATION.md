@@ -6,7 +6,7 @@ Esta etapa exige dispositivos físicos e uma pessoa responsável. Ela está **pe
 |---|---|---|
 | Instalação | Aplicativo instala pela forma autorizada para homologação, sem apontar para produção | Falha de instalação, origem não autorizada ou pedido de dado real |
 | Abertura inicial | Tela de acesso abre sem corte, rolagem horizontal ou texto técnico | Tela inacessível, conteúdo técnico inicial ou erro não tratado |
-| Conta e acesso | Criar conta fictícia, entrar, bloquear e recuperar com chave fictícia | Sessão de outra conta aparece, recuperação falha ou há exposição de segredo |
+| Conta e acesso | Criar conta fictícia; entrar no Safari e no app instalado somente com e-mail e senha; recuperar com chave fictícia apenas como contingência | Sessão de outra conta aparece, a entrada normal pede a chave, recuperação falha ou há exposição de segredo |
 | Uso offline | Após primeiro carregamento, abrir e consultar registros fictícios sem rede | Dados fictícios somem, falha sem mensagem tratada ou há tentativa de publicação |
 | Retorno à rede | Restaurar rede e observar somente o estado previsto da fila de homologação | Dados de outra conta aparecem, conteúdo legível é enviado ou há conexão com produção |
 | Atualização | Atualizar o aplicativo e confirmar abertura do cofre local fictício | Atualização perde ou mistura dados locais fictícios sem aviso controlado |

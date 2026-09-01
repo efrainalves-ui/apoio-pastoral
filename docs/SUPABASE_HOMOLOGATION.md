@@ -4,7 +4,7 @@ Este roteiro é exclusivo para um projeto Supabase novo, vazio, privado e separa
 
 ## Preparação já feita localmente
 
-A migration `supabase/migrations/0001_marco_zero_up.sql` mantém somente metadados técnicos e conteúdo cifrado. Ela foi reforçada para:
+As migrations `0001_marco_zero_up.sql` e `0002_password_key_envelopes_up.sql` mantêm somente metadados técnicos e conteúdo cifrado. Elas foram reforçadas para:
 
 - impedir que um envelope de uma conta aponte para dispositivo de outra conta;
 - aceitar novo envelope apenas para dispositivo ativo da mesma conta;
@@ -12,6 +12,7 @@ A migration `supabase/migrations/0001_marco_zero_up.sql` mantém somente metadad
 - retirar exclusão de dispositivo, evitando apagar e recriar um dispositivo revogado;
 - aceitar operações somente de dispositivo ativo pertencente à conta autenticada;
 - manter operações remotas sem permissão de atualização ou exclusão.
+- manter o envelope da senha protegido por RLS, disponível somente para a própria conta e sem expor a senha ou a chave mestra.
 
 Essas garantias têm testes estáticos e unitários locais. Ainda precisam ser comprovadas no Supabase de homologação; nenhuma migration foi aplicada remotamente nesta preparação.
 
@@ -29,8 +30,8 @@ Inserir os valores somente no computador privado do avaliador. Não versionar `.
 1. Confirmar que o CI Linux da branch passou integralmente, inclusive Playwright desktop e celular.
 2. Criar um projeto Supabase vazio e identificado claramente como homologação; conferir que não é produção.
 3. Em Auth, permitir somente as contas fictícias da rodada. Se necessário, desabilitar confirmação de e-mail apenas nesse projeto temporário.
-4. Aplicar `supabase/migrations/0001_marco_zero_up.sql` uma única vez. Não aplicar o arquivo `*_down.sql` na validação normal.
-5. Confirmar as quatro tabelas, RLS habilitada, políticas e trigger de revogação.
+4. Aplicar, nesta ordem, `supabase/migrations/0001_marco_zero_up.sql` e `supabase/migrations/0002_password_key_envelopes_up.sql`. Não aplicar os arquivos `*_down.sql` na validação normal.
+5. Confirmar as cinco tabelas, RLS habilitada, políticas e trigger de revogação.
 6. Inserir URL e chave pública somente no ambiente local privado, fora do Git.
 7. Criar duas contas fictícias distintas usando apenas endereços `example.test`, senhas exclusivas de teste e registros claramente inventados.
 8. Executar toda a checklist abaixo. Parar na primeira reprovação; não contornar RLS com credencial administrativa.
@@ -42,11 +43,12 @@ Inserir os valores somente no computador privado do avaliador. Não versionar `.
 |---|---|---|---|
 | Migration | Aplicar em projeto vazio | Transação conclui; tabelas, RLS, políticas e trigger existem | Qualquer erro, RLS ausente ou contrato diferente |
 | Login | Criar A e B, sair e entrar novamente | Cada sessão mantém sua identidade | Sessões ou identidades se misturam |
+| Novo dispositivo | Entrar em navegador limpo com a conta A | E-mail e senha abrem a conta, registram outro dispositivo e não pedem a chave de recuperação | Entrada pede chave de recuperação ou cria outra conta |
 | Leitura entre contas | Como B, consultar linhas de A em cada tabela | Zero linhas | Qualquer linha de A é visível |
 | Escrita entre contas | Como B, tentar escrever com `owner_id` de A | Operação recusada e A intacta | Escrita aceita ou A alterada |
 | Vínculo cruzado | Como B, tentar envelope apontando para dispositivo de A | Inserção recusada | Inserção aceita |
 | Revogação | Revogar dispositivo de A; tentar sincronizar, reativar, excluir e recriar | Todas as tentativas são recusadas | Qualquer tentativa é aceita |
-| Conteúdo remoto | Sincronizar registro pastoral fictício e inspecionar linha | Somente IDs, versões, ciphertext, IV, AAD e timestamps | Qualquer conteúdo legível aparece |
+| Conteúdo remoto | Sincronizar registro pastoral fictício e inspecionar tabelas | Somente IDs, versões, ciphertext, IV, AAD e timestamps; envelope de senha não contém senha nem chave legível | Qualquer conteúdo legível aparece |
 | Envio e recebimento | Alterar registro fictício no computador A e receber no celular A | Uma cópia lógica, sem duplicidade e com conteúdo correto após desbloqueio | Perda, duplicidade ou texto legível no transporte |
 | Isolamento do pull | Sincronizar A e executar pull como B | B não recebe operação de A | B recebe ID, envelope ou contagem de A |
 | Offline e retorno | Criar e editar dados fictícios sem rede; restaurar a rede e sincronizar | Dados locais continuam visíveis e fila conclui sem perda | Dados somem, duplicam ou fila é descartada |

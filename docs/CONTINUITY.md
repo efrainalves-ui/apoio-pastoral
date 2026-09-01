@@ -15,6 +15,10 @@ Atualizado em: 27 de agosto de 2026.
 
 ## Retomada registrada
 
+- Em 1º de setembro de 2026, o acesso em novo dispositivo foi corrigido no código: depois de confirmar e-mail e senha, a instalação baixa somente o envelope de senha cifrado da própria conta e registra um novo dispositivo. A migration complementar `0002_password_key_envelopes_up.sql` precisa ser aplicada no Supabase de homologação antes de publicar esta versão.
+- Safari e o aplicativo instalado na Tela de Início do iPhone devem ser validados como instalações diferentes. Ambos devem entrar somente com e-mail e senha, aparecer separadamente na lista de dispositivos e manter sincronização, isolamento e revogação.
+- A chave de recuperação não é enviada por e-mail e permanece reservada à contingência de perda de acesso aos dispositivos. A alteração passou em lint, TypeScript, 197 testes unitários com dados fictícios, build, verificação PWA e revisão de segurança do repositório. Ainda faltam a prova da migration no Supabase de homologação e os testes físicos documentados.
+
 - A correção de fidelidade pelo modelo 3 está separada e deve ser preservada: classificação oficial, quantidade exata opcional, faixa de origem preservada e compatibilidade de snapshots legados.
 - A leitura local anterior de documentos reais não deixou PDFs, nomes ou conteúdo pastoral no repositório. A sincronização permaneceu desativada para essa conta local de homologação.
 - Havia artefatos experimentais claramente separados de cache/desenvolvimento e uma importação temporária no ecrã de fidelidade. Eles foram descartados sem tocar na correção de fidelidade.

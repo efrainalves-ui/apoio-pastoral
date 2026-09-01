@@ -6,7 +6,7 @@ Aplicativo local-first com Distrito, Pessoas, Agenda, Planejamento Anual, Evange
 
 - conta local de desenvolvimento e integração de autenticação Supabase por ambiente;
 - cofre com chave mestra aleatória AES-GCM 256;
-- envelope de senha via PBKDF2-HMAC-SHA-256 e envelope de recuperação via HKDF-SHA-256;
+- envelope de senha via PBKDF2-HMAC-SHA-256 disponível à própria conta em qualquer dispositivo, e envelope de recuperação via HKDF-SHA-256 para contingência;
 - IndexedDB/Dexie com conteúdo cifrado e migrations versionadas;
 - fila offline idempotente e transporte Supabase que aceita apenas envelopes cifrados;
 - dispositivos ativos/revogados e RLS no banco remoto;
@@ -48,7 +48,7 @@ Abra `http://localhost:5173`. Sem `.env`, o aplicativo usa somente o transporte 
 
 Para uma homologação estritamente local, defina `VITE_DISABLE_SYNC=true` em `.env.local`. Nesse modo, autenticação remota, transporte e fila de saída ficam desativados; gravações continuam cifradas no IndexedDB.
 
-Para usar Supabase, copie `.env.example` para `.env.local`, preencha URL e chave anônima e aplique `supabase/migrations/0001_marco_zero_up.sql` no projeto. O cadastro por e-mail pode exigir confirmação conforme a configuração do Auth.
+Para usar Supabase, copie `.env.example` para `.env.local`, preencha URL e chave anônima e aplique, nesta ordem, `supabase/migrations/0001_marco_zero_up.sql` e `supabase/migrations/0002_password_key_envelopes_up.sql` no projeto. O cadastro por e-mail pode exigir confirmação conforme a configuração do Auth.
 
 ## Verificações
 

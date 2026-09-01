@@ -35,10 +35,13 @@ Repita a seção inteira em cada aparelho.
 | # | O que fazer | Aprova se | Reprova se |
 |---|---|---|---|
 | 3.1 | Instalar o aplicativo pela forma autorizada e entrar na conta A | A tela abre sem corte nem rolagem horizontal | Falha de instalação ou tela quebrada |
-| 3.2 | Conferir a lista de dispositivos da conta A | O celular aparece como um segundo dispositivo | O celular entra sem ser registrado |
-| 3.3 | Ver no celular o registro criado no computador | Aparece uma cópia só, com o conteúdo certo | Falta, duplica ou vem embaralhado |
-| 3.4 | Criar um registro no celular e sincronizar | Ele aparece no computador após sincronizar | Perda, duplicidade ou erro sem mensagem |
-| 3.5 | Desligar a rede, editar um registro, religar e sincronizar | A edição sobe e nada se perde | A fila é descartada ou os dados somem |
+| 3.2 | Entrar apenas com e-mail e senha da conta A | A conta abre normalmente; não pede chave de recuperação | Pede chave de recuperação ou cria uma conta/distrito separado |
+| 3.3 | Conferir a lista de dispositivos da conta A | O celular aparece como um segundo dispositivo | O celular entra sem ser registrado |
+| 3.4 | Ver no celular o registro criado no computador | Aparece uma cópia só, com o conteúdo certo | Falta, duplica ou vem embaralhado |
+| 3.5 | Criar um registro no celular e sincronizar | Ele aparece no computador após sincronizar | Perda, duplicidade ou erro sem mensagem |
+| 3.6 | Desligar a rede, editar um registro, religar e sincronizar | A edição sobe e nada se perde | A fila é descartada ou os dados somem |
+
+No iPhone, repita 3.1 a 3.6 no Safari e no aplicativo aberto pelo ícone da Tela de Início. Eles precisam aparecer como dois dispositivos distintos, sem misturar dados.
 
 ## 4. Conflito entre os dois aparelhos
 
@@ -57,7 +60,7 @@ Repita a seção inteira em cada aparelho.
 |---|---|---|---|
 | 5.1 | Pelo computador, revogar o dispositivo do celular | O celular passa a `revoked` na lista | A revogação não chega ao serviço |
 | 5.2 | Tentar sincronizar pelo celular revogado | A sincronização é recusada | O celular continua enviando dados |
-| 5.3 | No celular revogado, tentar entrar de novo | É preciso autorizar de novo por outro dispositivo | O celular se reativa sozinho |
+| 5.3 | No celular revogado, tentar usar o aplicativo já instalado | Ele não sincroniza nem se reativa sozinho | O aparelho volta a enviar ou receber dados |
 
 ## 6. Backup e restauração
 

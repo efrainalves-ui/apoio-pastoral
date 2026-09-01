@@ -52,6 +52,8 @@ Pessoas, famílias, WhatsApp, nascimento, histórico, divergências de importaç
 
 - E2EE não oculta todos os metadados (volume, timestamps e identificadores).
 - O modo local é para desenvolvimento, não substitui autenticação remota de produção.
-- Biometria e aprovação ECDH entre dispositivos permanecem controles avançados da V1.1; no Marco 0, um novo dispositivo exige login e chave de recuperação.
+- E-mail e senha abrem o cofre também em uma nova instalação. O serviço guarda somente o envelope da chave mestra já cifrado pela senha; nunca recebe a senha ou o conteúdo pastoral em texto aberto.
+- Uma nova instalação é registrada como outro dispositivo após a entrada. Safari e o aplicativo instalado no iPhone são instalações independentes para esse controle.
+- A chave de recuperação é contingência para perda de acesso aos dispositivos; ela não é enviada por e-mail e não é o caminho normal de entrada em um aparelho novo.
 - A revisão independente de segurança e o parecer jurídico continuam obrigatórios antes de uso público.
 - As garantias RLS e de sincronização precisam ser confirmadas em Supabase exclusivo de homologação depois da aprovação do CI Linux. Dados reais continuam proibidos até as validações externas documentadas.
