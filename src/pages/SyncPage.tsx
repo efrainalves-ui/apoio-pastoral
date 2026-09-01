@@ -18,6 +18,7 @@ export function SyncPage() {
   const [pending, setPending] = useState(0)
   const [lastSync, setLastSync] = useState<string | null>(null)
   const [conflicts, setConflicts] = useState(0)
+  const [resolved, setResolved] = useState(0)
   const [summary, setSummary] = useState<SyncSummary | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -27,6 +28,7 @@ export function SyncPage() {
     setPending(await db.outbox.where('accountId').equals(account.id).filter(({ status }) => status === 'pending').count())
     setLastSync((await db.syncState.get(account.id))?.lastSyncedAt ?? null)
     setConflicts(await db.syncConflicts.where('accountId').equals(account.id).filter(({ status }) => status === 'pending').count())
+    setResolved(await db.syncConflicts.where('accountId').equals(account.id).filter(({ status }) => status === 'resolved').count())
   }, [account])
 
   useEffect(() => { void refresh() }, [refresh])
@@ -53,11 +55,13 @@ export function SyncPage() {
         <div><small>Última sincronização</small><strong>{lastSync ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(lastSync)) : 'Ainda não realizada'}</strong></div>
         <div><small>Disponibilidade</small><strong>{transport.name === 'disabled' ? 'Somente neste dispositivo' : 'Sincronização disponível'}</strong></div>
         <div><small>Revisões pendentes</small><strong>{conflicts}</strong></div>
+        <div><small>Revisões já resolvidas</small><strong>{resolved}</strong></div>
       </div>
       <Card title="Sincronização manual" action={navigator.onLine ? <Cloud /> : <CloudOff />}>
         <p className="card-copy">{transport.name === 'disabled' ? 'A sincronização não está habilitada. Suas informações permanecem somente neste dispositivo.' : 'Se houver uma interrupção, as alterações pendentes serão mantidas para uma nova tentativa.'}</p>
         {summary && <div className="alert alert--success" role="status">Envio: {summary.pushed}. Recebimento: {summary.pulled}. Conflitos: {summary.conflicts}.</div>}
         {conflicts > 0 && <div className="alert alert--warning" role="status">Há alterações concorrentes preservadas para revisão. Nenhuma versão foi apagada automaticamente. <Link className="text-link" to="/app/sincronizacao/conflitos">Revisar agora</Link></div>}
+        {conflicts === 0 && resolved > 0 && <p className="card-copy">{resolved === 1 ? '1 revisão já foi resolvida.' : `${resolved} revisões já foram resolvidas.`} As versões preteridas continuam guardadas. <Link className="text-link" to="/app/sincronizacao/conflitos">Ver histórico</Link></p>}
         {error && <div className="alert alert--error" role="alert">{error}</div>}
         <Button onClick={() => void synchronize()} disabled={busy || transport.name === 'disabled'} icon={<RefreshCw className={busy ? 'spin' : ''} size={18} />}>{transport.name === 'disabled' ? 'Sincronização desativada' : busy ? 'Sincronizando…' : 'Sincronizar agora'}</Button>
       </Card>
