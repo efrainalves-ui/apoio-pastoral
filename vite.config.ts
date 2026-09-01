@@ -39,6 +39,12 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.{ts,tsx}'],
     environment: 'jsdom',
+    // A suíte unitária precisa ser hermética. Sem isto, o .env.local de quem
+    // estiver conduzindo a homologação faria o pacote de sincronização concluir
+    // que existe serviço remoto configurado e tentar rede no meio dos testes,
+    // e o resultado passaria a depender da máquina. Os testes que precisam de
+    // um ambiente específico o declaram com vi.stubEnv.
+    env: { VITE_SUPABASE_URL: '', VITE_SUPABASE_ANON_KEY: '', VITE_APP_ENV: '' },
     setupFiles: ['./src/test/setup.ts'],
     css: true,
     coverage: { provider: 'v8', reporter: ['text', 'html'] },

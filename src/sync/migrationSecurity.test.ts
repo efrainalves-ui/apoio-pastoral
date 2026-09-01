@@ -43,10 +43,19 @@ describe('migration de homologação', () => {
     }
   })
 
-  it('não concede nenhum privilégio ao visitante anônimo', () => {
+  it('zera os privilégios padrão antes de conceder o mínimo a cada tabela', () => {
     expect(migrationSql).not.toMatch(/grant[^;]*\bto\b[^;]*\banon\b/isu)
+
+    // O Supabase concede TRUNCATE, REFERENCES e TRIGGER a anon e a authenticated
+    // em toda tabela nova de public. TRUNCATE não passa pela RLS, então revogar
+    // só de anon deixaria qualquer conta autenticada apagar as linhas de todas
+    // as outras. Cada tabela precisa zerar os dois papéis antes dos grants.
     for (const tabela of tabelasCriadas(migrationSql)) {
-      expect(migrationSql).toMatch(new RegExp(`revoke all on[^;]*public\\.${tabela}[^;]*from anon`, 'isu'))
+      for (const papel of ['anon', 'authenticated']) {
+        expect(migrationSql).toMatch(
+          new RegExp(`revoke all on[^;]*public\\.${tabela}[^;]*from[^;]*\\b${papel}\\b`, 'isu'),
+        )
+      }
     }
   })
 
