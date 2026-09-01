@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { addDays, futureDate, isoDate, today } from './dates'
 import { navigateInsideApp } from './navigation'
 
 async function registerWithFictitiousDistrict(page: Page) {
@@ -19,12 +20,17 @@ async function registerWithFictitiousDistrict(page: Page) {
 }
 
 test('planeja uma meta e uma campanha integradas no computador e no celular', async ({ page }) => {
+  // A Agenda abre na semana corrente, de domingo a sábado. A campanha começa
+  // hoje para que o compromisso principal caia sempre dentro dessa semana; o
+  // ponto fica no dia seguinte para não colidir com o horário da campanha.
+  const campaignStart = today()
+
   await registerWithFictitiousDistrict(page)
   await navigateInsideApp(page, '/app/planejamento', page.getByText('Igreja Modelo Fictícia', { exact: true }))
   await expect(page.getByRole('heading', { name: 'Planejamento Anual' })).toBeVisible()
   await page.getByRole('link', { name: 'Nova meta' }).click()
   await page.getByLabel('Título').fill('Meta Anual Fictícia')
-  await page.getByLabel('Prazo').fill('2026-10-31')
+  await page.getByLabel('Prazo').fill(isoDate(futureDate(90)))
   await page.getByLabel('Responsável').fill('Responsável Fictício')
   await page.getByText('Igreja Modelo Fictícia', { exact: true }).click()
   await page.getByRole('button', { name: 'Salvar meta anual' }).click()
@@ -32,8 +38,8 @@ test('planeja uma meta e uma campanha integradas no computador e no celular', as
 
   await page.getByRole('link', { name: 'Criar campanha', exact: true }).click()
   await page.getByLabel('Nome da campanha').fill('Campanha Fictícia Integrada')
-  await page.getByLabel('Data de início').fill('2026-09-01')
-  await page.getByLabel('Data de término').fill('2026-09-08')
+  await page.getByLabel('Data de início').fill(isoDate(campaignStart))
+  await page.getByLabel('Data de término').fill(isoDate(addDays(campaignStart, 7)))
   await page.getByLabel('Responsável geral').fill('Responsável Fictício')
   await page.getByText('Igreja Modelo Fictícia', { exact: true }).click()
   await page.getByRole('button', { name: 'Salvar campanha e Agenda' }).click()
@@ -41,13 +47,13 @@ test('planeja uma meta e uma campanha integradas no computador e no celular', as
   await expect(page.getByText('Meta Anual Fictícia')).toBeVisible()
 
   await page.getByLabel('Nome do ponto').fill('Ponto Fictício Central')
-  await page.locator('#point-date').fill('2026-09-02')
+  await page.locator('#point-date').fill(isoDate(addDays(campaignStart, 1)))
   await page.locator('#point-responsible').fill('Pessoa Fictícia A')
   await page.getByRole('button', { name: 'Adicionar ponto e Agenda' }).click()
   await expect(page.getByText('Ponto Fictício Central')).toBeVisible()
 
   await page.getByLabel('Título da tarefa').fill('Preparar recepção fictícia')
-  await page.getByLabel('Prazo').last().fill('2026-09-01')
+  await page.getByLabel('Prazo').last().fill(isoDate(addDays(campaignStart, 2)))
   await page.getByText('Aparecer como lembrete na Agenda').click()
   await page.getByRole('button', { name: 'Criar tarefa' }).click()
   await expect(page.locator('.campaign-task-list article').filter({ hasText: 'Preparar recepção fictícia' })).toBeVisible()

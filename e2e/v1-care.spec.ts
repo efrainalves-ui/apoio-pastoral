@@ -1,9 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
+import { agendaDate, futureDate, isoDate, isoDateTime } from './dates'
 import { navigateInsideApp } from './navigation'
 
 const email = 'v1.cuidado.e2e@example.invalid'
 const password = 'senha-ficticia-cuidado-2026'
-function localInput(date: Date): string { const value = new Date(date); value.setMinutes(value.getMinutes() - value.getTimezoneOffset()); return value.toISOString().slice(0, 16) }
 
 async function foundation(page: Page) {
   await page.goto('/acesso')
@@ -36,11 +36,11 @@ async function foundation(page: Page) {
 
 test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento offline', async ({ page, context }) => {
   await foundation(page)
-  const appointment = new Date(); if (appointment.getDay() === 1) appointment.setDate(appointment.getDate() + 1); appointment.setHours(14, 0, 0, 0); const end = new Date(appointment); end.setHours(15)
+  const appointment = agendaDate()
   await navigateInsideApp(page, '/app/agenda/novo', page.getByLabel('Título'))
   await page.getByLabel('Título').fill('Visita Agendada Fictícia')
-  await page.getByLabel('Início').fill(localInput(appointment))
-  await page.getByLabel('Término').fill(localInput(end))
+  await page.getByLabel('Início').fill(isoDateTime(appointment, 14))
+  await page.getByLabel('Término').fill(isoDateTime(appointment, 15))
   await page.getByRole('button', { name: 'Salvar compromisso' }).click()
   await expect(page.getByRole('link', { name: /Abrir Visita Agendada Fictícia/ })).toBeVisible()
   await navigateInsideApp(page, '/app/cuidados', page.getByText('Família Cuidado Fictícia', { exact: true }))
@@ -60,9 +60,9 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   await question.getByRole('combobox').selectOption('Sim')
   await page.getByLabel('Pedido opcional').fill('Pedido de oração inteiramente fictício')
   await page.getByRole('combobox', { name: 'Acompanhamento', exact: true }).selectOption('call')
-  await page.getByLabel('Prazo do acompanhamento').fill('2026-09-01')
+  await page.getByLabel('Prazo do acompanhamento').fill(isoDate(futureDate(2)))
   await page.getByLabel('Título da tarefa').fill('Tarefa pastoral fictícia')
-  await page.getByLabel('Prazo da tarefa').fill('2026-09-02')
+  await page.getByLabel('Prazo da tarefa').fill(isoDate(futureDate(3)))
   await page.getByRole('button', { name: 'Finalizar visita' }).click()
   const visitVersion = page.getByText(/^Retrato imutável · versão \d+$/)
   await expect(visitVersion).toHaveText('Retrato imutável · versão 1')
