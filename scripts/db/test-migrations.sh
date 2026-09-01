@@ -32,20 +32,22 @@ contar_tabelas() {
 echo "==> 1/6 Preparando o ambiente auth que o Supabase fornece"
 psql_run -f "$testes/00_auth_shim.sql"
 
-echo "==> 2/6 Aplicando 0001_marco_zero_up.sql"
+echo "==> 2/6 Aplicando as migrations de homologação"
 psql_run -f "$migrations/0001_marco_zero_up.sql"
+psql_run -f "$migrations/0002_password_key_envelopes_up.sql"
 
 tabelas="$(contar_tabelas)"
-if [ "$tabelas" -ne 4 ]; then
-  echo "FALHOU: esperava 4 tabelas em public depois da migration, encontrei $tabelas" >&2
+if [ "$tabelas" -ne 5 ]; then
+  echo "FALHOU: esperava 5 tabelas em public depois das migrations, encontrei $tabelas" >&2
   exit 1
 fi
-echo "    4 tabelas criadas"
+echo "    5 tabelas criadas"
 
 echo "==> 3/6 Provando o isolamento entre duas contas fictícias"
 psql_run -f "$testes/01_rls_isolation.sql"
 
-echo "==> 4/6 Revertendo com 0001_marco_zero_down.sql"
+echo "==> 4/6 Revertendo as migrations"
+psql_run -f "$migrations/0002_password_key_envelopes_down.sql"
 psql_run -f "$migrations/0001_marco_zero_down.sql"
 
 tabelas="$(contar_tabelas)"
@@ -64,12 +66,13 @@ if [ "$restos" -ne 0 ]; then
 fi
 echo "    reversão limpa"
 
-echo "==> 5/6 Reaplicando a migration sobre a base revertida"
+echo "==> 5/6 Reaplicando as migrations sobre a base revertida"
 psql_run -f "$migrations/0001_marco_zero_up.sql"
+psql_run -f "$migrations/0002_password_key_envelopes_up.sql"
 
 tabelas="$(contar_tabelas)"
-if [ "$tabelas" -ne 4 ]; then
-  echo "FALHOU: a reaplicação recriou $tabelas tabela(s) em vez de 4" >&2
+if [ "$tabelas" -ne 5 ]; then
+  echo "FALHOU: a reaplicação recriou $tabelas tabela(s) em vez de 5" >&2
   exit 1
 fi
 

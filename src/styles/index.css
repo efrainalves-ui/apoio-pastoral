@@ -748,6 +748,11 @@ h1, h2, h3, .brand strong { font-family: ui-rounded, "SF Pro Rounded", Inter, ui
 .conflict-sides h3 svg { width: 18px; height: 18px; color: var(--green-800); }
 .conflict-sides small { color: var(--muted); }
 
+.device-approval__code { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 16px 0; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--green-50); }
+.device-approval__code strong { font-size: 2rem; letter-spacing: 0.18em; }
+.device-approval__code svg { width: 24px; height: 24px; color: var(--green-800); }
+.device-row__code { font-variant-numeric: tabular-nums; letter-spacing: 0.12em; }
+
 .conflict-diff { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--green-50); }
 .conflict-diff h4 { margin: 0 0 6px; font-size: 0.95rem; }
 .conflict-diff .detail-list > div { min-height: 0; padding: 10px 0; }

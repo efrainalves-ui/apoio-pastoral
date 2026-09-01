@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { currentDeviceId } from '../auth/device'
+import { DeviceApprovalPage } from '../pages/DeviceApprovalPage'
+import { db } from '../db/database'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { SyncService } from '../sync/service'
 import { createSyncTransport } from '../sync/transport'
@@ -98,18 +100,46 @@ export function useDistrictPresence(): boolean | null {
   return hasDistrict
 }
 
+/**
+ * Uma instalação nova abre o cofre com a senha, mas fica aguardando a
+ * confirmação de um aparelho já ativo antes de sincronizar. Esta checagem vem
+ * antes da do distrito: sem ela, o aparelho pendente tentaria sincronizar, não
+ * receberia nada e seria mandado criar um distrito duplicado.
+ */
+function useCurrentDeviceApproval(): { pending: boolean | null; approve: () => void } {
+  const { account, masterKey, recoveryCode } = useAuthVault()
+  const [pending, setPending] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    if (!account || !masterKey || recoveryCode) return
+    let cancelled = false
+    void db.devices.get(currentDeviceId()).then((device) => {
+      if (!cancelled) setPending(device?.accountId === account.id && device.status === 'pending')
+    })
+    return () => { cancelled = true }
+  }, [account, masterKey, recoveryCode])
+
+  return { pending, approve: () => setPending(false) }
+}
+
 function SetupAccess({ children }: { children: ReactNode }) {
   const { masterKey, recoveryCode } = useAuthVault()
+  const { pending, approve } = useCurrentDeviceApproval()
   const hasDistrict = useDistrictPresence()
   if (!masterKey || recoveryCode) return <Navigate to="/acesso" replace />
+  if (pending === null) return <div className="app-loading" role="status">Preparando seu distrito…</div>
+  if (pending) return <DeviceApprovalPage onApproved={approve} />
   if (hasDistrict === null) return <div className="app-loading" role="status">Preparando seu distrito…</div>
   return hasDistrict ? <Navigate to="/app" replace /> : <>{children}</>
 }
 
 function ProtectedApp() {
   const { masterKey, recoveryCode } = useAuthVault()
+  const { pending, approve } = useCurrentDeviceApproval()
   const hasDistrict = useDistrictPresence()
   if (!masterKey || recoveryCode) return <Navigate to="/acesso" replace />
+  if (pending === null) return <div className="app-loading" role="status">Preparando sua área…</div>
+  if (pending) return <DeviceApprovalPage onApproved={approve} />
   if (hasDistrict === null) return <div className="app-loading" role="status">Preparando sua área…</div>
   return hasDistrict ? <AppShell /> : <Navigate to="/configuracao-inicial" replace />
 }

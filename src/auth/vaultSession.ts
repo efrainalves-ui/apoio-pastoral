@@ -10,9 +10,11 @@ import type { AccountRecord, KeyEnvelopeRecord } from '../db/types'
 import { authorizeCurrentDevice } from './device'
 import {
   hasSupabaseConfiguration,
+  fetchRemotePasswordEnvelope,
   fetchRemoteRecoveryEnvelope,
   registerRemoteAccount,
   signInRemoteAccount,
+  storeRemotePasswordEnvelope,
   storeRemoteRecoveryEnvelope,
   updateRemotePassword,
 } from './supabase'
@@ -62,6 +64,7 @@ export async function registerAccount(
     await database.syncState.put({ accountId: id, cursor: null, lastSyncedAt: null })
   })
   await authorizeCurrentDevice(id, database)
+  await storeRemotePasswordEnvelope(passwordEnvelope)
   await storeRemoteRecoveryEnvelope(recovery.envelope)
   return { account, masterKey, recoveryCode: recovery.recoveryCode }
 }
@@ -72,16 +75,25 @@ export async function unlockAccount(
   database: ApoioDatabase = db,
 ): Promise<{ account: AccountRecord; masterKey: CryptoKey }> {
   const normalizedEmail = email.trim().toLowerCase()
-  const account = await database.accounts.where('email').equals(normalizedEmail).first()
+  let account = await database.accounts.where('email').equals(normalizedEmail).first()
+  let remoteAccountId: string | null = null
   if (!account) {
     if (hasSupabaseConfiguration) {
-      await signInRemoteAccount(normalizedEmail, password)
-      throw new Error('Este dispositivo precisa ser autorizado com a chave de recuperação.')
+      const accountId = await signInRemoteAccount(normalizedEmail, password)
+      remoteAccountId = accountId
+      const envelope = await fetchRemotePasswordEnvelope()
+      account = { id: accountId, email: normalizedEmail, createdAt: new Date().toISOString(), authMode: 'supabase' }
+      await database.transaction('rw', database.accounts, database.keyEnvelopes, database.syncState, async () => {
+        await database.accounts.put(account!)
+        await database.keyEnvelopes.put({ id: 'password', accountId, envelope, updatedAt: new Date().toISOString() })
+        await database.syncState.put({ accountId, cursor: null, lastSyncedAt: null })
+      })
+    } else {
+      throw new Error('E-mail ou senha inválidos.')
     }
-    throw new Error('E-mail ou senha inválidos.')
   }
   if (account.authMode === 'supabase') {
-    const remoteId = await signInRemoteAccount(normalizedEmail, password)
+    const remoteId = remoteAccountId ?? await signInRemoteAccount(normalizedEmail, password)
     if (remoteId !== account.id) throw new Error('Esta conta não corresponde à conta deste dispositivo.')
   }
   const envelopeRecord = await database.keyEnvelopes.get('password')
@@ -89,7 +101,9 @@ export async function unlockAccount(
     throw new Error('Este dispositivo precisa ser autorizado com a chave de recuperação.')
   }
   const masterKey = await openPasswordEnvelope(envelopeRecord.envelope, password)
-  await authorizeCurrentDevice(account.id, database)
+  // Instalação nova entra aguardando confirmação: a senha abre o cofre, mas
+  // liberar a sincronização exige o aval de um aparelho que já estava valendo.
+  await authorizeCurrentDevice(account.id, database, remoteAccountId ? 'pending' : 'active')
   return { account, masterKey }
 }
 
@@ -119,6 +133,7 @@ export async function recoverAccount(
   const masterKey = await openRecoveryEnvelope(recoveryEnvelope, recoveryCode)
   const passwordEnvelope = await createPasswordEnvelope(masterKey, newPassword)
   await database.keyEnvelopes.put({ id: 'password', accountId: account.id, envelope: passwordEnvelope, updatedAt: new Date().toISOString() })
+  if (account.authMode === 'supabase') await storeRemotePasswordEnvelope(passwordEnvelope)
   await authorizeCurrentDevice(account.id, database)
   return { account, masterKey }
 }
@@ -136,6 +151,7 @@ export async function changeVaultPassword(
   const replacement = await createPasswordEnvelope(masterKey, newPassword)
   if (account.authMode === 'supabase') await updateRemotePassword(newPassword)
   await database.keyEnvelopes.put({ ...passwordRecord, envelope: replacement, updatedAt: new Date().toISOString() })
+  if (account.authMode === 'supabase') await storeRemotePasswordEnvelope(replacement)
   return masterKey
 }
 

@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { RecoveryKeyEnvelope } from '../crypto/types'
+import type { PasswordKeyEnvelope, RecoveryKeyEnvelope } from '../crypto/types'
 import { isHomologationEnvironment, isSyncDisabled } from '../sync/config'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -53,19 +53,51 @@ export async function signOutRemoteAccount(): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
-export async function ensureRemoteDevice(deviceId: string, label: string): Promise<void> {
+/**
+ * Registra o aparelho no serviço. `status` vale apenas para a primeira vez: um
+ * aparelho já conhecido nunca é rebaixado aqui, senão uma instalação nova
+ * derrubaria a aprovação de um aparelho que já estava valendo.
+ */
+export async function ensureRemoteDevice(deviceId: string, label: string, status: RemoteDeviceStatus = 'active'): Promise<void> {
   if (!hasSupabaseConfiguration) return
   const client = getSupabaseClient()
   const { data: { user } } = await client.auth.getUser()
   if (!user) return
+  const conhecido = await readRemoteDeviceStatus(deviceId)
   const { error } = await client.from('devices').upsert({
     id: deviceId,
     owner_id: user.id,
     label,
-    status: 'active',
+    status: conhecido ?? status,
     last_seen_at: new Date().toISOString(),
   }, { onConflict: 'id' })
   if (error) throw new Error('Não foi possível autorizar o dispositivo no serviço.')
+}
+
+/**
+ * Leitura crua do estado do aparelho: devolve `null` quando ainda não existe
+ * linha. Diferente de `fetchRemoteDeviceStatus`, que falha fechado e trata a
+ * ausência como revogação — o que é certo para liberar sincronização e errado
+ * para decidir se o aparelho é novo.
+ */
+async function readRemoteDeviceStatus(deviceId: string): Promise<RemoteDeviceStatus | null> {
+  const { data, error } = await getSupabaseClient()
+    .from('devices')
+    .select('status')
+    .eq('id', deviceId)
+    .maybeSingle()
+  if (error) throw new Error('Não foi possível confirmar a autorização deste dispositivo.')
+  return (data?.status as RemoteDeviceStatus | undefined) ?? null
+}
+
+/** Libera um aparelho que estava aguardando confirmação. */
+export async function approveRemoteDevice(deviceId: string): Promise<void> {
+  if (!hasSupabaseConfiguration) return
+  const { error } = await getSupabaseClient().from('devices')
+    .update({ status: 'active', last_seen_at: new Date().toISOString() })
+    .eq('id', deviceId)
+    .eq('status', 'pending')
+  if (error) throw new Error('Não foi possível confirmar o aparelho no serviço.')
 }
 
 export async function storeRemoteRecoveryEnvelope(envelope: RecoveryKeyEnvelope): Promise<void> {
@@ -86,6 +118,25 @@ export async function storeRemoteRecoveryEnvelope(envelope: RecoveryKeyEnvelope)
   if (error) throw new Error('Não foi possível guardar o envelope de recuperação cifrado.')
 }
 
+export async function storeRemotePasswordEnvelope(envelope: PasswordKeyEnvelope): Promise<void> {
+  if (!hasSupabaseConfiguration) return
+  const client = getSupabaseClient()
+  const { data: { user } } = await client.auth.getUser()
+  if (!user) throw new Error('Não foi possível confirmar a conta no serviço.')
+  const { error } = await client.from('password_key_envelopes').upsert({
+    owner_id: user.id,
+    ciphertext: envelope.ciphertext,
+    iv: envelope.iv,
+    aad: envelope.aad,
+    salt: envelope.salt,
+    kdf: envelope.kdf,
+    iterations: envelope.iterations,
+    key_version: envelope.keyVersion,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'owner_id' })
+  if (error) throw new Error('Não foi possível guardar o acesso protegido da conta.')
+}
+
 interface RecoveryEnvelopeRow {
   ciphertext: string
   iv: string
@@ -93,6 +144,36 @@ interface RecoveryEnvelopeRow {
   salt: string
   kdf: 'HKDF-SHA-256'
   key_version: number
+}
+
+interface PasswordEnvelopeRow {
+  ciphertext: string
+  iv: string
+  aad: string
+  salt: string
+  kdf: 'PBKDF2-SHA-256'
+  iterations: number
+  key_version: number
+}
+
+export async function fetchRemotePasswordEnvelope(): Promise<PasswordKeyEnvelope> {
+  const { data, error } = await getSupabaseClient()
+    .from('password_key_envelopes')
+    .select('ciphertext,iv,aad,salt,kdf,iterations,key_version')
+    .single()
+  if (error || !data) throw new Error('Não foi possível preparar o acesso neste dispositivo. Use a chave de recuperação somente se você não tiver acesso a nenhum dispositivo.')
+  const row: PasswordEnvelopeRow = data
+  return {
+    kind: 'password',
+    algorithm: 'AES-GCM-256',
+    ciphertext: row.ciphertext,
+    iv: row.iv,
+    aad: row.aad,
+    salt: row.salt,
+    kdf: row.kdf,
+    iterations: row.iterations,
+    keyVersion: row.key_version,
+  }
 }
 
 export async function fetchRemoteRecoveryEnvelope(): Promise<RecoveryKeyEnvelope> {

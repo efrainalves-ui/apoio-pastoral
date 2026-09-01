@@ -1,6 +1,6 @@
 import { KeyRound, Laptop, LockKeyhole, ShieldCheck, Smartphone } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { currentDeviceId, revokeDevice } from '../auth/device'
+import { approveDevice, currentDeviceId, deviceConfirmationCode, revokeDevice } from '../auth/device'
 import { fetchRemoteDevices } from '../auth/supabase'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -58,6 +58,11 @@ export function SecurityPage() {
     }
   }
 
+  async function approve(id: string) {
+    await approveDevice(id)
+    await loadDevices()
+  }
+
   async function revoke(id: string) {
     await revokeDevice(id)
     await loadDevices()
@@ -70,7 +75,9 @@ export function SecurityPage() {
         <div className="device-list">
           {devices.map((device) => {
             const isCurrent = device.id === currentDeviceId()
-            return <div className="device-row" key={device.id}><span className="device-row__icon">{device.label.includes('móvel') ? <Smartphone /> : <Laptop />}</span><div><strong>{device.label}</strong><small>{isCurrent ? 'Este dispositivo' : 'Dispositivo autorizado'} · visto {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date(device.lastSeenAt))}</small></div><StatusPill tone={device.status === 'active' ? 'success' : 'warning'}>{device.status === 'active' ? 'Ativo' : 'Revogado'}</StatusPill>{!isCurrent && device.status === 'active' && <Button variant="danger" onClick={() => void revoke(device.id)}>Revogar</Button>}</div>
+            const aguardando = device.status === 'pending'
+            const situacao = device.status === 'active' ? 'Ativo' : aguardando ? 'Aguardando confirmação' : 'Revogado'
+            return <div className="device-row" key={device.id}><span className="device-row__icon">{device.label.includes('móvel') ? <Smartphone /> : <Laptop />}</span><div><strong>{device.label}</strong><small>{isCurrent ? 'Este dispositivo' : aguardando ? <>Confira o código <span className="device-row__code">{deviceConfirmationCode(device.id)}</span> nesse aparelho</> : 'Dispositivo autorizado'} · visto {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date(device.lastSeenAt))}</small></div><StatusPill tone={device.status === 'active' ? 'success' : 'warning'}>{situacao}</StatusPill>{!isCurrent && aguardando && <Button onClick={() => void approve(device.id)}>Confirmar</Button>}{!isCurrent && device.status !== 'revoked' && <Button variant="danger" onClick={() => void revoke(device.id)}>{aguardando ? 'Recusar' : 'Revogar'}</Button>}</div>
           })}
         </div>
       </Card>

@@ -1,6 +1,6 @@
 import { db, type ApoioDatabase } from '../db/database'
 import type { DeviceRecord } from '../db/types'
-import { ensureRemoteDevice, fetchRemoteDeviceStatus, revokeRemoteDevice, type RemoteDeviceStatus } from './supabase'
+import { approveRemoteDevice, ensureRemoteDevice, fetchRemoteDeviceStatus, revokeRemoteDevice, type RemoteDeviceStatus } from './supabase'
 
 const DEVICE_ID_KEY = 'apoio-pastoral:device-id'
 
@@ -17,7 +17,24 @@ function deviceLabel(): string {
   return mobile ? 'Dispositivo móvel' : 'Computador'
 }
 
-export async function authorizeCurrentDevice(accountId: string, database: ApoioDatabase = db): Promise<DeviceRecord> {
+/**
+ * Código curto que o pastor confere entre os dois aparelhos. Vem do próprio
+ * identificador do aparelho, então os dois lados chegam ao mesmo valor sem
+ * precisar guardar nada a mais.
+ */
+export function deviceConfirmationCode(deviceId: string): string {
+  const limpo = deviceId.replace(/[^0-9a-f]/giu, '').toUpperCase()
+  const seis = limpo.slice(-6).padStart(6, '0')
+  return `${seis.slice(0, 3)}-${seis.slice(3)}`
+}
+
+export async function authorizeCurrentDevice(
+  accountId: string,
+  database: ApoioDatabase = db,
+  // Uma instalação nova entra como 'pending': quem prova só a senha ainda
+  // precisa da confirmação de um aparelho que já estava valendo.
+  statusInicial: 'active' | 'pending' = 'active',
+): Promise<DeviceRecord> {
   const id = currentDeviceId()
   const existing = await database.devices.get(id)
   if (existing?.accountId !== undefined && existing.accountId !== accountId) {
@@ -31,13 +48,39 @@ export async function authorizeCurrentDevice(accountId: string, database: ApoioD
     id,
     accountId,
     label: existing?.label ?? deviceLabel(),
-    status: 'active',
+    status: existing?.status ?? statusInicial,
     createdAt: existing?.createdAt ?? now,
     lastSeenAt: now,
   }
   await database.devices.put(device)
-  await ensureRemoteDevice(device.id, device.label)
+  await ensureRemoteDevice(device.id, device.label, device.status)
   return device
+}
+
+/** Confirma, a partir de um aparelho já ativo, uma instalação que aguardava. */
+export async function approveDevice(deviceId: string, database: ApoioDatabase = db): Promise<void> {
+  await approveRemoteDevice(deviceId)
+  const local = await database.devices.get(deviceId)
+  if (local) await database.devices.put({ ...local, status: 'active' })
+}
+
+/**
+ * Traz do serviço o estado deste aparelho e grava localmente. É como uma
+ * instalação que aguarda confirmação descobre que foi liberada.
+ */
+export async function refreshCurrentDeviceStatus(
+  accountId: string,
+  database: ApoioDatabase = db,
+  readRemoteStatus: RemoteDeviceStatusReader = fetchRemoteDeviceStatus,
+): Promise<RemoteDeviceStatus | null> {
+  const id = currentDeviceId()
+  const remoto = await readRemoteStatus(id)
+  if (!remoto) return null
+  const local = await database.devices.get(id)
+  if (local && local.accountId === accountId && local.status !== remoto) {
+    await database.devices.put({ ...local, status: remoto, ...(remoto === 'revoked' ? { revokedAt: new Date().toISOString() } : {}) })
+  }
+  return remoto
 }
 
 export async function assertDeviceCanSync(accountId: string, deviceId: string, database: ApoioDatabase = db): Promise<void> {

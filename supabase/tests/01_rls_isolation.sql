@@ -68,6 +68,8 @@ insert into public.device_key_envelopes (owner_id, device_id, ciphertext, iv, aa
   values (:conta_a, :disp_a, 'cifra-ficticia-a', 'iv-a', 'aad-a');
 insert into public.recovery_key_envelopes (owner_id, ciphertext, iv, aad, salt)
   values (:conta_a, 'cifra-recuperacao-a', 'iv-a', 'aad-a', 'sal-a');
+insert into public.password_key_envelopes (owner_id, ciphertext, iv, aad, salt, iterations)
+  values (:conta_a, 'cifra-senha-a', 'iv-a', 'aad-a', 'sal-a', 600000);
 insert into public.encrypted_operations
   (id, owner_id, device_id, record_id, operation, base_version, record_version, schema_version, ciphertext, iv, aad)
   values ('a1000000-0000-4000-8000-00000000000a', :conta_a, :disp_a,
@@ -106,6 +108,9 @@ select homologacao_testes.exigir(
   (select count(*) from public.recovery_key_envelopes) = 0,
   'B não lê o envelope de recuperação de A, logo não restaura o cofre de A');
 select homologacao_testes.exigir(
+  (select count(*) from public.password_key_envelopes) = 0,
+  'B não lê o envelope de senha de A');
+select homologacao_testes.exigir(
   (select count(*) from public.encrypted_operations) = 0,
   'B não recebe operações cifradas de A ao sincronizar');
 
@@ -131,6 +136,11 @@ select homologacao_testes.exigir_recusa(
   format($cmd$insert into public.recovery_key_envelopes (owner_id, ciphertext, iv, aad, salt)
                values (%L, 'x', 'x', 'x', 'x')$cmd$, :conta_a),
   'B não substitui o envelope de recuperação de A');
+
+select homologacao_testes.exigir_recusa(
+  format($cmd$insert into public.password_key_envelopes (owner_id, ciphertext, iv, aad, salt, iterations)
+               values (%L, 'x', 'x', 'x', 'x', 600000)$cmd$, :conta_a),
+  'B não substitui o envelope de senha de A');
 
 select homologacao_testes.exigir_recusa(
   $cmd$delete from public.encrypted_operations$cmd$,
@@ -233,6 +243,8 @@ select homologacao_testes.exigir_recusa(
   $cmd$select * from public.device_key_envelopes$cmd$, 'anônimo não lê envelopes de dispositivo');
 select homologacao_testes.exigir_recusa(
   $cmd$select * from public.recovery_key_envelopes$cmd$, 'anônimo não lê envelopes de recuperação');
+select homologacao_testes.exigir_recusa(
+  $cmd$select * from public.password_key_envelopes$cmd$, 'anônimo não lê envelopes de senha');
 select homologacao_testes.exigir_recusa(
   $cmd$select * from public.encrypted_operations$cmd$, 'anônimo não lê operações cifradas');
 
