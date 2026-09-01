@@ -68,10 +68,17 @@ pnpm dev
 
 Depois, no navegador:
 
-1. Crie a **conta fictícia A** com um endereço `@example.invalid` e uma senha só
+> **Por que `.test` e não `.invalid`.** Os dois são TLDs reservados pela RFC 2606:
+> nenhum é registrável, nenhum resolve e nenhum entrega mensagem, então um envio
+> acidental não chega a pessoa nenhuma. A escolha por `.test` é imposta pelo
+> serviço: o Auth do Supabase recusa `.invalid` com `email_address_invalid`. Os
+> testes automatizados locais continuam usando `@example.invalid`, porque não
+> falam com o Auth.
+
+1. Crie a **conta fictícia A** com um endereço `@example.test` e uma senha só
    de teste. Guarde a chave de recuperação que aparecer.
 2. Crie o distrito, uma igreja e uma pessoa, tudo com nomes inventados.
-3. Crie a **conta fictícia B**, também `@example.invalid`, com dados diferentes.
+3. Crie a **conta fictícia B**, também `@example.test`, com dados diferentes.
 4. Siga [CHECKLIST_DISPOSITIVOS.md](CHECKLIST_DISPOSITIVOS.md) no computador e
    depois no celular.
 

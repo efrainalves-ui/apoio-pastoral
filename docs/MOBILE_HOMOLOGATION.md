@@ -16,6 +16,6 @@ Esta etapa exige dispositivos físicos e uma pessoa responsável. Ela está **pe
 
 ## Registro mínimo da rodada
 
-Anotar somente: plataforma (iPhone ou Android), versão do sistema, versão do aplicativo, data, resultado de cada linha e código técnico de falha. Não registrar URL, conta fora de `example.invalid`, senha, chave de recuperação, ciphertext, backup ou screenshots com campos preenchidos.
+Anotar somente: plataforma (iPhone ou Android), versão do sistema, versão do aplicativo, data, resultado de cada linha e código técnico de falha. Não registrar URL, conta fora de `example.test`, senha, chave de recuperação, ciphertext, backup ou screenshots com campos preenchidos.
 
 Uma falha bloqueia o uso de dados reais. A aprovação desta lista também não libera produção, publicação, Supabase de produção ou auditoria independente.

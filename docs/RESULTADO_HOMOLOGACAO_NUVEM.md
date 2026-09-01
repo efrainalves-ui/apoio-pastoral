@@ -7,7 +7,8 @@ Registro da rodada conforme [HOMOLOGACAO_NUVEM.md](HOMOLOGACAO_NUVEM.md),
 Segue a regra de evidência daqueles documentos: aqui entram apenas identificador
 da rodada, commit, versão da migration, nomes de tabelas e políticas,
 aprovado/reprovado, contagens e código técnico de erro. Não entram URL do
-projeto, identificador do projeto, chaves, e-mails fora de `example.invalid`,
+projeto, identificador do projeto, chaves, e-mails fora de `example.test` ou
+`example.invalid`,
 senhas, chave de recuperação, ciphertext nem conteúdo digitado.
 
 ## Identificação
@@ -15,7 +16,7 @@ senhas, chave de recuperação, ciphertext nem conteúdo digitado.
 | Campo | Valor |
 |---|---|
 | Rodada | `nuvem-2026-09-01` |
-| Situação geral | **Aprovação parcial** — banco e isolamento aprovados; jornada do aplicativo bloqueada no Auth |
+| Situação geral | **Aprovação parcial** — banco e isolamento aprovados; jornada do aplicativo bloqueada na confirmação por e-mail do Auth |
 | Migration | `0001_marco_zero_up.sql` |
 | Projeto | Supabase de homologação, vazio e exclusivo desta rodada |
 
@@ -131,10 +132,16 @@ configuração do projeto:
 Domínios alternativos passam pela validação de formato, o que confirma que a
 recusa é específica do TLD `.invalid`.
 
-A segunda causa se resolve desligando a confirmação por e-mail apenas neste
-projeto temporário, como os roteiros já preveem. A primeira exige decisão
-humana: a convenção `@example.invalid` está fixada em três documentos e não é
-aceita pelo serviço.
+**Resolvido:** a convenção da rodada em nuvem passou para `@example.test`. Os
+dois são TLDs reservados pela RFC 2606 — nenhum é registrável, nenhum resolve e
+nenhum entrega mensagem —, de modo que a garantia de não alcançar pessoa real
+permanece intacta. Os testes automatizados locais seguem com `@example.invalid`,
+porque não falam com o Auth.
+
+**Em aberto:** a confirmação por e-mail continua ligada. Enquanto estiver, todo
+cadastro tenta enviar mensagem e esbarra no limite de envio, e nenhuma conta
+fictícia pode ser criada. Desligar essa opção apenas neste projeto temporário é
+ação de painel, prevista nos roteiros, e não pode ser feita pelo conector.
 
 ## 7. Pendente
 

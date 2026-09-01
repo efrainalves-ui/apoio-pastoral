@@ -1,6 +1,6 @@
 # Checklist da rodada em nuvem — computador, iPhone e Android
 
-Use somente contas `@example.invalid`, senhas exclusivas de teste e registros
+Use somente contas `@example.test`, senhas exclusivas de teste e registros
 inventados. Pare na primeira reprovação e anote o que aconteceu.
 
 Pré-requisito: [HOMOLOGACAO_NUVEM.md](HOMOLOGACAO_NUVEM.md) concluído, com as
@@ -79,7 +79,7 @@ Repita a seção inteira em cada aparelho.
 Anote apenas: data, versão do aplicativo, commit testado, plataforma, o
 resultado de cada linha e o código técnico de qualquer erro.
 
-Não anote: URL do projeto, chaves, e-mails fora de `example.invalid`, senhas,
+Não anote: URL do projeto, chaves, e-mails fora de `example.test`, senhas,
 chave de recuperação, ciphertext, arquivos de backup ou capturas de tela com
 campos preenchidos.
 

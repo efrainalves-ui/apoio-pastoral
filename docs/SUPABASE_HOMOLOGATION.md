@@ -32,7 +32,7 @@ Inserir os valores somente no computador privado do avaliador. Não versionar `.
 4. Aplicar `supabase/migrations/0001_marco_zero_up.sql` uma única vez. Não aplicar o arquivo `*_down.sql` na validação normal.
 5. Confirmar as quatro tabelas, RLS habilitada, políticas e trigger de revogação.
 6. Inserir URL e chave pública somente no ambiente local privado, fora do Git.
-7. Criar duas contas fictícias distintas usando apenas endereços `example.invalid`, senhas exclusivas de teste e registros claramente inventados.
+7. Criar duas contas fictícias distintas usando apenas endereços `example.test`, senhas exclusivas de teste e registros claramente inventados.
 8. Executar toda a checklist abaixo. Parar na primeira reprovação; não contornar RLS com credencial administrativa.
 9. Apagar contas e projeto temporário ao fim da rodada, conforme a política interna. Guardar apenas evidência técnica redigida.
 
@@ -56,7 +56,7 @@ Inserir os valores somente no computador privado do avaliador. Não versionar `.
 
 ## Evidências permitidas
 
-Registrar somente: identificador da rodada, commit testado, versão da migration, nomes de tabelas/políticas, aprovado/reprovado, contagens e código técnico de erro. Não registrar URL, token, e-mail fora de `example.invalid`, senha, chave de recuperação, ciphertext completo, PDF, backup, formulário, nome ou conteúdo pastoral.
+Registrar somente: identificador da rodada, commit testado, versão da migration, nomes de tabelas/políticas, aprovado/reprovado, contagens e código técnico de erro. Não registrar URL, token, e-mail fora de `example.test`, senha, chave de recuperação, ciphertext completo, PDF, backup, formulário, nome ou conteúdo pastoral.
 
 ## Decisão
 
