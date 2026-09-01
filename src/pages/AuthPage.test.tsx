@@ -13,6 +13,12 @@ const authState = vi.hoisted(() => ({
   clearRecoveryCode: vi.fn(),
 }))
 
+const ambiente = vi.hoisted(() => ({ temServicoRemoto: false }))
+
+vi.mock('../auth/supabase', () => ({
+  get hasSupabaseConfiguration() { return ambiente.temServicoRemoto },
+}))
+
 vi.mock('../auth/AuthVaultContext', () => ({
   useAuthVault: () => ({
     account: authState.account,
@@ -30,6 +36,7 @@ describe('tela de acesso', () => {
   beforeEach(() => {
     authState.account = null
     authState.recoveryCode = null
+    ambiente.temServicoRemoto = false
     vi.clearAllMocks()
   })
 
@@ -98,8 +105,24 @@ describe('tela de acesso', () => {
     expect(screen.queryByRole('tablist', { name: 'Acesso' })).not.toBeInTheDocument()
   })
 
-  it('não oferece recuperação antes de existir uma conta', () => {
+  it('não oferece recuperação sem conta local e sem serviço remoto', () => {
     render(<AuthPage />)
     expect(screen.queryByRole('button', { name: 'Usar chave de recuperação' })).not.toBeInTheDocument()
+  })
+
+  // Num aparelho recém-autorizado não existe conta local: é justamente esse o
+  // caso em que a entrada de recuperação precisa aparecer, porque a senha
+  // sozinha não abre o cofre e a chave de recuperação é o único caminho.
+  it('oferece recuperação num dispositivo novo quando há serviço remoto', async () => {
+    const user = userEvent.setup()
+    ambiente.temServicoRemoto = true
+    render(<AuthPage />)
+
+    const entrada = screen.getByRole('button', { name: 'Usar chave de recuperação' })
+    expect(entrada).toBeInTheDocument()
+    await user.click(entrada)
+
+    expect(screen.getByRole('heading', { name: 'Recupere o acesso' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Chave de recuperação')).toBeRequired()
   })
 })

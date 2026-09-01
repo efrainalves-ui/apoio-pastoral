@@ -1,6 +1,7 @@
 import { KeyRound, Leaf } from 'lucide-react'
 import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { hasSupabaseConfiguration } from '../auth/supabase'
 import { Button } from '../components/ui/Button'
 import { Field } from '../components/ui/Field'
 
@@ -100,7 +101,7 @@ export function AuthPage() {
               <Button type="submit" full disabled={busy}>{busy ? 'Processando…' : mode === 'register' ? 'Criar conta' : mode === 'recover' ? 'Recuperar acesso' : 'Entrar'}</Button>
             </form>
           </div>
-          {account && mode !== 'recover' && <button className="text-button" onClick={() => setMode('recover')}>Usar chave de recuperação</button>}
+          {(account || hasSupabaseConfiguration) && mode !== 'recover' && <button className="text-button" onClick={() => setMode('recover')}>Usar chave de recuperação</button>}
           {mode === 'recover' && <button className="text-button" onClick={() => selectMode('unlock')}>Voltar para o acesso</button>}
         </div>
       </section>
