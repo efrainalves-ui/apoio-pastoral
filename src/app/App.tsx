@@ -1,6 +1,9 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { currentDeviceId } from '../auth/device'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { SyncService } from '../sync/service'
+import { createSyncTransport } from '../sync/transport'
 import { AppShell } from '../components/AppShell'
 import { AuthPage } from '../pages/AuthPage'
 import { AgendaFormPage } from '../pages/AgendaFormPage'
@@ -56,19 +59,56 @@ const FamilyBudgetPage = lazy(() => import('../pages/FamilyBudgetPage').then((mo
 
 const districtService = new DistrictService()
 
-function SetupAccess({ children }: { children: ReactNode }) {
+/**
+ * Um aparelho recém-autorizado chega com o cofre local vazio, mesmo quando a
+ * conta já tem distrito. Sem uma primeira sincronização aqui, ele seria mandado
+ * para a configuração inicial e criaria um distrito duplicado — e não teria como
+ * escapar, porque a tela de Sincronização mora dentro da área protegida, que só
+ * abre depois de existir distrito.
+ *
+ * A falha de sincronização é deliberadamente silenciosa: sem rede, ou com o
+ * dispositivo revogado, o aparelho segue para a configuração inicial em vez de
+ * travar na abertura.
+ */
+export function useDistrictPresence(): boolean | null {
   const { account, masterKey, recoveryCode } = useAuthVault()
   const [hasDistrict, setHasDistrict] = useState<boolean | null>(null)
-  useEffect(() => { if (!account || !masterKey || recoveryCode) return; void districtService.getDistrict(account.id, masterKey).then((district) => setHasDistrict(Boolean(district))) }, [account, masterKey, recoveryCode])
+
+  useEffect(() => {
+    if (!account || !masterKey || recoveryCode) return
+    let cancelled = false
+
+    void (async () => {
+      let district = await districtService.getDistrict(account.id, masterKey)
+      if (!district) {
+        const transport = createSyncTransport()
+        if (transport.name !== 'disabled') {
+          try {
+            await new SyncService(transport).synchronize(account.id, currentDeviceId())
+            district = await districtService.getDistrict(account.id, masterKey)
+          } catch { /* segue para a configuração inicial */ }
+        }
+      }
+      if (!cancelled) setHasDistrict(Boolean(district))
+    })()
+
+    return () => { cancelled = true }
+  }, [account, masterKey, recoveryCode])
+
+  return hasDistrict
+}
+
+function SetupAccess({ children }: { children: ReactNode }) {
+  const { masterKey, recoveryCode } = useAuthVault()
+  const hasDistrict = useDistrictPresence()
   if (!masterKey || recoveryCode) return <Navigate to="/acesso" replace />
   if (hasDistrict === null) return <div className="app-loading" role="status">Preparando seu distrito…</div>
   return hasDistrict ? <Navigate to="/app" replace /> : <>{children}</>
 }
 
 function ProtectedApp() {
-  const { account, masterKey, recoveryCode } = useAuthVault()
-  const [hasDistrict, setHasDistrict] = useState<boolean | null>(null)
-  useEffect(() => { if (!account || !masterKey || recoveryCode) return; void districtService.getDistrict(account.id, masterKey).then((district) => setHasDistrict(Boolean(district))) }, [account, masterKey, recoveryCode])
+  const { masterKey, recoveryCode } = useAuthVault()
+  const hasDistrict = useDistrictPresence()
   if (!masterKey || recoveryCode) return <Navigate to="/acesso" replace />
   if (hasDistrict === null) return <div className="app-loading" role="status">Preparando sua área…</div>
   return hasDistrict ? <AppShell /> : <Navigate to="/configuracao-inicial" replace />
