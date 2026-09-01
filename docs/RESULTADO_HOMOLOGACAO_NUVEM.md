@@ -16,7 +16,7 @@ senhas, chave de recuperação, ciphertext nem conteúdo digitado.
 | Campo | Valor |
 |---|---|
 | Rodada | `nuvem-2026-09-01` |
-| Situação geral | **Aprovação parcial** — banco e isolamento aprovados; jornada do aplicativo bloqueada na confirmação por e-mail do Auth |
+| Situação geral | **Aprovação parcial** — tudo o que é executável por ferramenta passou; faltam os aparelhos físicos |
 | Migration | `0001_marco_zero_up.sql` |
 | Projeto | Supabase de homologação, vazio e exclusivo desta rodada |
 
@@ -119,64 +119,113 @@ aplicativo não seja removida no futuro supondo que a RLS a cubra.
 Limitação conhecida e aceita: o que já está gravado num aparelho revogado
 permanece nele. A trava impede novas trocas; não apaga o passado à distância.
 
-## 6. Bloqueio: Auth não aceita a convenção de e-mail da documentação
+## 6. Jornada do aplicativo com duas contas fictícias
 
-A jornada do aplicativo não pôde ser executada. Duas causas, ambas de
-configuração do projeto:
+Executada com três aparelhos independentes da conta A (origens locais separadas,
+portanto armazenamentos separados) e um aparelho da conta B. Contas
+`@example.test`, conforme a convenção adotada nesta rodada.
 
-| Causa | Efeito |
+### Reprovações encontradas e corrigidas
+
+| # | Item | Situação |
+|---|---|---|
+| 1 | Autorizar um aparelho novo | **Reprovava** — corrigido |
+| 2 | Receber o distrito da conta num aparelho novo | **Reprovava** — corrigido |
+| 3 | Ver registros criados em outro aparelho | **Reprovava** — corrigido |
+| 4 | Revogar outro aparelho pela interface | **Reprovava** — corrigido |
+
+**1. Aparelho novo não podia ser autorizado.** A tela dizia que o dispositivo
+precisava ser autorizado com a chave de recuperação, mas a entrada para isso só
+aparecia quando já existia conta local — que num aparelho novo nunca existe. O
+motor já suportava o caso; faltava a porta.
+
+**2. Aparelho novo era mandado criar outro distrito.** O guarda de rota olhava
+só o distrito local, não achava nada e enviava para a configuração inicial,
+duplicando o distrito da conta. Não havia saída: a tela de Sincronização mora
+dentro da área protegida, que só abre depois de existir distrito.
+
+**3. Registros de outro aparelho chegavam e ficavam invisíveis.** Quem recebe
+não pode saber o tipo do registro sem abrir o conteúdo cifrado, então ele era
+gravado com tipo genérico; as listagens filtravam por tipo e o descartavam.
+Distrito e igrejas escapavam por serem procurados pelo conteúdo já decifrado.
+Pessoas, famílias, agenda e visitas sumiam — indistinguível de perda de dados.
+
+**4. A revogação era inalcançável.** A lista de dispositivos vinha do banco
+local, e cada aparelho guarda apenas a si mesmo: a tela mostrava só o aparelho
+em uso, e o botão de revogar nunca aparecia.
+
+### Aprovado depois das correções
+
+| Verificação | Resultado |
 |---|---|
-| O Auth do Supabase recusa o domínio reservado `.invalid` com `email_address_invalid` | Nenhuma conta `@example.invalid` pode ser criada pelo aplicativo |
-| A confirmação por e-mail continua ligada | O cadastro tenta enviar mensagem e esbarra em `over_email_send_rate_limit` |
+| Conta A criada pelo aplicativo, com chave de recuperação | Aprovado |
+| Primeiro aparelho registrado como `active` | Aprovado |
+| Senha sozinha não autoriza aparelho novo | Aprovado — exige a chave de recuperação |
+| Segundo aparelho autorizado e listado na conta | Aprovado — dois dispositivos `active` |
+| Registro criado no computador aparece no celular | Aprovado — uma cópia, conteúdo correto |
+| Registro criado no celular aparece no computador | Aprovado — uma cópia |
+| Offline: edição guardada e fila preservada | Aprovado — envio 0, fila mantida |
+| Retorno à rede: fila sobe sem perda | Aprovado |
+| Conflito entre dois aparelhos | Aprovado — sinalizado, nenhuma versão apagada |
+| Revisão mostra as duas versões lado a lado | Aprovado |
+| "Manter as duas" preserva ambas | Aprovado — viraram dois registros |
+| Conta B começa vazia | Aprovado |
+| Conta B não vê distrito, igreja nem pessoas de A | Aprovado |
+| Conta A não vê nada de B | Aprovado |
+| Backup criado só por ação explícita, no aparelho | Aprovado — nada enviado |
+| Restaurar em B um backup de A | Aprovado — recusado, mesmo com o código correto |
+| Orçamento Familiar fora da sincronização pastoral | Aprovado — nenhuma operação remota |
 
-Domínios alternativos passam pela validação de formato, o que confirma que a
-recusa é específica do TLD `.invalid`.
+### Conteúdo remoto
 
-**Resolvido:** a convenção da rodada em nuvem passou para `@example.test`. Os
-dois são TLDs reservados pela RFC 2606 — nenhum é registrável, nenhum resolve e
-nenhum entrega mensagem —, de modo que a garantia de não alcançar pessoa real
-permanece intacta. Os testes automatizados locais seguem com `@example.invalid`,
-porque não falam com o Auth.
+Linha real de `encrypted_operations` gerada pelo aplicativo contém apenas
+identificadores, versões, `created_at` e `ciphertext`/`iv`/`aad` opacos. Nenhum
+nome de igreja, pessoa, distrito ou lançamento financeiro aparece legível em
+nenhuma coluna.
 
-**Em aberto:** a confirmação por e-mail continua ligada. Enquanto estiver, todo
-cadastro tenta enviar mensagem e esbarra no limite de envio, e nenhuma conta
-fictícia pode ser criada. Desligar essa opção apenas neste projeto temporário é
-ação de painel, prevista nos roteiros, e não pode ser feita pelo conector.
+## 7. Revogação de dispositivo
 
-## 7. Pendente
-
-| Item | Motivo |
+| Verificação | Resultado |
 |---|---|
-| Contas fictícias A e B criadas pelo aplicativo | Bloqueado pelo item 6 |
-| Conteúdo remoto observado numa linha real de `encrypted_operations` | Depende das contas |
-| Sincronização entre computador e celular emulado, offline, conflito e resolução | Depende das contas |
-| Revogação verificada pela interface, com envio e recebimento | Depende das contas |
-| Backup: recusa em B e restauração em A | Depende das contas |
-| Orçamento Familiar fora da sincronização pastoral | Depende das contas |
-| Seção 3 da CHECKLIST_DISPOSITIVOS em iPhone e Android físicos | Não executável por ferramenta |
-| Encerramento: apagar contas fictícias e o projeto | Ao fim da rodada |
+| Revogar outro aparelho pela interface | Aprovado — chega ao serviço com data |
+| Aparelho revogado tenta entrar de novo | Aprovado — recusado pelo gatilho, não reativa |
+| Aparelho revogado com sessão aberta tenta sincronizar | Aprovado — recusado |
+| Aparelho revogado **envia** algo depois da revogação | Aprovado — nenhuma operação registrada |
+| Aparelho revogado **recebe** algo criado depois | Aprovado — não recebeu |
 
-Sobre o item 6, vale registrar o que já está provado por outro caminho: a
-verificação estática da migration e os testes unitários confirmam que apenas
-`ciphertext`, `iv`, `aad` e metadados técnicos saem do dispositivo, e que
-nenhuma coluna das quatro tabelas guarda texto pastoral. O que falta é a
-observação numa linha gerada pelo próprio aplicativo.
+O aparelho revogado com sessão ainda aberta foi barrado antes do envio e antes
+do recebimento, e a fila local permaneceu intacta. No serviço, esse aparelho
+consta com zero operações enviadas em toda a sua existência.
 
-## 8. Avisos do analisador do Supabase
+Limitação conhecida e aceita: o que já estava gravado no aparelho revogado
+permanece nele. A trava impede novas trocas; não apaga o passado à distância.
+
+## 8. Observações menores, sem reprovação
+
+- A revisão de conflito mostra as duas versões, mas o resumo exibe apenas o
+  título do registro; quando a diferença está em outro campo, as duas colunas
+  ficam visualmente iguais.
+- A tela de Sincronização informa as revisões pendentes, mas não quantas já
+  foram resolvidas.
+
+## 9. Avisos do analisador do Supabase
 
 Nenhum achado de RLS ou de exposição de dados nas quatro tabelas. Resta um aviso
 informativo de Auth, sobre proteção contra senhas vazadas estar desligada, sem
 efeito nesta rodada fictícia.
 
-## Estado em que o projeto ficou
+## 10. Pendente
 
-Migration aplicada, privilégios corrigidos, nenhuma conta, nenhuma linha e
-nenhum objeto auxiliar de teste. Pronto para a jornada do aplicativo assim que o
-item 6 for resolvido.
+| Item | Motivo |
+|---|---|
+| Seção 3 da CHECKLIST_DISPOSITIVOS em iPhone e Android físicos | Não executável por ferramenta |
+| Instalação do PWA no aparelho e tela sem corte nem rolagem horizontal | Idem |
+| Encerramento: apagar contas fictícias e o projeto de homologação | Ação destrutiva; aguarda decisão do responsável |
 
 ## Decisão
 
-Esta aprovação parcial **não** libera dados reais, publicação nem produção.
-Continuam obrigatórios a jornada do aplicativo, os testes em iPhone e Android
-físicos e a revisão independente de segurança, privacidade e LGPD, conforme
+Todas as verificações executáveis por ferramenta passaram, quatro delas somente
+depois de correção. Esta aprovação **não** libera dados reais, publicação nem
+produção. Continuam obrigatórios os testes em iPhone e Android físicos e a
+revisão independente de segurança, privacidade e LGPD, conforme
 [CONTINUITY.md](CONTINUITY.md).
