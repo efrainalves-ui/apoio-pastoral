@@ -71,7 +71,7 @@ describe('shell do aplicativo', () => {
   })
 
   it('recebe o distrito da conta antes de mandar um aparelho novo criar outro', async () => {
-    auth.account = { id: 'conta-ficticia', email: 'conta.ficticia@example.test' }
+    auth.account = { id: 'conta-ficticia', email: 'conta.ficticia@example.invalid' }
     auth.masterKey = {} as CryptoKey
     nuvem.transporte = 'supabase'
     nuvem.distritoNaNuvem = { id: 'distrito-ficticio' }
@@ -85,7 +85,7 @@ describe('shell do aplicativo', () => {
   })
 
   it('mantém a configuração inicial quando a conta realmente não tem distrito', async () => {
-    auth.account = { id: 'conta-ficticia', email: 'conta.ficticia@example.test' }
+    auth.account = { id: 'conta-ficticia', email: 'conta.ficticia@example.invalid' }
     auth.masterKey = {} as CryptoKey
     nuvem.transporte = 'supabase'
     nuvem.distritoNaNuvem = null
@@ -97,7 +97,7 @@ describe('shell do aplicativo', () => {
   })
 
   it('não procura o serviço quando a sincronização está desativada', async () => {
-    auth.account = { id: 'conta-ficticia', email: 'conta.ficticia@example.test' }
+    auth.account = { id: 'conta-ficticia', email: 'conta.ficticia@example.invalid' }
     auth.masterKey = {} as CryptoKey
     nuvem.transporte = 'disabled'
 

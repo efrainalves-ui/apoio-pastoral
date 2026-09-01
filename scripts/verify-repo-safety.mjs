@@ -13,6 +13,10 @@ const ARQUIVOS_SEM_VARREDURA_DE_EMAIL = new Set(['pnpm-lock.yaml'])
 
 const DOMINIOS_FICTICIOS_PERMITIDOS = [
   'example.invalid',
+  // Reservado pela RFC 2606 como os demais: não é registrável, não resolve e
+  // não entrega mensagem. Passou a ser a convenção da rodada em nuvem porque o
+  // Auth do Supabase recusa o TLD .invalid.
+  'example.test',
   'exemplo.test',
   'example.com',
   'apoio-pastoral.local',
