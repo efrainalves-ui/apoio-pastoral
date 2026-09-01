@@ -73,7 +73,7 @@ export function ChurchDetailPage() {
     }
   }
 
-  if (loading) return <div className="app-loading" role="status">Descriptografando a igreja…</div>
+  if (loading) return <div className="app-loading" role="status">Abrindo a igreja…</div>
   if (!church) return <div className="page-stack page-narrow"><div className="alert alert--error" role="alert">{error}</div><Link className="text-link" to="/app/distrito"><ArrowLeft />Voltar ao distrito</Link></div>
 
   return (

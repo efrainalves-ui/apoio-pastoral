@@ -67,7 +67,7 @@ export class DistrictService {
 
   async createDistrict(accountId: string, masterKey: CryptoKey, name: string): Promise<DistrictEntity> {
     assertValid(validateDistrictName(name))
-    if (await this.getDistrict(accountId, masterKey)) throw new Error('Já existe um distrito ativo neste cofre.')
+    if (await this.getDistrict(accountId, masterKey)) throw new Error('Já existe um distrito ativo nesta conta.')
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
     const data: DistrictData = { name: name.trim(), createdAt: now, updatedAt: now }

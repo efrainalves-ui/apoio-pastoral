@@ -27,7 +27,7 @@ describe('cofre criptográfico', () => {
     const key = await generateMasterKey()
     const envelope = await createPasswordEnvelope(key, 'senha-ficticia-correta')
 
-    await expect(openPasswordEnvelope(envelope, 'senha-ficticia-incorreta')).rejects.toThrow('Verifique a senha')
+    await expect(openPasswordEnvelope(envelope, 'senha-ficticia-incorreta')).rejects.toThrow('Senha incorreta')
   })
 
   it('abre a mesma chave mestra com o código de recuperação', async () => {

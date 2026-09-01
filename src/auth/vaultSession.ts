@@ -82,7 +82,7 @@ export async function unlockAccount(
   }
   if (account.authMode === 'supabase') {
     const remoteId = await signInRemoteAccount(normalizedEmail, password)
-    if (remoteId !== account.id) throw new Error('A conta autenticada não corresponde a este cofre.')
+    if (remoteId !== account.id) throw new Error('Esta conta não corresponde à conta deste dispositivo.')
   }
   const envelopeRecord = await database.keyEnvelopes.get('password')
   if (!envelopeRecord || envelopeRecord.accountId !== account.id || envelopeRecord.envelope.kind !== 'password') {

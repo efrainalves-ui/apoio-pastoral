@@ -88,7 +88,7 @@ export async function openPasswordEnvelope(envelope: PasswordKeyEnvelope, passwo
     const passwordKey = await derivePasswordKey(password, fromBase64Url(envelope.salt), envelope.iterations)
     return await unwrapMasterKey(envelope, passwordKey)
   } catch {
-    throw new Error('Não foi possível abrir o cofre. Verifique a senha.')
+    throw new Error('Senha incorreta. Verifique e tente novamente.')
   }
 }
 
@@ -150,6 +150,6 @@ export async function decryptPayload(masterKey: CryptoKey, envelope: CipherEnvel
     )
     return JSON.parse(fromUtf8(plaintext)) as VaultPayload
   } catch {
-    throw new Error('O registro não pôde ser autenticado ou descriptografado.')
+    throw new Error('Não foi possível abrir esta informação neste dispositivo.')
   }
 }
