@@ -17,6 +17,25 @@ jobs:
       CI: 'true'
       # A homologação não se conecta a serviços remotos nem usa credenciais.
       VITE_DISABLE_SYNC: 'true'
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGDATABASE: postgres
+
+    # Postgres descartável do próprio runner, com autenticação de confiança:
+    # não existe senha, segredo ou conexão com Supabase nesta verificação.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
 
     steps:
       - name: Obter código
@@ -50,6 +69,20 @@ jobs:
 
       - name: Verificação PWA
         run: pnpm verify:pwa
+
+      - name: Revisão de segurança do repositório
+        run: pnpm verify:repo
+
+      - name: Garantir o cliente psql
+        run: |
+          if ! command -v psql > /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends postgresql-client
+          fi
+          psql --version
+
+      - name: Migrations, reversão e isolamento por RLS
+        run: ./scripts/db/test-migrations.sh
 
       - name: Testes E2E Playwright
         run: pnpm test:e2e

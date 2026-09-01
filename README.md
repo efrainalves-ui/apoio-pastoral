@@ -71,3 +71,6 @@ O Playwright cobre Chromium desktop (1440 × 1000), viewport móvel Pixel 7, ins
 - Sincronização não substitui backup; backup `.apoio` pertence à V1.
 
 Documentos técnicos e decisões estão em `docs/`. O estado de continuidade está em `docs/CONTINUITY.md`.
+
+Para preparar a rodada de homologação em nuvem com dados fictícios, comece por
+`docs/HOMOLOGACAO_NUVEM.md` e siga `docs/CHECKLIST_DISPOSITIVOS.md`.

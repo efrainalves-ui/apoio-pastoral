@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { RecoveryKeyEnvelope } from '../crypto/types'
-import { isSyncDisabled } from '../sync/config'
+import { isHomologationEnvironment, isSyncDisabled } from '../sync/config'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -9,10 +9,20 @@ export const hasSupabaseConfiguration = !isSyncDisabled && Boolean(supabaseUrl &
 
 let cachedClient: SupabaseClient | null = null
 
+// Trava de ambiente: mesmo com URL e chave preenchidas, a conexão remota só é
+// aberta quando o ambiente está declarado como homologação. Falha alto e claro
+// em vez de cair em silêncio para o transporte local.
+export function assertHomologationEnvironment(): void {
+  if (!isHomologationEnvironment) {
+    throw new Error('A conexão remota só é permitida em ambiente de homologação. Defina VITE_APP_ENV=homologacao no seu .env.local.')
+  }
+}
+
 export function getSupabaseClient(): SupabaseClient {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('O ambiente Supabase ainda não foi configurado.')
   }
+  assertHomologationEnvironment()
   cachedClient ??= createClient(supabaseUrl, supabaseAnonKey, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
   })

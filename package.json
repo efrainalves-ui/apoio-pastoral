@@ -19,7 +19,9 @@
     "test:e2e:desktop": "playwright test --project=desktop-chromium",
     "test:e2e:mobile": "playwright test --project=mobile-chromium",
     "verify:pwa": "node scripts/verify-pwa.mjs",
-    "check": "pnpm lint && pnpm test && pnpm build && pnpm verify:pwa"
+    "verify:repo": "node scripts/verify-repo-safety.mjs",
+    "test:db": "bash scripts/db/test-migrations.sh",
+    "check": "pnpm lint && pnpm test && pnpm build && pnpm verify:pwa && pnpm verify:repo"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.112.3",

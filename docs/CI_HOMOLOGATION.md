@@ -1,6 +1,8 @@
 # Homologação interna contínua
 
-O workflow `.github/workflows/homologation-linux.yml` executa no Linux uma instalação limpa e, nesta ordem: lint, TypeScript, testes unitários, build, verificação PWA e Playwright E2E em Chromium desktop e celular.
+O workflow `.github/workflows/homologation-linux.yml` executa no Linux uma instalação limpa e, nesta ordem: lint, TypeScript, testes unitários, build, verificação PWA, revisão de segurança do repositório, migrations com RLS e Playwright E2E em Chromium desktop e celular.
+
+O workflow `ci.yml` faz o mesmo dividido em três jobs paralelos: `quality`, `banco` e `e2e`.
 
 Ele não recebe credenciais, não acessa Supabase, não publica o aplicativo e mantém a sincronização remota desativada. Todos os cenários usam somente dados inventados, com domínios `example.invalid`.
 
@@ -29,6 +31,37 @@ No Linux, use `pnpm exec playwright install --with-deps chromium`, como faz o CI
 - Falha E2E: o CI guarda por sete dias `playwright-report` e `test-results`, que incluem relatório HTML, screenshots e traces apenas das falhas. Esses materiais devem conter exclusivamente os dados fictícios já presentes nos testes; não enviar casos reais para reproduzir um erro.
 
 Os testes E2E iniciam cada cenário em um `BrowserContext` novo do Playwright e declaram armazenamento inicial vazio. Assim, conta, sessão e base local de um teste não são reutilizadas pelo próximo.
+
+## Banco, migrations e RLS sem credenciais
+
+O job `banco` sobe um Postgres 16 descartável no próprio runner, com
+`POSTGRES_HOST_AUTH_METHOD=trust`: não existe senha, segredo nem conexão com o
+Supabase. Sobre ele, `scripts/db/test-migrations.sh`:
+
+1. cria em `supabase/tests/00_auth_shim.sql` a parte do ambiente Supabase de que
+   a migration depende — os papéis `anon`, `authenticated` e `service_role`, a
+   tabela `auth.users` e a função `auth.uid()`;
+2. aplica `0001_marco_zero_up.sql` e confere que as quatro tabelas existem;
+3. executa `supabase/tests/01_rls_isolation.sql`, que prova com duas contas
+   fictícias que nenhuma delas lê, altera, vincula dispositivo, restaura o cofre
+   ou sincroniza dados da outra, e que um dispositivo revogado não volta;
+4. aplica `0001_marco_zero_down.sql` e confere que nada sobrou;
+5. reaplica a subida e repete a prova de isolamento.
+
+O shim de `auth` existe apenas para o CI e nunca é aplicado no projeto Supabase
+de homologação, onde o próprio Supabase fornece esse ambiente.
+
+Para rodar o mesmo teste na sua máquina, com um Postgres em contêiner, siga o
+cabeçalho de `scripts/db/test-migrations.sh`.
+
+## Revisão de segurança do repositório
+
+`pnpm verify:repo` roda `scripts/verify-repo-safety.mjs` nos arquivos que o Git
+versiona e reprova o pipeline diante de arquivo `.env`, backup `.apb`, material
+criptográfico, artefato gerado, chave privada, JWT, URL de projeto Supabase
+real, variável do Supabase preenchida, token do GitHub, endereço de e-mail fora
+dos domínios fictícios permitidos ou `.gitignore` incompleto. O relatório mostra
+apenas arquivo, linha e motivo, nunca o conteúdo encontrado.
 
 ## Segurança do pipeline
 

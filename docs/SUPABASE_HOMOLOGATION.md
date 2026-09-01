@@ -19,6 +19,8 @@ Essas garantias têm testes estáticos e unitários locais. Ainda precisam ser c
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
+- `VITE_APP_ENV`, obrigatoriamente com o valor `homologacao`; sem ele o aplicativo recusa qualquer conexão remota
+- `VITE_DISABLE_SYNC`, com o valor `false` apenas durante esta rodada
 
 Inserir os valores somente no computador privado do avaliador. Não versionar `.env` ou `.env.local`, não copiar valores para documentação, CI, logs, screenshots ou mensagens e nunca usar `service_role` no navegador. Durante o teste remoto, `VITE_DISABLE_SYNC` não pode estar definido como `true`.
 

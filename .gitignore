@@ -4,7 +4,22 @@ dev-dist/
 coverage/
 playwright-report/
 test-results/
+
+# Ambiente: só o modelo sem valores entra no Git.
 .env
-.env.local
+.env.*
+!.env.example
+
+# Backups do aplicativo e material criptográfico nunca são versionados.
+*.apb
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Arquivos locais do Supabase CLI, caso o avaliador o utilize.
+supabase/.branches/
+supabase/.temp/
+
 .DS_Store
 *.log
