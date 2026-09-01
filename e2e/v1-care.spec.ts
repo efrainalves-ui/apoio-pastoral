@@ -59,7 +59,7 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   await question.locator('input[type="checkbox"]').check()
   await question.getByRole('combobox').selectOption('Sim')
   await page.getByLabel('Pedido opcional').fill('Pedido de oração inteiramente fictício')
-  await page.getByLabel('Acompanhamento', { exact: true }).selectOption('call')
+  await page.getByRole('combobox', { name: 'Acompanhamento', exact: true }).selectOption('call')
   await page.getByLabel('Prazo do acompanhamento').fill('2026-09-01')
   await page.getByLabel('Título da tarefa').fill('Tarefa pastoral fictícia')
   await page.getByLabel('Prazo da tarefa').fill('2026-09-02')
