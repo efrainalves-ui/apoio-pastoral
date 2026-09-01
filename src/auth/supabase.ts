@@ -114,6 +114,28 @@ export async function fetchRemoteRecoveryEnvelope(): Promise<RecoveryKeyEnvelope
   }
 }
 
+export type RemoteDeviceStatus = 'pending' | 'active' | 'revoked'
+
+/**
+ * Quem revoga um aparelho é outro aparelho, e essa notícia nunca chega pelo
+ * conteúdo sincronizado: o registro em `devices` é a única autoridade sobre a
+ * revogação. Devolve `null` quando não há serviço remoto configurado, para que
+ * o transporte local de desenvolvimento continue funcionando sem rede.
+ *
+ * Falha fechada de propósito: linha ausente ou escondida pela RLS conta como
+ * revogada, e erro técnico interrompe a sincronização em vez de liberá-la.
+ */
+export async function fetchRemoteDeviceStatus(deviceId: string): Promise<RemoteDeviceStatus | null> {
+  if (!hasSupabaseConfiguration) return null
+  const { data, error } = await getSupabaseClient()
+    .from('devices')
+    .select('status')
+    .eq('id', deviceId)
+    .maybeSingle()
+  if (error) throw new Error('Não foi possível confirmar a autorização deste dispositivo.')
+  return (data?.status as RemoteDeviceStatus | undefined) ?? 'revoked'
+}
+
 export async function revokeRemoteDevice(deviceId: string): Promise<void> {
   if (!hasSupabaseConfiguration) return
   const { error } = await getSupabaseClient().from('devices').update({

@@ -1,4 +1,5 @@
-import { assertDeviceCanSync } from '../auth/device'
+import { assertDeviceCanSync, assertRemoteDeviceStillActive, type RemoteDeviceStatusReader } from '../auth/device'
+import { fetchRemoteDeviceStatus } from '../auth/supabase'
 import { db, type ApoioDatabase } from '../db/database'
 import type { OutboxRecord, SyncConflictRecord, VaultRecord } from '../db/types'
 import type { EncryptedOperation, SyncSummary, SyncTransport } from './types'
@@ -31,11 +32,15 @@ export class SyncService {
     private readonly transport: SyncTransport,
     private readonly database: ApoioDatabase = db,
     private readonly online: () => boolean = () => navigator.onLine,
+    private readonly readRemoteDeviceStatus: RemoteDeviceStatusReader = fetchRemoteDeviceStatus,
   ) {}
 
   async synchronize(accountId: string, deviceId: string): Promise<SyncSummary> {
     await assertDeviceCanSync(accountId, deviceId, this.database)
     if (!this.online()) return { status: 'offline', pushed: 0, pulled: 0, conflicts: 0 }
+    // Antes de enviar e antes de receber: só o serviço sabe se outro aparelho
+    // revogou este aqui.
+    await assertRemoteDeviceStillActive(accountId, deviceId, this.database, this.readRemoteDeviceStatus)
 
     const pending = await this.database.outbox.where('accountId').equals(accountId).filter(({ status }) => status === 'pending').toArray()
     const state = await this.database.syncState.get(accountId)

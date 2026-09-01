@@ -10,11 +10,13 @@ import type { EncryptedOperation, PullResult, PushResult, SyncTransport } from '
 class CaptureTransport implements SyncTransport {
   readonly name = 'local-development' as const
   pushed: EncryptedOperation[] = []
+  pulls = 0
   push(operations: EncryptedOperation[]): Promise<PushResult> {
     this.pushed = operations
     return Promise.resolve({ acceptedIds: operations.map(({ id }) => id), conflicts: [] })
   }
   pull(_ownerId: string, cursor: string | null): Promise<PullResult> {
+    this.pulls += 1
     return Promise.resolve({ operations: [], cursor })
   }
 }
@@ -107,6 +109,42 @@ describe('sincronização cifrada', () => {
 
     await expect(new SyncService(new CaptureTransport(), database, () => true).synchronize(accountId, deviceId))
       .rejects.toThrow('não está autorizado')
+  })
+
+  it('não envia nem recebe depois que outro aparelho revogou este dispositivo', async () => {
+    const { database, accountId, deviceId } = await fixture()
+    const transport = new CaptureTransport()
+    const service = new SyncService(transport, database, () => true, () => Promise.resolve('revoked'))
+
+    await expect(service.synchronize(accountId, deviceId)).rejects.toThrow('removido')
+
+    expect(transport.pushed).toHaveLength(0)
+    expect(transport.pulls).toBe(0)
+    expect(await database.outbox.count()).toBe(1)
+    expect((await database.devices.get(deviceId))?.status).toBe('revoked')
+  })
+
+  it('recusa sincronizar enquanto não confirma a autorização do dispositivo no serviço', async () => {
+    const { database, accountId, deviceId } = await fixture()
+    const transport = new CaptureTransport()
+    const indisponivel = () => Promise.reject(new Error('Não foi possível confirmar a autorização deste dispositivo.'))
+    const service = new SyncService(transport, database, () => true, indisponivel)
+
+    await expect(service.synchronize(accountId, deviceId)).rejects.toThrow('confirmar a autorização')
+
+    expect(transport.pushed).toHaveLength(0)
+    expect(transport.pulls).toBe(0)
+    expect(await database.outbox.count()).toBe(1)
+  })
+
+  it('segue sincronizando enquanto o serviço confirma o dispositivo ativo', async () => {
+    const { database, accountId, deviceId } = await fixture()
+    const transport = new CaptureTransport()
+    const summary = await new SyncService(transport, database, () => true, () => Promise.resolve('active')).synchronize(accountId, deviceId)
+
+    expect(summary.pushed).toBe(1)
+    expect(transport.pulls).toBe(1)
+    expect((await database.devices.get(deviceId))?.status).toBe('active')
   })
 
   it('preserva conflito cifrado e não substitui silenciosamente a versão local', async () => {

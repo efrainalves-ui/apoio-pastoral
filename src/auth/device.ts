@@ -1,6 +1,6 @@
 import { db, type ApoioDatabase } from '../db/database'
 import type { DeviceRecord } from '../db/types'
-import { ensureRemoteDevice, revokeRemoteDevice } from './supabase'
+import { ensureRemoteDevice, fetchRemoteDeviceStatus, revokeRemoteDevice, type RemoteDeviceStatus } from './supabase'
 
 const DEVICE_ID_KEY = 'apoio-pastoral:device-id'
 
@@ -45,6 +45,33 @@ export async function assertDeviceCanSync(accountId: string, deviceId: string, d
   if (!device || device.accountId !== accountId || device.status !== 'active') {
     throw new Error('Este dispositivo não está autorizado a sincronizar.')
   }
+}
+
+export type RemoteDeviceStatusReader = (deviceId: string) => Promise<RemoteDeviceStatus | null>
+
+/**
+ * Segunda barreira da revogação, e a única que também vale para o recebimento.
+ * A RLS separa contas, não aparelhos: um dispositivo revogado continua com a
+ * sessão da própria conta e, sem esta conferência, seguiria baixando as
+ * operações cifradas dos outros aparelhos. Ao confirmar a revogação, grava o
+ * estado localmente para que o bloqueio continue valendo mesmo sem rede.
+ *
+ * O que já está gravado no aparelho revogado permanece nele: esta trava impede
+ * novas trocas, não apaga o passado à distância.
+ */
+export async function assertRemoteDeviceStillActive(
+  accountId: string,
+  deviceId: string,
+  database: ApoioDatabase = db,
+  readRemoteStatus: RemoteDeviceStatusReader = fetchRemoteDeviceStatus,
+): Promise<void> {
+  const remoteStatus = await readRemoteStatus(deviceId)
+  if (remoteStatus === null || remoteStatus === 'active') return
+  const device = await database.devices.get(deviceId)
+  if (device && device.accountId === accountId) {
+    await database.devices.put({ ...device, status: 'revoked', revokedAt: new Date().toISOString() })
+  }
+  throw new Error('Este dispositivo foi removido e não sincroniza mais. Autorize-o novamente por outro dispositivo.')
 }
 
 export async function revokeDevice(deviceId: string, database: ApoioDatabase = db): Promise<void> {

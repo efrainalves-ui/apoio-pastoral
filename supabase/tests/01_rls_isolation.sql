@@ -209,6 +209,16 @@ select homologacao_testes.exigir_recusa(
                values (%L, %L, 'x', 'x', 'x')$cmd$, :conta_a, :disp_a),
   'dispositivo revogado não recebe nova chave');
 
+-- A RLS separa contas, não aparelhos: o dispositivo revogado continua usando a
+-- sessão da própria conta, então o banco ainda entrega a ele as operações
+-- cifradas já gravadas. Bloquear o recebimento é responsabilidade do
+-- aplicativo, em assertRemoteDeviceStillActive. Esta asserção fixa o limite
+-- real do banco para que ninguém remova aquela trava supondo que a RLS cobre
+-- também o recebimento.
+select homologacao_testes.exigir(
+  (select count(*) from public.encrypted_operations where owner_id = :conta_a) = 1,
+  'a RLS barra o envio do dispositivo revogado, mas o recebimento é barrado pelo aplicativo');
+
 -- ---------------------------------------------------------------------------
 -- 6. Visitante anônimo não alcança nenhuma tabela.
 -- ---------------------------------------------------------------------------
