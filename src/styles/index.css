@@ -748,6 +748,12 @@ h1, h2, h3, .brand strong { font-family: ui-rounded, "SF Pro Rounded", Inter, ui
 .conflict-sides h3 svg { width: 18px; height: 18px; color: var(--green-800); }
 .conflict-sides small { color: var(--muted); }
 
+.conflict-diff { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--green-50); }
+.conflict-diff h4 { margin: 0 0 6px; font-size: 0.95rem; }
+.conflict-diff .detail-list > div { min-height: 0; padding: 10px 0; }
+.conflict-diff dd { display: grid; gap: 2px; }
+.conflict-diff dd span { overflow-wrap: anywhere; }
+
 .commission-president-vote { grid-column: 1 / -1; }
 .commission-tiebreak { grid-column: 1 / -1; display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--green-50); }
 .commission-tiebreak small { color: var(--muted); }
@@ -769,6 +775,7 @@ h1, h2, h3, .brand strong { font-family: ui-rounded, "SF Pro Rounded", Inter, ui
   .reading-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .planning-layout, .evangelism-dashboard, .campaign-columns { grid-template-columns: 1fr; }
   .conflict-sides { grid-template-columns: 1fr; }
+  .conflict-diff .detail-list > div { grid-template-columns: 1fr; gap: 4px; }
   .planning-aside, .campaign-aside { position: static; }
 }
 

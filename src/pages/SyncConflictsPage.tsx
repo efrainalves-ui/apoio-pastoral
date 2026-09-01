@@ -85,6 +85,29 @@ export function SyncConflictsPage() {
               </article>
             </div>
 
+            {preview.differences.length > 0 && (
+              <div className="conflict-diff">
+                <h4>O que mudou</h4>
+                <dl className="detail-list">
+                  {preview.differences.map((diferenca) => (
+                    <div key={diferenca.field}>
+                      <dt>{diferenca.field}</dt>
+                      <dd>
+                        {diferenca.local === null || diferenca.remote === null
+                          ? 'Diferente nas duas versões'
+                          : <><span>Neste aparelho: {diferenca.local}</span><span>No outro: {diferenca.remote}</span></>}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                {preview.hiddenDifferences > 0 && <p className="card-copy">Há também {preview.hiddenDifferences === 1 ? 'uma diferença' : `${preview.hiddenDifferences} diferenças`} em campos que o aplicativo controla sozinho.</p>}
+              </div>
+            )}
+
+            {preview.differences.length === 0 && preview.hiddenDifferences > 0 && !preview.remoteIsDeletion && (
+              <p className="card-copy">As duas versões mudaram apenas em campos que o aplicativo controla sozinho.</p>
+            )}
+
             <p className="card-copy">A versão que não ficar ativa continua guardada e protegida, para você consultar depois.</p>
 
             <div className="form-actions">

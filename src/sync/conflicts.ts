@@ -26,6 +26,13 @@ export interface ConflictSide {
   available: boolean
 }
 
+/** Um campo que mudou entre as duas versões, pronto para leitura. */
+export interface ConflictDifference {
+  field: string
+  local: string | null
+  remote: string | null
+}
+
 export interface ConflictPreview {
   id: string
   recordId: string
@@ -34,6 +41,74 @@ export interface ConflictPreview {
   remoteIsDeletion: boolean
   local: ConflictSide
   remote: ConflictSide
+  differences: ConflictDifference[]
+  /** Diferenças em campos que o pastor não edita diretamente. */
+  hiddenDifferences: number
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  name: 'Nome', title: 'Título', text: 'Texto', subject: 'Assunto', description: 'Descrição',
+  notes: 'Observações', administrativeNotes: 'Observações', address: 'Endereço', location: 'Local',
+  whatsapp: 'WhatsApp', email: 'E-mail', phone: 'Telefone', birthDate: 'Data de nascimento',
+  status: 'Situação', type: 'Tipo', category: 'Categoria', pastoralStatus: 'Situação pastoral',
+  incomeStatus: 'Fidelidade', externalCode: 'Código externo', startAt: 'Início', endAt: 'Término',
+  allDay: 'Dia inteiro', date: 'Data', deadline: 'Prazo', responsible: 'Responsável',
+  amount: 'Valor', value: 'Valor', reason: 'Motivo', quorum: 'Quórum', author: 'Autor',
+  pages: 'Páginas', theme: 'Tema', passage: 'Passagem', role: 'Cargo', label: 'Identificação',
+}
+
+/**
+ * Campos cujo conteúdo é um código interno. O nome do campo é mostrado, o valor
+ * não: exibi-lo colocaria vocabulário técnico na frente do pastor.
+ */
+const CODED_FIELDS = new Set(['status', 'type', 'category', 'pastoralStatus', 'incomeStatus', 'role', 'visitTarget', 'mode', 'kind', 'operation', 'importStatus'])
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?$/u
+
+/** Deixa um valor pronto para leitura, ou devolve null quando não deve aparecer. */
+function readableValue(field: string, value: unknown): string | null {
+  if (value === null || value === undefined || value === '') return 'não informado'
+  if (CODED_FIELDS.has(field)) return null
+  if (typeof value === 'boolean') return value ? 'Sim' : 'Não'
+  if (typeof value === 'number') return String(value)
+  if (typeof value !== 'string') return null
+  if (ISO_DATE.test(value)) {
+    const data = new Date(value)
+    if (!Number.isNaN(data.getTime())) {
+      return new Intl.DateTimeFormat('pt-BR', value.includes('T') ? { dateStyle: 'short', timeStyle: 'short' } : { dateStyle: 'short' }).format(data)
+    }
+  }
+  return value.length > 80 ? `${value.slice(0, 80)}…` : value
+}
+
+function sameValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true
+  if (left === null || left === undefined) return right === null || right === undefined || right === ''
+  if (right === null || right === undefined) return left === ''
+  if (typeof left === 'object' || typeof right === 'object') return JSON.stringify(left) === JSON.stringify(right)
+  return false
+}
+
+/**
+ * Aponta o que mudou entre as duas versões. Sem isto, as duas colunas podem
+ * parecer idênticas quando a diferença está num campo que o resumo não mostra,
+ * e a escolha vira adivinhação.
+ */
+function differences(local: unknown, remote: unknown): { visible: ConflictDifference[]; hidden: number } {
+  if (!local || !remote || typeof local !== 'object' || typeof remote !== 'object') return { visible: [], hidden: 0 }
+  const esquerda = local as Record<string, unknown>
+  const direita = remote as Record<string, unknown>
+  const visible: ConflictDifference[] = []
+  let hidden = 0
+
+  for (const chave of [...new Set([...Object.keys(esquerda), ...Object.keys(direita)])].sort()) {
+    if (sameValue(esquerda[chave], direita[chave])) continue
+    const rotulo = FIELD_LABELS[chave]
+    if (!rotulo) { hidden += 1; continue }
+    visible.push({ field: rotulo, local: readableValue(chave, esquerda[chave]), remote: readableValue(chave, direita[chave]) })
+  }
+
+  return { visible, hidden }
 }
 
 function label(type: string): string {
@@ -80,12 +155,15 @@ export class ConflictService {
     let localAvailable = false
     let remoteSummary: string
     let remoteAvailable = false
+    let localData: unknown = null
+    let remoteData: unknown = null
 
     if (localRecord && !localRecord.deletedAt) {
       try {
         const payload = await decryptPayload(masterKey, localRecord)
         kind = label(payload.type)
         localSummary = summarize(payload.data)
+        localData = payload.data
         localAvailable = true
       } catch { localSummary = 'Conteúdo não pôde ser aberto' }
     }
@@ -97,9 +175,12 @@ export class ConflictService {
         const payload = await decryptPayload(masterKey, conflict.remotePayload)
         if (kind === 'Registro') kind = label(payload.type)
         remoteSummary = summarize(payload.data)
+        remoteData = payload.data
         remoteAvailable = true
       } catch { remoteSummary = 'Conteúdo não pôde ser aberto' }
     }
+
+    const mudancas = localAvailable && remoteAvailable ? differences(localData, remoteData) : { visible: [], hidden: 0 }
 
     return {
       id: conflict.id,
@@ -109,6 +190,8 @@ export class ConflictService {
       remoteIsDeletion: conflict.remoteOperation === 'delete',
       local: { version: conflict.localVersion, summary: localSummary, available: localAvailable },
       remote: { version: conflict.remoteVersion, summary: remoteSummary, available: remoteAvailable },
+      differences: mudancas.visible,
+      hiddenDifferences: mudancas.hidden,
     }
   }
 

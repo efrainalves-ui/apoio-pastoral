@@ -53,6 +53,67 @@ describe('revisão de alterações concorrentes', () => {
     expect(await database.vaultRecords.count()).toBe(1)
   })
 
+  it('aponta quais campos diferem entre as duas versões', async () => {
+    // Sem isto, quando a diferença não está no nome, as duas colunas ficam
+    // visualmente iguais e a escolha do pastor vira adivinhação.
+    const database = new ApoioDatabase(`test-${crypto.randomUUID()}`); databases.push(database)
+    const key = await generateMasterKey()
+    const repository = new VaultRepository(database)
+    const recordId = crypto.randomUUID()
+    const comum = { name: 'Pessoa Fictícia Igual', pastoralStatus: 'active', updatedAt: '2026-09-01T10:00:00.000Z' }
+
+    await repository.saveEncrypted(
+      accountId, deviceId, recordId,
+      await encryptPayload(key, { schemaVersion: 1, type: 'person', data: { ...comum, whatsapp: '(61) 90000-0001', notes: 'Anotação deste aparelho' } }, recordId),
+      'person',
+    )
+    const conflict: SyncConflictRecord = {
+      id: crypto.randomUUID(), accountId, recordId, localVersion: 1, remoteVersion: 2,
+      remoteOperation: 'upsert',
+      remotePayload: await encryptPayload(key, { schemaVersion: 1, type: 'person', data: { ...comum, whatsapp: '(61) 90000-0002', notes: 'Anotação do outro aparelho', updatedAt: '2026-09-01T11:00:00.000Z' } }, recordId),
+      createdAt: new Date().toISOString(), status: 'pending',
+    }
+    await database.syncConflicts.put(conflict)
+
+    const preview = await new ConflictService(database).preview(conflict, key)
+
+    const campos = preview.differences.map(({ field }) => field)
+    expect(campos).toContain('WhatsApp')
+    expect(campos).toContain('Observações')
+    expect(campos).not.toContain('Nome')
+    const whatsapp = preview.differences.find(({ field }) => field === 'WhatsApp')
+    expect(whatsapp?.local).toBe('(61) 90000-0001')
+    expect(whatsapp?.remote).toBe('(61) 90000-0002')
+  })
+
+  it('não expõe código interno no lugar do valor de um campo codificado', async () => {
+    const database = new ApoioDatabase(`test-${crypto.randomUUID()}`); databases.push(database)
+    const key = await generateMasterKey()
+    const repository = new VaultRepository(database)
+    const recordId = crypto.randomUUID()
+
+    await repository.saveEncrypted(
+      accountId, deviceId, recordId,
+      await encryptPayload(key, { schemaVersion: 1, type: 'church', data: { name: 'Igreja Fictícia', type: 'organized_church' } }, recordId),
+      'church',
+    )
+    const conflict: SyncConflictRecord = {
+      id: crypto.randomUUID(), accountId, recordId, localVersion: 1, remoteVersion: 2,
+      remoteOperation: 'upsert',
+      remotePayload: await encryptPayload(key, { schemaVersion: 1, type: 'church', data: { name: 'Igreja Fictícia', type: 'preaching_point' } }, recordId),
+      createdAt: new Date().toISOString(), status: 'pending',
+    }
+    await database.syncConflicts.put(conflict)
+
+    const preview = await new ConflictService(database).preview(conflict, key)
+
+    const tipo = preview.differences.find(({ field }) => field === 'Tipo')
+    expect(tipo).toBeDefined()
+    expect(tipo?.local).toBeNull()
+    expect(JSON.stringify(preview)).not.toContain('organized_church')
+    expect(JSON.stringify(preview)).not.toContain('preaching_point')
+  })
+
   it('mantém a versão local e guarda a preterida no histórico', async () => {
     const { database, key, recordId, conflict, service } = await cenario()
     databases.push(database)
