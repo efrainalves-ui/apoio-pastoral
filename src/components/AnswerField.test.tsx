@@ -23,18 +23,35 @@ describe('campo de resposta da entrevista', () => {
     expect(onChange).toHaveBeenCalledWith('C')
   })
 
-  it('diz em que unidade responder a pergunta numérica', () => {
+  it('dá campo aberto e a unidade para pergunta de tempo', () => {
     render(<AnswerField question={pergunta({ responseType: 'number', unit: 'minutos' })} value="" onChange={vi.fn()} />)
 
     expect(screen.getByRole('spinbutton')).toBeInTheDocument()
-    expect(screen.getByText('Responda em minutos.')).toBeInTheDocument()
+    expect(screen.getByText('minutos')).toBeInTheDocument()
   })
 
-  it('mostra as opções da pergunta de escolha, com a opção de pular', () => {
-    render(<AnswerField question={pergunta({ responseType: 'choice', options: ['Sim', 'Não'] })} value="" onChange={vi.fn()} />)
+  // "Em quantos dias dos últimos 7" se responde tocando no número.
+  it('dá os números de 0 a 7 para pergunta de dias', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<AnswerField question={pergunta({ responseType: 'number', unit: 'dias', scaleMax: 7 })} value="" onChange={onChange} />)
 
-    expect(screen.getByRole('option', { name: 'Pular pergunta' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Sim' })).toBeInTheDocument()
+    const botoes = screen.getAllByRole('button')
+    expect(botoes.map((botao) => botao.textContent)).toEqual(['0', '1', '2', '3', '4', '5', '6', '7'])
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '3' }))
+    expect(onChange).toHaveBeenCalledWith('3')
+  })
+
+  it('mostra sim e não como botões, e desmarca ao tocar de novo', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<AnswerField question={pergunta({ responseType: 'choice', options: ['Sim', 'Não', 'Prefere não responder'] })} value="Sim" onChange={onChange} />)
+
+    expect(screen.getByRole('button', { name: 'Sim' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Prefere não responder' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Sim' }))
+    expect(onChange).toHaveBeenCalledWith('')
   })
 
   it('deixa marcar várias opções sem o pastor digitar vírgulas', async () => {
@@ -42,8 +59,8 @@ describe('campo de resposta da entrevista', () => {
     const onChange = vi.fn()
     render(<AnswerField question={pergunta({ responseType: 'multiple', options: ['Louvor', 'Estudo'] })} value="Louvor" onChange={onChange} />)
 
-    expect(screen.getByRole('checkbox', { name: 'Louvor' })).toBeChecked()
-    await user.click(screen.getByRole('checkbox', { name: 'Estudo' }))
+    expect(screen.getByRole('button', { name: 'Louvor' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: 'Estudo' }))
     expect(onChange).toHaveBeenCalledWith('Louvor, Estudo')
   })
 })

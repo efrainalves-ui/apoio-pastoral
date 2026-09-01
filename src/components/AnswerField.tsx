@@ -6,50 +6,80 @@ interface AnswerFieldProps {
   onChange: (value: string) => void
 }
 
+function escolhas(value: string): string[] {
+  return value.split(',').map((item) => item.trim()).filter(Boolean)
+}
+
 /**
- * O campo de resposta de uma pergunta da entrevista. Cada tipo aparece do jeito
- * que se responde de verdade: texto tem caixa, número tem unidade, escolha tem
- * as opções à vista. Em branco continua significando "pergunta pulada".
+ * A resposta de uma pergunta da entrevista, do jeito que se responde de verdade:
+ * sim e não são botões, quantos dias são os números para tocar, tempo é um campo
+ * aberto com a unidade, e texto é uma caixa de escrita.
+ *
+ * Tocar de novo na opção escolhida limpa a resposta — é assim que se desfaz sem
+ * precisar de um controle extra.
  */
 export function AnswerField({ question, value, onChange }: AnswerFieldProps) {
   if (question.responseType === 'choice') {
     return (
-      <select className="field__input" value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Pular pergunta</option>
-        {question.options.map((option) => <option key={option} value={option}>{option}</option>)}
-      </select>
+      <div className="answer-choice" role="group" aria-label={question.text}>
+        {question.options.map((option) => (
+          <button
+            key={option}
+            type="button"
+            className={`answer-choice__option${value === option ? ' answer-choice__option--on' : ''}`}
+            aria-pressed={value === option}
+            onClick={() => onChange(value === option ? '' : option)}
+          >{option}</button>
+        ))}
+      </div>
     )
   }
 
-  if (question.responseType === 'text') {
-    return <textarea className="field__input" rows={3} placeholder="Deixar em branco para pular" value={value} onChange={(event) => onChange(event.target.value)} />
+  if (question.responseType === 'multiple') {
+    const marcadas = escolhas(value)
+    return (
+      <div className="answer-choice" role="group" aria-label={question.text}>
+        {question.options.map((option) => {
+          const ligada = marcadas.includes(option)
+          return (
+            <button
+              key={option}
+              type="button"
+              className={`answer-choice__option${ligada ? ' answer-choice__option--on' : ''}`}
+              aria-pressed={ligada}
+              onClick={() => onChange((ligada ? marcadas.filter((item) => item !== option) : [...marcadas, option]).join(', '))}
+            >{option}</button>
+          )
+        })}
+      </div>
+    )
+  }
+
+  if (question.responseType === 'number' && question.scaleMax) {
+    const escala = Array.from({ length: question.scaleMax + 1 }, (_, indice) => String(indice))
+    return (
+      <div className="answer-choice answer-choice--scale" role="group" aria-label={question.text}>
+        {escala.map((numero) => (
+          <button
+            key={numero}
+            type="button"
+            className={`answer-choice__option${value === numero ? ' answer-choice__option--on' : ''}`}
+            aria-pressed={value === numero}
+            onClick={() => onChange(value === numero ? '' : numero)}
+          >{numero}</button>
+        ))}
+      </div>
+    )
   }
 
   if (question.responseType === 'number') {
     return (
-      <>
-        <input className="field__input" type="number" min={0} placeholder="Deixar em branco para pular" value={value} onChange={(event) => onChange(event.target.value)} />
-        {question.unit && <small className="field__hint">Responda em {question.unit}.</small>}
-      </>
+      <div className="answer-number">
+        <input className="field__input" type="number" min={0} inputMode="numeric" aria-label={question.text} value={value} onChange={(event) => onChange(event.target.value)} />
+        <span>{question.unit ?? 'minutos'}</span>
+      </div>
     )
   }
 
-  const escolhidas = value.split(',').map((item) => item.trim()).filter(Boolean)
-  return (
-    <div className="answer-options">
-      {question.options.map((option) => {
-        const marcado = escolhidas.includes(option)
-        return (
-          <label key={option}>
-            <input
-              type="checkbox"
-              checked={marcado}
-              onChange={() => onChange((marcado ? escolhidas.filter((item) => item !== option) : [...escolhidas, option]).join(', '))}
-            />
-            <span>{option}</span>
-          </label>
-        )
-      })}
-    </div>
-  )
+  return <textarea className="field__input" rows={3} aria-label={question.text} value={value} onChange={(event) => onChange(event.target.value)} />
 }

@@ -6,7 +6,7 @@ export const VISIT_REASON_LABELS: Record<VisitReason, string> = { routine: 'Roti
 
 export type QuestionScope = 'individual' | 'family'
 export type QuestionResponseType = 'choice' | 'multiple' | 'number' | 'text'
-export interface QuestionSnapshot { code: string; version: number; category: string; text: string; scope: QuestionScope; responseType: QuestionResponseType; options: string[]; sensitivity: 'pastoral' | 'health_general' | 'prayer'; unit?: string }
+export interface QuestionSnapshot { code: string; version: number; category: string; text: string; scope: QuestionScope; responseType: QuestionResponseType; options: string[]; sensitivity: 'pastoral' | 'health_general' | 'prayer'; unit?: string; scaleMax?: number }
 export interface VisitAnswer { id: string; question: QuestionSnapshot; subjectId: string; value: string | string[]; skipped: boolean }
 export interface VisitParticipant { id: string; kind: 'person' | 'guest'; personId?: string; guestName?: string; present: boolean }
 export interface VisitVersion { version: number; correctedAt: string; correctionNote?: string; answers: VisitAnswer[]; participants: VisitParticipant[]; reason: VisitReason; startAt: string; endAt: string; notes: string }

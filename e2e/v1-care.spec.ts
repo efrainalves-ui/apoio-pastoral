@@ -55,9 +55,12 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   await page.getByLabel('Cadastro visitado').selectOption({ label: 'Família Cuidado Fictícia' })
   await page.getByLabel(/Agendamento vinculado/).selectOption({ label: 'Visita Agendada Fictícia' })
   await page.getByLabel('Rodada (opcional)').selectOption({ label: 'Rodada Cuidado Fictícia' })
-  const question = page.locator('.question-card').filter({ hasText: 'COM-01' })
-  await question.locator('input[type="checkbox"]').check()
-  await question.getByRole('combobox').selectOption('Sim')
+  // A pergunta é achada pelo texto, como o pastor a lê: o código interno não
+  // aparece mais na tela, e responder é tocar no botão.
+  const question = page.locator('.question-card').filter({ hasText: 'Você estudou a Bíblia hoje?' })
+  await expect(question.getByText('1. Comunhão')).toBeVisible()
+  await question.getByRole('button', { name: 'Sim', exact: true }).click()
+  await expect(question.getByRole('button', { name: 'Sim', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await page.getByLabel('Pedido opcional').fill('Pedido de oração inteiramente fictício')
   await page.getByRole('combobox', { name: 'Acompanhamento', exact: true }).selectOption('call')
   await page.getByLabel('Prazo do acompanhamento').fill(isoDate(futureDate(2)))
