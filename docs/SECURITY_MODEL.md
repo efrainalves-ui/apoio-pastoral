@@ -57,3 +57,19 @@ Pessoas, famílias, WhatsApp, nascimento, histórico, divergências de importaç
 - A chave de recuperação é contingência para perda de acesso aos dispositivos; ela não é enviada por e-mail e não é o caminho normal de entrada em um aparelho novo.
 - A revisão independente de segurança e o parecer jurídico continuam obrigatórios antes de uso público.
 - As garantias RLS e de sincronização precisam ser confirmadas em Supabase exclusivo de homologação depois da aprovação do CI Linux. Dados reais continuam proibidos até as validações externas documentadas.
+
+## Preparo do acesso em ambiente novo
+
+O envelope protegido pela senha fica também no serviço, cifrado pela própria
+senha — o serviço não tem como abri-lo. É o que permite entrar com e-mail e
+senha em um navegador, computador ou celular novo.
+
+Contas criadas antes desse envelope existir são preenchidas sozinhas: quando o
+titular entra em um aparelho onde a conta já abre, aquele aparelho, que acabou
+de provar a senha, grava o envelope que faltava. Nenhuma senha, chave ou token
+sai do aparelho em texto aberto nesse processo.
+
+Ambiente novo não sincroniza de imediato: ele mostra um código curto e espera a
+confirmação de um aparelho já ativo. Safari e o aplicativo instalado pela Tela
+de Início do iPhone têm armazenamentos separados, então contam como ambientes
+diferentes e cada um passa por essa confirmação.

@@ -748,6 +748,10 @@ h1, h2, h3, .brand strong { font-family: ui-rounded, "SF Pro Rounded", Inter, ui
 .conflict-sides h3 svg { width: 18px; height: 18px; color: var(--green-800); }
 .conflict-sides small { color: var(--muted); }
 
+.answer-options { display: grid; gap: 6px; }
+.answer-options label { display: flex; gap: 8px; align-items: center; }
+.question-card__hint { display: block; margin-top: 4px; color: var(--muted); }
+
 .sermon-reading { min-height: 100vh; padding: 16px clamp(16px, 5vw, 64px) 64px; background: var(--paper); }
 .sermon-reading__bar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 0; font-size: 1rem; background: var(--paper); border-bottom: 1px solid var(--line); }
 .sermon-reading__zoom { display: flex; gap: 8px; }

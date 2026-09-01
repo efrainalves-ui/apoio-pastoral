@@ -11,6 +11,7 @@ import { authorizeCurrentDevice } from './device'
 import {
   hasSupabaseConfiguration,
   fetchRemotePasswordEnvelope,
+  hasRemotePasswordEnvelope,
   fetchRemoteRecoveryEnvelope,
   registerRemoteAccount,
   signInRemoteAccount,
@@ -101,6 +102,14 @@ export async function unlockAccount(
     throw new Error('Este dispositivo precisa ser autorizado com a chave de recuperação.')
   }
   const masterKey = await openPasswordEnvelope(envelopeRecord.envelope, password)
+  // Conta criada antes do envelope de senha remoto: este aparelho acabou de
+  // provar a senha, então pode preencher o que falta. Sem isso, entrar em um
+  // navegador novo exigiria a chave de recuperação para sempre.
+  if (!remoteAccountId && account.authMode === 'supabase') {
+    try {
+      if (!await hasRemotePasswordEnvelope()) await storeRemotePasswordEnvelope(envelopeRecord.envelope)
+    } catch { /* sem rede, segue: a próxima entrada tenta de novo */ }
+  }
   // Instalação nova entra aguardando confirmação: a senha abre o cofre, mas
   // liberar a sincronização exige o aval de um aparelho que já estava valendo.
   await authorizeCurrentDevice(account.id, database, remoteAccountId ? 'pending' : 'active')

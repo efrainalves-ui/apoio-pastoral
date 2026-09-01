@@ -4,7 +4,23 @@ import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { SermonEntity, SermonInput } from './types'
 
-function validate(input: SermonInput): void { if (!input.title.trim()) throw new Error('Informe o título do sermão.'); if (!input.mainText.trim()) throw new Error('Informe o texto bíblico principal.'); if (input.title.length > 180 || input.content.length > 20_000 || input.notes.length > 4_000) throw new Error('Um dos campos excede o limite permitido.') }
+/**
+ * Um sermão de 15 páginas do Word passa de 30 mil caracteres, e o limite antigo
+ * de 20 mil barrava exatamente isso. O teto agora é folgado — cerca de 120
+ * páginas — e existe só para um registro não virar um envio gigante na
+ * sincronização.
+ */
+export const SERMON_CONTENT_LIMIT = 300_000
+export const SERMON_NOTES_LIMIT = 40_000
+const SERMON_TITLE_LIMIT = 180
+
+function validate(input: SermonInput): void {
+  if (!input.title.trim()) throw new Error('Informe o título do sermão.')
+  if (!input.mainText.trim()) throw new Error('Informe o texto bíblico principal.')
+  if (input.title.length > SERMON_TITLE_LIMIT) throw new Error(`O título passa de ${SERMON_TITLE_LIMIT} caracteres.`)
+  if (input.content.length > SERMON_CONTENT_LIMIT) throw new Error(`O conteúdo passa de ${SERMON_CONTENT_LIMIT.toLocaleString('pt-BR')} caracteres. Divida o sermão em duas partes.`)
+  if (input.notes.length > SERMON_NOTES_LIMIT) throw new Error(`As observações passam de ${SERMON_NOTES_LIMIT.toLocaleString('pt-BR')} caracteres.`)
+}
 export class SermonService {
   private readonly repository: VaultRepository
   constructor(private readonly database: ApoioDatabase = db) { this.repository = new VaultRepository(database) }

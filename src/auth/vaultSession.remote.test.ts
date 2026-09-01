@@ -15,6 +15,8 @@ afterEach(async () => {
 async function loadRemoteSession(passwordEnvelope: Awaited<ReturnType<typeof createPasswordEnvelope>>) {
   const remote = {
     envelope: passwordEnvelope,
+    existeEnvelope: true,
+    guardados: [] as unknown[],
     signIn: vi.fn(() => Promise.resolve('00000000-0000-4000-8000-000000000001')),
     authorize: vi.fn(() => Promise.resolve()),
   }
@@ -24,7 +26,8 @@ async function loadRemoteSession(passwordEnvelope: Awaited<ReturnType<typeof cre
     fetchRemotePasswordEnvelope: vi.fn(() => Promise.resolve(remote.envelope)),
     ensureRemoteDevice: remote.authorize,
     registerRemoteAccount: vi.fn(),
-    storeRemotePasswordEnvelope: vi.fn(),
+    hasRemotePasswordEnvelope: vi.fn(() => Promise.resolve(remote.existeEnvelope)),
+    storeRemotePasswordEnvelope: vi.fn((envelope: unknown) => { remote.guardados.push(envelope); return Promise.resolve() }),
     storeRemoteRecoveryEnvelope: vi.fn(),
     fetchRemoteRecoveryEnvelope: vi.fn(),
     updateRemotePassword: vi.fn(),
@@ -68,5 +71,42 @@ describe('entrada remota em novo dispositivo', () => {
     const dispositivo = await database.devices.toCollection().first()
     expect(dispositivo?.status).toBe('pending')
     expect(remote.authorize).toHaveBeenCalledWith(dispositivo?.id, expect.any(String), 'pending')
+  })
+
+  it('prepara o envelope remoto a partir de um aparelho que ainda entra', async () => {
+    // Conta criada antes do envelope remoto: sem esta recuperação, entrar em um
+    // navegador novo exigiria a chave de recuperação para sempre.
+    const password = 'senha-ficticia-segura-2026'
+    const masterKey = await generateMasterKey()
+    const envelope = await createPasswordEnvelope(masterKey, password)
+    const { remote, session } = await loadRemoteSession(envelope)
+    remote.existeEnvelope = false
+    const database = new ApoioDatabase(`remote-backfill-${crypto.randomUUID()}`)
+    databases.push(database)
+
+    // primeiro acesso cria a conta local, como num aparelho já conectado
+    await session.unlockAccount('conta.ficticia@example.invalid', password, database)
+    remote.guardados.length = 0
+
+    // segundo acesso, já com conta local: é aqui que o envelope é preenchido
+    await session.unlockAccount('conta.ficticia@example.invalid', password, database)
+
+    expect(remote.guardados).toHaveLength(1)
+    expect(remote.guardados[0]).toMatchObject({ kind: 'password' })
+  })
+
+  it('não regrava o envelope quando o serviço já tem um', async () => {
+    const password = 'senha-ficticia-segura-2026'
+    const masterKey = await generateMasterKey()
+    const envelope = await createPasswordEnvelope(masterKey, password)
+    const { remote, session } = await loadRemoteSession(envelope)
+    const database = new ApoioDatabase(`remote-sem-regravar-${crypto.randomUUID()}`)
+    databases.push(database)
+
+    await session.unlockAccount('conta.ficticia@example.invalid', password, database)
+    remote.guardados.length = 0
+    await session.unlockAccount('conta.ficticia@example.invalid', password, database)
+
+    expect(remote.guardados).toHaveLength(0)
   })
 })

@@ -28,6 +28,18 @@ e os itens específicos de aparelho físico em [MOBILE_HOMOLOGATION.md](MOBILE_H
 | 2.3 | Voltar à conta A e sincronizar | Só o registro de A aparece em A | Registro de B aparece em A |
 | 2.4 | Tentar restaurar em B um backup gerado em A | O aplicativo recusa e explica o motivo | A restauração acontece ou mistura contas |
 
+## 2b. Navegador novo na mesma conta
+
+| # | O que fazer | Aprova se | Reprova se |
+|---|---|---|---|
+| 2b.1 | Entrar com e-mail e senha em um navegador onde a conta nunca foi aberta | O cofre abre sem pedir a chave de recuperação | Exige a chave de recuperação |
+| 2b.2 | Conferir o código de confirmação mostrado no ambiente novo | O mesmo código aparece em Segurança no aparelho já ativo | Os códigos não batem |
+| 2b.3 | Confirmar pelo aparelho já ativo | O ambiente novo passa a sincronizar | Continua sem enviar nem receber |
+
+Contas criadas antes desta mudança não têm o preparo remoto. Basta entrar uma
+vez em um aparelho onde a conta já abre: o preparo acontece sozinho, e a partir
+daí qualquer navegador novo aceita e-mail e senha.
+
 ## 3. Celular — iPhone e Android, mesma conta A
 
 Repita a seção inteira em cada aparelho.

@@ -156,12 +156,27 @@ interface PasswordEnvelopeRow {
   key_version: number
 }
 
+/**
+ * Contas criadas antes do envelope de senha remoto não têm essa linha. Um
+ * aparelho que ainda abre o cofre pode preenchê-la sozinho, e a partir daí a
+ * conta entra em qualquer navegador com e-mail e senha.
+ */
+export async function hasRemotePasswordEnvelope(): Promise<boolean> {
+  if (!hasSupabaseConfiguration) return true
+  const { data, error } = await getSupabaseClient()
+    .from('password_key_envelopes')
+    .select('owner_id')
+    .maybeSingle()
+  if (error) throw new Error('Não foi possível conferir o acesso desta conta.')
+  return Boolean(data)
+}
+
 export async function fetchRemotePasswordEnvelope(): Promise<PasswordKeyEnvelope> {
   const { data, error } = await getSupabaseClient()
     .from('password_key_envelopes')
     .select('ciphertext,iv,aad,salt,kdf,iterations,key_version')
     .single()
-  if (error || !data) throw new Error('Não foi possível preparar o acesso neste dispositivo. Use a chave de recuperação somente se você não tiver acesso a nenhum dispositivo.')
+  if (error || !data) throw new Error('Esta conta ainda não está preparada para entrar em um aparelho novo. Abra o aplicativo em um aparelho onde você já entra e faça o acesso uma vez; depois volte aqui. Se não tiver mais nenhum aparelho, use a chave de recuperação.')
   const row: PasswordEnvelopeRow = data
   return {
     kind: 'password',
