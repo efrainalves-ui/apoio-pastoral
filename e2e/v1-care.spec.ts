@@ -37,7 +37,7 @@ async function foundation(page: Page) {
 test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento offline', async ({ page, context }) => {
   await foundation(page)
   const appointment = agendaDate()
-  await navigateInsideApp(page, '/app/agenda/novo', page.getByLabel('Título'))
+  await navigateInsideApp(page, '/app/agenda/novo', page.getByLabel('Categoria'))
   await page.getByLabel('Título').fill('Visita Agendada Fictícia')
   await page.getByLabel('Início').fill(isoDateTime(appointment, 14))
   await page.getByLabel('Término').fill(isoDateTime(appointment, 15))

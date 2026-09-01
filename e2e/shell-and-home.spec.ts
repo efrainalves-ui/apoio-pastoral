@@ -49,6 +49,13 @@ test('barra inferior, busca do cabeçalho e botão de criar funcionam', async ({
   await quickMenu.getByRole('link', { name: 'Novo compromisso' }).click()
 
   await expect(page).toHaveURL(/\/app\/agenda\/novo/)
+  // A categoria vem primeiro: é ela que decide o que o formulário pergunta.
+  await expect(page.getByLabel('Categoria')).toBeVisible()
+  await page.getByLabel('Categoria').selectOption({ label: 'Pregação' })
+  await expect(page.getByLabel('Título')).toHaveCount(0)
+  await expect(page.getByLabel('Local')).toHaveCount(0)
+  await expect(page.getByRole('combobox', { name: /^Igreja/ })).toBeVisible()
+  await page.getByLabel('Categoria').selectOption({ label: 'Reunião' })
   await expect(page.getByLabel('Título')).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Criar' })).toHaveCount(0)
 })
