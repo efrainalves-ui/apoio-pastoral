@@ -111,7 +111,17 @@ create policy encrypted_operations_active_device_insert on public.encrypted_oper
     )
   );
 
-revoke all on public.devices, public.device_key_envelopes, public.recovery_key_envelopes, public.encrypted_operations from anon;
+-- O Supabase concede privilégios padrão a anon, authenticated e service_role em
+-- toda tabela nova de public: TRUNCATE, REFERENCES e TRIGGER (e MAINTAIN no
+-- PostgreSQL 17). TRUNCATE não passa pela RLS e apagaria as linhas de todas as
+-- contas; TRIGGER permitiria anexar um gatilho à tabela e desviar linhas
+-- alheias. Por isso zera-se tudo antes de conceder o mínimo necessário.
+--
+-- service_role fica de fora de propósito: ele tem bypassrls, nunca é exposto ao
+-- navegador e não é usado por este projeto, então revogar privilégios de tabela
+-- dele não acrescenta proteção nenhuma.
+revoke all on public.devices, public.device_key_envelopes, public.recovery_key_envelopes, public.encrypted_operations
+  from public, anon, authenticated;
 grant select, insert, update on public.devices to authenticated;
 grant select, insert, update, delete on public.device_key_envelopes, public.recovery_key_envelopes to authenticated;
 grant select, insert on public.encrypted_operations to authenticated;

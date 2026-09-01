@@ -267,4 +267,18 @@ select homologacao_testes.exigir(
     where n.nspname = 'public' and c.relkind = 'r' and r.rolname = 'anon'),
   'anon não tem nenhum privilégio em public');
 
+-- TRUNCATE não passa pela RLS: quem o tiver apaga as linhas de todas as contas.
+-- TRIGGER permite anexar um gatilho à tabela e desviar linhas alheias. Nenhum
+-- dos dois pode sobrar para authenticated, nem nas tabelas de hoje nem nas que
+-- vierem depois.
+select homologacao_testes.exigir(
+  not exists (
+    select 1 from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r'
+      and (has_table_privilege('authenticated', c.oid, 'TRUNCATE')
+        or has_table_privilege('authenticated', c.oid, 'TRIGGER')
+        or has_table_privilege('authenticated', c.oid, 'REFERENCES'))),
+  'authenticated não trunca, não referencia e não cria gatilho em nenhuma tabela de public');
+
 \echo 'Isolamento entre contas ficticias comprovado.'

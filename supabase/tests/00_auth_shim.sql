@@ -41,4 +41,12 @@ $$;
 grant usage on schema public to anon, authenticated, service_role;
 grant usage on schema auth to anon, authenticated, service_role;
 
+-- O Supabase concede privilégios padrão em toda tabela nova de public. Sem
+-- reproduzir isso aqui, o teste de isolamento não teria como perceber que a
+-- migration precisa revogá-los: no Postgres cru a tabela nasceria sem nada, e
+-- um TRUNCATE ao alcance de authenticated passaria despercebido até a nuvem.
+-- MAINTAIN fica de fora porque só existe a partir do PostgreSQL 17.
+alter default privileges in schema public
+  grant truncate, references, trigger on tables to anon, authenticated, service_role;
+
 commit;
