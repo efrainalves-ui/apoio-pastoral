@@ -30,6 +30,7 @@ import { SyncConflictsPage } from '../pages/SyncConflictsPage'
 import { SyncPage } from '../pages/SyncPage'
 import { SermonsPage } from '../pages/SermonsPage'
 import { SermonFormPage } from '../pages/SermonFormPage'
+import { SermonReadingPage } from '../pages/SermonReadingPage'
 import { SermonDetailPage } from '../pages/SermonDetailPage'
 import { GoalsPage } from '../pages/GoalsPage'
 import { MissionaryPage } from '../pages/MissionaryPage'
@@ -159,6 +160,7 @@ export function App() {
         <Route path="sermoes" element={<SermonsPage />} />
         <Route path="sermoes/novo" element={<SermonFormPage />} />
         <Route path="sermoes/:sermonId" element={<SermonDetailPage />} />
+        <Route path="sermoes/:sermonId/pregar" element={<SermonReadingPage />} />
         <Route path="sermoes/:sermonId/editar" element={<SermonFormPage />} />
         <Route path="metas" element={<GoalsPage />} />
         <Route path="metas/missionario" element={<MissionaryGoalsPage />} />

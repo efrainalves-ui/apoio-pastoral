@@ -748,6 +748,14 @@ h1, h2, h3, .brand strong { font-family: ui-rounded, "SF Pro Rounded", Inter, ui
 .conflict-sides h3 svg { width: 18px; height: 18px; color: var(--green-800); }
 .conflict-sides small { color: var(--muted); }
 
+.sermon-reading { min-height: 100vh; padding: 16px clamp(16px, 5vw, 64px) 64px; background: var(--paper); }
+.sermon-reading__bar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 0; font-size: 1rem; background: var(--paper); border-bottom: 1px solid var(--line); }
+.sermon-reading__zoom { display: flex; gap: 8px; }
+.sermon-reading__text { max-width: 46ch; margin: 0 auto; line-height: 1.7; }
+.sermon-reading__text h1 { margin: 24px 0 4px; font-size: 1.5em; }
+.sermon-reading__text h2 { margin: 32px 0 8px; font-size: 1.1em; color: var(--green-800); }
+.sermon-reading__reference { margin: 0 0 8px; color: var(--muted); }
+
 .device-approval__code { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 16px 0; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--green-50); }
 .device-approval__code strong { font-size: 2rem; letter-spacing: 0.18em; }
 .device-approval__code svg { width: 24px; height: 24px; color: var(--green-800); }

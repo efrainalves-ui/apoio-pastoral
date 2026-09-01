@@ -1,6 +1,8 @@
 import { Archive, ArrowLeft, Clock3, History, MapPin, Pencil, Trash2, UsersRound } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { AgendaService } from '../agenda/service'
+import type { AgendaEventEntity } from '../agenda/types'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -16,6 +18,7 @@ import {
 } from '../district/types'
 
 const service = new DistrictService()
+const agenda = new AgendaService()
 const peopleService = new PeopleService()
 const familyService = new FamilyService()
 
@@ -35,6 +38,7 @@ export function ChurchDetailPage() {
   const [error, setError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [preachings, setPreachings] = useState<AgendaEventEntity[]>([])
 
   const load = useCallback(async () => {
     if (!account || !masterKey) return
@@ -54,6 +58,7 @@ export function ChurchDetailPage() {
     } catch (loadError) {
       setError(messageFrom(loadError))
     } finally {
+      setPreachings((await agenda.listEvents(account.id, masterKey)).filter((event) => event.category === 'preaching' && event.churchId === churchId).sort((a, b) => b.startAt.localeCompare(a.startAt)))
       setLoading(false)
     }
   }, [account, churchId, masterKey])
@@ -85,7 +90,7 @@ export function ChurchDetailPage() {
       </header>
 
       {error && <div className="alert alert--error" role="alert">{error}</div>}
-      {confirmDelete && <Card className="danger-card"><h2>Remover esta igreja?</h2><p>A unidade deixará de aparecer no distrito. Uma tombstone cifrada será sincronizada; nomes e endereço não sairão em texto aberto.</p><div className="form-actions"><Button variant="danger" disabled={busy} onClick={() => void removeChurch()}>{busy ? 'Removendo…' : 'Confirmar remoção'}</Button><Button variant="secondary" onClick={() => setConfirmDelete(false)}>Cancelar</Button></div></Card>}
+      {confirmDelete && <Card className="danger-card"><h2>Remover esta igreja?</h2><p>A igreja deixará de aparecer no distrito. Os outros aparelhos recebem apenas o aviso da remoção; nome e endereço não saem daqui em texto aberto.</p><div className="form-actions"><Button variant="danger" disabled={busy} onClick={() => void removeChurch()}>{busy ? 'Removendo…' : 'Confirmar remoção'}</Button><Button variant="secondary" onClick={() => setConfirmDelete(false)}>Cancelar</Button></div></Card>}
 
       <div className="church-detail-grid">
         <Card eyebrow="Cadastro" title="Informações da igreja">
@@ -114,6 +119,11 @@ export function ChurchDetailPage() {
         <ol className="history-list">
           {[...church.history].reverse().map((entry) => <li key={entry.id}><span className="history-list__marker">{entry.event === 'status_changed' ? <Archive /> : <History />}</span><div><strong>{historyEventLabel(entry)}</strong><small>{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(entry.at))}</small></div></li>)}
         </ol>
+      </Card>
+      <Card title="Pregações nesta igreja" eyebrow="Histórico">
+        {preachings.length === 0
+          ? <div className="empty-state compact-empty"><strong>Ainda não há pregação registrada aqui</strong><span>Registre a pregação no sermão ou crie um compromisso de pregação.</span></div>
+          : <div className="entity-list">{preachings.map((event) => <Link className="entity-row" key={event.id} to={event.sermonId ? `/app/sermoes/${event.sermonId}` : `/app/agenda/${event.id}/editar`}><span><strong>{event.sermonSnapshot?.title ?? event.title}</strong><small>{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(new Date(event.startAt))}{event.sermonSnapshot?.mainText ? ` · ${event.sermonSnapshot.mainText}` : ''}</small></span></Link>)}</div>}
       </Card>
     </div>
   )
