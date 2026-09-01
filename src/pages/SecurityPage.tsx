@@ -52,7 +52,7 @@ export function SecurityPage() {
       await changePassword(currentPassword, newPassword)
       setCurrentPassword('')
       setNewPassword('')
-      setMessage('Senha alterada. Os dados protegidos foram preservados.')
+      setMessage('Senha alterada. Seus dados continuam como estavam.')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível alterar a senha.')
     }

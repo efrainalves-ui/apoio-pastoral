@@ -66,7 +66,7 @@ export function SyncPage() {
         <Button onClick={() => void synchronize()} disabled={busy || transport.name === 'disabled'} icon={<RefreshCw className={busy ? 'spin' : ''} size={18} />}>{transport.name === 'disabled' ? 'Sincronização desativada' : busy ? 'Sincronizando…' : 'Sincronizar agora'}</Button>
       </Card>
       <Card title="Proteção da conta">
-        <ul className="check-list"><li><ShieldCheck />Somente sua conta pode acessar as próprias informações.</li><li><ShieldCheck />Dispositivos removidos perdem o acesso.</li><li><ShieldCheck />O conteúdo pastoral permanece protegido durante a sincronização.</li></ul>
+        <ul className="check-list"><li><ShieldCheck />Somente sua conta pode acessar as próprias informações.</li><li><ShieldCheck />Dispositivos removidos perdem o acesso.</li><li><ShieldCheck />O conteúdo pastoral não é lido por ninguém no caminho.</li></ul>
       </Card>
     </div>
   )

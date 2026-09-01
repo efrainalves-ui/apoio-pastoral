@@ -85,7 +85,7 @@ export function ChurchDetailPage() {
     <div className="page-stack">
       <Link className="text-link back-link" to="/app/distrito"><ArrowLeft />Voltar ao distrito</Link>
       <header className="page-hero district-hero">
-        <div><p className="eyebrow">{districtName}</p><div className="title-with-badge"><h1>{church.name}</h1><span className={`entity-badge entity-badge--${church.status}`}>{CHURCH_STATUS_LABELS[church.status]}</span></div><p>{CHURCH_TYPE_LABELS[church.type]} · dados protegidos e disponíveis offline.</p></div>
+        <div><p className="eyebrow">{districtName}</p><div className="title-with-badge"><h1>{church.name}</h1><span className={`entity-badge entity-badge--${church.status}`}>{CHURCH_STATUS_LABELS[church.status]}</span></div><p>{CHURCH_TYPE_LABELS[church.type]} · disponível sem internet.</p></div>
         <div className="page-actions"><Link className="button button--secondary" to={`/app/distrito/igrejas/${church.id}/editar`}><Pencil size={17} /><span>Editar</span></Link><Button variant="danger" onClick={() => setConfirmDelete(true)} icon={<Trash2 size={17} />}>Remover</Button></div>
       </header>
 

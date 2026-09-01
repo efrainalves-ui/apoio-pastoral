@@ -117,7 +117,7 @@ export function ChurchFormPage() {
     }
   }
 
-  if (loading) return <div className="app-loading" role="status">Abrindo formulário protegido…</div>
+  if (loading) return <div className="app-loading" role="status">Abrindo o formulário…</div>
 
   if (!districtId) {
     return <div className="page-stack page-narrow"><div className="alert alert--error" role="alert">{error}</div><Link className="text-link" to="/app/distrito"><ArrowLeft />Voltar ao distrito</Link></div>
@@ -129,7 +129,7 @@ export function ChurchFormPage() {
   return (
     <div className="page-stack page-narrow">
       <Link className="text-link back-link" to={cancelPath}><ArrowLeft />Voltar</Link>
-      <header className="page-hero"><div><p className="eyebrow">{districtName}</p><h1>{editing ? 'Editar igreja' : 'Nova igreja'}</h1><p>Nome e tipo são obrigatórios. Todos os campos abaixo permanecem protegidos no aplicativo.</p></div></header>
+      <header className="page-hero"><div><p className="eyebrow">{districtName}</p><h1>{editing ? 'Editar igreja' : 'Nova igreja'}</h1><p>Nome e tipo são obrigatórios. Só o nome e o tipo são obrigatórios.</p></div></header>
       {error && <div className="alert alert--error" role="alert">{error}</div>}
 
       <form className="church-form" onSubmit={(event) => void submit(event)} noValidate>

@@ -7,6 +7,7 @@ import type { AgendaEventEntity } from '../agenda/types'
 import { CareService } from '../care/service'
 import type { FollowUpEntity, PrayerRequestEntity, TaskEntity, VisitRoundEntity } from '../care/types'
 import { SyncNowButton } from '../components/SyncNowButton'
+import { GoalsSummary } from '../components/GoalsSummary'
 import { VisitAnswersSummary } from '../components/VisitAnswersSummary'
 import { Card } from '../components/ui/Card'
 import { DistrictService } from '../district/service'
@@ -86,6 +87,7 @@ export function HomePage() {
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
 
   return <div className="page-stack"><header className="page-hero"><div><p className="eyebrow">Hoje</p><h1>Visão do distrito</h1><p>O que merece sua atenção pastoral neste momento.</p></div><div className="page-actions"><SyncNowButton /><Link className="button button--secondary" to="/app/visitas/nova"><HeartHandshake />Nova visita</Link><Link className="button" to="/app/agenda/novo"><Plus />Novo compromisso</Link></div></header>
+    <GoalsSummary />
     <VisitAnswersSummary />
     <section className="dashboard-metrics" aria-label="Resumo do distrito"><Link to="/app/pessoas"><small>Pessoas</small><strong>{people.length}</strong><span>{people.filter(({ pastoralStatus }) => pastoralStatus === 'active').length} ativas</span></Link><Link to="/app/pessoas"><small>Acompanhar</small><strong>{people.filter(({ pastoralStatus }) => pastoralStatus === 'rescue').length}</strong><span>pessoas a resgatar</span></Link><Link to="/app/familias"><small>Famílias</small><strong>{families}</strong><span>laços cadastrados</span></Link><Link to="/app/aniversarios"><small>Aniversários hoje</small><strong>{todayBirthdays.length}</strong><span>ver mensagens</span></Link></section>
     <div className="home-grid"><Card eyebrow="Hoje" title="Agenda" action={<CalendarDays className="accent-icon" />}>{!todayEvents.length ? <div className="empty-state compact-empty"><CalendarDays /><strong>Nenhum compromisso hoje</strong><span>Reserve um horário para uma visita, reunião ou pregação.</span></div> : <div className="breakdown-list">{todayEvents.map((event) => <div key={event.id}><span>{event.title}</span><strong>{event.allDay ? 'Dia todo' : new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(event.startAt))}</strong></div>)}</div>}<Link className="text-link" to="/app/agenda">Abrir agenda <ChevronRight /></Link></Card><Card eyebrow="Hoje" title="Aniversariantes" action={<Cake className="accent-icon" />}>{todayBirthdays.length === 0 ? <div className="empty-state compact-empty"><Cake /><strong>Nenhum aniversariante hoje</strong></div> : <div className="entity-list">{todayBirthdays.map(({ person, turningAge }) => <Link className="entity-row" key={person.id} to={`/app/pessoas/${person.id}`}><span className="avatar">{person.name[0]}</span><span><strong>{person.name}</strong><small>Completa {turningAge} anos</small></span></Link>)}</div>}<Link className="text-link" to="/app/aniversarios">Ver próximos aniversários <ChevronRight /></Link></Card></div>

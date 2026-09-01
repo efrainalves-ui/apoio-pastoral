@@ -17,7 +17,6 @@ const groups = [
     { to: '/app/missionario', icon: BookHeart, title: 'Interessados e estudos bíblicos', detail: 'Acompanhe cada pessoa' },
     { to: '/app/missionario/duplas', icon: UsersRound, title: 'Duplas missionárias', detail: 'Organize as duplas por igreja' },
     { to: '/app/missionario/grupos', icon: UsersRound, title: 'Escola Sabatina, PG e UAPG', detail: 'Classes e grupos' },
-    { to: '/app/metas/missionario', icon: BookHeart, title: 'Metas missionárias', detail: 'Acompanhe o planejamento' },
     { to: '/app/relatorios', icon: FileText, title: 'Relatórios', detail: 'Prepare os relatórios do distrito' },
   ] },
   { title: 'Área pessoal', links: [

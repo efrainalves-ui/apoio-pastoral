@@ -36,7 +36,7 @@ import { GoalsPage } from '../pages/GoalsPage'
 import { MissionaryPage } from '../pages/MissionaryPage'
 import { MissionaryPairsPage } from '../pages/MissionaryPairsPage'
 import { CommunityGroupsPage } from '../pages/CommunityGroupsPage'
-import { MissionaryGoalsPage } from '../pages/MissionaryGoalsPage'
+import { GoalAreaPage } from '../pages/GoalAreaPage'
 import { ReportsPage } from '../pages/ReportsPage'
 import { BackupPage } from '../pages/BackupPage'
 import { CommissionsPage } from '../pages/CommissionsPage'
@@ -163,7 +163,7 @@ export function App() {
         <Route path="sermoes/:sermonId/pregar" element={<SermonReadingPage />} />
         <Route path="sermoes/:sermonId/editar" element={<SermonFormPage />} />
         <Route path="metas" element={<GoalsPage />} />
-        <Route path="metas/missionario" element={<MissionaryGoalsPage />} />
+        <Route path="metas/:area" element={<GoalAreaPage />} />
         <Route path="planejamento" element={<AnnualPlanningPage />} />
         <Route path="planejamento/nova" element={<AnnualGoalPage />} />
         <Route path="planejamento/:goalId" element={<AnnualGoalPage />} />
