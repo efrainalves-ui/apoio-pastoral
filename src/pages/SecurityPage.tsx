@@ -1,6 +1,7 @@
 import { KeyRound, Laptop, LockKeyhole, ShieldCheck, Smartphone } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { currentDeviceId, revokeDevice } from '../auth/device'
+import { fetchRemoteDevices } from '../auth/supabase'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -18,7 +19,28 @@ export function SecurityPage() {
   const [error, setError] = useState('')
 
   const loadDevices = useCallback(async () => {
-    if (account) setDevices(await db.devices.where('accountId').equals(account.id).toArray())
+    if (!account) return
+    const locais = await db.devices.where('accountId').equals(account.id).toArray()
+    // Cada aparelho só guarda a si mesmo. A lista da conta inteira vem do
+    // serviço; sem ela, os outros aparelhos ficariam invisíveis e não haveria
+    // como revogar nenhum deles.
+    const remotos = await fetchRemoteDevices().catch(() => null)
+    if (!remotos) { setDevices(locais); return }
+
+    const porId = new Map(locais.map((device) => [device.id, device]))
+    setDevices(remotos.map((remoto) => {
+      const local = porId.get(remoto.id)
+      const agora = new Date().toISOString()
+      return {
+        ...local,
+        id: remoto.id,
+        accountId: account.id,
+        label: remoto.label,
+        status: remoto.status,
+        createdAt: local?.createdAt ?? remoto.lastSeenAt ?? agora,
+        lastSeenAt: remoto.lastSeenAt ?? local?.lastSeenAt ?? agora,
+      }
+    }))
   }, [account])
   useEffect(() => { void loadDevices() }, [loadDevices])
 

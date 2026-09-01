@@ -75,8 +75,12 @@ export async function assertRemoteDeviceStillActive(
 }
 
 export async function revokeDevice(deviceId: string, database: ApoioDatabase = db): Promise<void> {
+  // O aparelho que revoga quase nunca tem registro local do aparelho revogado:
+  // cada um só guarda a si mesmo. Por isso a ausência do registro local não
+  // impede a revogação — o serviço é a autoridade.
   const device = await database.devices.get(deviceId)
-  if (!device) throw new Error('Dispositivo não encontrado.')
-  await database.devices.put({ ...device, status: 'revoked', revokedAt: new Date().toISOString() })
+  if (device) {
+    await database.devices.put({ ...device, status: 'revoked', revokedAt: new Date().toISOString() })
+  }
   await revokeRemoteDevice(deviceId)
 }

@@ -136,6 +136,34 @@ export async function fetchRemoteDeviceStatus(deviceId: string): Promise<RemoteD
   return (data?.status as RemoteDeviceStatus | undefined) ?? 'revoked'
 }
 
+export interface RemoteDevice {
+  id: string
+  label: string
+  status: RemoteDeviceStatus
+  lastSeenAt: string | null
+}
+
+/**
+ * A lista de dispositivos da conta vive no serviço: cada aparelho só conhece a
+ * si mesmo localmente. Sem esta consulta, a tela de Segurança nunca mostraria os
+ * outros aparelhos e a revogação seria inalcançável. Devolve `null` quando não
+ * há serviço remoto, para a tela seguir com o que tem localmente.
+ */
+export async function fetchRemoteDevices(): Promise<RemoteDevice[] | null> {
+  if (!hasSupabaseConfiguration) return null
+  const { data, error } = await getSupabaseClient()
+    .from('devices')
+    .select('id,label,status,last_seen_at')
+    .order('created_at', { ascending: true })
+  if (error) throw new Error('Não foi possível consultar os dispositivos da conta.')
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    label: row.label as string,
+    status: row.status as RemoteDeviceStatus,
+    lastSeenAt: (row.last_seen_at as string | null) ?? null,
+  }))
+}
+
 export async function revokeRemoteDevice(deviceId: string): Promise<void> {
   if (!hasSupabaseConfiguration) return
   const { error } = await getSupabaseClient().from('devices').update({
