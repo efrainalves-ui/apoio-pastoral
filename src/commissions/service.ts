@@ -5,7 +5,8 @@ import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { EncryptedMutation } from '../db/repository'
 import type { VaultRecord } from '../db/types'
-import { agendaText, canDeliberate, minutesText, presidentMayBreakTie, tieBreakNote, voteNumber, voteResult } from './core'
+import { DistrictService } from '../district/service'
+import { agendaText, canDeliberate, elderPresidencyAllowed, meetingPresidentName, minutesText, presidentMayBreakTie, tieBreakNote, voteNumber, voteResult } from './core'
 import type { CommissionAgendaItem, CommissionConfigData, CommissionEntity, CommissionMeetingData, CommissionTaskData, TaskStatus, PresidentTieBreak } from './types'
 
 const now = () => new Date().toISOString()
@@ -13,10 +14,12 @@ const now = () => new Date().toISOString()
 export class CommissionService {
   private readonly repository: VaultRepository
   private readonly agenda: AgendaService
+  private readonly district: DistrictService
 
   constructor(private readonly database: ApoioDatabase = db) {
     this.repository = new VaultRepository(database)
     this.agenda = new AgendaService(database)
+    this.district = new DistrictService(database)
   }
 
   private async decode<T extends object>(record: VaultRecord, masterKey: CryptoKey, type: string): Promise<CommissionEntity<T> | null> {
@@ -36,6 +39,13 @@ export class CommissionService {
   async saveConfig(accountId: string, masterKey: CryptoKey, input: Omit<CommissionConfigData, 'updatedAt'>): Promise<CommissionEntity<CommissionConfigData>> {
     if (input.boardQuorum < 1 || input.administrativeQuorum < 1) throw new Error('Informe os quóruns definidos pela igreja.')
     if (!input.year || input.year < 2000) throw new Error('Informe o ano eclesiástico.')
+    // O presidente padrão é o pastor. A escolha de um ancião é exceção de
+    // igreja organizada e só vale para quem está registrado como ancião.
+    if (input.presidentMode === 'elder') {
+      const church = await this.district.getChurch(accountId, masterKey, input.churchId)
+      if (!elderPresidencyAllowed(church?.type)) throw new Error('Somente igreja organizada pode ter um ancião presidindo a comissão.')
+      if (!input.boardPresidentId || !(input.elderIds ?? []).includes(input.boardPresidentId)) throw new Error('Escolha um ancião registrado para presidir a comissão.')
+    }
     const current = await this.config(accountId, masterKey, input.churchId)
     const id = current?.id ?? crypto.randomUUID()
     const sameYear = current?.year === input.year
@@ -121,7 +131,7 @@ export class CommissionService {
     const meeting = await this.meeting(accountId, masterKey, meetingId)
     if (!meeting) throw new Error('Reunião não encontrada.')
     if (meeting.finalizedAt) return meeting
-    if (!meeting.presidentId || !meeting.secretaryId) throw new Error('Informe presidente e secretário(a) antes de finalizar a ata.')
+    if (!(meeting.presidentId || meeting.presidentLabel?.trim()) || !meeting.secretaryId) throw new Error('Informe presidente e secretário(a) antes de finalizar a ata.')
     const finalizedAt = now()
     return this.saveMeeting(accountId, masterKey, { ...meeting, finalizedAt, updatedAt: finalizedAt }, meetingId)
   }
@@ -142,7 +152,7 @@ export class CommissionService {
       const config = await this.config(accountId, masterKey, source.churchId)
       return this.saveMeeting(accountId, masterKey, {
         churchId: source.churchId, kind: 'administrative', date: source.date, time: '', location: source.location,
-        presidentId: config?.boardPresidentId ?? '', secretaryId: config?.secretaryId ?? '', participantIds: [], guestNames: [], votingGuestNames: [],
+        presidentId: source.presidentId, ...(source.presidentLabel ? { presidentLabel: source.presidentLabel } : {}), secretaryId: config?.secretaryId ?? '', participantIds: [], guestNames: [], votingGuestNames: [],
         openingPrayer: '', reflection: '', notes: '', agenda: [forwarded], createdAt: timestamp, updatedAt: timestamp,
       })
     }
@@ -189,11 +199,11 @@ export class CommissionService {
   }
 
   agendaDocument(meeting: CommissionEntity<CommissionMeetingData>, churchName: string, personName: (id: string) => string = (id) => id): string {
-    return [churchName, meeting.kind === 'board' ? 'Agenda da Comissão Diretiva' : 'Agenda da Reunião Administrativa', `Data: ${meeting.date} · Horário: ${meeting.time || 'a confirmar'} · Local: ${meeting.location || 'a confirmar'}`, `Presidente: ${personName(meeting.presidentId)} · Secretário(a): ${personName(meeting.secretaryId)}`, `Participantes: ${meeting.participantIds.map(personName).join(', ') || 'A confirmar'}`, meeting.openingPrayer ? `Oração: ${meeting.openingPrayer}` : '', meeting.reflection ? `Reflexão: ${meeting.reflection}` : '', ...[...meeting.agenda].sort((a, b) => a.order - b.order).map((item) => `${item.order}. ${item.title}${item.sourceVoteNumber ? ` (Origem: voto ${item.sourceVoteNumber})` : ''}\n${agendaText(item)}`)].filter(Boolean).join('\n\n')
+    return [churchName, meeting.kind === 'board' ? 'Agenda da Comissão Diretiva' : 'Agenda da Reunião Administrativa', `Data: ${meeting.date} · Horário: ${meeting.time || 'a confirmar'} · Local: ${meeting.location || 'a confirmar'}`, `Presidente: ${meetingPresidentName(meeting, personName)} · Secretário(a): ${personName(meeting.secretaryId)}`, `Participantes: ${meeting.participantIds.map(personName).join(', ') || 'A confirmar'}`, meeting.openingPrayer ? `Oração: ${meeting.openingPrayer}` : '', meeting.reflection ? `Reflexão: ${meeting.reflection}` : '', ...[...meeting.agenda].sort((a, b) => a.order - b.order).map((item) => `${item.order}. ${item.title}${item.sourceVoteNumber ? ` (Origem: voto ${item.sourceVoteNumber})` : ''}\n${agendaText(item)}`)].filter(Boolean).join('\n\n')
   }
 
   minutesDocument(meeting: CommissionEntity<CommissionMeetingData>, churchName: string, quorum: number, personName: (id: string) => string = (id) => id): string {
     const present = meeting.participantIds.length + meeting.votingGuestNames.length
-    return [churchName, meeting.kind === 'board' ? 'Ata da Comissão Diretiva' : 'Ata da Reunião Administrativa', `Data: ${meeting.date} · Horário: ${meeting.time || 'a confirmar'} · Local: ${meeting.location || 'a confirmar'}`, `Presidente: ${personName(meeting.presidentId)} · Secretário(a): ${personName(meeting.secretaryId)}`, `Participantes: ${meeting.participantIds.map(personName).join(', ') || 'Nenhum informado'}`, `Quórum: ${present} presentes com voto; mínimo ${quorum}. ${canDeliberate(present, quorum) ? 'Quórum confirmado.' : 'Sem quórum.'}`, ...meeting.agenda.filter((item) => item.vote).map((item) => `${item.vote?.voteNumber ?? 'Decisão sem número'} · ${minutesText(item)}\nFavoráveis: ${item.vote?.favorable}; contrários: ${item.vote?.against}; abstenções: ${item.vote?.abstentions}. Resultado: ${item.vote?.result}.${item.vote?.presidentTieBreak ? `\n${tieBreakNote(item.vote.presidentTieBreak)}` : ''}`), meeting.notes ? `Observações: ${meeting.notes}` : '', `Assinaturas:\n${personName(meeting.presidentId)} — Presidente\n${personName(meeting.secretaryId)} — Secretário(a)`].filter(Boolean).join('\n\n')
+    return [churchName, meeting.kind === 'board' ? 'Ata da Comissão Diretiva' : 'Ata da Reunião Administrativa', `Data: ${meeting.date} · Horário: ${meeting.time || 'a confirmar'} · Local: ${meeting.location || 'a confirmar'}`, `Presidente: ${meetingPresidentName(meeting, personName)} · Secretário(a): ${personName(meeting.secretaryId)}`, `Participantes: ${meeting.participantIds.map(personName).join(', ') || 'Nenhum informado'}`, `Quórum: ${present} presentes com voto; mínimo ${quorum}. ${canDeliberate(present, quorum) ? 'Quórum confirmado.' : 'Sem quórum.'}`, ...meeting.agenda.filter((item) => item.vote).map((item) => `${item.vote?.voteNumber ?? 'Decisão sem número'} · ${minutesText(item)}\nFavoráveis: ${item.vote?.favorable}; contrários: ${item.vote?.against}; abstenções: ${item.vote?.abstentions}. Resultado: ${item.vote?.result}.${item.vote?.presidentTieBreak ? `\n${tieBreakNote(item.vote.presidentTieBreak)}` : ''}`), meeting.notes ? `Observações: ${meeting.notes}` : '', `Assinaturas:\n${meetingPresidentName(meeting, personName)} — Presidente\n${personName(meeting.secretaryId)} — Secretário(a)`].filter(Boolean).join('\n\n')
   }
 }

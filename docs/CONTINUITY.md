@@ -70,6 +70,14 @@ Concluída a criação e restauração de backup local cifrado. O arquivo conté
 - A Agenda aceita Batismo, Santa Ceia, Casamento e Dedicação de criança, com responsável, pessoas aplicáveis e checklists próprios. Os compromissos continuam no mesmo fluxo de Dia, Semana, Mês e Lista; nenhum documento civil ou certificado foi criado.
 - Em 27 de agosto de 2026, lint, TypeScript, build, PWA e 134 testes Vitest em 46 arquivos foram aprovados. O Playwright permanece pendente no CI Linux porque o Chromium headless foi bloqueado pelo sandbox macOS antes de abrir qualquer página.
 
+## Etapa estável: Comissões e Comissão de Nomeações
+
+- O presidente padrão da comissão é o pastor, e a configuração diz isso na tela. Só em igreja organizada é possível escolher um ancião, e apenas entre os membros marcados como anciãos naquela igreja; em grupo e ponto de pregação a escolha nem aparece. A pauta e a ata assinam com o nome do pastor quando é ele quem preside.
+- A reunião segue três etapas separadas. 1. Preparar pauta: dados, participantes, cadastro e ordem dos assuntos, com a pauta pronta para imprimir. 2. Realizar comissão: um assunto por vez, com a decisão registrada na hora e navegação para o próximo. 3. Gerar ata: só abre depois que todos os assuntos têm decisão, permite a revisão final dos textos e a finalização protegida.
+- A Comissão de Nomeações não tem nenhuma demonstração na interface: o pastor cria o processo e percorre formação, cargos, indicações, reuniões, relatório, votação oficial e vagas com os dados da própria igreja.
+- O catálogo de cargos traz ancião, diácono chefe, diaconisa chefe, primeiro diácono, primeira diaconisa, diáconos, diaconisas, secretários dos departamentos, sonoplastia, mídia, adolescentes, Desbravadores, Aventureiros, Ministério da Mulher, Ministério dos Homens, Patrimônio e Escola Sabatina, entre os demais. Diáconos e diaconisas continuam separados e cada cargo pode ser votado sozinho.
+- Ancião e todo o diaconato nunca têm associados, mesmo quando o cargo é digitado à mão; os demais cargos podem ter associado quando a igreja achar necessário, e o relatório mostra isso ao lado do cargo.
+
 ## Etapa estável: Planejamento Anual e Evangelismo
 
 - Planejamento Anual organiza metas por ano e pelas áreas Identidade, Liderança, Novas gerações e Discipulado. O cadastro pede apenas título, área estratégica, vínculo opcional com Financeiro, Batismos, Estudos Bíblicos ou UAPG, datas de início e fim e quantidade esperada; toda meta é do distrito. Cada meta abre em Acompanhar, com resumo, divisão opcional por igreja, plano de ação, agenda, orçamento próprio e resultado mês a mês. Quando há vínculo, o resultado vem da área correspondente, sem lançamento duplicado. Inclui calendário mensal, próximas ações, resumo por igreja, histórico, vínculos e cópia revisável para outro ano.

@@ -3,7 +3,9 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { elderPresidencyAllowed } from '../commissions/core'
 import { CommissionService } from '../commissions/service'
+import type { PresidentMode } from '../commissions/types'
 import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
 import { PeopleService } from '../people/service'
@@ -26,6 +28,9 @@ export function CommissionConfigPage() {
   const [year, setYear] = useState(new Date().getFullYear())
   const [members, setMembers] = useState<string[]>([])
   const [president, setPresident] = useState('')
+  const [presidentMode, setPresidentMode] = useState<PresidentMode>('pastor')
+  const [pastorName, setPastorName] = useState('')
+  const [elders, setElders] = useState<string[]>([])
   const [secretary, setSecretary] = useState('')
   const [boardQuorum, setBoardQuorum] = useState(0)
   const [administrativeQuorum, setAdministrativeQuorum] = useState(0)
@@ -50,6 +55,9 @@ export function CommissionConfigPage() {
         setYear(config?.year ?? new Date().getFullYear())
         setMembers(config?.boardMemberIds ?? [])
         setPresident(config?.boardPresidentId ?? '')
+        setPresidentMode(config?.presidentMode ?? 'pastor')
+        setPastorName(config?.pastorName ?? '')
+        setElders(config?.elderIds ?? [])
         setSecretary(config?.secretaryId ?? '')
         setBoardQuorum(config?.boardQuorum ?? 0)
         setAdministrativeQuorum(config?.administrativeQuorum ?? 0)
@@ -72,7 +80,10 @@ export function CommissionConfigPage() {
         churchId,
         year,
         boardMemberIds: members,
-        boardPresidentId: president,
+        boardPresidentId: presidentMode === 'elder' ? president : '',
+        presidentMode,
+        pastorName,
+        elderIds: elders,
         secretaryId: secretary,
         boardQuorum,
         administrativeQuorum,
@@ -91,6 +102,7 @@ export function CommissionConfigPage() {
   }
 
   const options = people.filter((person) => !churchId || person.currentChurchId === churchId)
+  const organized = elderPresidencyAllowed(churches.find((church) => church.id === churchId)?.type)
 
   return <div className="page-stack commission-config-page">
     <Link className="text-link back-link" to="/app/comissoes">Voltar a Comissões</Link>
@@ -108,13 +120,26 @@ export function CommissionConfigPage() {
       <p className="muted">Próximo voto da Comissão Diretiva: {year}-{String(nextBoardVote).padStart(3, '0')} · Próximo voto da Reunião Administrativa: {year}-{String(nextAdministrativeVote).padStart(3, '0')}</p>
     </Card>
 
+    <Card title="Quem preside a comissão">
+      <ul className="plain-list">
+        <li>Presidente padrão: <strong>Pastor</strong>.</li>
+        <li>Em igreja organizada: pode ser escolhido um ancião, quando necessário.</li>
+      </ul>
+      <div className="form-grid">
+        <label className="field" htmlFor="commission-pastor-name"><span className="field__label">Nome do pastor na ata</span><input id="commission-pastor-name" className="field__input" disabled={loading} value={pastorName} onChange={(event) => setPastorName(event.target.value)} placeholder="Pastor do distrito" /></label>
+        <label className="field" htmlFor="commission-president-mode"><span className="field__label">Presidente</span><select id="commission-president-mode" className="field__input" disabled={loading || !organized} value={presidentMode} onChange={(event) => setPresidentMode(event.target.value as PresidentMode)}><option value="pastor">Pastor (padrão)</option><option value="elder">Um ancião da igreja</option></select>{!organized && <small className="field__hint">Esta igreja não é organizada, então quem preside é o pastor.</small>}</label>
+      </div>
+      {organized && <>
+        <p>Marque quem é ancião nesta igreja. Só quem estiver marcado aqui pode presidir no lugar do pastor.</p>
+        <div className="checkbox-grid">{options.map((person) => <label className="choice-card" key={`anciao-${person.id}`}><input type="checkbox" disabled={loading} checked={elders.includes(person.id)} onChange={() => setElders(elders.includes(person.id) ? elders.filter((id) => id !== person.id) : [...elders, person.id])} /><span>{person.name}</span></label>)}</div>
+        {presidentMode === 'elder' && <label className="field" htmlFor="commission-elder-president"><span className="field__label">Ancião que vai presidir</span><select id="commission-elder-president" className="field__input" disabled={loading} value={president} onChange={(event) => setPresident(event.target.value)}><option value="">Selecionar</option>{options.filter((person) => elders.includes(person.id)).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>}
+      </>}
+    </Card>
+
     <Card title="Pessoas responsáveis">
       <p>Marque os membros que compõem a Comissão Diretiva neste ano.</p>
       <div className="checkbox-grid">{options.map((person) => <label className="choice-card" key={person.id}><input type="checkbox" disabled={loading} checked={members.includes(person.id)} onChange={() => setMembers(members.includes(person.id) ? members.filter((id) => id !== person.id) : [...members, person.id])} /><span>{person.name}</span></label>)}</div>
-      <div className="form-grid">
-        <label className="field"><span className="field__label">Presidente</span><select className="field__input" disabled={loading} value={president} onChange={(event) => setPresident(event.target.value)}><option value="">Selecionar</option>{options.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
-        <label className="field"><span className="field__label">Secretário(a)</span><select className="field__input" disabled={loading} value={secretary} onChange={(event) => setSecretary(event.target.value)}><option value="">Selecionar</option>{options.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
-      </div>
+      <label className="field" htmlFor="commission-secretary"><span className="field__label">Secretário(a)</span><select id="commission-secretary" className="field__input" disabled={loading} value={secretary} onChange={(event) => setSecretary(event.target.value)}><option value="">Selecionar</option>{options.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
       <Button disabled={loading || busy} onClick={() => void save()}>{busy ? 'Salvando…' : 'Salvar configuração'}</Button>
     </Card>
   </div>

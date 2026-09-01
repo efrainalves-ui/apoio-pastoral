@@ -161,7 +161,7 @@ Transferência de Distrito foi retirada da interface, rotas, ações e testes ex
 
 ## Playwright
 
-A suíte contém 14 cenários e é projetada para dois projetos, totalizando 28 execuções: desktop Chromium 1440 × 1000 e Pixel 7. Ela cobre criação de conta, entrada, saída protegida, recuperação após conta existente, proteção de rota, PWA, acessibilidade, Distrito, Pessoas, Agenda, Cuidado Pastoral, Comissões, Nomeações, Orçamento Familiar, Pedidos de Oração, Leitura, cerimônias, Planejamento Anual e Evangelismo. Cada cenário inicia em contexto do navegador e armazenamento vazios e usa somente dados fictícios.
+A suíte contém 18 cenários e é projetada para dois projetos, totalizando 36 execuções: desktop Chromium 1440 × 1000 e Pixel 7. Ela cobre criação de conta, entrada, saída protegida, recuperação após conta existente, proteção de rota, PWA, acessibilidade, Distrito, Pessoas, Agenda, Cuidado Pastoral, Comissões, Nomeações, Orçamento Familiar, Pedidos de Oração, Leitura, cerimônias, Planejamento Anual e Evangelismo. Cada cenário inicia em contexto do navegador e armazenamento vazios e usa somente dados fictícios.
 
 Na execução final de 27 de agosto de 2026, o build e o servidor de teste foram concluídos. A suíte iniciou 28 execuções, mas o sandbox macOS bloqueou cada Chromium iniciado por permissão de MachPort antes de abrir uma página ou executar uma asserção. Depois de 25 falhas idênticas de inicialização, a tentativa foi encerrada; uma execução ficou interrompida e duas não chegaram a iniciar. Isso não é aprovação nem falha funcional dos cenários. O workflow Linux de homologação executará `pnpm test:e2e` em host compatível para concluir essa validação.
 
@@ -179,6 +179,8 @@ Na execução final de 27 de agosto de 2026, o build e o servidor de teste foram
 - uma build de produção foi servida em porta isolada, recebeu um registro fictício, teve o servidor encerrado e foi recarregada pelo service worker; após desbloquear o cofre, o registro cifrado reapareceu offline;
 - manifesto, ícones e `display: standalone` foram verificados pelo script PWA; a confirmação nativa de instalação no sistema operacional continua sendo um teste físico do navegador/plataforma;
 - nenhum erro ou warning foi registrado no console durante a jornada.
+- Comissões percorreu as três etapas com dados fictícios: a pauta foi preparada sem nenhum campo de votação, a ata foi recusada enquanto havia assunto sem decisão, a decisão foi registrada um assunto por vez e a ata só então foi gerada e finalizada. A configuração manteve o pastor como presidente sem exigir escolha.
+- Comissão de Nomeações percorreu formação, cargos, indicações, reunião, relatório e votação oficial por cargo com dados fictícios; nenhuma tela de demonstração apareceu, o associado foi aceito em Patrimônio, recusado em Ancião, e o relatório público não citou fidelidade nem contagem de votos.
 - Planejamento Anual e Evangelismo foram abertos pelo menu; uma meta fictícia foi criada com o cadastro simples e acompanhada em seguida — divisão por igreja com aviso de soma diferente, tarefa do plano de ação, item de orçamento da meta e resultado do mês, chegando a 25% da meta. Campanha, ponto, tarefa e item de orçamento fictícios foram criados, e a Agenda mostrou campanha, ponto e lembrete vinculados sem recadastro.
 - a build final foi aberta em origem nova, sem ler armazenamento anterior; a entrada foi conferida em desktop e 390 × 844 sem rolagem horizontal, as abas Entrar/Criar conta e seus rótulos estavam presentes, e a rota protegida de Backup retornou corretamente para a entrada.
 
@@ -186,7 +188,7 @@ Na execução final de 27 de agosto de 2026, o build e o servidor de teste foram
 
 - manter fixtures fictícias alinhadas aos leiautes paginados já validados localmente;
 - aplicar e testar migration/RLS em Supabase de homologação;
-- confirmar as 28 execuções dos 14 cenários Playwright no CI Linux;
+- confirmar as 36 execuções dos 18 cenários Playwright no CI Linux;
 - instalar fisicamente em iPhone e Android antes do piloto;
 - realizar revisão independente de segurança e jurídica antes de usar dados reais.
 - revisar as prévias de todos os relatórios para assegurar que nenhum campo privado opcional seja incluído indevidamente.

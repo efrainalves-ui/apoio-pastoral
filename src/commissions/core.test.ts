@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isTie, presidentMayBreakTie, requiredMajority, tieBreakNote, voteResult } from './core'
+import { commissionPresident, isTie, meetingPresidentName, presidentMayBreakTie, requiredMajority, tieBreakNote, voteResult } from './core'
 
 describe('regra de aprovação e voto de desempate', () => {
   it('exige sempre metade mais um dos votos válidos', () => {
@@ -48,5 +48,30 @@ describe('regra de aprovação e voto de desempate', () => {
     expect(tieBreakNote('favorable')).toMatch(/presidente, a favor/u)
     expect(tieBreakNote('against')).toMatch(/presidente, contra/u)
     expect(tieBreakNote(null)).toBe('')
+  })
+})
+
+describe('quem preside a comissão', () => {
+  const anciao = { presidentMode: 'elder' as const, boardPresidentId: 'anciao-ficticio', elderIds: ['anciao-ficticio'], pastorName: '' }
+
+  it('usa o pastor por padrão, mesmo sem configuração salva', () => {
+    expect(commissionPresident(null, 'organized_church')).toMatchObject({ mode: 'pastor', personId: '', label: 'Pastor do distrito' })
+    expect(commissionPresident({ presidentMode: 'pastor', pastorName: 'Pastor Fictício', boardPresidentId: '', elderIds: [] }, 'organized_church').label).toBe('Pastor Fictício')
+  })
+
+  it('aceita um ancião registrado somente em igreja organizada', () => {
+    expect(commissionPresident(anciao, 'organized_church', () => 'Ancião Fictício')).toMatchObject({ mode: 'elder', personId: 'anciao-ficticio', label: 'Ancião Fictício' })
+    expect(commissionPresident(anciao, 'group').mode).toBe('pastor')
+    expect(commissionPresident(anciao, 'preaching_point').mode).toBe('pastor')
+  })
+
+  // Escolher qualquer membro não vale: só quem está marcado como ancião.
+  it('volta para o pastor quando a pessoa escolhida não é ancião registrado', () => {
+    expect(commissionPresident({ ...anciao, elderIds: [] }, 'organized_church').mode).toBe('pastor')
+  })
+
+  it('mostra nos documentos o nome de quem presidiu', () => {
+    expect(meetingPresidentName({ presidentId: '', presidentLabel: 'Pastor Fictício' }, () => 'ignorado')).toBe('Pastor Fictício')
+    expect(meetingPresidentName({ presidentId: 'anciao-ficticio' }, () => 'Ancião Fictício')).toBe('Ancião Fictício')
   })
 })

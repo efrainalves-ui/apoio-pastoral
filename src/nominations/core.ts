@@ -2,21 +2,57 @@ import { requiredMajority, voteResult } from '../commissions/core'
 import type { PersonEntity } from '../people/types'
 import type { NominationCandidate, NominationMeeting, NominationOffice, NominationProcessData, NominationReportVersion } from './types'
 
-export const COMMON_OFFICES: Array<{ area: string; title: string; vacancies: number }> = [
-  { area: 'Anciãos', title: 'Ancião(ã)', vacancies: 2 }, { area: 'Secretaria', title: 'Secretário(a)', vacancies: 1 }, { area: 'Tesouraria', title: 'Tesoureiro(a)', vacancies: 1 }, { area: 'Diaconato', title: 'Diácono/Diaconisa', vacancies: 4 },
-  { area: 'Escola Sabatina', title: 'Diretor(a) da Escola Sabatina', vacancies: 1 }, { area: 'Ministério Pessoal', title: 'Diretor(a) de Ministério Pessoal', vacancies: 1 }, { area: 'Ministério Jovem', title: 'Diretor(a) de Jovens', vacancies: 1 },
-  { area: 'Ministério da Criança', title: 'Diretor(a) do Ministério da Criança', vacancies: 1 }, { area: 'Música', title: 'Diretor(a) de Música', vacancies: 1 }, { area: 'Comunicação', title: 'Diretor(a) de Comunicação', vacancies: 1 },
-  { area: 'Saúde', title: 'Diretor(a) de Saúde', vacancies: 1 }, { area: 'Família', title: 'Diretor(a) do Ministério da Família', vacancies: 1 }, { area: 'Mordomia', title: 'Diretor(a) de Mordomia', vacancies: 1 },
-  { area: 'Missão', title: 'Coordenador(a) de Missão', vacancies: 1 }, { area: 'Pequenos Grupos', title: 'Coordenador(a) de Pequenos Grupos', vacancies: 1 },
+export interface OfficeTemplate { area: string; title: string; vacancies: number; allowsAssociates: boolean }
+
+/**
+ * Cargos que a igreja costuma votar. Ancião e diaconato não têm associados;
+ * os demais podem ter, quando a igreja achar necessário. Diáconos e diaconisas
+ * ficam sempre separados, e cada cargo é votado por si.
+ */
+export const COMMON_OFFICES: OfficeTemplate[] = [
+  { area: 'Anciãos', title: 'Ancião', vacancies: 2, allowsAssociates: false },
+  { area: 'Diaconato', title: 'Diácono chefe', vacancies: 1, allowsAssociates: false },
+  { area: 'Diaconato', title: 'Diaconisa chefe', vacancies: 1, allowsAssociates: false },
+  { area: 'Diaconato', title: 'Primeiro diácono', vacancies: 1, allowsAssociates: false },
+  { area: 'Diaconato', title: 'Primeira diaconisa', vacancies: 1, allowsAssociates: false },
+  { area: 'Diaconato', title: 'Diáconos', vacancies: 4, allowsAssociates: false },
+  { area: 'Diaconato', title: 'Diaconisas', vacancies: 4, allowsAssociates: false },
+  { area: 'Secretaria', title: 'Secretário(a)', vacancies: 1, allowsAssociates: true },
+  { area: 'Secretaria', title: 'Secretários dos departamentos', vacancies: 1, allowsAssociates: true },
+  { area: 'Tesouraria', title: 'Tesoureiro(a)', vacancies: 1, allowsAssociates: true },
+  { area: 'Escola Sabatina', title: 'Diretor de Escola Sabatina', vacancies: 1, allowsAssociates: true },
+  { area: 'Ministério Pessoal', title: 'Diretor(a) de Ministério Pessoal', vacancies: 1, allowsAssociates: true },
+  { area: 'Ministério Jovem', title: 'Diretor(a) de Jovens', vacancies: 1, allowsAssociates: true },
+  { area: 'Ministério Jovem', title: 'Adolescentes', vacancies: 1, allowsAssociates: true },
+  { area: 'Desbravadores', title: 'Diretor de Desbravadores', vacancies: 1, allowsAssociates: true },
+  { area: 'Aventureiros', title: 'Diretor de Aventureiros', vacancies: 1, allowsAssociates: true },
+  { area: 'Ministério da Criança', title: 'Diretor(a) do Ministério da Criança', vacancies: 1, allowsAssociates: true },
+  { area: 'Ministério da Mulher', title: 'Ministério da Mulher', vacancies: 1, allowsAssociates: true },
+  { area: 'Ministério dos Homens', title: 'Ministério dos Homens', vacancies: 1, allowsAssociates: true },
+  { area: 'Música', title: 'Diretor(a) de Música', vacancies: 1, allowsAssociates: true },
+  { area: 'Comunicação', title: 'Diretor(a) de Comunicação', vacancies: 1, allowsAssociates: true },
+  { area: 'Comunicação', title: 'Sonoplastia', vacancies: 1, allowsAssociates: true },
+  { area: 'Comunicação', title: 'Mídia', vacancies: 1, allowsAssociates: true },
+  { area: 'Saúde', title: 'Diretor(a) de Saúde', vacancies: 1, allowsAssociates: true },
+  { area: 'Família', title: 'Diretor(a) do Ministério da Família', vacancies: 1, allowsAssociates: true },
+  { area: 'Mordomia', title: 'Diretor(a) de Mordomia', vacancies: 1, allowsAssociates: true },
+  { area: 'Patrimônio', title: 'Patrimônio', vacancies: 1, allowsAssociates: true },
+  { area: 'Pequenos Grupos', title: 'Coordenador(a) de Pequenos Grupos', vacancies: 1, allowsAssociates: true },
 ]
+
+const semAcento = (valor: string) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
+
+/** Ancião e diaconato nunca têm associados, mesmo que o cargo seja digitado à mão. */
+export function officeAllowsAssociates(title: string): boolean { return !/anci|diacon/.test(semAcento(title)) }
+
 export function fidelityNeedsReview(person: PersonEntity): boolean { return person.fidelity?.category !== 'tither' }
 export function internalVote(favorable: number, against: number, abstentions: number, participants: number, quorum: number) { const hasQuorum = quorum > 0 && participants >= quorum; return { result: voteResult(favorable, against, abstentions, hasQuorum), required: requiredMajority(favorable, against), hasQuorum } }
 export function candidateReady(candidate: NominationCandidate): boolean { return candidate.consent && candidate.eligibility === 'confirmed' && candidate.vote?.result === 'approved' }
 export function officeRecommendedCount(process: NominationProcessData, officeId: string): number { return process.candidates.filter((candidate) => candidate.officeId === officeId && candidateReady(candidate)).length }
 export function processMetrics(process: NominationProcessData) { const active = process.offices.filter((office) => office.status !== 'archived' && office.status !== 'not_applicable'); return { filled: active.filter((office) => officeRecommendedCount(process, office.id) >= office.vacancies).length, vacant: active.filter((office) => officeRecommendedCount(process, office.id) < office.vacancies).length, awaitingConsent: process.candidates.filter((candidate) => !candidate.consent && !['declined', 'withdrawn', 'not_recommended'].includes(candidate.status)).length, awaitingEligibility: process.candidates.filter((candidate) => candidate.eligibility === 'pending').length, readyToVote: process.candidates.filter((candidate) => candidate.consent && candidate.eligibility === 'confirmed' && !candidate.vote).length, objections: process.objections.filter((objection) => objection.decision === 'pending').length } }
-export function publicReport(process: NominationProcessData, people: PersonEntity[]): Omit<NominationReportVersion, 'id' | 'version' | 'createdAt'> { const lines = process.candidates.filter(candidateReady).map((candidate) => ({ officeId: candidate.officeId, officeTitle: process.offices.find((office) => office.id === candidate.officeId)?.title ?? 'Cargo', personId: candidate.personId, personName: people.find((person) => person.id === candidate.personId)?.name ?? 'Pessoa cadastrada' })); const openOffices = process.offices.filter((office) => office.status === 'open' && lines.filter((line) => line.officeId === office.id).length < office.vacancies).map((office) => office.title); return { presentationDate: '', officialVoteDate: '', lines, openOffices, publicNote: '' } }
+export function publicReport(process: NominationProcessData, people: PersonEntity[]): Omit<NominationReportVersion, 'id' | 'version' | 'createdAt'> { const lines = process.candidates.filter(candidateReady).map((candidate) => ({ officeId: candidate.officeId, officeTitle: `${process.offices.find((office) => office.id === candidate.officeId)?.title ?? 'Cargo'}${candidate.associate ? ' (associado)' : ''}`, personId: candidate.personId, personName: people.find((person) => person.id === candidate.personId)?.name ?? 'Pessoa cadastrada' })); const openOffices = process.offices.filter((office) => office.status === 'open' && lines.filter((line) => line.officeId === office.id).length < office.vacancies).map((office) => office.title); return { presentationDate: '', officialVoteDate: '', lines, openOffices, publicNote: '' } }
 export function publicReportText(churchName: string, process: NominationProcessData, report: NominationReportVersion): string { return [churchName, 'Relatório da Comissão de Nomeações', `Período: ${process.period}`, report.presentationDate ? `Data de apresentação: ${report.presentationDate}` : 'Data de apresentação: a definir', ...report.lines.map((line) => `${line.officeTitle}: ${line.personName}`), ...(report.openOffices.length ? ['Vagas ainda abertas:', ...report.openOffices.map((office) => `- ${office}`)] : []), report.publicNote].filter(Boolean).join('\n\n') }
-export function officeDefault(area: string, title: string, vacancies = 1): NominationOffice { return { id: crypto.randomUUID(), area, title, vacancies, multiplePeople: vacancies > 1, description: '', status: 'open', indicatedByOtherCommittee: false, officialStatus: 'pending' } }
+export function officeDefault(area: string, title: string, vacancies = 1, allowsAssociates = officeAllowsAssociates(title)): NominationOffice { return { id: crypto.randomUUID(), area, title, vacancies, multiplePeople: vacancies > 1, allowsAssociates: allowsAssociates && officeAllowsAssociates(title), description: '', status: 'open', indicatedByOtherCommittee: false, officialStatus: 'pending' } }
 
 /**
  * Modelos pastorais padrão da Comissão de Nomeações.

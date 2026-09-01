@@ -31,6 +31,7 @@ vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => auth }))
 vi.mock('../district/service', () => ({ DistrictService: class {
   getDistrict = vi.fn(() => Promise.resolve(fixtures.district))
   listChurches = vi.fn(() => Promise.resolve([fixtures.church]))
+  getChurch = vi.fn(() => Promise.resolve(fixtures.church))
 } }))
 vi.mock('../people/service', () => ({ PeopleService: class {
   listPeople = vi.fn(() => Promise.resolve(fixtures.people))
@@ -124,13 +125,48 @@ describe('navegação inicial de Comissões', () => {
     await screen.findByText('Depois de salvar, você voltará automaticamente para criar a reunião.')
     await user.type(screen.getByLabelText('Quórum da Comissão Diretiva'), '2')
     await user.type(screen.getByLabelText('Quórum da Reunião Administrativa'), '5')
-    await user.click(screen.getByRole('checkbox', { name: 'Pessoa Fictícia A' }))
-    await user.selectOptions(screen.getByLabelText('Presidente'), 'pessoa-a')
+    await user.click(screen.getAllByRole('checkbox', { name: 'Pessoa Fictícia A' })[1]!)
     await user.selectOptions(screen.getByLabelText('Secretário(a)'), 'pessoa-b')
     await user.click(screen.getByRole('button', { name: 'Salvar configuração' }))
 
     await waitFor(() => expect(state.saveMeeting).toHaveBeenCalledTimes(1))
-    expect(state.saveMeeting.mock.calls[0]?.[2]).toMatchObject({ churchId: 'igreja-ficticia', kind: 'board' })
+    // Sem escolher ninguém, quem preside é o pastor.
+    expect(state.saveMeeting.mock.calls[0]?.[2]).toMatchObject({ churchId: 'igreja-ficticia', kind: 'board', presidentId: '', presidentLabel: 'Pastor do distrito' })
     expect(await screen.findByLabelText('localização atual')).toHaveTextContent('/app/comissoes/reuniao-ficticia-criada')
+  })
+
+  it('deixa claro que o presidente padrão é o pastor', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={['/app/comissoes/configurar?churchId=igreja-ficticia']}><CommissionConfigPage /></MemoryRouter>)
+
+    expect(await screen.findByText('Pastor')).toBeInTheDocument()
+    expect(screen.getByText('Em igreja organizada: pode ser escolhido um ancião, quando necessário.')).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Quórum da Comissão Diretiva'), '2')
+    await user.type(screen.getByLabelText('Quórum da Reunião Administrativa'), '5')
+    await user.selectOptions(screen.getByLabelText('Secretário(a)'), 'pessoa-b')
+    await user.click(screen.getByRole('button', { name: 'Salvar configuração' }))
+
+    await waitFor(() => expect(state.saveConfig).toHaveBeenCalledTimes(1))
+    expect(state.saveConfig.mock.calls[0]?.[2]).toMatchObject({ presidentMode: 'pastor', boardPresidentId: '' })
+  })
+
+  it('só oferece para presidir quem foi marcado como ancião', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={['/app/comissoes/configurar?churchId=igreja-ficticia']}><CommissionConfigPage /></MemoryRouter>)
+
+    await screen.findByLabelText('Presidente')
+    await user.selectOptions(screen.getByLabelText('Presidente'), 'elder')
+    // Antes de marcar o ancião, ninguém aparece para presidir.
+    expect(screen.getByLabelText('Ancião que vai presidir')).not.toHaveTextContent('Pessoa Fictícia A')
+
+    await user.click(screen.getAllByRole('checkbox', { name: 'Pessoa Fictícia A' })[0]!)
+    await user.selectOptions(screen.getByLabelText('Ancião que vai presidir'), 'pessoa-a')
+    await user.type(screen.getByLabelText('Quórum da Comissão Diretiva'), '2')
+    await user.type(screen.getByLabelText('Quórum da Reunião Administrativa'), '5')
+    await user.selectOptions(screen.getByLabelText('Secretário(a)'), 'pessoa-b')
+    await user.click(screen.getByRole('button', { name: 'Salvar configuração' }))
+
+    await waitFor(() => expect(state.saveConfig).toHaveBeenCalledTimes(1))
+    expect(state.saveConfig.mock.calls[0]?.[2]).toMatchObject({ presidentMode: 'elder', boardPresidentId: 'pessoa-a', elderIds: ['pessoa-a'] })
   })
 })

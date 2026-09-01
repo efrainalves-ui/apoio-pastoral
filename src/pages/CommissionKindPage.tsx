@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { commissionPresident } from '../commissions/core'
 import { CommissionService } from '../commissions/service'
 import type { CommissionConfigData, CommissionEntity, CommissionKind, CommissionMeetingData } from '../commissions/types'
 import { DistrictService } from '../district/service'
@@ -13,7 +14,10 @@ const service = new CommissionService()
 const districts = new DistrictService()
 
 export function commissionConfigReady(config: CommissionEntity<CommissionConfigData> | null, kind: CommissionKind) {
-  if (!config?.boardPresidentId || !config.secretaryId) return false
+  // Quem preside é o pastor por padrão, então a configuração fica pronta sem
+  // escolher presidente; o ancião é exceção e aí precisa estar escolhido.
+  if (!config?.secretaryId) return false
+  if (config.presidentMode === 'elder' && !config.boardPresidentId) return false
   if (kind === 'board') return config.boardQuorum > 0 && config.boardMemberIds.length > 0
   return config.administrativeQuorum > 0
 }
@@ -71,13 +75,17 @@ export function CommissionKindPage({ kind }: { kind: CommissionKind }) {
         return
       }
       const timestamp = new Date().toISOString()
+      const church = await districts.getChurch(account.id, masterKey, churchId)
+      // Pastor por padrão; o ancião entra como pessoa cadastrada da igreja.
+      const presidencia = commissionPresident(currentConfig, church?.type)
       const meeting = await service.saveMeeting(account.id, masterKey, {
         churchId,
         kind,
         date: timestamp.slice(0, 10),
         time: '',
         location: '',
-        presidentId: currentConfig!.boardPresidentId,
+        presidentId: presidencia.mode === 'elder' ? presidencia.personId : '',
+        ...(presidencia.mode === 'pastor' ? { presidentLabel: presidencia.label } : {}),
         secretaryId: currentConfig!.secretaryId,
         participantIds: kind === 'board' ? currentConfig!.boardMemberIds : [],
         guestNames: [],

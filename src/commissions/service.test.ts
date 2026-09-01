@@ -1,6 +1,8 @@
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it } from 'vitest'
 import { generateMasterKey } from '../crypto/vault'
+import { DistrictService } from '../district/service'
+import { emptyChurchInput } from '../district/types'
 import { ApoioDatabase } from '../db/database'
 import { canDeliberate, requiredMajority, voteResult } from './core'
 import { CommissionService } from './service'
@@ -80,5 +82,51 @@ describe('fluxo persistente de Comissão Diretiva e Reunião Administrativa', ()
     await expect(service.confirmVote(accountId, key, board.id, 'item-1', 3, 0, 0)).rejects.toThrow('Não há quórum')
     expect((await service.config(accountId, key, churchId))?.nextBoardVote).toBe(1)
     expect((await service.meeting(accountId, key, board.id))?.agenda[0]?.vote).toBeUndefined()
+  })
+})
+
+describe('presidência da comissão', () => {
+  async function comIgreja(tipo: 'organized_church' | 'group') {
+    const database = new ApoioDatabase(`commissions-president-${crypto.randomUUID()}`); databases.push(database)
+    const service = new CommissionService(database); const districts = new DistrictService(database)
+    const key = await generateMasterKey(); const accountId = 'account-fixture'
+    const district = await districts.createDistrict(accountId, key, 'Distrito Fictício')
+    const church = await districts.createChurch(accountId, key, district.id, { ...emptyChurchInput(), name: 'Igreja Fictícia', type: tipo })
+    return { service, key, accountId, churchId: church.id }
+  }
+
+  const base = (churchId: string) => ({ churchId, year: 2026, boardMemberIds: ['person-1'], boardPresidentId: '', secretaryId: 'person-2', boardQuorum: 2, administrativeQuorum: 2, nextBoardVote: 1, nextAdministrativeVote: 1 })
+
+  it('guarda a configuração com o pastor presidindo, sem exigir nenhum membro', async () => {
+    const { service, key, accountId, churchId } = await comIgreja('organized_church')
+    const saved = await service.saveConfig(accountId, key, base(churchId))
+    expect(saved.boardPresidentId).toBe('')
+  })
+
+  it('aceita um ancião registrado em igreja organizada', async () => {
+    const { service, key, accountId, churchId } = await comIgreja('organized_church')
+    const saved = await service.saveConfig(accountId, key, { ...base(churchId), presidentMode: 'elder', boardPresidentId: 'person-1', elderIds: ['person-1'] })
+    expect(saved).toMatchObject({ presidentMode: 'elder', boardPresidentId: 'person-1' })
+  })
+
+  it('recusa ancião presidindo fora de igreja organizada', async () => {
+    const { service, key, accountId, churchId } = await comIgreja('group')
+    await expect(service.saveConfig(accountId, key, { ...base(churchId), presidentMode: 'elder', boardPresidentId: 'person-1', elderIds: ['person-1'] })).rejects.toThrow('igreja organizada')
+  })
+
+  // Não basta ser membro: quem preside precisa estar marcado como ancião.
+  it('recusa um membro que não está registrado como ancião', async () => {
+    const { service, key, accountId, churchId } = await comIgreja('organized_church')
+    await expect(service.saveConfig(accountId, key, { ...base(churchId), presidentMode: 'elder', boardPresidentId: 'person-3', elderIds: ['person-1'] })).rejects.toThrow('ancião registrado')
+  })
+
+  it('assina a ata com o nome do pastor quando é ele quem preside', async () => {
+    const { service, key, accountId, churchId } = await comIgreja('organized_church')
+    await service.saveConfig(accountId, key, base(churchId))
+    const meeting = await service.saveMeeting(accountId, key, { ...meetingData(churchId, 'board', [agendaItem('item-1', 'aprovar ação fictícia')]), presidentId: '', presidentLabel: 'Pastor Fictício' })
+    const ata = service.minutesDocument(meeting, 'Igreja Fictícia', 2, (id) => `Pessoa ${id}`)
+
+    expect(ata).toContain('Presidente: Pastor Fictício')
+    expect(ata).toContain('Pastor Fictício — Presidente')
   })
 })

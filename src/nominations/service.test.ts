@@ -4,7 +4,7 @@ import { CommissionService } from '../commissions/service'
 import { generateMasterKey } from '../crypto/vault'
 import { ApoioDatabase } from '../db/database'
 import type { PersonEntity } from '../people/types'
-import { internalVote, publicReportText } from './core'
+import { COMMON_OFFICES, internalVote, officeAllowsAssociates, publicReportText } from './core'
 import { NominationService } from './service'
 
 const databases: ApoioDatabase[] = []
@@ -55,4 +55,81 @@ describe('regras da Comissão de Nomeações',()=>{
   })
 
   it('bloqueia recomendação sem quórum e relatório sem consentimento',async()=>{const database=new ApoioDatabase(`nominations-block-${crypto.randomUUID()}`);databases.push(database);const service=new NominationService(database);const key=await generateMasterKey();const people=[person('p1','Pessoa Fictícia Um'),person('p2','Pessoa Fictícia Dois'),person('p3','Pessoa Fictícia Três')];let process=await service.create('account-fixture',key,'church-fixture','Nomeações 2028','p1');process=await service.saveFormation('account-fixture',key,process.id,{...process.formation,committeeMemberIds:['p1','p2','p3'],presidentId:'p1',secretaryId:'p2',quorum:4});process=await service.addCandidate('account-fixture',key,process.id,process.offices[0]!.id,people[2]!);process=await service.createMeeting('account-fixture',key,process.id);await expect(service.voteCandidate('account-fixture',key,process.id,process.candidates[0]!.id,process.meetings[0]!.id,3,0,0)).rejects.toThrow('quórum');await expect(service.generateReport('account-fixture',key,process.id,people)).rejects.toThrow('Nenhuma indicação')})
+})
+
+describe('cargos que a igreja pode votar', () => {
+  const titulos = COMMON_OFFICES.map((office) => office.title)
+
+  it('traz os cargos pedidos pelo distrito', () => {
+    for (const titulo of ['Ancião', 'Diácono chefe', 'Diaconisa chefe', 'Primeiro diácono', 'Primeira diaconisa', 'Diáconos', 'Diaconisas', 'Secretários dos departamentos', 'Sonoplastia', 'Mídia', 'Adolescentes', 'Diretor de Desbravadores', 'Diretor de Aventureiros', 'Ministério da Mulher', 'Ministério dos Homens', 'Patrimônio', 'Diretor de Escola Sabatina']) {
+      expect(titulos).toContain(titulo)
+    }
+  })
+
+  it('não oferece mais Coordenador(a) de Missão', () => {
+    expect(titulos).not.toContain('Coordenador(a) de Missão')
+  })
+
+  // Diáconos e diaconisas são cargos distintos, votados um a um.
+  it('mantém diáconos e diaconisas separados, sem cargo misturado', () => {
+    expect(titulos).toContain('Diáconos')
+    expect(titulos).toContain('Diaconisas')
+    expect(titulos.some((titulo) => titulo.includes('/'))).toBe(false)
+  })
+
+  it('nega associados ao ancião e a todo o diaconato', () => {
+    for (const office of COMMON_OFFICES.filter((item) => ['Anciãos', 'Diaconato'].includes(item.area))) expect(office.allowsAssociates).toBe(false)
+    expect(officeAllowsAssociates('Ancião')).toBe(false)
+    expect(officeAllowsAssociates('Primeira diaconisa')).toBe(false)
+    expect(officeAllowsAssociates('Diáconos')).toBe(false)
+  })
+
+  it('permite associados nos demais cargos', () => {
+    for (const titulo of ['Ministério da Mulher', 'Ministério dos Homens', 'Patrimônio', 'Sonoplastia', 'Mídia']) {
+      expect(COMMON_OFFICES.find((office) => office.title === titulo)?.allowsAssociates).toBe(true)
+    }
+  })
+})
+
+describe('indicação de associados', () => {
+  async function processoFicticio() {
+    const database = new ApoioDatabase(`nominations-associados-${crypto.randomUUID()}`); databases.push(database)
+    const service = new NominationService(database); const key = await generateMasterKey()
+    const process = await service.create('account-fixture', key, 'church-fixture', 'Nomeações 2029', 'p1')
+    return { service, key, process }
+  }
+
+  it('recusa associado em cargo de ancião ou do diaconato', async () => {
+    const { service, key, process } = await processoFicticio()
+    const anciao = process.offices.find((office) => office.title === 'Ancião')!
+    const diaconisas = process.offices.find((office) => office.title === 'Diaconisas')!
+
+    await expect(service.addCandidate('account-fixture', key, process.id, anciao.id, person('p1', 'Pessoa Fictícia Um'), true)).rejects.toThrow('não tem associados')
+    await expect(service.addCandidate('account-fixture', key, process.id, diaconisas.id, person('p2', 'Pessoa Fictícia Dois'), true)).rejects.toThrow('não tem associados')
+  })
+
+  it('registra o associado nos cargos que permitem e mostra isso no relatório', async () => {
+    const { service, key, process } = await processoFicticio()
+    const patrimonio = process.offices.find((office) => office.title === 'Patrimônio')!
+    const pessoa = person('p3', 'Pessoa Fictícia Três')
+
+    let atual = await service.addCandidate('account-fixture', key, process.id, patrimonio.id, pessoa, true)
+    expect(atual.candidates[0]?.associate).toBe(true)
+
+    atual = await service.saveFormation('account-fixture', key, atual.id, { ...atual.formation, committeeMemberIds: ['p1', 'p2', 'p3'], presidentId: 'p1', secretaryId: 'p2', quorum: 3 })
+    atual = await service.updateCandidate('account-fixture', key, atual.id, atual.candidates[0]!.id, { consent: true, status: 'accepted', eligibility: 'confirmed' })
+    atual = await service.createMeeting('account-fixture', key, atual.id)
+    atual = await service.voteCandidate('account-fixture', key, atual.id, atual.candidates[0]!.id, atual.meetings[0]!.id, 3, 0, 0)
+    atual = await service.generateReport('account-fixture', key, atual.id, [pessoa])
+
+    expect(publicReportText('Igreja Fictícia', atual, atual.reports[0]!)).toContain('Patrimônio (associado): Pessoa Fictícia Três')
+  })
+
+  // Cargo digitado à mão também obedece à regra, sem depender do catálogo.
+  it('desliga associados quando o cargo criado à mão é do diaconato', async () => {
+    const { service, key, process } = await processoFicticio()
+    const salvo = await service.saveOffice('account-fixture', key, process.id, { ...process.offices[0]!, id: crypto.randomUUID(), area: 'Diaconato', title: 'Segundo diácono', allowsAssociates: true })
+
+    expect(salvo.offices.find((office) => office.title === 'Segundo diácono')?.allowsAssociates).toBe(false)
+  })
 })

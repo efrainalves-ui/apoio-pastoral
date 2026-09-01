@@ -1,4 +1,27 @@
-import type { CommissionAgendaItem, DecisionResult, PresidentTieBreak } from './types'
+import type { ChurchType } from '../district/types'
+import type { CommissionAgendaItem, CommissionConfigData, CommissionMeetingData, DecisionResult, PresidentMode, PresidentTieBreak } from './types'
+
+/** Como o pastor aparece na pauta e na ata quando ele não informou o nome. */
+export const PASTOR_PRESIDENT_LABEL = 'Pastor do distrito'
+export function pastorLabel(pastorName?: string): string { return pastorName?.trim() || PASTOR_PRESIDENT_LABEL }
+
+/**
+ * O presidente padrão da comissão é o pastor. Só em igreja organizada, e
+ * excepcionalmente, um ancião registrado pode presidir no lugar dele.
+ */
+export function elderPresidencyAllowed(churchType: ChurchType | undefined): boolean { return churchType === 'organized_church' }
+
+export function commissionPresident(config: Pick<CommissionConfigData, 'presidentMode' | 'pastorName' | 'boardPresidentId' | 'elderIds'> | null, churchType: ChurchType | undefined, personName: (id: string) => string = (id) => id): { mode: PresidentMode; personId: string; label: string } {
+  const anciao = config?.boardPresidentId ?? ''
+  const registrado = (config?.elderIds ?? []).includes(anciao)
+  if (config?.presidentMode === 'elder' && elderPresidencyAllowed(churchType) && anciao && registrado) return { mode: 'elder', personId: anciao, label: personName(anciao) }
+  return { mode: 'pastor', personId: '', label: pastorLabel(config?.pastorName) }
+}
+
+/** Nome que vai para os documentos, seja o pastor ou o ancião que presidiu. */
+export function meetingPresidentName(meeting: Pick<CommissionMeetingData, 'presidentId' | 'presidentLabel'>, personName: (id: string) => string): string {
+  return meeting.presidentLabel?.trim() || personName(meeting.presidentId)
+}
 
 export function requiredMajority(favorable: number, against: number): number { const valid = favorable + against; return valid ? Math.floor(valid / 2) + 1 : 0 }
 
