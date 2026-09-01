@@ -89,6 +89,12 @@ export class VaultRepository {
 
   async list(accountId: string, recordType?: VaultRecordType): Promise<VaultRecord[]> {
     const records = await this.database.vaultRecords.where('accountId').equals(accountId).filter((record) => !record.deletedAt).toArray()
-    return recordType ? records.filter((record) => record.recordType === recordType) : records
+    if (!recordType) return records
+    // O que chega de outro aparelho vem sem tipo: descobri-lo exigiria abrir o
+    // conteúdo cifrado, e a sincronização não tem a chave — nem deve ter. Esses
+    // registros entram na lista com o tipo pedido, e quem chamou os descarta ao
+    // conferir o tipo do payload já decifrado. Sem isso eles ficariam guardados
+    // e invisíveis, o que para o pastor é indistinguível de perda de dados.
+    return records.filter((record) => record.recordType === recordType || record.recordType === 'encrypted')
   }
 }

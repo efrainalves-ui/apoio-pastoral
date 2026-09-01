@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { encryptPayload, generateMasterKey } from '../crypto/vault'
+import { PeopleService } from '../people/service'
 import { ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { OutboxRecord } from '../db/types'
@@ -145,6 +146,43 @@ describe('sincronização cifrada', () => {
     expect(summary.pushed).toBe(1)
     expect(transport.pulls).toBe(1)
     expect((await database.devices.get(deviceId))?.status).toBe('active')
+  })
+
+  it('torna visível no aplicativo o registro criado em outro aparelho', async () => {
+    // O aparelho que recebe não tem como saber o tipo do registro: descobri-lo
+    // exigiria abrir o conteúdo cifrado, o que a sincronização não faz. Se a
+    // listagem confiar só no tipo gravado, o registro chega, fica guardado e
+    // nunca aparece — perda silenciosa da visão do usuário.
+    const { database, accountId, deviceId } = await fixture()
+    const masterKey = await generateMasterKey()
+    const recordId = crypto.randomUUID()
+    const envelope = await encryptPayload(masterKey, {
+      schemaVersion: 1,
+      type: 'person',
+      data: { name: 'Pessoa Fictícia do Outro Aparelho', churchId: crypto.randomUUID(), status: 'active' },
+    }, recordId)
+    const vindaDeOutroAparelho: EncryptedOperation = {
+      id: crypto.randomUUID(),
+      ownerId: accountId,
+      deviceId: crypto.randomUUID(),
+      recordId,
+      operation: 'upsert',
+      baseVersion: 0,
+      recordVersion: 1,
+      schemaVersion: 1,
+      payload: envelope,
+      createdAt: '2026-09-01T00:00:00.000Z',
+    }
+
+    const summary = await new SyncService(
+      new PullTransport({ operations: [vindaDeOutroAparelho], cursor: 'cursor' }),
+      database,
+      () => true,
+    ).synchronize(accountId, deviceId)
+
+    expect(summary.pulled).toBe(1)
+    const pessoas = await new PeopleService(database).listPeople(accountId, masterKey)
+    expect(pessoas.map(({ name }) => name)).toContain('Pessoa Fictícia do Outro Aparelho')
   })
 
   it('preserva conflito cifrado e não substitui silenciosamente a versão local', async () => {
