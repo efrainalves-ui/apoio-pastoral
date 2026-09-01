@@ -57,6 +57,46 @@ export function parseMemberText(text: string): ParsedMemberRow[] {
   return rows
 }
 
+/**
+ * Lista colada ou vinda de um .docx, para uma igreja escolhida na tela. Aceita
+ * "Nome; 01/02/1990", "Nome 01/02/1990", "Nome, 1990-02-01" ou só o nome —
+ * quem digita a lista não deve precisar acertar um formato exato.
+ */
+export function parsePastedMemberList(text: string, churchName: string): ParsedMemberRow[] {
+  const igreja = churchName.trim()
+  if (!igreja) throw new ImportFormatError('Escolha a igreja desta lista antes de conferir.')
+
+  const rows: ParsedMemberRow[] = []
+  for (const line of cleanLines(text)) {
+    const semSeparador = line.replace(/\s*[;,|\t]\s*/gu, ' ').trim()
+    if (!semSeparador) continue
+
+    const comData = /^(.*?)[\s]+(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})$/u.exec(semSeparador)
+    const nome = (comData ? comData[1] ?? '' : semSeparador).trim()
+    if (!/\p{L}{2,}/u.test(nome)) continue
+
+    let birthDate: string | null = null
+    let review = false
+    if (comData) {
+      const bruto = comData[2]!
+      if (bruto.includes('/')) {
+        const parsed = parseBrazilianDate(bruto)
+        birthDate = parsed.date
+        review = parsed.review
+      } else {
+        const data = new Date(`${bruto}T00:00:00`)
+        birthDate = Number.isNaN(data.getTime()) ? null : bruto
+        review = birthDate === null
+      }
+    }
+
+    rows.push({ churchName: igreja, name: nome, birthDate, needsReview: review || /\d/u.test(nome) })
+  }
+
+  if (rows.length === 0) throw new ImportFormatError('Nenhum nome foi reconhecido na lista. Nenhuma pessoa será alterada.')
+  return rows
+}
+
 export function parseDistrictListText(text: string): ParsedDistrictList {
   const lines = cleanLines(text)
   const districtName = lines.map((line) => line.match(/^(?:DISTRITO|NOME DO DISTRITO)\s*[:-]\s*(.+)$/iu)?.[1]?.trim() ?? null).find(Boolean) ?? null
