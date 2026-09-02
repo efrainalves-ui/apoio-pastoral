@@ -23,6 +23,17 @@ export function currentDeviceId(accountId: string): string {
   return id
 }
 
+/**
+ * Troca este aparelho por uma autorização nova. Usado ao encerrar o distrito:
+ * as autorizações antigas são revogadas para sempre e a instalação atual passa
+ * a valer com outro identificador, sem herdar nada da anterior.
+ */
+export function rotateDeviceId(accountId: string): string {
+  const novo = crypto.randomUUID()
+  localStorage.setItem(`${DEVICE_ID_KEY}:${accountId}`, novo)
+  return novo
+}
+
 function deviceLabel(): string {
   const mobile = /Android|iPhone|iPad/u.test(navigator.userAgent)
   return mobile ? 'Dispositivo móvel' : 'Computador'

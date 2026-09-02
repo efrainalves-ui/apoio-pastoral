@@ -70,6 +70,15 @@ Concluída a criação e restauração de backup local cifrado. O arquivo conté
 - A Agenda aceita Batismo, Santa Ceia, Casamento e Dedicação de criança, com responsável, pessoas aplicáveis e checklists próprios. Os compromissos continuam no mesmo fluxo de Dia, Semana, Mês e Lista; nenhum documento civil ou certificado foi criado.
 - Em 27 de agosto de 2026, lint, TypeScript, build, PWA e 134 testes Vitest em 46 arquivos foram aprovados. O Playwright permanece pendente no CI Linux porque o Chromium headless foi bloqueado pelo sandbox macOS antes de abrir qualquer página.
 
+## Etapa estável: privacidade, direitos do titular e encerramento de distrito
+
+- Regra de dados registrada no produto e em `docs/PRIVACIDADE.md`: uma conta, um pastor, um distrito, sem compartilhamento nem transferência entre pastores.
+- Configurações ganhou **Encerrar distrito**: apaga os registros do distrito no aparelho, enfileira a mesma remoção cifrada para o serviço, revoga todos os aparelhos e dá uma autorização nova a este; preserva conta, leitura, orçamento familiar e agenda pessoal. Confirmação forte com palavra digitada, caixa de ciência e diálogo final.
+- No perfil da pessoa: *Exportar dados* (documento legível) e *Apagar dados*, que remove o que era só dela e retira o vínculo onde ela aparecia junto de outras.
+- Relatórios saem sem nomes por padrão; o itinerário só inclui títulos com *Incluir nomes neste relatório* marcado, com aviso curto.
+- Campos de visita e de pedido de oração orientam, em uma linha, a evitar detalhes íntimos desnecessários.
+- Política de privacidade simples em Configurações e na criação da conta.
+
 ## Etapa estável: auditoria técnica antes da criação do ambiente real
 
 - O conteúdo cifrado passou a ser conferido contra o registro que o guarda: um envelope colocado na linha de outro registro é recusado ao abrir, mesmo dentro da mesma conta e mesmo que venha do serviço remoto.

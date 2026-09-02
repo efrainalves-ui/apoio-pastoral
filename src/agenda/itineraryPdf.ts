@@ -15,10 +15,15 @@ export function itineraryItems(events: AgendaEventEntity[], from: Date, to: Date
   return [...mondayRestItems(from, to), ...selected].sort((a, b) => a.startAt.localeCompare(b.startAt))
 }
 
-export function buildItineraryPdf(items: ItineraryItem[], heading: string): Uint8Array {
+/**
+ * O padrão é sair sem nomes: data, tipo e local bastam para o itinerário. O
+ * título é escrito pelo pastor e pode conter o nome de quem será visitado, por
+ * isso só entra quando ele pede na hora de gerar.
+ */
+export function buildItineraryPdf(items: ItineraryItem[], heading: string, includeNames = false): Uint8Array {
   const rows = [heading, 'Apoio Pastoral · itinerário selecionado', '', ...items.flatMap((item) => {
     const category = item.category === 'rest' ? 'Folga' : AGENDA_CATEGORY_LABELS[item.category]
-    return [`${pdfDate(item.startAt, item.allDay)} · ${category}`, item.title, [item.churchName, item.location, item.address].filter(Boolean).join(' · '), '']
+    return [`${pdfDate(item.startAt, item.allDay)} · ${category}`, ...(includeNames ? [item.title] : []), [item.churchName, item.location, item.address].filter(Boolean).join(' · '), '']
   })]
   const pages: string[][] = []
   for (let index = 0; index < rows.length; index += 42) pages.push(rows.slice(index, index + 42))
@@ -43,8 +48,8 @@ export function buildItineraryPdf(items: ItineraryItem[], heading: string): Uint
   return Uint8Array.from(output, (character) => character.charCodeAt(0))
 }
 
-export function downloadItineraryPdf(items: ItineraryItem[], heading: string): void {
-  const bytes = buildItineraryPdf(items, heading)
+export function downloadItineraryPdf(items: ItineraryItem[], heading: string, includeNames = false): void {
+  const bytes = buildItineraryPdf(items, heading, includeNames)
   const url = URL.createObjectURL(new Blob([new Uint8Array(bytes).buffer], { type: 'application/pdf' }))
   const anchor = document.createElement('a'); anchor.href = url; anchor.download = `itinerario-${new Date().toISOString().slice(0, 10)}.pdf`; anchor.click()
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000)

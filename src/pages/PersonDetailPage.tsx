@@ -1,4 +1,4 @@
-import { ArrowLeft, Cake, Church, Clock3, Pencil, Phone, ShieldCheck, Trash2, UsersRound } from 'lucide-react'
+import { ArrowLeft, Cake, Church, Clock3, FileText, Pencil, Phone, ShieldCheck, Trash2, UsersRound } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
@@ -7,18 +7,38 @@ import { Card } from '../components/ui/Card'
 import { DistrictService } from '../district/service'
 import { FamilyService } from '../families/service'
 import { calculateAge } from '../people/dates'
+import { currentDeviceId } from '../auth/device'
+import { PersonDataService, type PersonRemovalPlan } from '../people/personData'
+import { previewLocalPdf } from '../reports/localPdf'
 import { PeopleService } from '../people/service'
 import { FIDELITY_CATEGORY_LABELS, IMPORT_STATUS_LABELS, PASTORAL_STATUS_LABELS, type PersonEntity } from '../people/types'
 
-const service = new PeopleService(); const districtService = new DistrictService(); const familyService = new FamilyService()
+const service = new PeopleService()
+const dadosPessoais = new PersonDataService(); const districtService = new DistrictService(); const familyService = new FamilyService()
 export function PersonDetailPage() {
-  const { personId = '' } = useParams<{ personId: string }>(); const { account, masterKey } = useAuthVault(); const navigate = useNavigate(); const [person, setPerson] = useState<PersonEntity | null>(null); const [churchName, setChurchName] = useState(''); const [family, setFamily] = useState<{ id: string; name: string } | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [confirmDelete, setConfirmDelete] = useState(false)
+  const { personId = '' } = useParams<{ personId: string }>(); const { account, masterKey } = useAuthVault(); const navigate = useNavigate(); const [person, setPerson] = useState<PersonEntity | null>(null); const [churchName, setChurchName] = useState(''); const [family, setFamily] = useState<{ id: string; name: string } | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [confirmDelete, setConfirmDelete] = useState(false); const [plano, setPlano] = useState<PersonRemovalPlan | null>(null)
   const load = useCallback(async () => { if (!account || !masterKey) return; try { const next = await service.getPerson(account.id, masterKey, personId); if (!next) throw new Error('Pessoa não encontrada.'); setPerson(next); const district = await districtService.getDistrict(account.id, masterKey); const churches = district ? await districtService.listChurches(account.id, masterKey, district.id) : []; setChurchName(churches.find(({ id }) => id === next.currentChurchId)?.name ?? 'Igreja não encontrada'); const found = (await familyService.listFamilies(account.id, masterKey)).find(({ memberIds }) => memberIds.includes(next.id)); setFamily(found ? { id: found.id, name: found.name } : null) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível abrir o perfil.') } finally { setLoading(false) } }, [account, masterKey, personId])
   useEffect(() => { void load() }, [load])
-  async function remove() { if (!account || !masterKey || !person) return; try { await service.deletePerson(account.id, masterKey, person.id); await navigate('/app/pessoas', { replace: true }) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível remover.') } }
+  async function prepararPlano() {
+    if (!account || !masterKey || !person) return
+    try { setPlano(await dadosPessoais.plan(account.id, masterKey, person.id)) } catch { /* segue sem a contagem */ }
+  }
+
+  async function exportar() {
+    if (!account || !masterKey || !person) return
+    try { previewLocalPdf(`Dados de ${person.name}`, await dadosPessoais.exportLines(account.id, masterKey, person.id)) } catch { setError('Não foi possível preparar a exportação.') }
+  }
+
+  async function removerTudo() {
+    if (!account || !masterKey || !person) return
+    try { await dadosPessoais.remove(account.id, masterKey, currentDeviceId(account.id), person.id); await navigate('/app/pessoas', { replace: true }) } catch (motivo) { setError(motivo instanceof Error ? motivo.message : 'Não foi possível apagar os dados desta pessoa.') }
+  }
+
   if (loading) return <div className="app-loading" role="status">Abrindo o perfil…</div>
   if (!person) return <div className="page-stack"><div className="alert alert--error">{error}</div><Link className="text-link" to="/app/pessoas"><ArrowLeft />Voltar</Link></div>
-  return <div className="page-stack"><Link className="text-link back-link" to="/app/pessoas"><ArrowLeft />Voltar às pessoas</Link><header className="page-hero district-hero"><div><p className="eyebrow">Perfil privado</p><h1>{person.name}</h1><p>{churchName} · {PASTORAL_STATUS_LABELS[person.pastoralStatus]}</p></div><div className="page-actions"><Link className="button button--secondary" to={`/app/pessoas/${person.id}/editar`}><Pencil />Editar</Link><Button variant="danger" icon={<Trash2 />} onClick={() => setConfirmDelete(true)}>Remover</Button></div></header>{error && <div className="alert alert--error" role="alert">{error}</div>}{confirmDelete && <Card className="danger-card"><h2>Remover esta pessoa?</h2><p>O cadastro só pode ser removido depois de sair de uma família. Os outros aparelhos recebem apenas o aviso da remoção.</p><div className="form-actions"><Button variant="danger" onClick={() => void remove()}>Confirmar remoção</Button><Button variant="secondary" onClick={() => setConfirmDelete(false)}>Cancelar</Button></div></Card>}
+  return <div className="page-stack"><Link className="text-link back-link" to="/app/pessoas"><ArrowLeft />Voltar às pessoas</Link><header className="page-hero district-hero"><div><p className="eyebrow">Perfil privado</p><h1>{person.name}</h1><p>{churchName} · {PASTORAL_STATUS_LABELS[person.pastoralStatus]}</p></div><div className="page-actions"><Link className="button button--secondary" to={`/app/pessoas/${person.id}/editar`}><Pencil />Editar</Link><Button variant="secondary" icon={<FileText />} onClick={() => void exportar()}>Exportar dados</Button><Button variant="danger" icon={<Trash2 />} onClick={() => { setPlano(null); setConfirmDelete(true); void prepararPlano() }}>Apagar dados</Button></div></header>{error && <div className="alert alert--error" role="alert">{error}</div>}{confirmDelete && <Card className="danger-card"><h2>Apagar os dados desta pessoa?</h2>
+    <p>Serão apagados o cadastro e o que era só dela: visitas, pedidos de oração, acompanhamentos, tarefas e estudos bíblicos{plano ? ` — ${plano.removed.length} registro(s)` : ''}. Onde ela aparece junto de outras pessoas{plano ? ` (${plano.edited.length} registro(s))` : ''}, apenas o vínculo é retirado. O aplicativo não recupera esses dados depois.</p>
+    <div className="form-actions"><Button variant="danger" onClick={() => { if (window.confirm('Apagar definitivamente os dados desta pessoa?')) void removerTudo() }}>Confirmar exclusão</Button><Button variant="secondary" onClick={() => setConfirmDelete(false)}>Cancelar</Button></div></Card>}
     <div className="church-detail-grid"><Card eyebrow="Cadastro" title="Informações essenciais"><dl className="detail-list"><div><dt>Igreja</dt><dd><Church />{churchName}</dd></div><div><dt>Nascimento</dt><dd><Cake />{person.birthDate ? `${new Intl.DateTimeFormat('pt-BR').format(new Date(`${person.birthDate}T12:00:00`))} · ${calculateAge(person.birthDate)} anos` : 'Não informado'}</dd></div><div><dt>WhatsApp</dt><dd><Phone />{person.whatsapp || 'Não informado'}</dd></div><div><dt>Lista atual</dt><dd>{IMPORT_STATUS_LABELS[person.importStatus]}</dd></div></dl></Card><Card eyebrow="Família" title="Composição"><p>{family ? <Link className="text-link" to={`/app/familias/${family.id}`}><UsersRound />{family.name}</Link> : 'Ainda não vinculada a uma família.'}</p></Card></div>
     <Card eyebrow="Privado do pastor" title="Fidelidade nos últimos 12 meses" action={<ShieldCheck className="accent-icon" />}>{person.fidelity ? <dl className="detail-list"><div><dt>Classificação</dt><dd>{FIDELITY_CATEGORY_LABELS[person.fidelity.category]}</dd></div><div><dt>Informação complementar</dt><dd>{person.fidelity.precision === 'exact' && person.fidelity.months !== null ? `${person.fidelity.months} ${person.fidelity.months === 1 ? 'mês' : 'meses'} no período` : person.fidelity.precision === 'range' ? `Faixa ${person.fidelity.rangeMin}–${person.fidelity.rangeMax} meses` : 'Categoria informada pelo relatório'}</dd></div><div><dt>Atualização</dt><dd>{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(person.fidelity.updatedAt))}</dd></div><div><dt>Origem</dt><dd>{person.fidelity.source}</dd></div></dl> : <p className="muted">Nenhuma informação de fidelidade importada. Esta área nunca aparece em relatório público nominal.</p>}</Card>
     <Card eyebrow="Uso interno" title="Observações"><p className={person.notes ? 'preserved-text' : 'muted'}>{person.notes || 'Nenhuma observação cadastrada.'}</p></Card>

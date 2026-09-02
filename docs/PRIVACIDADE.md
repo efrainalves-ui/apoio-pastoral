@@ -1,0 +1,59 @@
+# Privacidade e controle de dados
+
+Texto de apoio ao que o aplicativo já faz. Não é parecer jurídico e não afirma
+certificação de nenhuma lei.
+
+## Regra de dados
+
+- Cada conta pertence a um pastor e cuida apenas do distrito dele.
+- Uma conta começa com o próprio distrito; não há compartilhamento interno de
+  dados entre pastores.
+- Não existe transferência de dados de um pastor ou distrito para outro.
+- Associação, Missão ou outra instituição não participa do acesso nesta fase.
+- Nenhum pastor vê, pesquisa, sincroniza, restaura ou recebe dados de outro.
+- Relatórios só saem quando o próprio pastor gera e exporta.
+
+## Categorias de dados
+
+| Categoria | Exemplos | Onde fica |
+|---|---|---|
+| Distrito | igrejas, membros, famílias, visitas, pedidos de oração, acompanhamentos, tarefas, agenda do distrito, sermões, metas, campanhas, comissões | cifrado no aparelho; cifrado no serviço quando a sincronização está ligada |
+| Pessoal | leitura, orçamento familiar, agenda marcada como pessoal | cifrado no aparelho, em bancos separados |
+| Conta | e-mail, envelopes de chave, aparelhos autorizados | aparelho e, quando há sincronização, serviço |
+
+## Direitos do titular
+
+- **Exportar**: no perfil da pessoa, *Exportar dados* gera um documento legível
+  com o cadastro e a contagem dos registros ligados.
+- **Apagar**: no mesmo perfil, *Apagar dados* remove o cadastro e o que era só
+  daquela pessoa — visitas, pedidos, acompanhamentos, tarefas e estudos — e
+  retira o vínculo dela onde aparecia junto de outras.
+- **Canal**: o e-mail cadastrado na própria conta.
+
+## Encerrar distrito
+
+Em Configurações, *Encerrar distrito*:
+
+1. apaga os registros do distrito no aparelho e enfileira a mesma remoção
+   cifrada para o serviço de sincronização;
+2. revoga todos os aparelhos autorizados e dá uma autorização nova a este;
+3. preserva a conta, leitura, orçamento familiar e a agenda pessoal;
+4. deixa a conta pronta para começar um distrito vazio.
+
+Backups baixados manualmente continuam com o pastor: o aplicativo não alcança
+esses arquivos.
+
+## Relatórios
+
+- O padrão é sem nomes: datas, tipos, locais, números e totais.
+- Um relatório com nomes só é gerado quando o pastor marca *Incluir nomes neste
+  relatório*, com aviso de que o arquivo pode conter dados pessoais.
+- Pedidos de oração, observações privadas e anotações não entram no padrão.
+
+## Menores e informações sensíveis
+
+Crianças e adolescentes podem ser cadastrados normalmente. Nos campos de visita,
+pedido de oração e anotações, o aplicativo orienta em uma linha a registrar o
+essencial pastoral e evitar detalhes íntimos desnecessários, sem bloquear o uso.
+Esse conteúdo não aparece em relatórios padrão, buscas globais, mensagens de
+erro nem notificações — o aplicativo não envia notificações.

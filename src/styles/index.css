@@ -151,6 +151,8 @@ button.entity-row { width: 100%; background: none; border-top: 0; border-inline:
 .auth-tabs { margin: 29px 0 25px; display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); }
 .auth-tabs button { min-height: 44px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--muted); font-weight: 700; cursor: pointer; }
 .auth-tabs button[aria-selected='true'] { color: var(--green-900); border-bottom-color: var(--green-800); }
+.auth-privacy { margin: 12px 0 0; color: var(--muted); font-size: .82rem; text-align: center; }
+.auth-privacy a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .recovery-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at top, #e5f0ea, var(--cream) 50%); }
 .recovery-card { width: min(560px, 100%); padding: 40px; text-align: center; border-radius: 24px; background: var(--paper); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .recovery-card h1 { font-size: 2rem; letter-spacing: -.04em; }

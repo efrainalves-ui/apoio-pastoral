@@ -20,6 +20,8 @@ import { FamilyDetailPage } from '../pages/FamilyDetailPage'
 import { FamilyFormPage } from '../pages/FamilyFormPage'
 import { HomePage } from '../pages/HomePage'
 import { MorePage } from '../pages/MorePage'
+import { PrivacyPage } from '../pages/PrivacyPage'
+import { CloseDistrictPage } from '../pages/CloseDistrictPage'
 import { PeoplePage } from '../pages/PeoplePage'
 import { PersonDetailPage } from '../pages/PersonDetailPage'
 import { PersonFormPage } from '../pages/PersonFormPage'
@@ -147,6 +149,7 @@ export function App() {
   if (!initialized) return <div className="app-loading" role="status">Preparando o acesso…</div>
   return <Suspense fallback={<div className="app-loading" role="status">Abrindo sua área…</div>}>
     <Routes>
+      <Route path="/privacidade" element={<PrivacyPage />} />
       <Route path="/acesso" element={masterKey && !recoveryCode ? <Navigate to="/app" replace /> : <AuthPage />} />
       <Route path="/configuracao-inicial" element={<SetupAccess><InitialSetupPage /></SetupAccess>} />
       <Route path="/app" element={<ProtectedApp />}>
@@ -206,6 +209,8 @@ export function App() {
         <Route path="distrito/igrejas/:churchId" element={<ChurchDetailPage />} />
         <Route path="distrito/igrejas/:churchId/editar" element={<ChurchFormPage />} />
         <Route path="configuracoes" element={<MorePage />} />
+        <Route path="configuracoes/privacidade" element={<PrivacyPage />} />
+        <Route path="configuracoes/encerrar-distrito" element={<CloseDistrictPage />} />
         <Route path="mais" element={<Navigate to="/app/configuracoes" replace />} />
         <Route path="sincronizacao" element={<SyncPage />} />
         <Route path="sincronizacao/conflitos" element={<SyncConflictsPage />} />

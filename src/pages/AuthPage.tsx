@@ -104,6 +104,7 @@ export function AuthPage() {
               />
               {error && <div className="alert alert--error" role="alert">{error}</div>}
               <Button type="submit" full disabled={busy}>{busy ? 'Processando…' : mode === 'register' ? 'Criar conta' : mode === 'recover' ? 'Recuperar acesso' : 'Entrar'}</Button>
+              {mode === 'register' && <p className="auth-privacy">Sua conta cuida só do seu distrito. <a href="/privacidade">Como cuidamos dos dados</a></p>}
             </form>
           </div>
           {(account || hasSupabaseConfiguration) && mode !== 'recover' && <button className="text-button" onClick={() => setMode('recover')}>Usar chave de recuperação</button>}
