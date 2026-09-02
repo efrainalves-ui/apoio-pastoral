@@ -48,11 +48,11 @@ describe('cuidado pastoral cifrado', () => {
     const database = new ApoioDatabase(`care-prayer-${crypto.randomUUID()}`); databases.push(database); const key = await generateMasterKey(); const people = new PeopleService(database); const service = new CareService(database)
     const linkedPerson = await people.createPerson('account-fixture', key, { name: 'Pessoa Alfa Fictícia', birthDate: '', whatsapp: '', notes: '', pastoralStatus: 'active', currentChurchId: 'church-alpha' })
     const otherPerson = await people.createPerson('account-fixture', key, { name: 'Pessoa Beta Fictícia', birthDate: '', whatsapp: '', notes: '', pastoralStatus: 'active', currentChurchId: 'church-beta' })
-    expect(peopleForPrayerChurch([linkedPerson, otherPerson], 'church-alpha', 'alfa')).toEqual([linkedPerson])
-    expect(peopleForPrayerChurch([linkedPerson, otherPerson], 'church-alpha', 'beta')).toEqual([])
+    expect(peopleForPrayerChurch([linkedPerson, otherPerson], 'church-alpha')).toEqual([linkedPerson])
+    expect(peopleForPrayerChurch([linkedPerson, otherPerson], 'church-beta')).toEqual([otherPerson])
 
-    const linked = await service.savePrayerRequest('account-fixture', key, { churchId: 'church-alpha', personId: linkedPerson.id, anonymous: false, subject: 'Motivo fictício reservado', description: 'Descrição fictícia', requestedAt: '2026-08-20', privateNotes: 'Nota fictícia privada' })
-    const anonymous = await service.savePrayerRequest('account-fixture', key, { churchId: 'church-beta', personId: otherPerson.id, anonymous: true, subject: 'Pedido fictício sem identificação', description: '', requestedAt: '2026-08-21', privateNotes: '' })
+    const linked = await service.savePrayerRequest('account-fixture', key, { churchId: 'church-alpha', kind: 'member', personId: linkedPerson.id, personName: '', subject: 'Motivo fictício reservado', description: 'Descrição fictícia', requestedAt: '2026-08-20', privateNotes: 'Nota fictícia privada' })
+    const anonymous = await service.savePrayerRequest('account-fixture', key, { churchId: 'church-beta', kind: 'anonymous', personId: null, personName: '', subject: 'Pedido fictício sem identificação', description: '', requestedAt: '2026-08-21', privateNotes: '' })
     expect(linked.subjectId).toBe(linkedPerson.id)
     expect(anonymous.subjectType).toBe('anonymous'); expect(anonymous.subjectId).toBeNull()
 
@@ -62,5 +62,19 @@ describe('cuidado pastoral cifrado', () => {
     const updated = (await service.listPrayerRequests('account-fixture', key)).find(({ id }) => id === linked.id)!
     expect(updated.status).toBe('answered'); expect(updated.updates.map(({ text }) => text)).toEqual(['Atualização fictícia curta'])
     expect(JSON.stringify(await database.vaultRecords.toArray())).not.toContain('Motivo fictício reservado')
+  })
+
+  it('separa membro, pessoa não cadastrada e pedido sem identificação', async () => {
+    const database = new ApoioDatabase(`care-prayer-kinds-${crypto.randomUUID()}`); databases.push(database); const key = await generateMasterKey(); const service = new CareService(database)
+    const base = { churchId: 'church-alpha', personId: null, personName: '', subject: 'Motivo fictício', description: '', requestedAt: '2026-08-22', privateNotes: '' }
+
+    const naoCadastrada = await service.savePrayerRequest('account-fixture', key, { ...base, kind: 'unregistered', personName: 'Visitante Fictício' })
+    expect(naoCadastrada).toMatchObject({ subjectType: 'unregistered', subjectId: null, subjectName: 'Visitante Fictício' })
+
+    const semIdentificacao = await service.savePrayerRequest('account-fixture', key, { ...base, kind: 'anonymous', personName: 'ignorado' })
+    expect(semIdentificacao).toMatchObject({ subjectType: 'anonymous', subjectId: null, subjectName: '' })
+
+    await expect(service.savePrayerRequest('account-fixture', key, { ...base, kind: 'unregistered' })).rejects.toThrow('nome da pessoa não cadastrada')
+    await expect(service.savePrayerRequest('account-fixture', key, { ...base, kind: 'member' })).rejects.toThrow('membro da igreja')
   })
 })

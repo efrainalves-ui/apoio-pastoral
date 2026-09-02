@@ -14,9 +14,11 @@ export interface VisitData { targetType: 'family' | 'person'; targetId: string; 
 export interface VisitEntity extends VisitData { id: string }
 
 export interface PrayerUpdate { id: string; at: string; text: string }
-export interface PrayerRequestData { subjectType: 'family' | 'person' | 'anonymous'; subjectId: string | null; churchId: string; visitId: string | null; text: string; description: string; privateNotes: string; updates: PrayerUpdate[]; status: 'active' | 'answered' | 'closed' | 'needs_follow_up' | 'archived'; requestedAt: string; reviewAt: string; testimony: string; revealed: boolean; createdAt: string; updatedAt: string }
+/** Três situações distintas: membro da igreja, pessoa não cadastrada e pedido sem identificação. */
+export type PrayerSubjectKind = 'member' | 'unregistered' | 'anonymous'
+export interface PrayerRequestData { subjectType: 'family' | 'person' | 'anonymous' | 'unregistered'; /** Nome digitado quando a pessoa não é cadastrada. */ subjectName?: string; subjectId: string | null; churchId: string; visitId: string | null; text: string; description: string; privateNotes: string; updates: PrayerUpdate[]; status: 'active' | 'answered' | 'closed' | 'needs_follow_up' | 'archived'; requestedAt: string; reviewAt: string; testimony: string; revealed: boolean; createdAt: string; updatedAt: string }
 export interface PrayerRequestEntity extends PrayerRequestData { id: string }
-export interface PrayerRequestInput { churchId: string; personId: string | null; anonymous: boolean; subject: string; description: string; requestedAt: string; privateNotes: string }
+export interface PrayerRequestInput { churchId: string; kind: PrayerSubjectKind; personId: string | null; personName: string; subject: string; description: string; requestedAt: string; privateNotes: string }
 
 export const FOLLOW_UP_KINDS = ['call', 'revisit', 'send_material', 'bring_lesson', 'talk_family', 'talk_leader', 'schedule_study', 'follow_decision', 'follow_prayer', 'refer_help', 'other'] as const
 export type FollowUpKind = (typeof FOLLOW_UP_KINDS)[number]

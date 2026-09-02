@@ -70,6 +70,13 @@ Concluída a criação e restauração de backup local cifrado. O arquivo conté
 - A Agenda aceita Batismo, Santa Ceia, Casamento e Dedicação de criança, com responsável, pessoas aplicáveis e checklists próprios. Os compromissos continuam no mesmo fluxo de Dia, Semana, Mês e Lista; nenhum documento civil ou certificado foi criado.
 - Em 27 de agosto de 2026, lint, TypeScript, build, PWA e 134 testes Vitest em 46 arquivos foram aprovados. O Playwright permanece pendente no CI Linux porque o Chromium headless foi bloqueado pelo sandbox macOS antes de abrir qualquer página.
 
+## Etapa estável: Registrar visita e Pedidos de Oração
+
+- A tela de registrar visita ficou com os títulos dos blocos e os campos, sem os textos explicativos que poluíam a leitura. Nada do funcionamento mudou: igreja, membros visitados, perguntas, anotações, pedido de oração, acompanhamento e tarefa continuam iguais.
+- Pedidos de Oração começa vazio com apenas o título, o botão Novo pedido e o convite para cadastrar o primeiro. Cartões zerados, filtros, busca, listas vazias e acompanhamento só aparecem depois que existe pedido.
+- O cadastro pergunta a igreja e mostra sozinho os membros dela. Quem pediu tem três situações distintas: membro da igreja, pessoa não cadastrada (com o nome digitado) e sem identificação. Não há mais campo de pesquisar membro.
+- O acompanhamento virou uma lista leve: igrejas, depois as pessoas com pedidos, depois os pedidos daquela pessoa. Só ao abrir um pedido aparecem os detalhes, a atualização, a situação, o encerramento e a exclusão, ambos com confirmação. Pessoas não cadastradas e pedidos sem identificação têm seções próprias.
+
 ## Etapa estável: Comissões e Comissão de Nomeações
 
 - O presidente padrão da comissão é o pastor, e a configuração diz isso na tela. Só em igreja organizada é possível escolher um ancião, e apenas entre os membros marcados como anciãos naquela igreja; em grupo e ponto de pregação a escolha nem aparece. A pauta e a ata assinam com o nome do pastor quando é ele quem preside.

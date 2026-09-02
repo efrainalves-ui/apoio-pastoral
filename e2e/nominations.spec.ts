@@ -31,11 +31,7 @@ async function prepare(page: Page) {
   await page.getByRole('button', { name: 'Salvar igreja' }).click()
   await expect(page.getByRole('heading', { name: 'Igreja Fictícia de Nomeações', exact: true })).toBeVisible()
 
-  for (const name of [
-    'Pessoa Fictícia Alfa',
-    'Pessoa Fictícia Beta',
-    'Pessoa Fictícia Gama',
-  ]) {
+  for (const name of ['Pessoa Fictícia Alfa', 'Pessoa Fictícia Beta']) {
     await navigateInsideApp(page, '/app/pessoas/nova', page.getByLabel('Nome completo *'))
     await page.getByLabel('Nome completo *').fill(name)
     await page.getByRole('button', { name: 'Salvar pessoa' }).click()
@@ -43,13 +39,23 @@ async function prepare(page: Page) {
   }
 }
 
-test('jornada completa e confidencial da Comissão de Nomeações', async ({ page }) => {
-  await prepare(page)
+async function abrirProcesso(page: Page) {
   await navigateInsideApp(page, '/app/comissoes', page.getByRole('heading', { name: 'Comissões', exact: true }))
   const nominationsChurch = page.getByRole('combobox', { name: /^Igreja(?:$|\s)/ })
   await expect(nominationsChurch).toContainText('Igreja Fictícia de Nomeações')
   await page.getByRole('link', { name: 'Abrir Nomeações' }).click()
   await expect(nominationsChurch).toContainText('Igreja Fictícia de Nomeações')
+
+  await page.getByRole('button', { name: 'Novo processo' }).click()
+  await page.getByLabel('Período').fill(PERIODO)
+  await page.getByRole('button', { name: 'Criar processo' }).click()
+  await expect(page.getByRole('heading', { name: PERIODO })).toBeVisible()
+}
+
+test('cargos e associados da Comissão de Nomeações, sem nenhuma demonstração', async ({ page }) => {
+  await prepare(page)
+  await navigateInsideApp(page, '/app/comissoes', page.getByRole('heading', { name: 'Comissões', exact: true }))
+  await page.getByRole('link', { name: 'Abrir Nomeações' }).click()
 
   // Nada de demonstração aparece para o pastor.
   await expect(page.getByText('Apenas para teste')).toHaveCount(0)
@@ -61,18 +67,7 @@ test('jornada completa e confidencial da Comissão de Nomeações', async ({ pag
   await page.getByRole('button', { name: 'Criar processo' }).click()
   await expect(page.getByRole('heading', { name: PERIODO })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Formação' }).click()
-  await page.getByLabel('Quórum').fill('3')
-  await page.getByLabel('Pastor ou líder distrital').selectOption({ label: 'Pessoa Fictícia Alfa' })
-  await page.getByLabel('Presidente').selectOption({ label: 'Pessoa Fictícia Alfa' })
-  await page.getByLabel('Secretário(a)').selectOption({ label: 'Pessoa Fictícia Beta' })
-  for (const name of ['Pessoa Fictícia Beta', 'Pessoa Fictícia Gama']) {
-    await page.getByRole('checkbox', { name }).nth(1).check()
-  }
-  await page.getByRole('button', { name: 'Salvar formação' }).click()
-  await expect(page.getByText('Formação da comissão salva.')).toBeVisible()
-
-  // Cargos: a lista já traz o diaconato separado e sem Coordenador(a) de Missão.
+  // O catálogo traz o diaconato separado e não tem mais Coordenador(a) de Missão.
   await page.getByRole('button', { name: 'Cargos' }).click()
   const catalogo = page.locator('.entity-row')
   for (const office of ['Ancião', 'Diácono chefe', 'Diaconisa chefe', 'Primeiro diácono', 'Primeira diaconisa', 'Diáconos', 'Diaconisas', 'Secretários dos departamentos', 'Ministério da Mulher', 'Ministério dos Homens', 'Patrimônio', 'Sonoplastia', 'Mídia', 'Adolescentes', 'Diretor de Desbravadores', 'Diretor de Aventureiros', 'Diretor de Escola Sabatina']) {
@@ -85,15 +80,36 @@ test('jornada completa e confidencial da Comissão de Nomeações', async ({ pag
   await expect(page.getByText('Ancião, diácono chefe, diaconisa chefe, primeiro diácono, primeira diaconisa, diáconos e diaconisas não têm associados.')).toBeVisible()
   await expect(page.getByRole('checkbox', { name: 'Pode ter associado(a)' })).toHaveCount(0)
 
-  // Indicações: associado só onde o cargo aceita.
+  // Associado só onde o cargo aceita.
   await page.getByRole('button', { name: 'Indicações' }).click()
   await page.getByLabel('Cargo').selectOption({ label: 'Ancião' })
   await expect(page.getByRole('checkbox', { name: 'Indicar como associado(a)' })).toHaveCount(0)
   await page.getByLabel('Cargo').selectOption({ label: 'Patrimônio' })
   await page.getByRole('checkbox', { name: 'Indicar como associado(a)' }).check()
-  await page.getByLabel('Pessoa da igreja').selectOption({ label: 'Pessoa Fictícia Gama' })
+  await page.getByLabel('Pessoa da igreja').selectOption({ label: 'Pessoa Fictícia Beta' })
   await page.getByRole('button', { name: 'Adicionar indicação' }).click()
-  await expect(page.getByText('Pessoa Fictícia Gama · Patrimônio (associado)')).toBeVisible()
+  await expect(page.getByText('Pessoa Fictícia Beta · Patrimônio (associado)')).toBeVisible()
+})
+
+test('jornada completa e confidencial da Comissão de Nomeações', async ({ page }) => {
+  await prepare(page)
+  await abrirProcesso(page)
+
+  await page.getByRole('button', { name: 'Formação' }).click()
+  await page.getByLabel('Quórum').fill('2')
+  await page.getByLabel('Pastor ou líder distrital').selectOption({ label: 'Pessoa Fictícia Alfa' })
+  await page.getByLabel('Presidente').selectOption({ label: 'Pessoa Fictícia Alfa' })
+  await page.getByLabel('Secretário(a)').selectOption({ label: 'Pessoa Fictícia Beta' })
+  await page.getByRole('checkbox', { name: 'Pessoa Fictícia Beta' }).nth(1).check()
+  await page.getByRole('button', { name: 'Salvar formação' }).click()
+  await expect(page.getByText('Formação da comissão salva.')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Indicações' }).click()
+  await page.getByLabel('Cargo').selectOption({ label: 'Patrimônio' })
+  await page.getByRole('checkbox', { name: 'Indicar como associado(a)' }).check()
+  await page.getByLabel('Pessoa da igreja').selectOption({ label: 'Pessoa Fictícia Beta' })
+  await page.getByRole('button', { name: 'Adicionar indicação' }).click()
+  await expect(page.getByText('Pessoa Fictícia Beta · Patrimônio (associado)')).toBeVisible()
   await expect(page.getByText(/não consta como dizimista regular/)).toBeVisible()
 
   await marcarOpcao(page, 'Consentiu em servir')
@@ -107,7 +123,7 @@ test('jornada completa e confidencial da Comissão de Nomeações', async ({ pag
   await expect(page.getByRole('button', { name: 'Na Agenda' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Indicações' }).click()
-  await page.getByLabel('Favoráveis').fill('3')
+  await page.getByLabel('Favoráveis').fill('2')
   await page.getByLabel('Reunião').selectOption({ index: 1 })
   await page.getByRole('button', { name: 'Votar recomendação' }).click()
   await expect(page.getByText('Recomendação aprovada')).toBeVisible()
@@ -115,7 +131,7 @@ test('jornada completa e confidencial da Comissão de Nomeações', async ({ pag
   await page.getByRole('button', { name: 'Relatório e objeções' }).click()
   await page.getByRole('button', { name: 'Gerar nova versão' }).click()
   await expect(page.getByText(/versão 1/)).toBeVisible()
-  await expect(page.locator('.public-report')).toContainText('Patrimônio (associado): Pessoa Fictícia Gama')
+  await expect(page.locator('.public-report')).toContainText('Patrimônio (associado): Pessoa Fictícia Beta')
   await expect(page.locator('.public-report')).not.toContainText('dizimista')
   await expect(page.locator('.public-report')).not.toContainText('favoráveis')
 
@@ -127,11 +143,11 @@ test('jornada completa e confidencial da Comissão de Nomeações', async ({ pag
   await page.getByRole('button', { name: 'Preparar votação' }).click()
   await expect(page.getByText('Votação oficial preparada.')).toBeVisible()
 
-  await page.getByLabel('Quórum').fill('3')
-  for (const name of ['Pessoa Fictícia Alfa', 'Pessoa Fictícia Beta', 'Pessoa Fictícia Gama']) {
+  await page.getByLabel('Quórum').fill('2')
+  for (const name of ['Pessoa Fictícia Alfa', 'Pessoa Fictícia Beta']) {
     await marcarOpcao(page, name)
   }
-  await page.getByLabel('Favoráveis').fill('3')
+  await page.getByLabel('Favoráveis').fill('2')
   await page.getByRole('button', { name: 'Registrar votação oficial' }).click()
   await expect(page.getByText('Relatório aprovado')).toBeVisible()
 })

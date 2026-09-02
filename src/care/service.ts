@@ -97,14 +97,18 @@ export class CareService {
 
   async savePrayerRequest(accountId: string, masterKey: CryptoKey, input: PrayerRequestInput, prayerId?: string): Promise<PrayerRequestEntity> {
     if (!input.churchId) throw new Error('Escolha a igreja do pedido.')
-    if (!input.anonymous && !input.personId) throw new Error('Selecione uma pessoa ou marque Pedido sem identificação.')
+    if (input.kind === 'member' && !input.personId) throw new Error('Escolha o membro da igreja.')
+    if (input.kind === 'unregistered' && !input.personName.trim()) throw new Error('Informe o nome da pessoa não cadastrada.')
     if (!input.subject.trim() || !input.requestedAt) throw new Error('Informe o assunto e a data do pedido.')
+    if (input.personName.trim().length > 120) throw new Error('Revise o tamanho do nome informado.')
     if (input.subject.trim().length > 180 || input.description.trim().length > 1_000 || input.privateNotes.trim().length > 1_000) throw new Error('Revise o tamanho dos textos do pedido.')
     const current = prayerId ? (await this.listPrayerRequests(accountId, masterKey)).find(({ id }) => id === prayerId) : null
     if (prayerId && !current) throw new Error('Pedido não encontrado.')
     const id = prayerId ?? crypto.randomUUID(); const timestamp = new Date().toISOString()
     const data: PrayerRequestData = {
-      subjectType: input.anonymous ? 'anonymous' : 'person', subjectId: input.anonymous ? null : input.personId,
+      subjectType: input.kind === 'member' ? 'person' : input.kind === 'unregistered' ? 'unregistered' : 'anonymous',
+      subjectId: input.kind === 'member' ? input.personId : null,
+      subjectName: input.kind === 'unregistered' ? input.personName.trim() : '',
       churchId: input.churchId, visitId: current?.visitId ?? null, text: input.subject.trim(), description: input.description.trim(), privateNotes: input.privateNotes.trim(),
       updates: current?.updates ?? [], status: current?.status ?? 'active', requestedAt: input.requestedAt, reviewAt: current?.reviewAt ?? input.requestedAt,
       testimony: current?.testimony ?? '', revealed: false, createdAt: current?.createdAt ?? timestamp, updatedAt: timestamp,

@@ -98,6 +98,10 @@ h1, h2, h3, .brand strong { font-family: ui-rounded, "SF Pro Rounded", Inter, ui
 .vote-grid { display: grid; grid-template-columns: repeat(3, minmax(90px, 1fr)) minmax(180px, auto); gap: 0.75rem; align-items: end; margin-top: 1rem; padding: 1rem; border-radius: 12px; background: var(--green-50); }
 .decision-result { display: grid; gap: 0.55rem; margin-top: 1rem; padding: 1rem; border-left: 4px solid var(--green-700); border-radius: 8px; background: var(--green-50); }
 .commission-document { max-height: none; padding: clamp(1rem, 3vw, 2.5rem); border: 1px solid var(--line); border-radius: 12px; background: #fff; color: #1e2926; font-family: Georgia, serif; font-size: 1rem; line-height: 1.75; white-space: pre-wrap; }
+button.entity-row { width: 100%; background: none; border-top: 0; border-inline: 0; font: inherit; text-align: left; cursor: pointer; }
+.prayer-detail { display: grid; gap: 8px; margin-bottom: 14px; }
+.prayer-detail h3 { margin: 0; }
+.prayer-detail small { color: var(--muted); }
 .entity-row--link { color: inherit; text-decoration: none; }
 .entity-row--link:hover { border-color: var(--green-700); }
 .nomination-page > .filter-bar { display: flex; flex-wrap: wrap; gap: .65rem; }
@@ -270,6 +274,7 @@ h1, h2, h3, .brand strong { font-family: ui-rounded, "SF Pro Rounded", Inter, ui
 .inline-form { max-width: 520px; }
 .text-link { min-height: 40px; width: max-content; display: inline-flex; align-items: center; gap: 7px; color: var(--green-700); font-weight: 750; text-underline-offset: 4px; }
 .text-link svg { width: 18px; }
+button.text-link { padding: 0; background: none; border: 0; font: inherit; font-weight: 750; cursor: pointer; }
 .back-link { margin-bottom: -14px; }
 .page-actions, .form-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; }
