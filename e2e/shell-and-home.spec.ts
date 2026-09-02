@@ -24,7 +24,7 @@ test('barra inferior, atalhos do topo e botão de criar funcionam', async ({ pag
     // A Bíblia do Produto define exatamente estas cinco entradas, nesta ordem.
     const bottom = page.getByLabel('Navegação principal móvel')
     await expect(bottom).toBeVisible()
-    await expect(bottom.getByRole('link')).toHaveText(['Início', 'Agenda', 'Distrito', 'Visitação', 'Mais'])
+    await expect(bottom.getByRole('link')).toHaveText(['Início', 'Agenda', 'Distrito', 'Visitação'])
     await bottom.getByRole('link', { name: 'Visitação' }).click()
     await expect(page).toHaveURL(/\/app\/visitacao$/)
     await bottom.getByRole('link', { name: 'Início' }).click()
@@ -35,13 +35,14 @@ test('barra inferior, atalhos do topo e botão de criar funcionam', async ({ pag
   await expect(page.getByRole('searchbox', { name: 'Buscar pessoa, família ou igreja' })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Nova visita' })).toHaveCount(0)
 
-  // Mais não repete o que já está no menu principal e não cria registros.
-  await navigateInsideApp(page, '/app/mais', page.getByRole('heading', { name: 'Mais', exact: true }))
+  // As configurações só têm o ícone e não repetem o menu principal.
+  await expect(page.getByRole('link', { name: 'Mais' })).toHaveCount(0)
+  await navigateInsideApp(page, '/app/configuracoes', page.getByRole('heading', { name: 'Configurações', exact: true }))
   const mais = page.locator('main')
-  for (const repetido of ['Visitas e cuidados', 'Pedidos de Oração', 'Famílias', 'Cuidados pastorais', 'Importar pessoas', 'Fidelidade', 'Leitura', 'Orçamento Familiar']) {
+  for (const repetido of ['Visitas e cuidados', 'Pedidos de Oração', 'Famílias', 'Cuidados pastorais', 'Importar pessoas', 'Fidelidade', 'Leitura', 'Orçamento Familiar', 'Relatórios', 'Aniversários', 'Interessados e estudos bíblicos', 'Duplas missionárias', 'Escola Sabatina, PG e UAPG']) {
     await expect(mais.getByRole('link', { name: repetido })).toHaveCount(0)
   }
-  await expect(mais.getByRole('link', { name: 'Aniversários' })).toBeVisible()
+  await expect(mais.getByRole('link', { name: 'Backup' })).toBeVisible()
   await navigateInsideApp(page, '/app', page.getByRole('heading', { name: 'Visão do distrito' }))
 
   const create = page.getByRole('button', { name: 'Criar' })
@@ -75,7 +76,7 @@ test('o início mostra os blocos práticos do dia sem classificar ninguém', asy
   await expect(page.getByRole('heading', { name: 'Igrejas que precisam de atenção', exact: true })).toBeVisible()
 
   await expect(page.getByRole('link', { name: /Abrir tarefas/ })).toHaveAttribute('href', '/app/cuidados#tarefas')
-  await expect(page.getByRole('link', { name: /Ver pedidos para acompanhar/ })).toHaveAttribute('href', '/app/pedidos-oracao')
+  await expect(page.getByRole('link', { name: /Ver pedidos para acompanhar/ })).toHaveAttribute('href', '/app/visitacao?aba=oracao')
   await expect(page.getByRole('link', { name: /Abrir interessados e estudos/ })).toHaveAttribute('href', '/app/missionario')
 
   const horizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)

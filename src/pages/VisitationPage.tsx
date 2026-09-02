@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import { CalendarPlus, CheckCircle2, ChevronRight, Circle, HeartHandshake, ListChecks, Plus, RotateCcw, UsersRound } from 'lucide-react'
+import { CalendarPlus, CheckCircle2, ChevronRight, Circle, FileText, HeartHandshake, ListChecks, Plus, RotateCcw, UsersRound } from 'lucide-react'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
@@ -14,6 +14,8 @@ import { FamilyService } from '../families/service'
 import type { FamilyEntity } from '../families/types'
 import { PeopleService } from '../people/service'
 import type { PersonEntity } from '../people/types'
+import { previewLocalPdf } from '../reports/localPdf'
+import { visitReportLines } from '../reports/areaReports'
 import { PrayerRequestsPage } from './PrayerRequestsPage'
 
 const care = new CareService(); const familiesService = new FamilyService(); const peopleService = new PeopleService(); const districts = new DistrictService()
@@ -115,7 +117,7 @@ export function VisitationPage() {
     </nav>
 
     {tab === 'visitas' && <>
-      <Card title="Visitas registradas">
+      <Card title="Visitas registradas" action={<Button variant="secondary" icon={<FileText />} onClick={() => previewLocalPdf('Relatório de Visitações', visitReportLines(visits, rounds, 'Distrito'))}>Relatório</Button>}>
         {!visits.length
           ? <div className="empty-state"><HeartHandshake /><strong>Nenhuma visita registrada</strong><p>Uma visita espontânea não precisa de agendamento prévio.</p></div>
           : <div className="visit-list">{visits.map((visit) => { const version = visit.versions.at(-1)!; return <Link key={visit.id} to={`/app/visitas/${visit.id}`}>

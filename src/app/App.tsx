@@ -36,7 +36,6 @@ import { MissionaryPage } from '../pages/MissionaryPage'
 import { MissionaryPairsPage } from '../pages/MissionaryPairsPage'
 import { CommunityGroupsPage } from '../pages/CommunityGroupsPage'
 import { GoalAreaPage } from '../pages/GoalAreaPage'
-import { ReportsPage } from '../pages/ReportsPage'
 import { BackupPage } from '../pages/BackupPage'
 import { CommissionsPage } from '../pages/CommissionsPage'
 import { CommissionConfigPage } from '../pages/CommissionConfigPage'
@@ -169,10 +168,12 @@ export function App() {
         <Route path="evangelismo" element={<EvangelismPage />} />
         <Route path="evangelismo/nova" element={<CampaignPage />} />
         <Route path="evangelismo/:campaignId" element={<CampaignPage />} />
-        <Route path="relatorios" element={<ReportsPage />} />
-        <Route path="missionario" element={<MissionaryPage />} />
-        <Route path="missionario/duplas" element={<MissionaryPairsPage />} />
-        <Route path="missionario/grupos" element={<CommunityGroupsPage />} />
+        <Route path="metas/missao/estudos" element={<MissionaryPage />} />
+        <Route path="metas/missao/duplas" element={<MissionaryPairsPage />} />
+        <Route path="metas/missao/grupos" element={<CommunityGroupsPage />} />
+        <Route path="missionario" element={<Navigate to="/app/metas/missao/estudos" replace />} />
+        <Route path="missionario/duplas" element={<Navigate to="/app/metas/missao/duplas" replace />} />
+        <Route path="missionario/grupos" element={<Navigate to="/app/metas/missao/grupos" replace />} />
         <Route path="pessoas" element={<PeoplePage />} />
         <Route path="pessoas/nova" element={<PersonFormPage />} />
         <Route path="pessoas/:personId" element={<PersonDetailPage />} />
@@ -204,7 +205,8 @@ export function App() {
         <Route path="distrito/igrejas/nova" element={<ChurchFormPage />} />
         <Route path="distrito/igrejas/:churchId" element={<ChurchDetailPage />} />
         <Route path="distrito/igrejas/:churchId/editar" element={<ChurchFormPage />} />
-        <Route path="mais" element={<MorePage />} />
+        <Route path="configuracoes" element={<MorePage />} />
+        <Route path="mais" element={<Navigate to="/app/configuracoes" replace />} />
         <Route path="sincronizacao" element={<SyncPage />} />
         <Route path="sincronizacao/conflitos" element={<SyncConflictsPage />} />
         <Route path="seguranca" element={<SecurityPage />} />

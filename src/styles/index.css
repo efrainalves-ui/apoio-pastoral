@@ -179,6 +179,8 @@ button.entity-row { width: 100%; background: none; border-top: 0; border-inline:
 .account-chip span { overflow: hidden; text-overflow: ellipsis; font-size: .8rem; }
 .account-chip small { color: #91afa3; font-size: .7rem; }
 .sidebar .button--secondary { color: #dce9e3; border-color: rgb(255 255 255 / 17%); }
+.sidebar__settings { color: #dce9e3; border: 1px solid rgb(255 255 255 / 17%); }
+.sidebar__settings:hover, .sidebar__settings.active { background: rgb(255 255 255 / 12%); }
 .sidebar-backdrop { display: none; }
 .app-main { width: calc(100% - 260px); min-height: 100vh; margin-left: 260px; }
 .content { max-width: 1260px; margin: 0 auto; padding: 54px 42px 70px; }
@@ -189,7 +191,7 @@ button.entity-row { width: 100%; background: none; border-top: 0; border-inline:
 .app-header .icon-button { color: #fff; }
 .sync-now { position: relative; display: flex; }
 .sync-now__toast { position: absolute; z-index: 30; right: 0; top: calc(100% + 9px); width: max-content; max-width: 260px; margin: 0; padding: 10px 13px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--paper); box-shadow: var(--shadow); font-size: .85rem; }
-.app-header__menu, .app-header__leave, .app-header__brand { display: none; }
+.app-header__menu, .app-header__leave, .app-header__settings, .app-header__brand { display: none; }
 .app-header__search { position: relative; flex: 1; max-width: 460px; display: flex; align-items: center; }
 .app-header__search svg { position: absolute; left: 12px; width: 18px; height: 18px; color: var(--muted); pointer-events: none; }
 .app-header__search input { width: 100%; min-height: 42px; padding: 0 14px 0 38px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: inherit; font: inherit; }
@@ -910,6 +912,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 
 .sidebar__footer-actions { display: flex; gap: 8px; }
 .sidebar__footer-actions .button { flex: 1; min-width: 0; padding-inline: 10px; }
+.sidebar__footer-actions .icon-button { width: 46px; height: 46px; border-radius: 12px; }
 
 .sync-now__notice { flex-basis: 100%; margin: 6px 0 0; font-size: 0.9rem; color: var(--muted); }
 .sync-now__notice--ok { color: var(--green-800); }
@@ -992,7 +995,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   .sidebar-backdrop { display: block; position: fixed; z-index: 20; inset: 0; border: 0; background: rgb(5 17 14 / 55%); }
   .app-main { width: 100%; margin-left: 0; }
   .app-header { flex-wrap: wrap; gap: 8px; padding: calc(env(safe-area-inset-top) + 8px) 12px 10px; border-bottom: 0; color: #fff; background: var(--green-950); backdrop-filter: none; }
-  .app-header__menu, .app-header__leave { display: grid; }
+  .app-header__menu, .app-header__leave, .app-header__settings { display: grid; }
   .app-header__brand { display: block; font-family: ui-rounded, "SF Pro Rounded", system-ui, sans-serif; font-weight: 700; }
   .app-header .icon-button { color: #fff; }
   .app-header__search { order: 3; flex: 1 0 100%; max-width: none; }

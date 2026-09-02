@@ -30,7 +30,8 @@ describe('completude do que o aplicativo promete', () => {
     const areas = [
       'agenda', 'distrito', 'pessoas', 'familias', 'aniversarios',
       'visitacao', 'sermoes', 'fidelidade', 'leitura', 'orcamento',
-      'comissoes', 'comissoes/nomeacoes', 'evangelismo', 'planejamento', 'relatorios',
+      'comissoes', 'comissoes/nomeacoes', 'evangelismo', 'planejamento',
+      'metas', 'metas/missao/estudos', 'metas/missao/duplas', 'metas/missao/grupos',
       'backup', 'sincronizacao', 'seguranca',
     ]
 

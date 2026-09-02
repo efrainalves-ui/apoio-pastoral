@@ -49,8 +49,12 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   await page.getByRole('button', { name: 'Iniciar rodada' }).click()
   await expect(page.getByText('0 de 1 famílias visitadas')).toBeVisible()
   const visitChurch = page.getByRole('combobox', { name: /^Igreja(?:$|\s)/ })
-  await navigateInsideApp(page, '/app/visitas/nova', visitChurch)
+  // A tela de destino é reconhecida pelo título: o seletor de igreja também
+  // existe em Visitação, e escolher antes da troca de tela perde o clique.
+  await navigateInsideApp(page, '/app/visitas/nova', page.getByRole('heading', { name: 'Igreja e quem você visitou' }))
+  await expect(visitChurch.locator('option', { hasText: 'Igreja Esperança Fictícia' })).toHaveCount(1)
   await visitChurch.selectOption({ label: 'Igreja Esperança Fictícia' })
+  await expect(visitChurch).not.toHaveValue('')
   // As perguntas ficam abertas desde o começo, antes de escolher qualquer membro.
   await expect(page.locator('.question-card').first()).toBeVisible()
   await page.getByRole('button', { name: 'Pessoa Cuidado Fictícia', exact: true }).click()

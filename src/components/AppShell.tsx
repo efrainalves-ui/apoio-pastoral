@@ -6,7 +6,7 @@ import {
   Home,
   LogOut,
   Menu,
-  MoreHorizontal,
+  Settings,
   ShieldCheck,
   Flag,
   ClipboardList,
@@ -14,7 +14,6 @@ import {
   WalletCards,
   CalendarRange,
   Megaphone,
-  UsersRound,
   X,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -37,21 +36,20 @@ const primaryNav = [
   { to: '/app/fidelidade', label: 'Fidelidade', icon: ShieldCheck },
   { to: '/app/leitura', label: 'Leitura', icon: Library, personal: true },
   { to: '/app/orcamento', label: 'Orçamento Familiar', icon: WalletCards, personal: true },
-  { to: '/app/mais', label: 'Mais', icon: MoreHorizontal },
 ]
 
-// Cinco entradas, nesta ordem, com rótulos curtos para caber no celular.
-// Membros e famílias ficam dentro da igreja, em Distrito.
+// Quatro entradas, nesta ordem, com rótulos curtos para caber no celular.
+// Membros e famílias ficam dentro da igreja, em Distrito; as configurações
+// ficam no ícone de engrenagem, ao lado de Sair.
 const mobileNav = [
   { to: '/app', label: 'Início', icon: Home, end: true },
   { to: '/app/agenda', label: 'Agenda', icon: CalendarDays, end: false },
   { to: '/app/distrito', label: 'Distrito', icon: Church, end: false },
   { to: '/app/visitacao', label: 'Visitação', icon: HeartHandshake, end: false },
-  { to: '/app/mais', label: 'Mais', icon: MoreHorizontal, end: false },
 ]
 
 export function AppShell() {
-  const { account, lock , switchAccount } = useAuthVault()
+  const { account, lock } = useAuthVault()
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
 
@@ -61,12 +59,6 @@ export function AppShell() {
 
   function leave() {
     if (window.confirm('Deseja sair do Apoio Pastoral neste dispositivo?')) lock()
-  }
-
-  // Trocar de conta não apaga nada: os dados desta conta continuam aqui,
-  // protegidos, e voltam a abrir com a senha dela.
-  function trocarConta() {
-    if (window.confirm('Trocar de conta? Os dados desta conta continuam guardados neste aparelho.')) void switchAccount()
   }
 
   return (
@@ -87,7 +79,7 @@ export function AppShell() {
         <div className="sidebar__footer">
           <div className="account-chip"><span>{account?.email}</span></div>
           <div className="sidebar__footer-actions">
-            <Button variant="secondary" onClick={trocarConta} icon={<UsersRound size={18} />}>Trocar conta</Button>
+            <NavLink className="icon-button sidebar__settings" to="/app/configuracoes" aria-label="Configurações" onClick={() => setOpen(false)}><Settings /></NavLink>
             <Button variant="secondary" onClick={leave} icon={<LogOut size={18} />}>Sair</Button>
           </div>
         </div>
@@ -101,6 +93,7 @@ export function AppShell() {
             <QuickActions />
             <SyncNowButton compact />
           </div>
+          <NavLink className="icon-button app-header__settings" to="/app/configuracoes" aria-label="Configurações"><Settings /></NavLink>
           <button className="icon-button app-header__leave" aria-label="Sair" onClick={leave}><LogOut /></button>
         </header>
         <main id="conteudo" className="content" tabIndex={-1}><Outlet /></main>

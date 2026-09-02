@@ -70,6 +70,13 @@ Concluída a criação e restauração de backup local cifrado. O arquivo conté
 - A Agenda aceita Batismo, Santa Ceia, Casamento e Dedicação de criança, com responsável, pessoas aplicáveis e checklists próprios. Os compromissos continuam no mesmo fluxo de Dia, Semana, Mês e Lista; nenhum documento civil ou certificado foi criado.
 - Em 27 de agosto de 2026, lint, TypeScript, build, PWA e 134 testes Vitest em 46 arquivos foram aprovados. O Playwright permanece pendente no CI Linux porque o Chromium headless foi bloqueado pelo sandbox macOS antes de abrir qualquer página.
 
+## Etapa estável: relatórios por área, missão dentro de Metas e Configurações
+
+- Não existe mais um módulo geral de Relatórios. Cada área gera o seu: Visitação tem o relatório de visitas e rodadas, a Agenda tem o itinerário, Metas tem o relatório de resultados com a missão junto, Sermões tem o histórico de pregações e o Orçamento Familiar mantém a própria aba de relatórios.
+- Aniversários saiu do menu: continua no resumo da tela inicial, que abre a tela com aniversariantes de hoje, próximos e filtro por igreja.
+- Interessados e estudos bíblicos, duplas missionárias e Escola Sabatina/PG/UAPG passaram a viver dentro de Metas, na área Missão e discipulado. Os estudos continuam contando na meta de Estudos Bíblicos e as UAPG na meta de UAPG, sem lançamento duplicado. As rotas antigas redirecionam e nenhum cadastro foi movido.
+- O menu Mais virou o ícone de engrenagem ao lado de Sair, sem rótulo, com busca, backup, segurança, sincronização e revisão de alterações concorrentes. O botão Trocar conta saiu: sair volta para a tela de acesso, que lista as contas já existentes no aparelho.
+
 ## Etapa estável: Distrito como centro e Visitação unificada
 
 - O menu principal ficou com Início, Agenda, Distrito, Visitação, Sermões, Metas, Planejamento Anual, Evangelismo, Comissões, Fidelidade, Leitura, Orçamento Familiar e Mais. Pessoas, Famílias, Cuidado pastoral, Visitas e Importar lista de membros deixaram de ser módulos próprios; o Mais lista apenas o que não está no menu principal e não oferece nenhuma ação de criação.
