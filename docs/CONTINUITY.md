@@ -70,6 +70,15 @@ Concluída a criação e restauração de backup local cifrado. O arquivo conté
 - A Agenda aceita Batismo, Santa Ceia, Casamento e Dedicação de criança, com responsável, pessoas aplicáveis e checklists próprios. Os compromissos continuam no mesmo fluxo de Dia, Semana, Mês e Lista; nenhum documento civil ou certificado foi criado.
 - Em 27 de agosto de 2026, lint, TypeScript, build, PWA e 134 testes Vitest em 46 arquivos foram aprovados. O Playwright permanece pendente no CI Linux porque o Chromium headless foi bloqueado pelo sandbox macOS antes de abrir qualquer página.
 
+## Etapa estável: auditoria técnica antes da criação do ambiente real
+
+- O conteúdo cifrado passou a ser conferido contra o registro que o guarda: um envelope colocado na linha de outro registro é recusado ao abrir, mesmo dentro da mesma conta e mesmo que venha do serviço remoto.
+- A trava de ambiente aceita `homologacao` e `producao` como valores declarados; qualquer outro valor, ou vazio, mantém tudo local. Homologação e produção continuam sendo projetos separados.
+- A prova de banco ganhou três guardas: nenhuma view em `public`, nenhuma função `security definer` sem `search_path` fixo e nenhum bucket de armazenamento.
+- Uma auditoria de isolamento com duas contas fictícias cobre, em um só lugar: leitura de registros, chave de uma conta contra o conteúdo da outra, fila de envio, recebimento de operação alheia, backup cruzado e senha trocada.
+- O atalho de sincronização mostra um ponto discreto quando há alterações aguardando envio, com o número apenas no rótulo de acessibilidade; ao sincronizar, o ponto some.
+- Configurações passou a dizer, em três linhas, onde os dados ficam.
+
 ## Etapa estável: varredura de interface antes da fase de segurança
 
 - Contraste corrigido em todo o aplicativo: títulos de estado vazio, números grandes de Fidelidade e Leitura, abas e atalhos da Agenda, texto secundário e barra inferior do celular. A verificação foi automatizada e repetida nos temas claro e escuro, em tela larga e em 375px.

@@ -136,7 +136,22 @@ export async function encryptPayload(masterKey: CryptoKey, payload: VaultPayload
   }
 }
 
-export async function decryptPayload(masterKey: CryptoKey, envelope: CipherEnvelope): Promise<VaultPayload> {
+/**
+ * O AAD amarra o texto cifrado ao registro e à versão do formato. Quando o
+ * envelope vem de um registro guardado, o vínculo é conferido antes de abrir:
+ * assim, trocar o conteúdo de um registro pelo de outro — mesmo dentro da
+ * própria conta, mesmo por quem controlar o serviço remoto — é recusado.
+ */
+function conferirVinculo(envelope: CipherEnvelope & { id?: string }) {
+  if (!envelope.id) return
+  const aad = fromUtf8(fromBase64Url(envelope.aad))
+  if (!aad.startsWith(`apoio-pastoral:record:${envelope.id}:schema:`)) {
+    throw new Error('Registro não confere com o conteúdo guardado.')
+  }
+}
+
+export async function decryptPayload(masterKey: CryptoKey, envelope: CipherEnvelope & { id?: string }): Promise<VaultPayload> {
+  conferirVinculo(envelope)
   try {
     const plaintext = await crypto.subtle.decrypt(
       {

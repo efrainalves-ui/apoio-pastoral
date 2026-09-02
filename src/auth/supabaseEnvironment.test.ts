@@ -13,22 +13,28 @@ afterEach(() => {
 })
 
 describe('trava de ambiente da conexão remota', () => {
-  it('recusa a conexão quando o ambiente não é de homologação', async () => {
-    const { assertHomologationEnvironment } = await carregarComAmbiente(undefined)
+  it('recusa a conexão quando o ambiente não é declarado', async () => {
+    const { assertRemoteEnvironment, currentEnvironment } = await carregarComAmbiente(undefined)
 
-    expect(() => { assertHomologationEnvironment() }).toThrowError(/homologação/u)
+    expect(() => { assertRemoteEnvironment() }).toThrowError(/ambiente declarado/u)
+    expect(currentEnvironment()).toBe('local')
   })
 
-  it('recusa a conexão quando o ambiente é produção', async () => {
-    const { assertHomologationEnvironment } = await carregarComAmbiente('production')
+  // Um valor parecido não vale: só os dois nomes exatos abrem conexão.
+  it('recusa a conexão com um nome de ambiente diferente', async () => {
+    const { assertRemoteEnvironment } = await carregarComAmbiente('production')
 
-    expect(() => { assertHomologationEnvironment() }).toThrowError(/homologação/u)
+    expect(() => { assertRemoteEnvironment() }).toThrowError(/ambiente declarado/u)
   })
 
-  it('permite a conexão apenas no ambiente declarado de homologação', async () => {
-    const { assertHomologationEnvironment } = await carregarComAmbiente('homologacao')
+  it('permite a conexão em homologação e em produção declaradas', async () => {
+    const homologacao = await carregarComAmbiente('homologacao')
+    expect(() => { homologacao.assertRemoteEnvironment() }).not.toThrow()
+    expect(homologacao.currentEnvironment()).toBe('homologacao')
 
-    expect(() => { assertHomologationEnvironment() }).not.toThrow()
+    const producao = await carregarComAmbiente('producao')
+    expect(() => { producao.assertRemoteEnvironment() }).not.toThrow()
+    expect(producao.currentEnvironment()).toBe('producao')
   })
 
   it('não abre cliente remoto sem URL e chave, mesmo em homologação', async () => {

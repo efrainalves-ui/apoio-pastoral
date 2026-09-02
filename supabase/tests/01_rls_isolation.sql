@@ -293,4 +293,41 @@ select homologacao_testes.exigir(
         or has_table_privilege('authenticated', c.oid, 'REFERENCES'))),
   'authenticated não trunca, não referencia e não cria gatilho em nenhuma tabela de public');
 
+-- Uma view em public pode ler as tabelas por baixo da RLS; hoje o aplicativo
+-- não usa nenhuma, e uma view nova precisa ser uma decisão consciente.
+select homologacao_testes.exigir(
+  not exists (
+    select 1 from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind in ('v', 'm')),
+  'nenhuma view em public contorna a RLS das tabelas');
+
+-- Função security definer roda com os privilégios do dono e ignora a RLS de
+-- quem chamou. Se um dia existir uma, ela precisa ao menos fixar o search_path.
+select homologacao_testes.exigir(
+  not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.prosecdef
+      and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) as cfg where cfg like 'search_path=%')),
+  'nenhuma função security definer em public sem search_path fixo');
+
+-- O aplicativo não usa armazenamento de arquivos: todo anexo continuaria fora
+-- do cofre cifrado, então nenhum bucket pode existir.
+do $$
+declare
+  total integer;
+begin
+  if to_regclass('storage.buckets') is null then
+    raise notice 'ok: %', 'armazenamento não existe neste ambiente';
+    return;
+  end if;
+  execute 'select count(*) from storage.buckets' into total;
+  if total <> 0 then
+    raise exception 'FALHOU: nenhum bucket de armazenamento exposto';
+  end if;
+  raise notice 'ok: %', 'nenhum bucket de armazenamento exposto';
+end;
+$$;
+
 \echo 'Isolamento entre contas ficticias comprovado.'

@@ -13,5 +13,11 @@ const groups = [
 ]
 
 export function MorePage() {
-  return <div className="page-stack page-narrow"><header className="page-hero"><div><h1>Configurações</h1></div></header>{groups.map((group) => <Card key={group.title} title={group.title}><div className="settings-list">{group.links.map(({ to, icon: Icon, title, detail }) => <Link to={to} key={to}><span><Icon /></span><div><strong>{title}</strong><small>{detail}</small></div><ChevronRight /></Link>)}</div></Card>)}</div>
+  return <div className="page-stack page-narrow"><header className="page-hero"><div><h1>Configurações</h1></div></header><Card title="Onde ficam seus dados">
+    <ul className="plain-list">
+      <li>Tudo é gravado cifrado neste aparelho e abre com a sua senha.</li>
+      <li>O backup é um arquivo cifrado que só você guarda e restaura.</li>
+      <li>Com a sincronização ligada, o serviço recebe apenas conteúdo cifrado — ele não lê nomes, visitas nem anotações.</li>
+    </ul>
+  </Card>{groups.map((group) => <Card key={group.title} title={group.title}><div className="settings-list">{group.links.map(({ to, icon: Icon, title, detail }) => <Link to={to} key={to}><span><Icon /></span><div><strong>{title}</strong><small>{detail}</small></div><ChevronRight /></Link>)}</div></Card>)}</div>
 }

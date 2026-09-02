@@ -98,7 +98,38 @@ Depois de reverter:
   para a versão publicada na próxima abertura;
 - registre o motivo da reversão junto com a data e o commit.
 
-## 5. Se a atualização mexer no banco
+## 5. Ambientes: homologação e produção são separados
+
+A build declara em qual ambiente está, e só dois valores abrem conexão remota:
+
+| `VITE_APP_ENV` | O que acontece |
+|---|---|
+| vazio ou qualquer outro valor | tudo local, nenhuma conexão remota |
+| `homologacao` | fala com o projeto Supabase de teste, só dados fictícios |
+| `producao` | fala com o projeto Supabase real do distrito |
+
+Cada ambiente tem o seu próprio projeto Supabase, com URL e chave pública
+próprias, guardadas apenas no painel do provedor e no `.env.local` de quem
+gera a build. Nunca aponte um ambiente para o banco do outro.
+
+## 6. Migrations, na ordem de aplicação
+
+No projeto de produção recém-criado, aplique nesta ordem:
+
+| Ordem | Arquivo | O que cria |
+|---|---|---|
+| 1 | `supabase/migrations/0001_marco_zero_up.sql` | `devices`, `device_key_envelopes`, `recovery_key_envelopes`, `encrypted_operations`; índice do cursor de sincronização; gatilho que impede reativar aparelho revogado; RLS por dono e privilégios mínimos |
+| 2 | `supabase/migrations/0002_password_key_envelopes_up.sql` | `password_key_envelopes`, com RLS por dono e mínimo de 600 mil iterações |
+
+Para desfazer, na ordem inversa: `0002_password_key_envelopes_down.sql` e
+`0001_marco_zero_down.sql`. Desfazer apaga as tabelas e o que estiver nelas —
+faça backup antes e só em ambiente de teste.
+
+Os dois workflows do GitHub aplicam, provam e revertem essas migrations em um
+Postgres descartável a cada envio, incluindo a prova de isolamento entre duas
+contas fictícias.
+
+## 7. Se a atualização mexer no banco
 
 Nesta etapa o aplicativo funciona sem servidor. Quando a sincronização estiver
 ligada, antes de publicar:

@@ -51,3 +51,22 @@ describe('cofre criptográfico', () => {
     await expect(openPasswordEnvelope(newEnvelope, 'senha-ficticia-antiga')).rejects.toThrow()
   })
 })
+
+describe('vínculo entre o registro e o conteúdo cifrado', () => {
+  it('recusa abrir o conteúdo de um registro dentro de outro', async () => {
+    const key = await generateMasterKey()
+    const alfa = await encryptPayload(key, { schemaVersion: 1, type: 'foundation_fixture', data: { nota: 'conteúdo fictício de alfa' } }, 'registro-alfa')
+    const beta = await encryptPayload(key, { schemaVersion: 1, type: 'foundation_fixture', data: { nota: 'conteúdo fictício de beta' } }, 'registro-beta')
+
+    // O serviço remoto entrega o conteúdo de alfa na linha de beta.
+    await expect(decryptPayload(key, { ...alfa, id: 'registro-beta' })).rejects.toThrow('não confere')
+    await expect(decryptPayload(key, { ...beta, id: 'registro-beta' })).resolves.toMatchObject({ data: { nota: 'conteúdo fictício de beta' } })
+  })
+
+  it('continua abrindo envelopes que não vêm de um registro guardado', async () => {
+    const key = await generateMasterKey()
+    const envelope = await encryptPayload(key, { schemaVersion: 1, type: 'foundation_fixture', data: { nota: 'conteúdo fictício' } }, 'registro-solto')
+
+    await expect(decryptPayload(key, envelope)).resolves.toMatchObject({ data: { nota: 'conteúdo fictício' } })
+  })
+})
