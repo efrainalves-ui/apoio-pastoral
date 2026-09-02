@@ -111,7 +111,7 @@ export function FamilyBudgetPage() {
   const hasRecords = snapshot.incomes.length + snapshot.expenses.length + snapshot.bills.length + snapshot.debts.length + snapshot.goals.length > 0
 
   return <div className="page-stack family-budget-page">
-    <header className="page-hero budget-hero"><div><p className="eyebrow">Área pessoal</p><h1>Orçamento Familiar</h1><p>Organize as finanças da sua família com tranquilidade, sem misturar com as informações da igreja.</p></div><WalletCards /></header>
+    <header className="page-hero budget-hero"><div><p className="eyebrow">Área pessoal</p><h1>Orçamento Familiar</h1></div><WalletCards /></header>
     <BudgetNav section={section} month={month} />
     <div className="budget-month-nav"><Button variant="secondary" aria-label="Mês anterior" icon={<ArrowLeft />} onClick={() => go(section, shiftMonth(month, -1))} /><strong>{monthLabel(month)}</strong><Button variant="secondary" aria-label="Próximo mês" icon={<ArrowRight />} onClick={() => go(section, shiftMonth(month, 1))} /><Button variant="quiet" onClick={() => go(section, monthKey(new Date()))}>Mês atual</Button></div>
     {notice && <div className="alert alert--success" role="status">{notice}</div>}

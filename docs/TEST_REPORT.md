@@ -161,7 +161,7 @@ Transferência de Distrito foi retirada da interface, rotas, ações e testes ex
 
 ## Playwright
 
-A suíte contém 20 cenários e é projetada para dois projetos, totalizando 40 execuções: desktop Chromium 1440 × 1000 e Pixel 7. Ela cobre criação de conta, entrada, saída protegida, recuperação após conta existente, proteção de rota, PWA, acessibilidade, Distrito, Pessoas, Agenda, Cuidado Pastoral, Comissões, Nomeações, Orçamento Familiar, Pedidos de Oração, Leitura, cerimônias, Planejamento Anual e Evangelismo. Cada cenário inicia em contexto do navegador e armazenamento vazios e usa somente dados fictícios.
+A suíte contém 21 cenários e é projetada para dois projetos, totalizando 42 execuções: desktop Chromium 1440 × 1000 e Pixel 7. Ela cobre criação de conta, entrada, saída protegida, recuperação após conta existente, proteção de rota, PWA, acessibilidade, Distrito, Pessoas, Agenda, Cuidado Pastoral, Comissões, Nomeações, Orçamento Familiar, Pedidos de Oração, Leitura, cerimônias, Planejamento Anual e Evangelismo. Cada cenário inicia em contexto do navegador e armazenamento vazios e usa somente dados fictícios.
 
 Na execução final de 27 de agosto de 2026, o build e o servidor de teste foram concluídos. A suíte iniciou 28 execuções, mas o sandbox macOS bloqueou cada Chromium iniciado por permissão de MachPort antes de abrir uma página ou executar uma asserção. Depois de 25 falhas idênticas de inicialização, a tentativa foi encerrada; uma execução ficou interrompida e duas não chegaram a iniciar. Isso não é aprovação nem falha funcional dos cenários. O workflow Linux de homologação executará `pnpm test:e2e` em host compatível para concluir essa validação.
 
@@ -179,6 +179,8 @@ Na execução final de 27 de agosto de 2026, o build e o servidor de teste foram
 - uma build de produção foi servida em porta isolada, recebeu um registro fictício, teve o servidor encerrado e foi recarregada pelo service worker; após desbloquear o cofre, o registro cifrado reapareceu offline;
 - manifesto, ícones e `display: standalone` foram verificados pelo script PWA; a confirmação nativa de instalação no sistema operacional continua sendo um teste físico do navegador/plataforma;
 - nenhum erro ou warning foi registrado no console durante a jornada.
+- Uma varredura automática de contraste, alvo de toque e rolagem horizontal percorreu 15 telas nos temas claro e escuro, em 1280px e 375px, com dados fictícios. Ela apontou e foram corrigidos: títulos de estado vazio a 2,01:1, números grandes de Fidelidade e Leitura a 1,42:1, abas e atalhos da Agenda a 2,68:1 com 24px de altura, o texto secundário a 4,47:1 e a barra inferior a 4,02:1. Depois das correções nenhuma tela apontou problema.
+- A verificação axe passou a rodar também dentro do aplicativo, em Início, Distrito, Visitação, Metas e Configurações, sem violações críticas ou sérias.
 - A navegação nova foi percorrida com dados fictícios: o menu principal mostrou Distrito, Visitação e Fidelidade; o Mais não repetiu nenhum módulo do menu principal; a busca do distrito achou igreja, membro e família; a igreja abriu nas seis abas; a importação colada rodou dentro da igreja, sem perguntar a igreja, e criou 2 membros fictícios. Em 375px a faixa de abas rolou com a aba escolhida sempre à vista e a página não teve rolagem horizontal.
 - O topo foi conferido com dados fictícios em 1280px e em 375px: apenas os ícones de criar e sincronizar, sem busca e sem faixa branca, com o menu de criação abrindo as dez opções.
 - Em Leitura, abrir Adicionar livro rolou a tela até o formulário e focou o primeiro campo, com os três primeiros campos acima de 360px no celular; a lista ficou com linhas de 70px e as ações de concluir, editar e excluir com 46px e contraste de 11,58:1 e 7,11:1.
@@ -195,7 +197,7 @@ Na execução final de 27 de agosto de 2026, o build e o servidor de teste foram
 
 - manter fixtures fictícias alinhadas aos leiautes paginados já validados localmente;
 - aplicar e testar migration/RLS em Supabase de homologação;
-- confirmar as 40 execuções dos 20 cenários Playwright no CI Linux;
+- confirmar as 42 execuções dos 21 cenários Playwright no CI Linux;
 - instalar fisicamente em iPhone e Android antes do piloto;
 - realizar revisão independente de segurança e jurídica antes de usar dados reais.
 - revisar as prévias de todos os relatórios para assegurar que nenhum campo privado opcional seja incluído indevidamente.

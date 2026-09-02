@@ -70,7 +70,7 @@ export function SecurityPage() {
 
   return (
     <div className="page-stack page-narrow">
-      <header className="page-hero"><div><p className="eyebrow">Proteção da conta</p><h1>Segurança</h1><p>Revise seus dispositivos e altere sua senha quando precisar.</p></div><StatusPill>Aplicativo aberto</StatusPill></header>
+      <header className="page-hero"><div><p className="eyebrow">Proteção da conta</p><h1>Segurança</h1></div><StatusPill>Aplicativo aberto</StatusPill></header>
       <Card title="Dispositivos" eyebrow="Controle de acesso" action={<Laptop />}>
         <div className="device-list">
           {devices.map((device) => {

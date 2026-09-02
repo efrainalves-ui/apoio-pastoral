@@ -70,6 +70,13 @@ Concluída a criação e restauração de backup local cifrado. O arquivo conté
 - A Agenda aceita Batismo, Santa Ceia, Casamento e Dedicação de criança, com responsável, pessoas aplicáveis e checklists próprios. Os compromissos continuam no mesmo fluxo de Dia, Semana, Mês e Lista; nenhum documento civil ou certificado foi criado.
 - Em 27 de agosto de 2026, lint, TypeScript, build, PWA e 134 testes Vitest em 46 arquivos foram aprovados. O Playwright permanece pendente no CI Linux porque o Chromium headless foi bloqueado pelo sandbox macOS antes de abrir qualquer página.
 
+## Etapa estável: varredura de interface antes da fase de segurança
+
+- Contraste corrigido em todo o aplicativo: títulos de estado vazio, números grandes de Fidelidade e Leitura, abas e atalhos da Agenda, texto secundário e barra inferior do celular. A verificação foi automatizada e repetida nos temas claro e escuro, em tela larga e em 375px.
+- Alvos de toque abaixo de 40px foram corrigidos na Agenda e no calendário do Planejamento.
+- Textos decorativos e explicações longas saíram das telas: sobraram título, campos, dados e ações. Frases que ajudam a decidir — backup, aprovação de dispositivo, conflitos de sincronização e primeira configuração — foram mantidas.
+- Toda exclusão pede confirmação, inclusive itens de checklist e de orçamento dentro de campanhas e metas.
+
 ## Etapa estável: relatórios por área, missão dentro de Metas e Configurações
 
 - Não existe mais um módulo geral de Relatórios. Cada área gera o seu: Visitação tem o relatório de visitas e rodadas, a Agenda tem o itinerário, Metas tem o relatório de resultados com a missão junto, Sermões tem o histórico de pregações e o Orçamento Familiar mantém a própria aba de relatórios.

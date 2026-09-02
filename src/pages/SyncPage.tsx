@@ -49,7 +49,7 @@ export function SyncPage() {
 
   return (
     <div className="page-stack page-narrow">
-      <header className="page-hero"><div><p className="eyebrow">Seus dispositivos</p><h1>Sincronização</h1><p>Mantenha suas informações atualizadas nos dispositivos autorizados.</p></div><StatusPill tone={navigator.onLine ? 'success' : 'offline'}>{navigator.onLine ? 'Rede disponível' : 'Sem conexão'}</StatusPill></header>
+      <header className="page-hero"><div><p className="eyebrow">Seus dispositivos</p><h1>Sincronização</h1></div><StatusPill tone={navigator.onLine ? 'success' : 'offline'}>{navigator.onLine ? 'Rede disponível' : 'Sem conexão'}</StatusPill></header>
       <div className="metric-row">
         <div><small>Pendentes</small><strong>{pending}</strong></div>
         <div><small>Última sincronização</small><strong>{lastSync ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(lastSync)) : 'Ainda não realizada'}</strong></div>

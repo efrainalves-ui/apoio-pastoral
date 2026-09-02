@@ -106,7 +106,7 @@ export function CommissionConfigPage() {
 
   return <div className="page-stack commission-config-page">
     <Link className="text-link back-link" to="/app/comissoes">Voltar a Comissões</Link>
-    <header className="page-hero"><div><p className="eyebrow">Configuração anual</p><h1>Configuração de Comissões</h1><p>Defina os responsáveis e os quóruns aprovados pela igreja.</p></div></header>
+    <header className="page-hero"><div><p className="eyebrow">Configuração anual</p><h1>Configuração de Comissões</h1></div></header>
     {notice && <div className={notice.includes('salva') ? 'alert alert--success' : 'alert alert--error'} role="status">{notice}</div>}
     {requestedReturn && <div className="commission-return-note">Depois de salvar, você voltará automaticamente para criar a reunião.</div>}
 

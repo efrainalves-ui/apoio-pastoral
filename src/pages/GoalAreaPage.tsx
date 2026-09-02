@@ -158,7 +158,6 @@ export function GoalAreaPage() {
 
       {AREA_USES_PDF[area] && (
         <Card title="Enviar PDF" eyebrow="Resultados do período">
-          <p className="card-copy">O arquivo é lido no próprio aparelho. Nada entra sem você conferir a prévia.</p>
           <label className="file-picker">
             <FileUp />
             <span><strong>{busy ? 'Lendo o arquivo…' : `Escolher PDF de ${GOAL_AREA_LABELS[area]}`}</strong><small>Você confere igreja, período e totais antes de salvar.</small></span>

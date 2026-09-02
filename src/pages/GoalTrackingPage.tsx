@@ -178,7 +178,7 @@ export function GoalTrackingPage() {
         {plano.checklist.map((item) => <label key={item.id} className="confirmation-check">
           <input type="checkbox" checked={item.done} onChange={() => ajustarPlano({ checklist: plano.checklist.map((atual) => atual.id === item.id ? { ...atual, done: !atual.done } : atual) })} />
           <span>{item.label}</span>
-          <Button variant="secondary" icon={<Trash2 />} aria-label={`Remover ${item.label}`} onClick={() => ajustarPlano({ checklist: plano.checklist.filter((atual) => atual.id !== item.id) })} />
+          <Button variant="secondary" icon={<Trash2 />} aria-label={`Remover ${item.label}`} onClick={() => { if (window.confirm(`Remover "${item.label}" da lista?`)) ajustarPlano({ checklist: plano.checklist.filter((atual) => atual.id !== item.id) }) }} />
         </label>)}
       </div>
       <div className="form-actions">
@@ -236,7 +236,7 @@ export function GoalTrackingPage() {
       <div className="budget-item-list">
         {(goal.budget ?? []).map((item) => <article key={item.id}>
           <span><strong>{item.label}</strong><small>Previsto {dinheiro(item.planned)} · Gasto {dinheiro(item.spent)}</small></span>
-          <Button variant="secondary" icon={<Trash2 />} aria-label={`Remover ${item.label}`} onClick={() => void salvar({ budget: (goal.budget ?? []).filter((atual) => atual.id !== item.id) }, 'Item removido do orçamento.')} />
+          <Button variant="secondary" icon={<Trash2 />} aria-label={`Remover ${item.label}`} onClick={() => { if (window.confirm(`Remover "${item.label}" do orçamento?`)) void salvar({ budget: (goal.budget ?? []).filter((atual) => atual.id !== item.id) }, 'Item removido do orçamento.') }} />
         </article>)}
         {!(goal.budget ?? []).length && <p className="muted">Nenhum item lançado.</p>}
       </div>

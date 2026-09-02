@@ -114,7 +114,7 @@ export function DistrictPage() {
   if (!district) {
     return (
       <div className="page-stack page-narrow">
-        <header className="page-hero"><div><p className="eyebrow">Distrito</p><h1>Seu distrito começa aqui.</h1><p>Organize as igrejas do seu distrito.</p></div></header>
+        <header className="page-hero"><div><p className="eyebrow">Distrito</p><h1>Seu distrito começa aqui.</h1></div></header>
         {error && <div className="alert alert--error" role="alert">{error}</div>}
         <Card className="district-empty-card">
           <div className="scope-icon"><Building2 /></div>

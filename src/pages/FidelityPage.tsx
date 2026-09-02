@@ -142,7 +142,7 @@ export function FidelityPage() {
 
   return <div className="page-stack">
     <Link className="text-link back-link" to="/app/mais"><ArrowLeft />Voltar</Link>
-    <header className="page-hero"><div><p className="eyebrow">Fidelidade</p><h1>Fidelidade nos dízimos</h1><p>A classificação considera os últimos 12 meses. Faixas são preservadas sem inventar uma quantidade exata, e nenhum valor monetário é armazenado.</p></div><LockKeyhole /></header>
+    <header className="page-hero"><div><p className="eyebrow">Fidelidade</p><h1>Fidelidade nos dízimos</h1></div><LockKeyhole /></header>
     {error && <div className="alert alert--error" role="alert">{error}</div>}
     <section className="district-metrics fidelity-metrics"><div><small>Não dizimistas</small><strong>{nonTither} · {percent(nonTither, total)}</strong></div><div><small>Dizimistas não sistemáticos</small><strong>{nonSystematicTither} · {percent(nonSystematicTither, total)}</strong></div><div><small>Dizimistas</small><strong>{tither} · {percent(tither, total)}</strong></div></section>
     <Card eyebrow={churchId ? churchName(churchId) : 'Distrito'} title="Fidelidade da igreja"><div className="private-summary"><div><span>Fiéis</span><strong>{careSummary.faithful}</strong></div><div><span>Em acompanhamento</span><strong>{careSummary.followingUp}</strong></div><button type="button" onClick={() => setAssessmentOpen(true)}><span>A avaliar</span><strong>{careSummary.toEvaluate}</strong></button></div><p className="field__hint">Fiéis reúne dizimistas, pessoas sem renda e pessoas de até 15 anos. A partir de 16 anos, quem não for dizimista sistemático entra na avaliação normal.</p></Card>

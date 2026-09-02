@@ -101,3 +101,14 @@ test('não apresenta violações críticas de acessibilidade no acesso', async (
   const results = await new AxeBuilder({ page }).analyze()
   expect(results.violations.filter((violation) => ['critical', 'serious'].includes(violation.impact ?? ''))).toEqual([])
 })
+
+test('não apresenta violações críticas de acessibilidade dentro do aplicativo', async ({ page }) => {
+  await register(page)
+  // As telas de uso diário passam pela mesma verificação da tela de acesso.
+  for (const rota of ['/app', '/app/distrito', '/app/visitacao', '/app/metas', '/app/configuracoes']) {
+    await page.evaluate((caminho) => { window.history.pushState({}, '', caminho); window.dispatchEvent(new PopStateEvent('popstate')) }, rota)
+    await expect(page.locator('#conteudo')).toBeVisible()
+    const results = await new AxeBuilder({ page }).analyze()
+    expect(results.violations.filter((violation) => ['critical', 'serious'].includes(violation.impact ?? ''))).toEqual([])
+  }
+})

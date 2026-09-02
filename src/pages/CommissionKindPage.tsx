@@ -114,7 +114,7 @@ export function CommissionKindPage({ kind }: { kind: CommissionKind }) {
   return <div className="page-stack commission-kind-page">
     <Link className="text-link back-link" to="/app/comissoes"><ArrowLeft />Voltar a Comissões</Link>
     <header className="page-hero">
-      <div><p className="eyebrow">Comissões</p><h1>{label.title}</h1><p>Organize reuniões, pautas, decisões e atas desta igreja.</p></div>
+      <div><p className="eyebrow">Comissões</p><h1>{label.title}</h1></div>
       <span className="commission-kind-page__icon">{label.icon}</span>
     </header>
 
