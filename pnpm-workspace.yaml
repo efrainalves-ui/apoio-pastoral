@@ -9,3 +9,11 @@ minimumReleaseAgeExclude:
   - '@vitest/utils@4.1.11'
   - lucide-react@1.32.0
   - vitest@4.1.11
+
+# `fast-uri` chega por vite-plugin-pwa > workbox-build > ajv e roda só na hora
+# de gerar o build. As versões anteriores à 3.1.6 têm falhas de confusão de
+# host e de requisição forjada; nada disso vai para o navegador do pastor, mas
+# dependência vulnerável na cadeia de build não fica. A faixa segura mantém a
+# mesma versão maior que o ajv espera.
+overrides:
+  fast-uri: '^3.1.6'
