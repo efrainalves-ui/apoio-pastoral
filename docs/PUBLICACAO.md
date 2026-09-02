@@ -150,6 +150,27 @@ Os dois workflows do GitHub aplicam, provam e revertem essas migrations em um
 Postgres descartável a cada envio, incluindo a prova de isolamento entre duas
 contas fictícias.
 
+## 6.1 Provar as barreiras direto na API
+
+As barreiras de aparelho são provadas a cada envio em um Postgres descartável
+(`supabase/tests/02_device_barriers.sql`). Falta a confirmação falando com o
+serviço de verdade, por HTTP, que é como um atacante falaria. Ela depende de um
+projeto de homologação no ar e de duas contas fictícias, então é um passo
+manual:
+
+```bash
+SUPABASE_URL=... SUPABASE_ANON_KEY=... \
+CONTA_A_EMAIL=... CONTA_A_SENHA=... \
+CONTA_B_EMAIL=... CONTA_B_SENHA=... \
+pnpm test:api
+```
+
+O script (`scripts/api-barreiras.mjs`) confere, sem o aplicativo no meio, que
+escrever direto nas tabelas é recusado, que uma conta não alcança o aparelho da
+outra, que o envio ignora conta e aparelho declarados no corpo da requisição,
+que o aparelho revogado para de receber e que a versão do esquema é a esperada.
+Use apenas contas e dados fictícios, e apenas no projeto de homologação.
+
 ## 7. Se a atualização mexer no banco
 
 Nesta etapa o aplicativo funciona sem servidor. Quando a sincronização estiver

@@ -203,3 +203,37 @@ Na execução final de 27 de agosto de 2026, o build e o servidor de teste foram
 - instalar fisicamente em iPhone e Android antes do piloto;
 - realizar revisão independente de segurança e jurídica antes de usar dados reais.
 - revisar as prévias de todos os relatórios para assegurar que nenhum campo privado opcional seja incluído indevidamente.
+
+## Rodada de correções da revisão independente (2026-09-02)
+
+| Camada | O que roda | Resultado |
+|---|---|---|
+| Unidade | `pnpm exec vitest run --maxWorkers=1` | 360 testes, 71 arquivos |
+| Ponta a ponta | `pnpm exec playwright test` (desktop + mobile) | 42 testes |
+| Banco | `scripts/db/test-migrations.sh` (Postgres 16 descartável) | aplica, prova, reverte, reaplica e prova de novo |
+| Isolamento e barreiras | `supabase/tests/01_rls_isolation.sql`, `02_device_barriers.sql` | duas contas fictícias, autoaprovação, contorno por identificador novo, ordem de chegada, quarentena |
+| Dependências | `pnpm audit` | sem vulnerabilidades conhecidas |
+| Cabeçalhos | `pnpm verify:headers` | CSP, HSTS, nosniff, Referrer-Policy, Permissions-Policy |
+| Repositório | `pnpm verify:repo` | nenhum segredo, endereço real ou dado pessoal |
+
+Testes novos que fixam os achados corrigidos:
+
+- assinatura de metadados recusada, gravação virada em exclusão, versão trocada
+  e operação pendurada em outra conta vão para quarentena;
+- edição local ainda não enviada não é sobrescrita;
+- mais de 500 operações chegam inteiras, em páginas;
+- envio atrasado e relógio adiantado seguem a ordem de chegada;
+- cursor em formato antigo recomeça do início em vez de pular registros;
+- primeira sincronização só é marcada quando termina;
+- chaves do cofre não são exportáveis;
+- cadastro com confirmação de e-mail não deixa a conta pela metade;
+- troca de senha com sessão de outra conta é recusada e volta atrás quando o
+  envelope não é gravado;
+- Sair encerra a sessão; bloquear apenas fecha o cofre;
+- backup recusa arquivo estranho, truncado, de outra versão e grande demais, e
+  leva Leitura e Orçamento Familiar;
+- encerrar distrito revoga tudo, inclusive o próprio aparelho, e segue com
+  autorização nova.
+
+Pendente de ambiente externo: `pnpm test:api`, que prova as mesmas barreiras
+falando HTTP com um projeto de homologação no ar, com duas contas fictícias.
