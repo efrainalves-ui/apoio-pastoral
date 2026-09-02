@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { PasswordKeyEnvelope, RecoveryKeyEnvelope } from '../crypto/types'
-import { declaredEnvironment, isRemoteEnvironmentAllowed, isSyncDisabled } from '../sync/config'
+import { declaredEnvironment, declaredProjectRef, EXPECTED_SCHEMA_VERSION, isRemoteEnvironmentAllowed, isSyncDisabled, remoteProjectProblem } from '../sync/config'
 import { falhaRemota } from './remoteErrors'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -22,11 +22,22 @@ export function assertRemoteEnvironment(): void {
 /** Ambiente declarado nesta build: `homologacao`, `producao` ou `local`. */
 export function currentEnvironment(): string { return declaredEnvironment }
 
+/**
+ * Confere que endereço, chave pública e projeto declarado são o mesmo projeto.
+ * Falha fechado: misturar homologação e produção é o tipo de engano que só
+ * aparece depois, com dado real no lugar errado.
+ */
+export function assertRemoteProject(): void {
+  const problema = remoteProjectProblem({ url: supabaseUrl, anonKey: supabaseAnonKey, declaredRef: declaredProjectRef })
+  if (problema) throw new Error(problema)
+}
+
 export function getSupabaseClient(): SupabaseClient {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('O ambiente Supabase ainda não foi configurado.')
   }
   assertRemoteEnvironment()
+  assertRemoteProject()
   cachedClient ??= createClient(supabaseUrl, supabaseAnonKey, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
   })
@@ -130,6 +141,23 @@ export async function approveRemoteDevice(deviceId: string): Promise<void> {
   if (!hasSupabaseConfiguration) return
   const { error } = await getSupabaseClient().rpc('approve_device', { p_device_id: deviceId })
   if (error) throw falhaRemota(error, 'Não foi possível confirmar o aparelho no serviço.')
+}
+
+let esquemaConferido: number | null = null
+
+/**
+ * Confere uma vez por sessão que o serviço está na versão de esquema que esta
+ * build espera. Um serviço atrasado não tem as funções de autorização novas, e
+ * seguir assim seria voltar às barreiras antigas sem ninguém perceber.
+ */
+export async function assertServiceSchema(): Promise<void> {
+  if (!hasSupabaseConfiguration || esquemaConferido === EXPECTED_SCHEMA_VERSION) return
+  const versao = await remoteSchemaVersion()
+  if (versao === null) return
+  if (versao !== EXPECTED_SCHEMA_VERSION) {
+    throw new Error('O serviço desta conta está em uma versão diferente da deste aplicativo. Atualize o aplicativo antes de sincronizar.')
+  }
+  esquemaConferido = versao
 }
 
 /** Versão do esquema que o serviço está usando, para conferir o ambiente. */

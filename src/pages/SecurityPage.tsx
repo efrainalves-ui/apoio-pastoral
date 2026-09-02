@@ -81,6 +81,14 @@ export function SecurityPage() {
           })}
         </div>
       </Card>
+      <Card title="O que a revogação alcança" eyebrow="Sem promessa que não se cumpre">
+        <ul className="plain-list">
+          <li>Revogar bloqueia o aparelho no serviço: ele para de enviar, de receber e perde o envelope de chave dele. A sessão daquele aparelho é encerrada e não volta a valer, nem com um identificador novo.</li>
+          <li>O que já tinha sido baixado continua gravado naquele aparelho. Nenhum aplicativo apaga à distância o que já está lá.</li>
+          <li>Se o aparelho foi perdido e alguém sabe a sua senha, revogar não basta: troque a senha logo abaixo. É a senha que abre a conta em qualquer lugar.</li>
+          <li>O cofre se fecha sozinho depois de quinze minutos parado ou de cinco minutos com o aplicativo em segundo plano. Sair encerra a sessão; bloquear apenas fecha o cofre.</li>
+        </ul>
+      </Card>
       <Card title="Alterar senha" eyebrow="Atualização de senha" action={<KeyRound />}>
         <p className="card-copy">A nova senha passa a proteger seus dados sem alterar os registros existentes.</p>
         <form className="inline-form" onSubmit={(event) => void submit(event)}>

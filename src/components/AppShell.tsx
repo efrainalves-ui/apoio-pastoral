@@ -20,6 +20,7 @@ import {
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { isHomologationEnvironment } from '../sync/config'
 import { QuickActions } from './QuickActions'
 import { SyncNowButton } from './SyncNowButton'
 import { Button } from './ui/Button'
@@ -102,6 +103,7 @@ export function AppShell() {
         <header className="app-header">
           <button className="icon-button app-header__menu" aria-label="Abrir menu" onClick={() => setOpen(true)}><Menu /></button>
           <span className="app-header__brand">Apoio Pastoral</span>
+          {isHomologationEnvironment && <span className="app-header__env" title="Ambiente de testes com dados fictícios">Homologação</span>}
           <div className="app-header__actions">
             <QuickActions />
             <SyncNowButton compact />

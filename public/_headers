@@ -1,0 +1,24 @@
+# Cabeçalhos de segurança do Apoio Pastoral, versionados aqui para não
+# dependerem de configuração manual no painel da hospedagem.
+#
+# Formato do Cloudflare Pages. A CSP não cita a URL do projeto: libera apenas
+# hosts do Supabase, o que já é restritivo e evita colocar um endereço privado
+# dentro do repositório.
+
+/*
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self'; worker-src 'self' blob:; manifest-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; upgrade-insecure-requests
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), xr-spatial-tracking=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  X-Frame-Options: DENY
+
+# O service worker precisa ser revalidado a cada visita, senão uma correção de
+# segurança fica presa no aparelho do pastor por tempo indeterminado.
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/index.html
+  Cache-Control: no-cache

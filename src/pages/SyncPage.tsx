@@ -6,6 +6,7 @@ import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { StatusPill } from '../components/ui/StatusPill'
+import { corruptedRecordIds } from '../crypto/vault'
 import { db } from '../db/database'
 import { SyncService } from '../sync/service'
 import { createSyncTransport } from '../sync/transport'
@@ -18,6 +19,8 @@ export function SyncPage() {
   const [pending, setPending] = useState(0)
   const [lastSync, setLastSync] = useState<string | null>(null)
   const [conflicts, setConflicts] = useState(0)
+  const [quarantined, setQuarantined] = useState(0)
+  const [corrupted, setCorrupted] = useState(0)
   const [resolved, setResolved] = useState(0)
   const [summary, setSummary] = useState<SyncSummary | null>(null)
   const [error, setError] = useState('')
@@ -29,6 +32,8 @@ export function SyncPage() {
     setLastSync((await db.syncState.get(account.id))?.lastSyncedAt ?? null)
     setConflicts(await db.syncConflicts.where('accountId').equals(account.id).filter(({ status }) => status === 'pending').count())
     setResolved(await db.syncConflicts.where('accountId').equals(account.id).filter(({ status }) => status === 'resolved').count())
+    setQuarantined(await db.quarantine.where('accountId').equals(account.id).count())
+    setCorrupted(corruptedRecordIds().length)
   }, [account])
 
   useEffect(() => { void refresh() }, [refresh])
@@ -56,7 +61,10 @@ export function SyncPage() {
         <div><small>Disponibilidade</small><strong>{transport.name === 'disabled' ? 'Somente neste dispositivo' : 'Sincronização disponível'}</strong></div>
         <div><small>Revisões pendentes</small><strong>{conflicts}</strong></div>
         <div><small>Revisões já resolvidas</small><strong>{resolved}</strong></div>
+        <div><small>Recebidos em quarentena</small><strong>{quarantined}</strong></div>
       </div>
+      {quarantined > 0 && <div className="alert alert--error" role="alert">Recebemos {quarantined} alteração(ões) que não conferem com a sua conta e não foram aplicadas. Elas ficaram guardadas de lado, sem alterar nada. Se isso se repetir, avise antes de continuar usando este aparelho.</div>}
+      {corrupted > 0 && <div className="alert alert--error" role="alert">{corrupted} registro(s) não abriram neste aparelho e foram pulados na leitura. O restante continua acessível; um backup restaurado costuma resolver.</div>}
       <Card title="Sincronização manual" action={navigator.onLine ? <Cloud /> : <CloudOff />}>
         <p className="card-copy">{transport.name === 'disabled' ? 'A sincronização não está habilitada. Suas informações permanecem somente neste dispositivo.' : 'Se houver uma interrupção, as alterações pendentes serão mantidas para uma nova tentativa.'}</p>
         {summary && <div className="alert alert--success" role="status">Envio: {summary.pushed}. Recebimento: {summary.pulled}. Conflitos: {summary.conflicts}.</div>}

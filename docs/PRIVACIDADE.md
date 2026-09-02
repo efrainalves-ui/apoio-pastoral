@@ -30,6 +30,12 @@ certificação de nenhuma lei.
   retira o vínculo dela onde aparecia junto de outras.
 - **Canal**: o e-mail cadastrado na própria conta.
 
+## Governança, retenção e incidentes
+
+O documento operacional está em [GOVERNANCA.md](GOVERNANCA.md): o que o serviço
+enxerga mesmo com tudo cifrado, como conferir uma exclusão, como responder a um
+pedido do titular e o que fazer em caso de aparelho perdido.
+
 ## Encerrar distrito
 
 Em Configurações, *Encerrar distrito*:

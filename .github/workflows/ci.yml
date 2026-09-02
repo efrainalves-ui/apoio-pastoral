@@ -29,6 +29,8 @@ jobs:
       - run: pnpm exec vitest run --maxWorkers=1
       - run: pnpm build
       - run: pnpm verify:pwa
+      - name: Conferir os cabeçalhos de segurança versionados
+        run: pnpm verify:headers
       - name: Revisão de segurança do repositório
         run: pnpm verify:repo
 

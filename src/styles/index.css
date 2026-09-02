@@ -1190,3 +1190,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   .priority--urgent { color: #f5c6c2; background: #3b2523; }
 
 }
+
+/* Marca discreta de homologação: presente o bastante para ninguém confundir
+   com o ambiente real, apagada o bastante para não disputar a tela. */
+.app-header__env { font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .45); color: #fff; }

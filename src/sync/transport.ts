@@ -1,4 +1,4 @@
-import { getSupabaseClient, hasSupabaseConfiguration } from '../auth/supabase'
+import { assertServiceSchema, getSupabaseClient, hasSupabaseConfiguration } from '../auth/supabase'
 import { falhaRemota } from '../auth/remoteErrors'
 import { isSyncDisabled } from './config'
 import type { EncryptedOperation, PullResult, PushResult, SyncTransport } from './types'
@@ -138,6 +138,7 @@ export class SupabaseSyncTransport implements SyncTransport {
 
   async push(operations: EncryptedOperation[]): Promise<PushResult> {
     if (operations.length === 0) return { acceptedIds: [], conflicts: [] }
+    await assertServiceSchema()
     const aceitos: string[] = []
     for (let inicio = 0; inicio < operations.length; inicio += BATCH_SIZE) {
       const lote = operations.slice(inicio, inicio + BATCH_SIZE)
@@ -151,6 +152,7 @@ export class SupabaseSyncTransport implements SyncTransport {
   }
 
   async pull(ownerId: string, cursor: string | null): Promise<PullResult> {
+    await assertServiceSchema()
     const resposta = await getSupabaseClient().rpc('download_operations', {
       p_after: cursorSeq(cursor),
       p_limit: PAGE_SIZE,
