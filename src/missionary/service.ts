@@ -1,5 +1,5 @@
 import { currentDeviceId } from '../auth/device'
-import { decryptPayload, encryptPayload } from '../crypto/vault'
+import { decryptRecord, encryptPayload } from '../crypto/vault'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { BibleStudyData, BibleStudyEntity, InterestData, InterestEntity, InterestStatus, MissionaryPairData, MissionaryPairEntity, SabbathClassData, SabbathClassEntity, SmallGroupData, SmallGroupEntity, UapgData, UapgEntity } from './types'
@@ -10,7 +10,7 @@ export class MissionaryService {
   constructor(database: ApoioDatabase = db) { this.repo = new VaultRepository(database) }
   private async list<T>(accountId: string, key: CryptoKey, type: MissionaryType): Promise<T[]> {
     const records = await this.repo.list(accountId, type)
-    const items = await Promise.all(records.map(async record => { const payload = await decryptPayload(key, record); return payload.type === type ? { id: record.id, ...(payload.data as object) } as T : null }))
+    const items = await Promise.all(records.map(async record => { const payload = await decryptRecord(key, record); return payload?.type === type ? { id: record.id, ...(payload.data as object) } as T : null }))
     return items.filter(Boolean) as T[]
   }
   listInterests(accountId: string, key: CryptoKey) { return this.list<InterestEntity>(accountId, key, 'interest') }

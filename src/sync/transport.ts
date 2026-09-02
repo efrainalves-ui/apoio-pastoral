@@ -1,23 +1,31 @@
 import { getSupabaseClient, hasSupabaseConfiguration } from '../auth/supabase'
+import { falhaRemota } from '../auth/remoteErrors'
 import { isSyncDisabled } from './config'
 import type { EncryptedOperation, PullResult, PushResult, SyncTransport } from './types'
 
 const developmentRemote = new Map<string, EncryptedOperation>()
+let developmentSeq = 0
+const developmentOrder = new Map<string, number>()
 
-function cursorParts(cursor: string | null): { createdAt: string; id: string } | null {
-  if (!cursor) return null
-  const separator = cursor.lastIndexOf('|')
-  if (separator > 0) return { createdAt: cursor.slice(0, separator), id: cursor.slice(separator + 1) }
-  const timestamp = Number(cursor)
-  return { createdAt: Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : cursor, id: '' }
-}
+/** Página de download. O serviço ainda aplica o próprio teto. */
+export const PAGE_SIZE = 200
+/** Lote de envio. O serviço recusa lotes maiores. */
+export const BATCH_SIZE = 200
 
-function operationCursor(operation: EncryptedOperation): string { return `${operation.createdAt}|${operation.id}` }
-
-function afterCursor(operation: EncryptedOperation, cursor: string | null): boolean {
-  const parts = cursorParts(cursor)
-  if (!parts) return true
-  return operation.createdAt > parts.createdAt || (operation.createdAt === parts.createdAt && operation.id > parts.id)
+/**
+ * O cursor passou a ser a ordem de chegada atribuída pelo servidor.
+ *
+ * Antes era o carimbo de tempo escrito pelo próprio aparelho, e isso custava
+ * dados: um relógio adiantado empurrava o cursor dos outros para o futuro, e um
+ * aparelho que ficou offline mandava operações com carimbo antigo que ninguém
+ * mais baixava. Cursor antigo (com `|` ou não numérico) é tratado como início:
+ * rebaixar tudo de novo é idempotente e sempre melhor do que pular registro.
+ */
+export function cursorSeq(cursor: string | null): number {
+  if (!cursor) return 0
+  const valor = Number(cursor)
+  if (!Number.isInteger(valor) || valor < 0) return 0
+  return valor
 }
 
 export class DisabledSyncTransport implements SyncTransport {
@@ -30,20 +38,36 @@ export class LocalDevelopmentTransport implements SyncTransport {
   readonly name = 'local-development' as const
 
   push(operations: EncryptedOperation[]): Promise<PushResult> {
-    for (const operation of operations) developmentRemote.set(operation.id, structuredClone(operation))
-    return Promise.resolve({ acceptedIds: operations.map(({ id }) => id), conflicts: [] })
+    const aceitos: string[] = []
+    for (const operation of operations) {
+      // Mesma regra do serviço: reenviar o mesmo identificador não reescreve.
+      if (!developmentRemote.has(operation.id)) {
+        developmentSeq += 1
+        developmentRemote.set(operation.id, structuredClone(operation))
+        developmentOrder.set(operation.id, developmentSeq)
+      }
+      aceitos.push(operation.id)
+    }
+    return Promise.resolve({ acceptedIds: aceitos, conflicts: [] })
   }
 
   pull(ownerId: string, cursor: string | null): Promise<PullResult> {
-    const operations = [...developmentRemote.values()]
-      .filter((operation) => operation.ownerId === ownerId && afterCursor(operation, cursor))
-      .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id))
-    const latest = operations.at(-1)
-    return Promise.resolve({ operations, cursor: latest ? operationCursor(latest) : cursor })
+    const desde = cursorSeq(cursor)
+    const todas = [...developmentRemote.values()]
+      .filter((operation) => operation.ownerId === ownerId && (developmentOrder.get(operation.id) ?? 0) > desde)
+      .sort((left, right) => (developmentOrder.get(left.id) ?? 0) - (developmentOrder.get(right.id) ?? 0))
+    const operations = todas.slice(0, PAGE_SIZE)
+    const ultima = operations.at(-1)
+    return Promise.resolve({
+      operations,
+      cursor: ultima ? String(developmentOrder.get(ultima.id)) : cursor,
+      hasMore: todas.length > operations.length,
+    })
   }
 }
 
 interface SupabaseOperationRow {
+  seq: number
   id: string
   owner_id: string
   device_id: string
@@ -56,14 +80,14 @@ interface SupabaseOperationRow {
   iv: string
   aad: string
   key_version: number
+  mac: string | null
+  mac_version: number
   created_at: string
 }
 
-function toRow(operation: EncryptedOperation): SupabaseOperationRow {
+function toPayload(operation: EncryptedOperation) {
   return {
     id: operation.id,
-    owner_id: operation.ownerId,
-    device_id: operation.deviceId,
     record_id: operation.recordId,
     operation: operation.operation,
     base_version: operation.baseVersion,
@@ -73,6 +97,8 @@ function toRow(operation: EncryptedOperation): SupabaseOperationRow {
     iv: operation.payload.iv,
     aad: operation.payload.aad,
     key_version: operation.payload.keyVersion,
+    mac: operation.mac ?? null,
+    mac_version: operation.macVersion ?? 1,
     created_at: operation.createdAt,
   }
 }
@@ -95,38 +121,60 @@ function fromRow(row: SupabaseOperationRow): EncryptedOperation {
       keyVersion: row.key_version,
     },
     createdAt: row.created_at,
+    ...(row.mac ? { mac: row.mac } : {}),
+    macVersion: row.mac_version,
   }
 }
 
+/**
+ * Envio e recebimento passam por funções do serviço, não pela tabela.
+ *
+ * É lá que o servidor decide de qual aparelho a operação veio, em que ordem
+ * ela entrou e se aquele aparelho ainda está autorizado. Nada disso pode vir
+ * do corpo da requisição, que é escrito pelo cliente.
+ */
 export class SupabaseSyncTransport implements SyncTransport {
   readonly name = 'supabase' as const
 
   async push(operations: EncryptedOperation[]): Promise<PushResult> {
     if (operations.length === 0) return { acceptedIds: [], conflicts: [] }
-    const { error } = await getSupabaseClient().from('encrypted_operations').upsert(operations.map(toRow), { onConflict: 'id', ignoreDuplicates: true })
-    if (error) throw new Error('Falha técnica ao enviar alterações cifradas.')
-    return { acceptedIds: operations.map(({ id }) => id), conflicts: [] }
+    const aceitos: string[] = []
+    for (let inicio = 0; inicio < operations.length; inicio += BATCH_SIZE) {
+      const lote = operations.slice(inicio, inicio + BATCH_SIZE)
+      // O serviço devolve o que gravou agora; o que já estava lá não volta na
+      // lista, e mesmo assim está entregue. Por isso o lote inteiro conta.
+      const resposta = await getSupabaseClient().rpc('upload_operations', { p_ops: lote.map(toPayload) })
+      if (resposta.error) throw falhaRemota(resposta.error, 'Falha técnica ao enviar alterações cifradas.')
+      aceitos.push(...lote.map(({ id }) => id))
+    }
+    return { acceptedIds: aceitos, conflicts: [] }
   }
 
   async pull(ownerId: string, cursor: string | null): Promise<PullResult> {
-    let query = getSupabaseClient()
-      .from('encrypted_operations')
-      .select('*')
-      .eq('owner_id', ownerId)
-      .order('created_at', { ascending: true })
-      .order('id', { ascending: true })
-      .limit(500)
-    const parts = cursorParts(cursor)
-    if (parts?.id) query = query.or(`created_at.gt.${parts.createdAt},and(created_at.eq.${parts.createdAt},id.gt.${parts.id})`)
-    else if (parts) query = query.gte('created_at', parts.createdAt)
-    const { data, error } = await query
-    if (error) throw new Error('Falha técnica ao receber alterações cifradas.')
-    const operations = (data as SupabaseOperationRow[]).map(fromRow)
-    return { operations, cursor: operations.at(-1) ? operationCursor(operations.at(-1)!) : cursor }
+    const resposta = await getSupabaseClient().rpc('download_operations', {
+      p_after: cursorSeq(cursor),
+      p_limit: PAGE_SIZE,
+    })
+    if (resposta.error) throw falhaRemota(resposta.error, 'Falha técnica ao receber alterações cifradas.')
+    const linhas = (resposta.data ?? []) as SupabaseOperationRow[]
+    const operations = linhas.map(fromRow)
+    const ultima = linhas.at(-1)
+    return {
+      operations,
+      cursor: ultima ? String(ultima.seq) : cursor,
+      hasMore: linhas.length === PAGE_SIZE,
+    }
   }
 }
 
 export function createSyncTransport(): SyncTransport {
   if (isSyncDisabled) return new DisabledSyncTransport()
   return hasSupabaseConfiguration ? new SupabaseSyncTransport() : new LocalDevelopmentTransport()
+}
+
+/** Limpa a memória do transporte local. Só usado em teste. */
+export function resetLocalDevelopmentTransport(): void {
+  developmentRemote.clear()
+  developmentOrder.clear()
+  developmentSeq = 0
 }

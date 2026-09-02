@@ -1,5 +1,5 @@
 import { currentDeviceId } from '../auth/device'
-import { decryptPayload, encryptPayload } from '../crypto/vault'
+import { decryptRecord, encryptPayload } from '../crypto/vault'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { VaultRecord } from '../db/types'
@@ -20,8 +20,8 @@ export class FamilyService {
   constructor(private readonly database: ApoioDatabase = db) { this.repository = new VaultRepository(database); this.people = new PeopleService(database) }
 
   private async decode(record: VaultRecord, masterKey: CryptoKey): Promise<FamilyEntity | null> {
-    const payload = await decryptPayload(masterKey, record)
-    return payload.type === 'family' ? { id: record.id, ...(payload.data as FamilyData) } : null
+    const payload = await decryptRecord(masterKey, record)
+    return payload?.type === 'family' ? { id: record.id, ...(payload.data as FamilyData) } : null
   }
 
   async listFamilies(accountId: string, masterKey: CryptoKey): Promise<FamilyEntity[]> {

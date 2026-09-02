@@ -62,6 +62,29 @@ export interface SyncStateRecord {
   accountId: string
   cursor: string | null
   lastSyncedAt: string | null
+  /**
+   * Quando a primeira sincronização completa terminou neste aparelho. Enquanto
+   * for nulo, "nenhum dado" significa "ainda não recebemos", nunca "a conta
+   * está vazia" — a diferença entre esperar e criar um distrito duplicado.
+   */
+  firstSyncAt?: string | null
+}
+
+/**
+ * Operação recebida que não passou na conferência: assinatura inválida,
+ * conteúdo que não abre ou linhagem que não bate. Fica guardada como veio, sem
+ * ser aplicada, para poder ser examinada depois sem contaminar os dados.
+ */
+export interface QuarantinedOperationRecord {
+  id: string
+  accountId: string
+  recordId: string
+  reason: 'assinatura' | 'conteudo' | 'conta'
+  operation: 'upsert' | 'delete'
+  recordVersion: number
+  baseVersion: number
+  payload: CipherEnvelope
+  createdAt: string
 }
 
 export interface SyncConflictRecord {

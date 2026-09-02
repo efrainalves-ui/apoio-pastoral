@@ -1,11 +1,11 @@
-import { decryptPayload, encryptPayload } from '../crypto/vault'
+import { decryptRecord, encryptPayload } from '../crypto/vault'
 import { readingDb, type ReadingDatabase } from './database'
 import type { ReadingBookData, ReadingDataByType, ReadingEntity, ReadingGoalData, ReadingRecordType, ReadingSessionData, ReadingStoredRecord } from './types'
 
 const now = () => new Date().toISOString()
 export class ReadingService {
   constructor(private readonly database: ReadingDatabase = readingDb) {}
-  private async decode<T extends ReadingRecordType>(record: ReadingStoredRecord, key: CryptoKey, type: T): Promise<ReadingEntity<ReadingDataByType[T]> | null> { const payload = await decryptPayload(key, record); return payload.type === `personal_reading_${type}` ? { id: record.id, ...(payload.data as ReadingDataByType[T]) } : null }
+  private async decode<T extends ReadingRecordType>(record: ReadingStoredRecord, key: CryptoKey, type: T): Promise<ReadingEntity<ReadingDataByType[T]> | null> { const payload = await decryptRecord(key, record); return payload?.type === `personal_reading_${type}` ? { id: record.id, ...(payload.data as ReadingDataByType[T]) } : null }
   private async list<T extends ReadingRecordType>(accountId: string, key: CryptoKey, type: T): Promise<ReadingEntity<ReadingDataByType[T]>[]> { const records = await this.database.records.where('accountId').equals(accountId).filter((record) => record.recordType === type).toArray(); return (await Promise.all(records.map((record) => this.decode(record, key, type)))).flatMap((item) => item ? [item] : []) }
   private async stored<T extends ReadingRecordType>(accountId: string, key: CryptoKey, type: T, input: ReadingDataByType[T], id: string = crypto.randomUUID()): Promise<ReadingStoredRecord> { const existing = await this.database.records.get(id); if (existing && existing.accountId !== accountId) throw new Error('Este registro pertence a outra conta.'); const timestamp = now(); const data = { ...input, createdAt: input.createdAt || timestamp, updatedAt: timestamp }; return { id, accountId, recordType: type, createdAt: existing?.createdAt ?? timestamp, updatedAt: timestamp, ...await encryptPayload(key, { schemaVersion: 1, type: `personal_reading_${type}`, data }, id) } }
   private async save<T extends ReadingRecordType>(accountId: string, key: CryptoKey, type: T, input: ReadingDataByType[T], id?: string): Promise<ReadingEntity<ReadingDataByType[T]>> { const record = await this.stored(accountId, key, type, input, id); await this.database.records.put(record); const decoded = await this.decode(record, key, type); return decoded! }

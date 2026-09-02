@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { PasswordKeyEnvelope, RecoveryKeyEnvelope } from '../crypto/types'
 import { declaredEnvironment, isRemoteEnvironmentAllowed, isSyncDisabled } from '../sync/config'
+import { falhaRemota } from './remoteErrors'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -32,75 +33,111 @@ export function getSupabaseClient(): SupabaseClient {
   return cachedClient
 }
 
-export async function registerRemoteAccount(email: string, password: string): Promise<string> {
+export interface RemoteRegistration {
+  /** Identificador da conta no serviço. */
+  userId: string
+  /** Falso quando o serviço exige confirmar o e-mail antes de liberar a sessão. */
+  ready: boolean
+}
+
+/**
+ * Cria a conta no serviço. Quando a confirmação de e-mail está ligada, o
+ * Supabase devolve o usuário sem sessão: nesse caso nada mais pode ser gravado
+ * no serviço, e quem chamou precisa parar em um estado de espera em vez de
+ * seguir gravando envelopes pela metade.
+ */
+export async function registerRemoteAccount(email: string, password: string): Promise<RemoteRegistration> {
   const { data, error } = await getSupabaseClient().auth.signUp({ email, password })
-  if (error) throw new Error(error.message)
+  if (error) {
+    if (/already registered|already exists|User already/iu.test(error.message)) {
+      throw new Error('Já existe uma conta com este e-mail. Entre com a senha dela.')
+    }
+    throw falhaRemota(error, 'Não foi possível criar a conta agora. Tente de novo em alguns minutos.')
+  }
   if (!data.user) throw new Error('Não foi possível criar a conta.')
-  return data.user.id
+  return { userId: data.user.id, ready: Boolean(data.session) }
+}
+
+/** Reenvia o e-mail de confirmação de uma conta recém-criada. */
+export async function resendConfirmationEmail(email: string): Promise<void> {
+  const { error } = await getSupabaseClient().auth.resend({ type: 'signup', email })
+  if (error) throw falhaRemota(error, 'Não foi possível reenviar a confirmação agora.')
+}
+
+/**
+ * Dispara o e-mail oficial de redefinição de senha do serviço. Nunca envia a
+ * chave de recuperação: ela não sai do aparelho do pastor, por e-mail nenhum.
+ */
+export async function requestPasswordReset(email: string, redirectTo: string): Promise<void> {
+  const { error } = await getSupabaseClient().auth.resetPasswordForEmail(email, { redirectTo })
+  if (error) throw falhaRemota(error, 'Não foi possível enviar o e-mail de redefinição agora.')
+}
+
+/** Conta autenticada agora no serviço, ou `null` quando não há sessão. */
+export async function currentRemoteAccountId(): Promise<string | null> {
+  if (!hasSupabaseConfiguration) return null
+  const { data: { user } } = await getSupabaseClient().auth.getUser()
+  return user?.id ?? null
 }
 
 export async function signInRemoteAccount(email: string, password: string): Promise<string> {
   const { data, error } = await getSupabaseClient().auth.signInWithPassword({ email, password })
-  if (error) throw new Error('E-mail ou senha inválidos.')
+  if (error) {
+    if (/email not confirmed|not confirmed/iu.test(error.message)) {
+      throw new Error('Confirme o e-mail desta conta pelo link que enviamos e entre de novo.')
+    }
+    throw new Error('E-mail ou senha inválidos.')
+  }
   return data.user.id
 }
 
 export async function updateRemotePassword(password: string): Promise<void> {
   const { error } = await getSupabaseClient().auth.updateUser({ password })
-  if (error) throw new Error(error.message)
+  if (error) throw falhaRemota(error, 'Não foi possível trocar a senha no serviço.')
 }
 
+/**
+ * Sair encerra a sessão em todo o serviço (`global`), não só a aba atual: é o
+ * que o pastor espera de "Sair" e o que faz diferença num aparelho emprestado.
+ * Bloquear o cofre é outra coisa e não passa por aqui.
+ */
 export async function signOutRemoteAccount(): Promise<void> {
   if (!hasSupabaseConfiguration) return
-  const { error } = await getSupabaseClient().auth.signOut()
-  if (error) throw new Error(error.message)
+  const { error } = await getSupabaseClient().auth.signOut({ scope: 'global' })
+  if (error) throw falhaRemota(error, 'Não foi possível encerrar a sessão no serviço.')
 }
 
 /**
- * Registra o aparelho no serviço. `status` vale apenas para a primeira vez: um
- * aparelho já conhecido nunca é rebaixado aqui, senão uma instalação nova
- * derrubaria a aprovação de um aparelho que já estava valendo.
+ * Registra o aparelho no serviço e amarra a sessão atual a ele.
+ *
+ * Quem decide a situação é o servidor, não este código: o primeiro aparelho de
+ * uma conta nasce ativo e qualquer outro nasce aguardando confirmação. Era esse
+ * o buraco de antes — bastava um identificador novo para voltar a sincronizar
+ * depois de uma revogação.
  */
-export async function ensureRemoteDevice(deviceId: string, label: string, status: RemoteDeviceStatus = 'active'): Promise<void> {
-  if (!hasSupabaseConfiguration) return
+export async function ensureRemoteDevice(deviceId: string, label: string): Promise<RemoteDeviceStatus | null> {
+  if (!hasSupabaseConfiguration) return null
   const client = getSupabaseClient()
   const { data: { user } } = await client.auth.getUser()
-  if (!user) return
-  const conhecido = await readRemoteDeviceStatus(deviceId)
-  const { error } = await client.from('devices').upsert({
-    id: deviceId,
-    owner_id: user.id,
-    label,
-    status: conhecido ?? status,
-    last_seen_at: new Date().toISOString(),
-  }, { onConflict: 'id' })
-  if (error) throw new Error('Não foi possível autorizar o dispositivo no serviço.')
+  if (!user) return null
+  const resposta = await client.rpc('claim_device', { p_device_id: deviceId, p_label: label })
+  if (resposta.error) throw falhaRemota(resposta.error, 'Não foi possível autorizar este aparelho no serviço.')
+  return (resposta.data as RemoteDeviceStatus | null) ?? null
 }
 
-/**
- * Leitura crua do estado do aparelho: devolve `null` quando ainda não existe
- * linha. Diferente de `fetchRemoteDeviceStatus`, que falha fechado e trata a
- * ausência como revogação — o que é certo para liberar sincronização e errado
- * para decidir se o aparelho é novo.
- */
-async function readRemoteDeviceStatus(deviceId: string): Promise<RemoteDeviceStatus | null> {
-  const { data, error } = await getSupabaseClient()
-    .from('devices')
-    .select('status')
-    .eq('id', deviceId)
-    .maybeSingle()
-  if (error) throw new Error('Não foi possível confirmar a autorização deste dispositivo.')
-  return (data?.status as RemoteDeviceStatus | undefined) ?? null
-}
-
-/** Libera um aparelho que estava aguardando confirmação. */
+/** Libera, a partir deste aparelho já ativo, uma instalação que aguardava. */
 export async function approveRemoteDevice(deviceId: string): Promise<void> {
   if (!hasSupabaseConfiguration) return
-  const { error } = await getSupabaseClient().from('devices')
-    .update({ status: 'active', last_seen_at: new Date().toISOString() })
-    .eq('id', deviceId)
-    .eq('status', 'pending')
-  if (error) throw new Error('Não foi possível confirmar o aparelho no serviço.')
+  const { error } = await getSupabaseClient().rpc('approve_device', { p_device_id: deviceId })
+  if (error) throw falhaRemota(error, 'Não foi possível confirmar o aparelho no serviço.')
+}
+
+/** Versão do esquema que o serviço está usando, para conferir o ambiente. */
+export async function remoteSchemaVersion(): Promise<number | null> {
+  if (!hasSupabaseConfiguration) return null
+  const resposta = await getSupabaseClient().rpc('app_schema_version')
+  if (resposta.error) throw falhaRemota(resposta.error, 'Não foi possível conferir a versão do serviço.')
+  return typeof resposta.data === 'number' ? resposta.data : null
 }
 
 export async function storeRemoteRecoveryEnvelope(envelope: RecoveryKeyEnvelope): Promise<void> {
@@ -118,7 +155,7 @@ export async function storeRemoteRecoveryEnvelope(envelope: RecoveryKeyEnvelope)
     key_version: envelope.keyVersion,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'owner_id' })
-  if (error) throw new Error('Não foi possível guardar o envelope de recuperação cifrado.')
+  if (error) throw falhaRemota(error, 'Não foi possível guardar o envelope de recuperação cifrado.')
 }
 
 export async function storeRemotePasswordEnvelope(envelope: PasswordKeyEnvelope): Promise<void> {
@@ -137,7 +174,7 @@ export async function storeRemotePasswordEnvelope(envelope: PasswordKeyEnvelope)
     key_version: envelope.keyVersion,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'owner_id' })
-  if (error) throw new Error('Não foi possível guardar o acesso protegido da conta.')
+  if (error) throw falhaRemota(error, 'Não foi possível guardar o acesso protegido da conta.')
 }
 
 interface RecoveryEnvelopeRow {
@@ -170,7 +207,7 @@ export async function hasRemotePasswordEnvelope(): Promise<boolean> {
     .from('password_key_envelopes')
     .select('owner_id')
     .maybeSingle()
-  if (error) throw new Error('Não foi possível conferir o acesso desta conta.')
+  if (error) throw falhaRemota(error, 'Não foi possível conferir o acesso desta conta.')
   return Boolean(data)
 }
 
@@ -231,7 +268,7 @@ export async function fetchRemoteDeviceStatus(deviceId: string): Promise<RemoteD
     .select('status')
     .eq('id', deviceId)
     .maybeSingle()
-  if (error) throw new Error('Não foi possível confirmar a autorização deste dispositivo.')
+  if (error) throw falhaRemota(error, 'Não foi possível confirmar a autorização deste aparelho.')
   return (data?.status as RemoteDeviceStatus | undefined) ?? 'revoked'
 }
 
@@ -254,7 +291,7 @@ export async function fetchRemoteDevices(): Promise<RemoteDevice[] | null> {
     .from('devices')
     .select('id,label,status,last_seen_at')
     .order('created_at', { ascending: true })
-  if (error) throw new Error('Não foi possível consultar os dispositivos da conta.')
+  if (error) throw falhaRemota(error, 'Não foi possível consultar os aparelhos da conta.')
   return (data ?? []).map((row) => ({
     id: row.id as string,
     label: row.label as string,
@@ -263,11 +300,14 @@ export async function fetchRemoteDevices(): Promise<RemoteDevice[] | null> {
   }))
 }
 
+/**
+ * Revoga pelo servidor: além de marcar a linha, a função apaga o envelope de
+ * chave daquele aparelho e derruba as sessões dele. O que já foi baixado
+ * continua no aparelho — isso nenhuma revogação alcança, e está dito assim na
+ * tela e na documentação.
+ */
 export async function revokeRemoteDevice(deviceId: string): Promise<void> {
   if (!hasSupabaseConfiguration) return
-  const { error } = await getSupabaseClient().from('devices').update({
-    status: 'revoked',
-    revoked_at: new Date().toISOString(),
-  }).eq('id', deviceId)
-  if (error) throw new Error('Não foi possível revogar o dispositivo no serviço.')
+  const { error } = await getSupabaseClient().rpc('revoke_device', { p_device_id: deviceId })
+  if (error) throw falhaRemota(error, 'Não foi possível revogar o aparelho no serviço.')
 }

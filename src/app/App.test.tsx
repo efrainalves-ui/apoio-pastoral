@@ -8,6 +8,7 @@ const auth = vi.hoisted(() => ({
 
   accounts: [],
   masterKey: null as CryptoKey | null,
+  syncKey: null as CryptoKey | null,
   initialized: true,
   recoveryCode: null,
   register: vi.fn(),
@@ -21,6 +22,8 @@ const nuvem = vi.hoisted(() => ({
   distritoNaNuvem: null as { id: string } | null,
   transporte: 'disabled',
   sincronizacoes: 0,
+  falhaAoSincronizar: false,
+  primeiraSincronizacaoPendente: false,
 }))
 
 vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => auth }))
@@ -38,9 +41,11 @@ vi.mock('../sync/transport', () => ({
 }))
 
 vi.mock('../sync/service', () => ({
+  firstSyncPending: () => Promise.resolve(nuvem.primeiraSincronizacaoPendente),
   SyncService: class {
     synchronize() {
       nuvem.sincronizacoes += 1
+      if (nuvem.falhaAoSincronizar) return Promise.reject(new Error('sem rede'))
       // Receber do serviço é o que preenche o cofre local do aparelho novo.
       nuvem.distritoLocal = nuvem.distritoNaNuvem
       return Promise.resolve({ status: 'synced', pushed: 0, pulled: 1, conflicts: 0 })
@@ -53,7 +58,10 @@ afterEach(cleanup)
 beforeEach(() => {
   auth.account = null
   auth.masterKey = null
+  auth.syncKey = null
   nuvem.distritoLocal = null
+  nuvem.falhaAoSincronizar = false
+  nuvem.primeiraSincronizacaoPendente = false
   nuvem.distritoNaNuvem = null
   nuvem.transporte = 'disabled'
   nuvem.sincronizacoes = 0
@@ -75,6 +83,7 @@ describe('shell do aplicativo', () => {
   it('recebe o distrito da conta antes de mandar um aparelho novo criar outro', async () => {
     auth.account = { id: 'conta-ficticia', email: 'conta.ficticia@example.invalid' }
     auth.masterKey = {} as CryptoKey
+    auth.syncKey = {} as CryptoKey
     nuvem.transporte = 'supabase'
     nuvem.distritoNaNuvem = { id: 'distrito-ficticio' }
 
@@ -89,6 +98,7 @@ describe('shell do aplicativo', () => {
   it('mantém a configuração inicial quando a conta realmente não tem distrito', async () => {
     auth.account = { id: 'conta-ficticia', email: 'conta.ficticia@example.invalid' }
     auth.masterKey = {} as CryptoKey
+    auth.syncKey = {} as CryptoKey
     nuvem.transporte = 'supabase'
     nuvem.distritoNaNuvem = null
 
@@ -96,6 +106,34 @@ describe('shell do aplicativo', () => {
 
     await waitFor(() => expect(result.current).toBe(false))
     expect(nuvem.sincronizacoes).toBe(1)
+  })
+
+  it('não manda criar distrito quando a primeira sincronização falhou', async () => {
+    // Falha de rede em um aparelho que nunca recebeu nada não é conta vazia.
+    // Tratar como vazia levaria o pastor a criar um segundo distrito.
+    auth.account = { id: 'conta-ficticia', email: 'conta.ficticia@example.invalid' }
+    auth.masterKey = {} as CryptoKey
+    auth.syncKey = {} as CryptoKey
+    nuvem.transporte = 'supabase'
+    nuvem.falhaAoSincronizar = true
+    nuvem.primeiraSincronizacaoPendente = true
+
+    const { result } = renderHook(() => useDistrictPresence())
+
+    await waitFor(() => expect(result.current).toBe('indisponivel'))
+  })
+
+  it('segue para a configuração inicial quando a conta já sincronizou antes e está vazia', async () => {
+    auth.account = { id: 'conta-ficticia', email: 'conta.ficticia@example.invalid' }
+    auth.masterKey = {} as CryptoKey
+    auth.syncKey = {} as CryptoKey
+    nuvem.transporte = 'supabase'
+    nuvem.falhaAoSincronizar = true
+    nuvem.primeiraSincronizacaoPendente = false
+
+    const { result } = renderHook(() => useDistrictPresence())
+
+    await waitFor(() => expect(result.current).toBe(false))
   })
 
   it('não procura o serviço quando a sincronização está desativada', async () => {

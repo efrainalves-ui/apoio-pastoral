@@ -1,4 +1,4 @@
-import { decryptPayload, encryptPayload } from '../crypto/vault'
+import { decryptRecord, encryptPayload } from '../crypto/vault'
 import { familyBudgetDb, type FamilyBudgetDatabase } from './database'
 import { monthKey } from './core'
 import type { BudgetBillData, BudgetDataByType, BudgetEntity, BudgetExpenseData, BudgetGoalData, BudgetIncomeData, BudgetPlanData, BudgetSkipData, BudgetSnapshot, FamilyBudgetRecordType, FamilyBudgetStoredRecord } from './types'
@@ -10,8 +10,8 @@ export class FamilyBudgetService {
   constructor(private readonly database: FamilyBudgetDatabase = familyBudgetDb) {}
 
   private async decode<T extends FamilyBudgetRecordType>(record: FamilyBudgetStoredRecord, masterKey: CryptoKey, type: T): Promise<BudgetEntity<BudgetDataByType[T]> | null> {
-    const payload = await decryptPayload(masterKey, record)
-    return payload.type === `family_budget_${type}` ? { id: record.id, ...(payload.data as BudgetDataByType[T]) } : null
+    const payload = await decryptRecord(masterKey, record)
+    return payload?.type === `family_budget_${type}` ? { id: record.id, ...(payload.data as BudgetDataByType[T]) } : null
   }
 
   private async list<T extends FamilyBudgetRecordType>(accountId: string, masterKey: CryptoKey, type: T): Promise<BudgetEntity<BudgetDataByType[T]>[]> {

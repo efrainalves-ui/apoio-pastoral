@@ -4,7 +4,7 @@ import { currentDeviceId } from '../auth/device'
 import { DeviceApprovalPage } from '../pages/DeviceApprovalPage'
 import { db } from '../db/database'
 import { useAuthVault } from '../auth/AuthVaultContext'
-import { SyncService } from '../sync/service'
+import { SyncService, firstSyncPending } from '../sync/service'
 import { createSyncTransport } from '../sync/transport'
 import { AppShell } from '../components/AppShell'
 import { AuthPage } from '../pages/AuthPage'
@@ -72,9 +72,15 @@ const districtService = new DistrictService()
  * dispositivo revogado, o aparelho segue para a configuração inicial em vez de
  * travar na abertura.
  */
-export function useDistrictPresence(): boolean | null {
-  const { account, masterKey, recoveryCode } = useAuthVault()
-  const [hasDistrict, setHasDistrict] = useState<boolean | null>(null)
+/**
+ * `null` enquanto verifica, `'indisponivel'` quando não deu para receber os
+ * dados desta conta neste aparelho, e o booleano quando a resposta é confiável.
+ */
+export type DistrictPresence = boolean | 'indisponivel' | null
+
+export function useDistrictPresence(): DistrictPresence {
+  const { account, masterKey, syncKey, recoveryCode } = useAuthVault()
+  const [presenca, setPresenca] = useState<DistrictPresence>(null)
 
   useEffect(() => {
     if (!account || !masterKey || recoveryCode) return
@@ -84,20 +90,26 @@ export function useDistrictPresence(): boolean | null {
       let district = await districtService.getDistrict(account.id, masterKey)
       if (!district) {
         const transport = createSyncTransport()
-        if (transport.name !== 'disabled') {
+        if (transport.name !== 'disabled' && syncKey) {
           try {
-            await new SyncService(transport).synchronize(account.id, currentDeviceId(account.id))
+            await new SyncService(transport).synchronize(account.id, currentDeviceId(account.id), syncKey)
             district = await districtService.getDistrict(account.id, masterKey)
-          } catch { /* segue para a configuração inicial */ }
+          } catch {
+            // Não deu para receber. Se este aparelho nunca completou uma
+            // sincronização desta conta, "nada aqui" não quer dizer "conta
+            // vazia" — mandar o pastor criar um distrito agora criaria um
+            // segundo distrito e duplicaria tudo.
+            if (!cancelled && await firstSyncPending(account.id)) { setPresenca('indisponivel'); return }
+          }
         }
       }
-      if (!cancelled) setHasDistrict(Boolean(district))
+      if (!cancelled) setPresenca(Boolean(district))
     })()
 
     return () => { cancelled = true }
-  }, [account, masterKey, recoveryCode])
+  }, [account, masterKey, syncKey, recoveryCode])
 
-  return hasDistrict
+  return presenca
 }
 
 /**
@@ -122,6 +134,20 @@ function useCurrentDeviceApproval(): { pending: boolean | null; approve: () => v
   return { pending, approve: () => setPending(false) }
 }
 
+/**
+ * Espera consciente: este aparelho ainda não recebeu os dados da conta e a
+ * tentativa falhou. Mandar criar um distrito aqui produziria um segundo
+ * distrito e duplicaria o trabalho do pastor.
+ */
+function SyncPending() {
+  return (
+    <div className="page-stack page-narrow">
+      <header className="page-hero"><div><p className="eyebrow">Aguardando seus dados</p><h1>Ainda não recebemos os dados desta conta neste aparelho</h1><p>Este aparelho entrou na sua conta, mas a primeira sincronização não terminou. Conecte-se à internet e tente de novo. Não crie um distrito novo agora: os dados que já existem chegariam depois e ficariam duplicados.</p></div></header>
+      <button type="button" className="button" onClick={() => window.location.reload()}>Tentar de novo</button>
+    </div>
+  )
+}
+
 function SetupAccess({ children }: { children: ReactNode }) {
   const { masterKey, recoveryCode } = useAuthVault()
   const { pending, approve } = useCurrentDeviceApproval()
@@ -130,6 +156,7 @@ function SetupAccess({ children }: { children: ReactNode }) {
   if (pending === null) return <div className="app-loading" role="status">Preparando seu distrito…</div>
   if (pending) return <DeviceApprovalPage onApproved={approve} />
   if (hasDistrict === null) return <div className="app-loading" role="status">Preparando seu distrito…</div>
+  if (hasDistrict === 'indisponivel') return <SyncPending />
   return hasDistrict ? <Navigate to="/app" replace /> : <>{children}</>
 }
 
@@ -141,6 +168,7 @@ function ProtectedApp() {
   if (pending === null) return <div className="app-loading" role="status">Preparando sua área…</div>
   if (pending) return <DeviceApprovalPage onApproved={approve} />
   if (hasDistrict === null) return <div className="app-loading" role="status">Preparando sua área…</div>
+  if (hasDistrict === 'indisponivel') return <SyncPending />
   return hasDistrict ? <AppShell /> : <Navigate to="/configuracao-inicial" replace />
 }
 

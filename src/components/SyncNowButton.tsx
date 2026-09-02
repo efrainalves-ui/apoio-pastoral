@@ -20,7 +20,7 @@ const MENSAGENS: Record<Exclude<Situacao, 'parado'>, string> = {
  * pastor só precisa saber se está atualizado — nada de detalhe técnico.
  */
 export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
-  const { account } = useAuthVault()
+  const { account, syncKey } = useAuthVault()
   const transport = useMemo(() => createSyncTransport(), [])
   const service = useMemo(() => new SyncService(transport), [transport])
   const [situacao, setSituacao] = useState<Situacao>('parado')
@@ -42,18 +42,18 @@ export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
   }, [conferirFila])
 
   const sincronizar = useCallback(async () => {
-    if (!account || situacao === 'sincronizando') return
+    if (!account || !syncKey || situacao === 'sincronizando') return
     if (!navigator.onLine) { setSituacao('offline'); return }
     setSituacao('sincronizando')
     try {
-      await service.synchronize(account.id, currentDeviceId(account.id))
+      await service.synchronize(account.id, currentDeviceId(account.id), syncKey)
       setSituacao('pronto')
     } catch {
       setSituacao(navigator.onLine ? 'erro' : 'offline')
     } finally {
       await conferirFila()
     }
-  }, [account, conferirFila, service, situacao])
+  }, [account, conferirFila, service, situacao, syncKey])
 
   if (transport.name === 'disabled') return null
 

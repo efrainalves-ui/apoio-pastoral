@@ -10,6 +10,8 @@
 \set conta_b '''bbbbbbbb-0000-4000-8000-000000000002'''
 \set disp_a  '''a0000000-0000-4000-8000-00000000000a'''
 \set disp_b  '''b0000000-0000-4000-8000-00000000000b'''
+\set sessao_a '''a5000000-0000-4000-8000-00000000000a'''
+\set sessao_b '''b5000000-0000-4000-8000-00000000000b'''
 
 create schema if not exists homologacao_testes;
 grant usage on schema homologacao_testes to public;
@@ -60,26 +62,32 @@ on conflict (id) do nothing;
 
 -- Conta A monta os próprios registros.
 set role authenticated;
-set request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000001"}';
+set request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","session_id":"a5000000-0000-4000-8000-00000000000a"}';
 
-insert into public.devices (id, owner_id, label, status)
-  values (:disp_a, :conta_a, 'Computador Fictício A', 'active');
+-- O aparelho entra pela função: `devices` não aceita mais escrita direta.
+select homologacao_testes.exigir(
+  public.claim_device(:disp_a, 'Computador Fictício A') = 'active',
+  'o primeiro aparelho de uma conta nasce ativo');
 insert into public.device_key_envelopes (owner_id, device_id, ciphertext, iv, aad)
   values (:conta_a, :disp_a, 'cifra-ficticia-a', 'iv-a', 'aad-a');
 insert into public.recovery_key_envelopes (owner_id, ciphertext, iv, aad, salt)
   values (:conta_a, 'cifra-recuperacao-a', 'iv-a', 'aad-a', 'sal-a');
 insert into public.password_key_envelopes (owner_id, ciphertext, iv, aad, salt, iterations)
   values (:conta_a, 'cifra-senha-a', 'iv-a', 'aad-a', 'sal-a', 600000);
-insert into public.encrypted_operations
-  (id, owner_id, device_id, record_id, operation, base_version, record_version, schema_version, ciphertext, iv, aad)
-  values ('a1000000-0000-4000-8000-00000000000a', :conta_a, :disp_a,
-          'a2000000-0000-4000-8000-00000000000a', 'upsert', 0, 1, 1, 'cifra-operacao-a', 'iv-a', 'aad-a');
+select homologacao_testes.exigir(
+  (select count(*) from public.upload_operations(jsonb_build_array(jsonb_build_object(
+     'id', 'a1000000-0000-4000-8000-00000000000a',
+     'record_id', 'a2000000-0000-4000-8000-00000000000a',
+     'operation', 'upsert', 'base_version', 0, 'record_version', 1, 'schema_version', 1,
+     'ciphertext', 'cifra-operacao-a', 'iv', 'iv-a', 'aad', 'aad-a', 'mac', 'mac-a', 'mac_version', 2)))) = 1,
+  'A envia a própria operação cifrada pela função de envio');
 
 -- Conta B monta os seus.
-set request.jwt.claims = '{"sub":"bbbbbbbb-0000-4000-8000-000000000002"}';
+set request.jwt.claims = '{"sub":"bbbbbbbb-0000-4000-8000-000000000002","session_id":"b5000000-0000-4000-8000-00000000000b"}';
 
-insert into public.devices (id, owner_id, label, status)
-  values (:disp_b, :conta_b, 'Celular Fictício B', 'active');
+select homologacao_testes.exigir(
+  public.claim_device(:disp_b, 'Celular Fictício B') = 'active',
+  'o primeiro aparelho da conta B também nasce ativo');
 insert into public.device_key_envelopes (owner_id, device_id, ciphertext, iv, aad)
   values (:conta_b, :disp_b, 'cifra-ficticia-b', 'iv-b', 'aad-b');
 
@@ -110,27 +118,32 @@ select homologacao_testes.exigir(
 select homologacao_testes.exigir(
   (select count(*) from public.password_key_envelopes) = 0,
   'B não lê o envelope de senha de A');
+select homologacao_testes.exigir_recusa(
+  $cmd$select * from public.encrypted_operations$cmd$,
+  'nenhuma conta lê a tabela de operações direto: o recebimento é só pela função');
 select homologacao_testes.exigir(
-  (select count(*) from public.encrypted_operations) = 0,
+  (select count(*) from public.download_operations(0, 500)) = 0,
   'B não recebe operações cifradas de A ao sincronizar');
 
 -- ---------------------------------------------------------------------------
 -- 2. Alteração: B não altera nem apaga o que é de A.
 -- ---------------------------------------------------------------------------
 
-with tentativa as (
-  update public.devices set label = 'sequestrado por B'
-  where id = :disp_a
-  returning 1
-)
-select homologacao_testes.exigir(
-  count(*) = 0,
-  'update de B não alcança nenhuma linha de A') from tentativa;
+select homologacao_testes.exigir_recusa(
+  $cmd$update public.devices set label = 'sequestrado por B'$cmd$,
+  'nenhuma conta altera a tabela de aparelhos direto');
 
 select homologacao_testes.exigir_recusa(
   format($cmd$insert into public.devices (id, owner_id, label, status)
                values ('c0000000-0000-4000-8000-00000000000c', %L, 'Forjado por B', 'active')$cmd$, :conta_a),
   'B não cria dispositivo em nome de A');
+
+select homologacao_testes.exigir_recusa(
+  format($cmd$select public.approve_device(%L)$cmd$, :disp_a),
+  'B não confirma o aparelho de A');
+select homologacao_testes.exigir_recusa(
+  format($cmd$select public.revoke_device(%L)$cmd$, :disp_a),
+  'B não revoga o aparelho de A');
 
 select homologacao_testes.exigir_recusa(
   format($cmd$insert into public.recovery_key_envelopes (owner_id, ciphertext, iv, aad, salt)
@@ -148,6 +161,12 @@ select homologacao_testes.exigir_recusa(
 select homologacao_testes.exigir_recusa(
   $cmd$update public.encrypted_operations set ciphertext = 'reescrito'$cmd$,
   'nenhuma conta reescreve operações cifradas');
+select homologacao_testes.exigir_recusa(
+  $cmd$insert into public.encrypted_operations
+        (id, owner_id, device_id, record_id, operation, base_version, record_version, schema_version, ciphertext, iv, aad)
+        values ('b9000000-0000-4000-8000-00000000000b', auth.uid(), 'b0000000-0000-4000-8000-00000000000b',
+                'b8000000-0000-4000-8000-00000000000b', 'upsert', 0, 1, 1, 'x', 'x', 'x')$cmd$,
+  'nem a própria conta escreve na tabela de operações sem passar pela função');
 
 -- ---------------------------------------------------------------------------
 -- 3. Vínculo de dispositivo: B não pendura nada no dispositivo de A.
@@ -167,67 +186,71 @@ select homologacao_testes.exigir_recusa(
 -- 4. Sincronização: B não injeta operação na conta A.
 -- ---------------------------------------------------------------------------
 
-select homologacao_testes.exigir_recusa(
-  format($cmd$insert into public.encrypted_operations
-               (id, owner_id, device_id, record_id, operation, base_version, record_version, schema_version, ciphertext, iv, aad)
-               values ('b1000000-0000-4000-8000-00000000000b', %L, %L,
-                       'b2000000-0000-4000-8000-00000000000b', 'upsert', 0, 1, 1, 'x', 'x', 'x')$cmd$,
-         :conta_a, :disp_a),
-  'B não grava operação na conta de A');
+-- A função ignora `owner_id` e `device_id` vindos do cliente: quem manda é a
+-- sessão autenticada. B tenta se passar por A e a linha nasce em nome de B.
+select public.upload_operations(jsonb_build_array(jsonb_build_object(
+  'id', 'b1000000-0000-4000-8000-00000000000b',
+  'owner_id', :conta_a, 'device_id', :disp_a,
+  'record_id', 'b2000000-0000-4000-8000-00000000000b',
+  'operation', 'upsert', 'base_version', 0, 'record_version', 1, 'schema_version', 1,
+  'ciphertext', 'x', 'iv', 'x', 'aad', 'x')));
 
-select homologacao_testes.exigir_recusa(
-  format($cmd$insert into public.encrypted_operations
-               (id, owner_id, device_id, record_id, operation, base_version, record_version, schema_version, ciphertext, iv, aad)
-               values ('b3000000-0000-4000-8000-00000000000b', %L, %L,
-                       'b4000000-0000-4000-8000-00000000000b', 'upsert', 0, 1, 1, 'x', 'x', 'x')$cmd$,
-         :conta_b, :disp_a),
-  'B não sincroniza usando o dispositivo de A');
+set role postgres;
+select homologacao_testes.exigir(
+  (select owner_id from public.encrypted_operations where id = 'b1000000-0000-4000-8000-00000000000b') = :conta_b,
+  'operação enviada por B fica em nome de B mesmo declarando a conta de A');
+select homologacao_testes.exigir(
+  (select device_id from public.encrypted_operations where id = 'b1000000-0000-4000-8000-00000000000b') = :disp_b,
+  'operação enviada por B fica no aparelho de B mesmo declarando o de A');
+set role authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 5. O dispositivo revogado da própria conta A não volta a funcionar.
 -- ---------------------------------------------------------------------------
 
-set request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000001"}';
+set request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","session_id":"a6000000-0000-4000-8000-00000000000a"}';
 
-with revogacao as (
-  update public.devices set status = 'revoked', revoked_at = now()
-  where id = :disp_a
-  returning 1
-)
+-- Um segundo aparelho de A, para revogar o primeiro de um lugar legítimo.
 select homologacao_testes.exigir(
-  count(*) = 1,
-  'A consegue revogar o próprio dispositivo') from revogacao;
+  public.claim_device('a7000000-0000-4000-8000-00000000000a', 'Celular Fictício A') = 'active',
+  'entrar com a senha em outro aparelho da mesma conta funciona');
+select public.revoke_device(:disp_a);
+select homologacao_testes.exigir(
+  (select status from public.devices where id = :disp_a) = 'revoked',
+  'A consegue revogar o próprio dispositivo a partir de outro aparelho ativo');
+
+set request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","session_id":"a5000000-0000-4000-8000-00000000000a"}';
 
 select homologacao_testes.exigir_recusa(
   format($cmd$update public.devices set status = 'active' where id = %L$cmd$, :disp_a),
   'dispositivo revogado não é reativado');
+select homologacao_testes.exigir_recusa(
+  format($cmd$select public.claim_device(%L, 'Computador Fictício A')$cmd$, :disp_a),
+  'dispositivo revogado não recupera o vínculo com a sessão');
 
 select homologacao_testes.exigir_recusa(
   format($cmd$delete from public.devices where id = %L$cmd$, :disp_a),
   'dispositivo revogado não é apagado e recriado para contornar a revogação');
 
 select homologacao_testes.exigir_recusa(
-  format($cmd$insert into public.encrypted_operations
-               (id, owner_id, device_id, record_id, operation, base_version, record_version, schema_version, ciphertext, iv, aad)
-               values ('a3000000-0000-4000-8000-00000000000a', %L, %L,
-                       'a4000000-0000-4000-8000-00000000000a', 'upsert', 1, 2, 1, 'x', 'x', 'x')$cmd$,
-         :conta_a, :disp_a),
-  'dispositivo revogado não sincroniza mais');
+  $cmd$select public.upload_operations(jsonb_build_array(jsonb_build_object(
+    'id', 'a3000000-0000-4000-8000-00000000000a',
+    'record_id', 'a4000000-0000-4000-8000-00000000000a',
+    'operation', 'upsert', 'base_version', 1, 'record_version', 2, 'schema_version', 1,
+    'ciphertext', 'x', 'iv', 'x', 'aad', 'x')))$cmd$,
+  'dispositivo revogado não envia mais');
 
 select homologacao_testes.exigir_recusa(
   format($cmd$insert into public.device_key_envelopes (owner_id, device_id, ciphertext, iv, aad)
                values (%L, %L, 'x', 'x', 'x')$cmd$, :conta_a, :disp_a),
   'dispositivo revogado não recebe nova chave');
 
--- A RLS separa contas, não aparelhos: o dispositivo revogado continua usando a
--- sessão da própria conta, então o banco ainda entrega a ele as operações
--- cifradas já gravadas. Bloquear o recebimento é responsabilidade do
--- aplicativo, em assertRemoteDeviceStillActive. Esta asserção fixa o limite
--- real do banco para que ninguém remova aquela trava supondo que a RLS cobre
--- também o recebimento.
-select homologacao_testes.exigir(
-  (select count(*) from public.encrypted_operations where owner_id = :conta_a) = 1,
-  'a RLS barra o envio do dispositivo revogado, mas o recebimento é barrado pelo aplicativo');
+-- O recebimento também é barrado no servidor: a sessão do aparelho revogado
+-- perdeu o vínculo, então a função de download não sabe por qual aparelho ela
+-- fala e recusa. Antes isso dependia só de uma trava do aplicativo.
+select homologacao_testes.exigir_recusa(
+  $cmd$select * from public.download_operations(0, 500)$cmd$,
+  'dispositivo revogado não recebe mais');
 
 -- ---------------------------------------------------------------------------
 -- 6. Visitante anônimo não alcança nenhuma tabela.
@@ -311,6 +334,23 @@ select homologacao_testes.exigir(
     where n.nspname = 'public' and p.prosecdef
       and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) as cfg where cfg like 'search_path=%')),
   'nenhuma função security definer em public sem search_path fixo');
+
+-- Uma função em public é chamável pela API. Nenhuma pode ficar ao alcance de
+-- quem não entrou na conta, e as que rodam como dono precisam ser exatamente
+-- as que este projeto escreveu de propósito.
+select homologacao_testes.exigir(
+  not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) as a
+    join pg_roles r on r.oid = a.grantee
+    where n.nspname = 'public' and r.rolname in ('anon', 'public')),
+  'anon não executa nenhuma função de public');
+
+select homologacao_testes.exigir(
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prosecdef) = 7,
+  'só as sete funções previstas rodam com os privilégios do dono');
 
 -- O aplicativo não usa armazenamento de arquivos: todo anexo continuaria fora
 -- do cofre cifrado, então nenhum bucket pode existir.

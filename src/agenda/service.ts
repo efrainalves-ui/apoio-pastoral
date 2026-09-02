@@ -1,5 +1,5 @@
 import { currentDeviceId } from '../auth/device'
-import { decryptPayload, encryptPayload } from '../crypto/vault'
+import { decryptRecord, encryptPayload } from '../crypto/vault'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { VaultRecord } from '../db/types'
@@ -54,8 +54,8 @@ export class AgendaService {
   constructor(private readonly database: ApoioDatabase = db) { this.repository = new VaultRepository(database) }
 
   private async decode(record: VaultRecord, masterKey: CryptoKey): Promise<AgendaEventEntity | null> {
-    const payload = await decryptPayload(masterKey, record)
-    if (payload.type !== 'agenda_event') return null
+    const payload = await decryptRecord(masterKey, record)
+    if (payload?.type !== 'agenda_event') return null
     const data = payload.data as Partial<AgendaEventData>
     return { id: record.id, ...data, location: data.location ?? '', address: data.address ?? '', visitTarget: data.visitTarget ?? 'none', sermonId: data.sermonId ?? null, sermonSnapshot: data.sermonSnapshot ?? null, ceremonyDetails: data.ceremonyDetails ?? null, linkedSource: data.linkedSource ?? null } as AgendaEventEntity
   }

@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createPasswordEnvelope, createRecoveryEnvelope, generateMasterKey } from '../crypto/vault'
+import { createPasswordEnvelope, createRecoveryEnvelope, generateMasterSecret } from '../crypto/vault'
 import { ApoioDatabase } from '../db/database'
 import { keyEnvelopeId } from '../db/types'
 import type { AccountRecord } from '../db/types'
@@ -25,7 +25,7 @@ describe('isolamento da sessão local', () => {
   it('recusa envelope de recuperação pertencente a outra conta', async () => {
     const database = new ApoioDatabase(`session-recovery-${crypto.randomUUID()}`); databases.push(database)
     const current = account('conta-ficticia-a'); await database.accounts.put(current)
-    const recovery = await createRecoveryEnvelope(await generateMasterKey())
+    const recovery = await createRecoveryEnvelope(generateMasterSecret())
     await database.keyEnvelopes.put({ id: keyEnvelopeId('conta-ficticia-b', 'recovery'), kind: 'recovery' as const, accountId: 'conta-ficticia-b', envelope: recovery.envelope, updatedAt: current.createdAt })
     await expect(recoverAccount(current.email, recovery.recoveryCode, 'nova-senha-ficticia-2026', database)).rejects.toThrow('indisponível')
   })
@@ -33,7 +33,7 @@ describe('isolamento da sessão local', () => {
   it('recusa troca de senha com envelope pertencente a outra conta', async () => {
     const database = new ApoioDatabase(`session-password-${crypto.randomUUID()}`); databases.push(database)
     const current = account('conta-ficticia-a'); await database.accounts.put(current)
-    const envelope = await createPasswordEnvelope(await generateMasterKey(), 'senha-ficticia-atual-2026')
+    const envelope = await createPasswordEnvelope(generateMasterSecret(), 'senha-ficticia-atual-2026')
     await database.keyEnvelopes.put({ id: keyEnvelopeId('conta-ficticia-b', 'password'), kind: 'password' as const, accountId: 'conta-ficticia-b', envelope, updatedAt: current.createdAt })
     await expect(changeVaultPassword(current, 'senha-ficticia-atual-2026', 'senha-ficticia-nova-2026', database)).rejects.toThrow('indisponível')
   })

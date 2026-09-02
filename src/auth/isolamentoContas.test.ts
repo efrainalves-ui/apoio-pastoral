@@ -57,9 +57,9 @@ async function gravarPessoa(banco: ApoioDatabase, accountId: string, chave: Cryp
 async function duasContas() {
   const banco = novoBanco('isolamento')
   const a = await registerAccount(CONTA_A.email, CONTA_A.senha, banco)
-  const registroA = await gravarPessoa(banco, a.account.id, a.masterKey, NOME_A)
+  const registroA = await gravarPessoa(banco, a.account.id, a.keys.master, NOME_A)
   const b = await registerAccount(CONTA_B.email, CONTA_B.senha, banco)
-  const registroB = await gravarPessoa(banco, b.account.id, b.masterKey, NOME_B)
+  const registroB = await gravarPessoa(banco, b.account.id, b.keys.master, NOME_B)
   return { banco, a, b, registroA, registroB }
 }
 
@@ -82,8 +82,8 @@ describe('auditoria de isolamento entre duas contas fictícias', { timeout: 30_0
     const guardado = await banco.vaultRecords.get(registroA)
 
     expect(guardado).toBeDefined()
-    await expect(decryptPayload(b.masterKey, guardado!)).rejects.toThrow()
-    await expect(decryptPayload(a.masterKey, guardado!)).resolves.toMatchObject({ data: { name: NOME_A } })
+    await expect(decryptPayload(b.keys.master, guardado!)).rejects.toThrow()
+    await expect(decryptPayload(a.keys.master, guardado!)).resolves.toMatchObject({ data: { name: NOME_A } })
     expect(JSON.stringify(await banco.vaultRecords.toArray())).not.toContain(NOME_A)
   })
 
@@ -91,7 +91,7 @@ describe('auditoria de isolamento entre duas contas fictícias', { timeout: 30_0
     const { banco, a, b } = await duasContas()
     const transporte = new TransporteCapturado()
 
-    await new SyncService(transporte, banco).synchronize(b.account.id, currentDeviceId(b.account.id))
+    await new SyncService(transporte, banco).synchronize(b.account.id, currentDeviceId(b.account.id), b.keys.sync)
 
     expect(transporte.enviadas.length).toBeGreaterThan(0)
     expect(transporte.enviadas.every((operacao) => operacao.ownerId === b.account.id)).toBe(true)
@@ -120,9 +120,9 @@ describe('auditoria de isolamento entre duas contas fictícias', { timeout: 30_0
   it('o backup de uma conta não restaura na outra', async () => {
     const { banco, a, b } = await duasContas()
     const destino = novoBanco('isolamento-destino')
-    const { file } = await new BackupService(banco).create(a.account.id, a.masterKey, 'codigo-ficticio-auditoria')
+    const { file } = await new BackupService(banco).create(a.account.id, a.keys.master, 'codigo-ficticio-auditoria')
 
-    await expect(new BackupService(destino).restore(b.account.id, b.masterKey, 'codigo-ficticio-auditoria', file)).rejects.toThrow('outra conta')
+    await expect(new BackupService(destino).restore(b.account.id, b.keys.master, 'codigo-ficticio-auditoria', file)).rejects.toThrow('outra conta')
     expect(await destino.vaultRecords.count()).toBe(0)
   })
 

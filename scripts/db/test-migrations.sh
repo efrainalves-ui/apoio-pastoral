@@ -35,18 +35,21 @@ psql_run -f "$testes/00_auth_shim.sql"
 echo "==> 2/6 Aplicando as migrations de homologação"
 psql_run -f "$migrations/0001_marco_zero_up.sql"
 psql_run -f "$migrations/0002_password_key_envelopes_up.sql"
+psql_run -f "$migrations/0003_device_sessions_up.sql"
 
 tabelas="$(contar_tabelas)"
-if [ "$tabelas" -ne 5 ]; then
-  echo "FALHOU: esperava 5 tabelas em public depois das migrations, encontrei $tabelas" >&2
+if [ "$tabelas" -ne 7 ]; then
+  echo "FALHOU: esperava 7 tabelas em public depois das migrations, encontrei $tabelas" >&2
   exit 1
 fi
-echo "    5 tabelas criadas"
+echo "    7 tabelas criadas"
 
 echo "==> 3/6 Provando o isolamento entre duas contas fictícias"
 psql_run -f "$testes/01_rls_isolation.sql"
+psql_run -f "$testes/02_device_barriers.sql"
 
 echo "==> 4/6 Revertendo as migrations"
+psql_run -f "$migrations/0003_device_sessions_down.sql"
 psql_run -f "$migrations/0002_password_key_envelopes_down.sql"
 psql_run -f "$migrations/0001_marco_zero_down.sql"
 
@@ -59,9 +62,13 @@ fi
 restos="$(psql_run --tuples-only --no-align -c \
   "select count(*) from pg_proc p
    join pg_namespace n on n.oid = p.pronamespace
-   where n.nspname = 'public' and p.proname = 'prevent_revoked_device_reactivation';")"
+   where n.nspname = 'public'
+     and p.proname in ('prevent_revoked_device_reactivation', 'claim_device', 'approve_device',
+                       'revoke_device', 'upload_operations', 'download_operations',
+                       'current_session_id', 'current_device_id', 'active_device_id',
+                       'app_schema_version');")"
 if [ "$restos" -ne 0 ]; then
-  echo "FALHOU: a reversão deixou a função de trigger para trás" >&2
+  echo "FALHOU: a reversão deixou $restos função(ões) das migrations para trás" >&2
   exit 1
 fi
 echo "    reversão limpa"
@@ -69,15 +76,17 @@ echo "    reversão limpa"
 echo "==> 5/6 Reaplicando as migrations sobre a base revertida"
 psql_run -f "$migrations/0001_marco_zero_up.sql"
 psql_run -f "$migrations/0002_password_key_envelopes_up.sql"
+psql_run -f "$migrations/0003_device_sessions_up.sql"
 
 tabelas="$(contar_tabelas)"
-if [ "$tabelas" -ne 5 ]; then
-  echo "FALHOU: a reaplicação recriou $tabelas tabela(s) em vez de 5" >&2
+if [ "$tabelas" -ne 7 ]; then
+  echo "FALHOU: a reaplicação recriou $tabelas tabela(s) em vez de 7" >&2
   exit 1
 fi
 
 echo "==> 6/6 Reprovando o isolamento sobre a base reaplicada"
 psql_run -f "$testes/01_rls_isolation.sql"
+psql_run -f "$testes/02_device_barriers.sql"
 
 echo
 echo "Migration aplicável, reversível e reaplicável; isolamento entre contas comprovado."

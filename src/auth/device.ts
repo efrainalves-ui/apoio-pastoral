@@ -50,12 +50,17 @@ export function deviceConfirmationCode(deviceId: string): string {
   return `${seis.slice(0, 3)}-${seis.slice(3)}`
 }
 
+/**
+ * Registra este aparelho e amarra a sessão do serviço a ele.
+ *
+ * Quem decide a situação é o servidor: entrar com e-mail e senha em um aparelho
+ * novo vale como autorização, e um aparelho revogado não volta sozinho. O
+ * estado local é só o espelho dessa resposta — antes ele era a decisão, e um
+ * cliente alterado podia se declarar ativo.
+ */
 export async function authorizeCurrentDevice(
   accountId: string,
   database: ApoioDatabase = db,
-  // Uma instalação nova entra como 'pending': quem prova só a senha ainda
-  // precisa da confirmação de um aparelho que já estava valendo.
-  statusInicial: 'active' | 'pending' = 'active',
 ): Promise<DeviceRecord> {
   const id = currentDeviceId(accountId)
   const existing = await database.devices.get(id)
@@ -63,20 +68,38 @@ export async function authorizeCurrentDevice(
     throw new Error('Este dispositivo já está vinculado a outra conta.')
   }
   if (existing?.status === 'revoked') {
-    throw new Error('Este dispositivo foi removido e precisa ser autorizado novamente por outro dispositivo.')
+    throw new Error('Este aparelho foi removido da conta. Autorize-o novamente entrando com a senha.')
   }
+  const label = existing?.label ?? deviceLabel()
+  const remoto = await ensureRemoteDevice(id, label)
   const now = new Date().toISOString()
   const device: DeviceRecord = {
     id,
     accountId,
-    label: existing?.label ?? deviceLabel(),
-    status: existing?.status ?? statusInicial,
+    label,
+    status: remoto ?? existing?.status ?? 'active',
     createdAt: existing?.createdAt ?? now,
     lastSeenAt: now,
   }
   await database.devices.put(device)
-  await ensureRemoteDevice(device.id, device.label, device.status)
   return device
+}
+
+/**
+ * Um aparelho revogado só volta provando a senha outra vez, e com identidade
+ * nova: a sessão anterior ficou na lista de revogadas do serviço e não
+ * reivindica mais nada. Por isso a troca do identificador é explícita, feita
+ * pelo pastor, e nunca automática dentro de uma tentativa de sincronizar.
+ */
+export async function reauthorizeRevokedDevice(
+  accountId: string,
+  database: ApoioDatabase = db,
+): Promise<DeviceRecord> {
+  const antigo = currentDeviceId(accountId)
+  const local = await database.devices.get(antigo)
+  if (local) await database.devices.put({ ...local, status: 'revoked' })
+  rotateDeviceId(accountId)
+  return authorizeCurrentDevice(accountId, database)
 }
 
 /** Confirma, a partir de um aparelho já ativo, uma instalação que aguardava. */

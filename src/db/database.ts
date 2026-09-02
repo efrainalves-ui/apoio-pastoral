@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from 'dexie'
 import type {
   AccountRecord,
   DeviceRecord,
+  QuarantinedOperationRecord,
   KeyEnvelopeRecord,
   MigrationRecord,
   OutboxRecord,
@@ -18,6 +19,7 @@ export class ApoioDatabase extends Dexie {
   outbox!: EntityTable<OutboxRecord, 'id'>
   syncState!: EntityTable<SyncStateRecord, 'accountId'>
   syncConflicts!: EntityTable<SyncConflictRecord, 'id'>
+  quarantine!: EntityTable<QuarantinedOperationRecord, 'id'>
   migrationHistory!: EntityTable<MigrationRecord, 'id'>
 
   constructor(name = 'apoio-pastoral') {
@@ -114,6 +116,14 @@ export class ApoioDatabase extends Dexie {
         await tabela.put({ ...registro, id: `${registro.accountId}:${registro.id}`, kind: registro.id })
       }
       await transaction.table('migrationHistory').put({ id: 'local-0010-multi-account-vault', version: 10, appliedAt: new Date().toISOString(), checksum: 'sha256:key-envelopes-scoped-by-account' })
+    })
+
+    // Operação recebida que não passa na conferência fica de lado, guardada,
+    // em vez de ser aplicada ou descartada em silêncio. `syncState` ganhou a
+    // marca da primeira sincronização concluída: sem ela, uma falha de rede em
+    // um aparelho novo parecia uma conta vazia.
+    this.version(11).stores({ accounts: 'id, &email, createdAt', keyEnvelopes: 'id, accountId, kind, updatedAt', devices: 'id, accountId, status, createdAt', vaultRecords: 'id, accountId, recordType, version, updatedAt, deletedAt', outbox: 'id, accountId, deviceId, recordId, status, createdAt', syncState: 'accountId, lastSyncedAt', syncConflicts: 'id, accountId, recordId, status, createdAt', quarantine: 'id, accountId, recordId, reason, createdAt', migrationHistory: 'id, version, appliedAt' }).upgrade(async (transaction) => {
+      await transaction.table('migrationHistory').put({ id: 'local-0011-sync-quarantine', version: 11, appliedAt: new Date().toISOString(), checksum: 'sha256:quarantine-and-first-sync-marker' })
     })
   }
 }

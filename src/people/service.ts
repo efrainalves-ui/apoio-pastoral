@@ -1,5 +1,5 @@
 import { currentDeviceId } from '../auth/device'
-import { decryptPayload, encryptPayload } from '../crypto/vault'
+import { decryptRecord, encryptPayload } from '../crypto/vault'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { VaultRecord } from '../db/types'
@@ -15,8 +15,8 @@ export class PeopleService {
   constructor(private readonly database: ApoioDatabase = db) { this.repository = new VaultRepository(database) }
 
   private async decode(record: VaultRecord, masterKey: CryptoKey): Promise<PersonEntity | null> {
-    const payload = await decryptPayload(masterKey, record)
-    if (payload.type !== 'person') return null
+    const payload = await decryptRecord(masterKey, record)
+    if (payload?.type !== 'person') return null
     const data = payload.data as PersonData
     return { id: record.id, ...data, incomeStatus: data.incomeStatus ?? 'unknown', fidelity: normalizeFidelitySnapshot(data.fidelity), fidelityHistory: (data.fidelityHistory ?? []).map((snapshot) => normalizeFidelitySnapshot(snapshot)!) }
   }
@@ -104,8 +104,8 @@ export class PeopleService {
     const person = await this.getPerson(accountId, masterKey, personId)
     if (!person) throw new Error('Pessoa não encontrada.')
     for (const record of await this.repository.list(accountId, 'family')) {
-      const payload = await decryptPayload(masterKey, record)
-      if (payload.type === 'family' && (payload.data as { memberIds: string[] }).memberIds.includes(personId)) throw new Error('Remova a pessoa da família antes de excluir o cadastro.')
+      const payload = await decryptRecord(masterKey, record)
+      if (payload?.type === 'family' && (payload.data as { memberIds: string[] }).memberIds.includes(personId)) throw new Error('Remova a pessoa da família antes de excluir o cadastro.')
     }
     const deletedAt = new Date().toISOString()
     const tombstone = await encryptPayload(masterKey, { schemaVersion: 1, type: 'person_tombstone', data: { deletedAt } }, personId)

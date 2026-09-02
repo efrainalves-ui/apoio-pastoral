@@ -82,8 +82,8 @@ describe('duas contas no mesmo aparelho', () => {
     const banco = novoBanco()
     const a = await registerAccount(CONTA_A.email, CONTA_A.senha, banco)
     const b = await registerAccount(CONTA_B.email, CONTA_B.senha, banco)
-    await guardarRegistro(banco, a.account.id, a.masterKey, 'Pessoa Fictícia da Conta A')
-    await guardarRegistro(banco, b.account.id, b.masterKey, 'Pessoa Fictícia da Conta B')
+    await guardarRegistro(banco, a.account.id, a.keys.master, 'Pessoa Fictícia da Conta A')
+    await guardarRegistro(banco, b.account.id, b.keys.master, 'Pessoa Fictícia da Conta B')
 
     const repositorio = new VaultRepository(banco)
     const deA = await repositorio.list(a.account.id, 'person')
@@ -97,9 +97,9 @@ describe('duas contas no mesmo aparelho', () => {
   it('vai e volta entre A, B e A pedindo a senha e mantendo os dados', async () => {
     const banco = novoBanco()
     const a = await registerAccount(CONTA_A.email, CONTA_A.senha, banco)
-    const registroDeA = await guardarRegistro(banco, a.account.id, a.masterKey, 'Pessoa Fictícia da Conta A')
+    const registroDeA = await guardarRegistro(banco, a.account.id, a.keys.master, 'Pessoa Fictícia da Conta A')
     const b = await registerAccount(CONTA_B.email, CONTA_B.senha, banco)
-    await guardarRegistro(banco, b.account.id, b.masterKey, 'Pessoa Fictícia da Conta B')
+    await guardarRegistro(banco, b.account.id, b.keys.master, 'Pessoa Fictícia da Conta B')
 
     // volta para A informando a senha dela
     const voltaParaA = await unlockAccount(CONTA_A.email, CONTA_A.senha, banco)

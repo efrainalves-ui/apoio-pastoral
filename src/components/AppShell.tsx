@@ -4,6 +4,7 @@ import {
   HeartHandshake,
   Church,
   Home,
+  LockKeyhole,
   LogOut,
   Menu,
   Settings,
@@ -49,7 +50,7 @@ const mobileNav = [
 ]
 
 export function AppShell() {
-  const { account, lock } = useAuthVault()
+  const { account, lock, signOut } = useAuthVault()
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
 
@@ -57,8 +58,19 @@ export function AppShell() {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }, [pathname])
 
+  /**
+   * Sair encerra a sessão no serviço, não só fecha o cofre. Sem isso, o
+   * aparelho continuava autenticado depois de o pastor achar que tinha saído —
+   * o que importa em computador emprestado ou aparelho compartilhado.
+   */
   function leave() {
-    if (window.confirm('Deseja sair do Apoio Pastoral neste dispositivo?')) lock()
+    if (!window.confirm('Sair encerra sua sessão neste aparelho. Para voltar, você entra de novo com e-mail e senha. Deseja sair?')) return
+    void signOut()
+  }
+
+  /** Fechar o cofre sem sair: volta com a senha, sem entrar de novo. */
+  function bloquear() {
+    lock()
   }
 
   return (
@@ -80,6 +92,7 @@ export function AppShell() {
           <div className="account-chip"><span>{account?.email}</span></div>
           <div className="sidebar__footer-actions">
             <NavLink className="icon-button sidebar__settings" to="/app/configuracoes" aria-label="Configurações" onClick={() => setOpen(false)}><Settings /></NavLink>
+            <button type="button" className="icon-button sidebar__settings" onClick={bloquear} aria-label="Bloquear cofre" title="Bloquear cofre"><LockKeyhole /></button>
             <Button variant="secondary" onClick={leave} icon={<LogOut size={18} />}>Sair</Button>
           </div>
         </div>
@@ -94,6 +107,7 @@ export function AppShell() {
             <SyncNowButton compact />
           </div>
           <NavLink className="icon-button app-header__settings" to="/app/configuracoes" aria-label="Configurações"><Settings /></NavLink>
+          <button className="icon-button app-header__leave" aria-label="Bloquear cofre" onClick={bloquear}><LockKeyhole /></button>
           <button className="icon-button app-header__leave" aria-label="Sair" onClick={leave}><LogOut /></button>
         </header>
         <main id="conteudo" className="content" tabIndex={-1}><Outlet /></main>

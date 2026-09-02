@@ -2,7 +2,7 @@ import { AgendaService } from '../agenda/service'
 import { currentDeviceId } from '../auth/device'
 import { CommissionService } from '../commissions/service'
 import type { CommissionAgendaItem, CommissionMeetingData } from '../commissions/types'
-import { decryptPayload, encryptPayload } from '../crypto/vault'
+import { decryptRecord, encryptPayload } from '../crypto/vault'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { VaultRecord } from '../db/types'
@@ -20,7 +20,7 @@ export class NominationService {
   private readonly commissions: CommissionService
   constructor(private readonly database: ApoioDatabase = db) { this.repository = new VaultRepository(database); this.agenda = new AgendaService(database); this.commissions = new CommissionService(database) }
 
-  private async decode(record: VaultRecord, masterKey: CryptoKey): Promise<NominationProcessEntity | null> { const payload = await decryptPayload(masterKey, record); if (payload.type !== 'nomination_process') return null; const data=payload.data as NominationProcessData; return { id: record.id, ...data, vacancyProcesses: data.vacancyProcesses??[], officialVotes:(data.officialVotes??[]).map((vote)=>({...vote,corrections:vote.corrections??[]})) } }
+  private async decode(record: VaultRecord, masterKey: CryptoKey): Promise<NominationProcessEntity | null> { const payload = await decryptRecord(masterKey, record); if (payload?.type !== 'nomination_process') return null; const data=payload.data as NominationProcessData; return { id: record.id, ...data, vacancyProcesses: data.vacancyProcesses??[], officialVotes:(data.officialVotes??[]).map((vote)=>({...vote,corrections:vote.corrections??[]})) } }
   async list(accountId: string, masterKey: CryptoKey, churchId?: string): Promise<NominationProcessEntity[]> { const decoded = await Promise.all((await this.repository.list(accountId, 'nomination_process')).map((record) => this.decode(record, masterKey))); return decoded.filter((item): item is NominationProcessEntity => Boolean(item)).filter((item) => !churchId || item.churchId === churchId).sort((a, b) => b.period.localeCompare(a.period)) }
   async get(accountId: string, masterKey: CryptoKey, id: string): Promise<NominationProcessEntity | null> { const record = await this.database.vaultRecords.get(id); return !record || record.accountId !== accountId || record.deletedAt ? null : this.decode(record, masterKey) }
   private async persist(accountId: string, masterKey: CryptoKey, process: NominationProcessEntity): Promise<NominationProcessEntity> { const data: NominationProcessData = { ...process, updatedAt: now() }; const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'nomination_process', data }, process.id); await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), process.id, envelope, 'nomination_process'); return { id: process.id, ...data } }

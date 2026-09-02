@@ -7,16 +7,60 @@ const AES_GCM_IV_LENGTH = 12
 const MASTER_KEY_AAD = 'apoio-pastoral:key-envelope:v1'
 const RECOVERY_INFO = 'apoio-pastoral:recovery-key:v1'
 
-async function importAesKey(raw: BufferSource, extractable = false): Promise<CryptoKey> {
-  return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM', length: KEY_LENGTH }, extractable, ['encrypt', 'decrypt'])
+const SYNC_MAC_INFO = 'apoio-pastoral:sync-mac:v2'
+
+/**
+ * As duas chaves que o aplicativo mantém abertas enquanto o cofre está
+ * destrancado. Nenhuma das duas é exportável: uma vez abertas, nem o próprio
+ * código consegue tirar os bytes delas da memória do navegador, então uma falha
+ * de script na página não tem como levar a chave embora.
+ *
+ * O material bruto só existe dentro das funções deste arquivo, pelo tempo de
+ * criar ou abrir um envelope, e é zerado logo em seguida.
+ */
+export interface VaultKeys {
+  /** Cifra e decifra o conteúdo dos registros. */
+  master: CryptoKey
+  /** Assina os metadados de cada operação de sincronização. */
+  sync: CryptoKey
 }
 
-async function exportKey(key: CryptoKey): Promise<Uint8Array<ArrayBuffer>> {
-  return new Uint8Array(await crypto.subtle.exportKey('raw', key))
+async function importAesKey(raw: BufferSource): Promise<CryptoKey> {
+  return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM', length: KEY_LENGTH }, false, ['encrypt', 'decrypt'])
 }
 
+/** Chave de autenticação dos metadados, derivada do mesmo segredo do cofre. */
+async function deriveSyncKey(raw: BufferSource): Promise<CryptoKey> {
+  const material = await crypto.subtle.importKey('raw', raw, 'HKDF', false, ['deriveKey'])
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: utf8(MASTER_KEY_AAD), info: utf8(SYNC_MAC_INFO) },
+    material,
+    { name: 'HMAC', hash: 'SHA-256', length: 256 },
+    false,
+    ['sign', 'verify'],
+  )
+}
+
+export async function importVaultKeys(raw: BufferSource): Promise<VaultKeys> {
+  return { master: await importAesKey(raw), sync: await deriveSyncKey(raw) }
+}
+
+/** Segredo do cofre recém-criado. Quem chama zera o buffer depois de usar. */
+export function generateMasterSecret(): Uint8Array<ArrayBuffer> {
+  return randomBytes(KEY_LENGTH / 8)
+}
+
+/** Um cofre novo, com as duas chaves já abertas e o segredo descartado. */
+export async function generateVaultKeys(): Promise<VaultKeys> {
+  const secret = generateMasterSecret()
+  const keys = await importVaultKeys(secret)
+  secret.fill(0)
+  return keys
+}
+
+/** Só a chave que cifra os registros. Atalho usado por teste e por serviço. */
 export async function generateMasterKey(): Promise<CryptoKey> {
-  return crypto.subtle.generateKey({ name: 'AES-GCM', length: KEY_LENGTH }, true, ['encrypt', 'decrypt'])
+  return (await generateVaultKeys()).master
 }
 
 async function derivePasswordKey(password: string, salt: BufferSource, iterations = PASSWORD_KDF_ITERATIONS): Promise<CryptoKey> {
@@ -41,12 +85,12 @@ async function deriveRecoveryKey(recoverySecret: BufferSource, salt: BufferSourc
   )
 }
 
-async function wrapMasterKey(masterKey: CryptoKey, wrappingKey: CryptoKey, aad: string): Promise<CipherEnvelope> {
+async function wrapMasterSecret(secret: BufferSource, wrappingKey: CryptoKey, aad: string): Promise<CipherEnvelope> {
   const iv = randomBytes(AES_GCM_IV_LENGTH)
   const ciphertext = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv, additionalData: utf8(aad), tagLength: 128 },
     wrappingKey,
-    await exportKey(masterKey),
+    secret,
   )
   return {
     algorithm: 'AES-GCM-256',
@@ -57,8 +101,8 @@ async function wrapMasterKey(masterKey: CryptoKey, wrappingKey: CryptoKey, aad: 
   }
 }
 
-async function unwrapMasterKey(envelope: CipherEnvelope, wrappingKey: CryptoKey): Promise<CryptoKey> {
-  const raw = await crypto.subtle.decrypt(
+async function unwrapSecret(envelope: CipherEnvelope, wrappingKey: CryptoKey): Promise<Uint8Array<ArrayBuffer>> {
+  return new Uint8Array(await crypto.subtle.decrypt(
     {
       name: 'AES-GCM',
       iv: fromBase64Url(envelope.iv),
@@ -67,15 +111,14 @@ async function unwrapMasterKey(envelope: CipherEnvelope, wrappingKey: CryptoKey)
     },
     wrappingKey,
     fromBase64Url(envelope.ciphertext),
-  )
-  return importAesKey(raw, true)
+  ))
 }
 
-export async function createPasswordEnvelope(masterKey: CryptoKey, password: string): Promise<PasswordKeyEnvelope> {
+export async function createPasswordEnvelope(secret: BufferSource, password: string): Promise<PasswordKeyEnvelope> {
   const salt = randomBytes(16)
   const passwordKey = await derivePasswordKey(password, salt)
   return {
-    ...(await wrapMasterKey(masterKey, passwordKey, MASTER_KEY_AAD)),
+    ...(await wrapMasterSecret(secret, passwordKey, MASTER_KEY_AAD)),
     kind: 'password',
     kdf: 'PBKDF2-SHA-256',
     iterations: PASSWORD_KDF_ITERATIONS,
@@ -83,22 +126,34 @@ export async function createPasswordEnvelope(masterKey: CryptoKey, password: str
   }
 }
 
-export async function openPasswordEnvelope(envelope: PasswordKeyEnvelope, password: string): Promise<CryptoKey> {
+/**
+ * Abre o cofre e devolve também o segredo bruto, que só serve para criar um
+ * envelope novo (troca de senha). Quem chama zera o buffer logo em seguida.
+ */
+export async function openPasswordVault(envelope: PasswordKeyEnvelope, password: string): Promise<{ keys: VaultKeys; secret: Uint8Array<ArrayBuffer> }> {
+  let secret: Uint8Array<ArrayBuffer>
   try {
     const passwordKey = await derivePasswordKey(password, fromBase64Url(envelope.salt), envelope.iterations)
-    return await unwrapMasterKey(envelope, passwordKey)
+    secret = await unwrapSecret(envelope, passwordKey)
   } catch {
     throw new Error('Senha incorreta. Verifique e tente novamente.')
   }
+  return { keys: await importVaultKeys(secret), secret }
 }
 
-export async function createRecoveryEnvelope(masterKey: CryptoKey): Promise<{ envelope: RecoveryKeyEnvelope; recoveryCode: string }> {
+export async function openPasswordEnvelope(envelope: PasswordKeyEnvelope, password: string): Promise<VaultKeys> {
+  const { keys, secret } = await openPasswordVault(envelope, password)
+  secret.fill(0)
+  return keys
+}
+
+export async function createRecoveryEnvelope(vaultSecret: BufferSource): Promise<{ envelope: RecoveryKeyEnvelope; recoveryCode: string }> {
   const secret = randomBytes(32)
   const salt = randomBytes(16)
   const recoveryKey = await deriveRecoveryKey(secret, salt)
   return {
     envelope: {
-      ...(await wrapMasterKey(masterKey, recoveryKey, `${MASTER_KEY_AAD}:recovery`)),
+      ...(await wrapMasterSecret(vaultSecret, recoveryKey, `${MASTER_KEY_AAD}:recovery`)),
       kind: 'recovery',
       kdf: 'HKDF-SHA-256',
       salt: toBase64Url(salt),
@@ -107,14 +162,22 @@ export async function createRecoveryEnvelope(masterKey: CryptoKey): Promise<{ en
   }
 }
 
-export async function openRecoveryEnvelope(envelope: RecoveryKeyEnvelope, recoveryCode: string): Promise<CryptoKey> {
+export async function openRecoveryVault(envelope: RecoveryKeyEnvelope, recoveryCode: string): Promise<{ keys: VaultKeys; secret: Uint8Array<ArrayBuffer> }> {
+  let secret: Uint8Array<ArrayBuffer>
   try {
     const encodedSecret = recoveryCode.trim().replace(/^APOIO-1-/u, '')
     const recoveryKey = await deriveRecoveryKey(fromBase64Url(encodedSecret), fromBase64Url(envelope.salt))
-    return await unwrapMasterKey(envelope, recoveryKey)
+    secret = await unwrapSecret(envelope, recoveryKey)
   } catch {
     throw new Error('Chave de recuperação inválida.')
   }
+  return { keys: await importVaultKeys(secret), secret }
+}
+
+export async function openRecoveryEnvelope(envelope: RecoveryKeyEnvelope, recoveryCode: string): Promise<VaultKeys> {
+  const { keys, secret } = await openRecoveryVault(envelope, recoveryCode)
+  secret.fill(0)
+  return keys
 }
 
 export async function encryptPayload(masterKey: CryptoKey, payload: VaultPayload, recordId: string): Promise<CipherEnvelope> {
@@ -166,5 +229,27 @@ export async function decryptPayload(masterKey: CryptoKey, envelope: CipherEnvel
     return JSON.parse(fromUtf8(plaintext)) as VaultPayload
   } catch {
     throw new Error('Não foi possível abrir esta informação neste dispositivo.')
+  }
+}
+
+/**
+ * Registros que não abriram neste aparelho, guardados de lado.
+ *
+ * Um único registro corrompido não pode derrubar a lista inteira: antes, uma
+ * falha ao decifrar interrompia a leitura e a tela ficava vazia, o que para o
+ * pastor é indistinguível de perda de todos os dados. Aqui o registro ruim é
+ * pulado, contado e mostrado como aviso, e o resto continua acessível.
+ */
+const corrompidos = new Set<string>()
+
+export function corruptedRecordIds(): string[] { return [...corrompidos] }
+export function forgetCorruptedRecords(): void { corrompidos.clear() }
+
+export async function decryptRecord(masterKey: CryptoKey, envelope: CipherEnvelope & { id?: string }): Promise<VaultPayload | null> {
+  try {
+    return await decryptPayload(masterKey, envelope)
+  } catch {
+    if (envelope.id) corrompidos.add(envelope.id)
+    return null
   }
 }

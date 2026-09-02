@@ -4,11 +4,11 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppShell } from './AppShell'
 
-const auth = vi.hoisted(() => ({ account: { email: 'menu-ficticio@example.invalid' }, lock: vi.fn() }))
+const auth = vi.hoisted(() => ({ account: { email: 'menu-ficticio@example.invalid' }, lock: vi.fn(), signOut: vi.fn(() => Promise.resolve()) }))
 
 vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => auth }))
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); auth.lock.mockReset() })
+afterEach(() => { cleanup(); vi.restoreAllMocks(); auth.lock.mockReset(); auth.signOut.mockReset() })
 
 function renderShell() {
   render(<MemoryRouter initialEntries={['/app']}><Routes><Route path="/app" element={<AppShell />}><Route index element={<div>Início</div>} /></Route></Routes></MemoryRouter>)
@@ -30,7 +30,9 @@ describe('menu do aplicativo', () => {
     expect(screen.getAllByRole('link', { name: 'Configurações' }).length).toBeGreaterThan(0)
   })
 
-  it('pede confirmação antes de sair e preserva a proteção de bloqueio', async () => {
+  it('pede confirmação antes de sair e encerra a sessão no serviço', async () => {
+    // Sair precisa encerrar a sessão, não só fechar o cofre: antes o aparelho
+    // seguia autenticado depois de o pastor achar que tinha saído.
     const user = userEvent.setup()
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderShell()
@@ -38,7 +40,19 @@ describe('menu do aplicativo', () => {
     expect(leaveButton).toBeDefined()
     if (!leaveButton) return
     await user.click(leaveButton)
-    expect(confirm).toHaveBeenCalledWith('Deseja sair do Apoio Pastoral neste dispositivo?')
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('encerra sua sessão'))
+    expect(auth.signOut).toHaveBeenCalledOnce()
+    expect(auth.lock).not.toHaveBeenCalled()
+  })
+
+  it('bloqueia o cofre sem encerrar a sessão', async () => {
+    const user = userEvent.setup()
+    renderShell()
+    const botao = screen.getAllByRole('button', { name: 'Bloquear cofre' })[0]
+    expect(botao).toBeDefined()
+    if (!botao) return
+    await user.click(botao)
     expect(auth.lock).toHaveBeenCalledOnce()
+    expect(auth.signOut).not.toHaveBeenCalled()
   })
 })

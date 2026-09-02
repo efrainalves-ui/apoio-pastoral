@@ -11,11 +11,16 @@ export interface EncryptedOperation {
   schemaVersion: number
   payload: CipherEnvelope
   createdAt: string
+  /** Autenticação dos metadados desta operação, conferida ao receber. */
+  mac?: string
+  macVersion?: number
 }
 
 export interface PullResult {
   operations: EncryptedOperation[]
   cursor: string | null
+  /** Verdadeiro quando o serviço ainda tem páginas depois desta. */
+  hasMore?: boolean
 }
 
 export interface PushResult {
@@ -34,4 +39,6 @@ export interface SyncSummary {
   pushed: number
   pulled: number
   conflicts: number
+  /** Operações recebidas que não passaram na conferência e ficaram de lado. */
+  quarantined: number
 }

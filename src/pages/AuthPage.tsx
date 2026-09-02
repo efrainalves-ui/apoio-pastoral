@@ -8,12 +8,13 @@ import { Field } from '../components/ui/Field'
 type Mode = 'register' | 'unlock' | 'recover'
 
 export function AuthPage() {
-  const { account, accounts, register, unlock, recover, recoveryCode, clearRecoveryCode } = useAuthVault()
+  const { account, accounts, register, unlock, recover, recoveryCode, clearRecoveryCode, awaitingConfirmation, resendConfirmation, sendPasswordReset } = useAuthVault()
   const [mode, setMode] = useState<Mode>(account ? 'unlock' : 'register')
   const [email, setEmail] = useState(account?.email ?? '')
   const [password, setPassword] = useState('')
   const [recovery, setRecovery] = useState('')
   const [error, setError] = useState('')
+  const [aviso, setAviso] = useState('')
   const [busy, setBusy] = useState(false)
   const unlockTab = useRef<HTMLButtonElement>(null)
   const registerTab = useRef<HTMLButtonElement>(null)
@@ -21,6 +22,42 @@ export function AuthPage() {
   function selectMode(nextMode: Extract<Mode, 'register' | 'unlock'>) {
     setMode(nextMode)
     setError('')
+    setAviso('')
+  }
+
+  /**
+   * Redefinir a senha usa o e-mail oficial do serviço. A chave de recuperação
+   * não é enviada por e-mail nenhum: ela é o último recurso, guardada pelo
+   * pastor, e continua sendo necessária para reabrir o cofre num aparelho que
+   * ainda não conhece a conta.
+   */
+  async function redefinirSenha() {
+    setError('')
+    setAviso('')
+    if (!/^\S+@\S+\.\S+$/u.test(email)) { setError('Informe o e-mail da conta para receber o link.'); return }
+    setBusy(true)
+    try {
+      await sendPasswordReset(email)
+      setAviso('Enviamos um link de redefinição para o seu e-mail. Depois de definir a senha nova, entre aqui com ela. Se este aparelho ainda não conhece sua conta, você também vai precisar da chave de recuperação.')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível enviar o link agora.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function reenviarConfirmacao() {
+    setError('')
+    setAviso('')
+    setBusy(true)
+    try {
+      await resendConfirmation(email)
+      setAviso('Confirmação reenviada. Confira sua caixa de entrada e o lixo eletrônico.')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível reenviar agora.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   function moveBetweenTabs(event: KeyboardEvent<HTMLButtonElement>) {
@@ -57,7 +94,8 @@ export function AuthPage() {
           <div className="auth-logo"><KeyRound aria-hidden="true" /></div>
           <p className="eyebrow">Etapa única e obrigatória</p>
           <h1 id="recovery-title">Guarde sua chave de recuperação</h1>
-          <p>Ela permite recuperar sua conta em outro dispositivo. Guarde-a em um local seguro e de acesso pessoal.</p>
+          <p>Ela permite recuperar sua conta em outro dispositivo. Guarde-a em um local seguro e de acesso pessoal. Nunca enviamos esta chave por e-mail.</p>
+          {awaitingConfirmation && <p className="alert alert--success" role="status">Confirme o e-mail desta conta pelo link que acabamos de enviar. Depois disso, entre com o e-mail e a senha que você escolheu.</p>}
           <code className="recovery-code" data-testid="recovery-code">{recoveryCode}</code>
           <Button onClick={() => void navigator.clipboard?.writeText(recoveryCode)} variant="secondary" full>Copiar chave</Button>
           <Button onClick={clearRecoveryCode} full>Já guardei em local seguro</Button>
@@ -90,7 +128,7 @@ export function AuthPage() {
           <div id={mode === 'recover' ? undefined : `auth-panel-${mode}`} role={mode === 'recover' ? undefined : 'tabpanel'} aria-labelledby={mode === 'recover' ? undefined : `auth-tab-${mode}`}>
             <form onSubmit={(event) => void submit(event)} noValidate>
               <Field label="E-mail" name="email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
-              {mode === 'recover' && <Field label="Chave de recuperação" name="recovery" autoComplete="off" required value={recovery} onChange={(event) => setRecovery(event.target.value)} />}
+              {mode === 'recover' && <><p className="field__hint">Use este caminho só quando perdeu a senha e todos os aparelhos. Redefina a senha pelo e-mail primeiro e informe abaixo a senha nova junto da sua chave.</p><Field label="Chave de recuperação" name="recovery" autoComplete="off" required value={recovery} onChange={(event) => setRecovery(event.target.value)} /></>}
               <Field
                 label={mode === 'recover' ? 'Senha da conta' : 'Senha'}
                 name="password"
@@ -103,10 +141,13 @@ export function AuthPage() {
                 onChange={(event) => setPassword(event.target.value)}
               />
               {error && <div className="alert alert--error" role="alert">{error}</div>}
+              {aviso && <div className="alert alert--success" role="status">{aviso}</div>}
               <Button type="submit" full disabled={busy}>{busy ? 'Processando…' : mode === 'register' ? 'Criar conta' : mode === 'recover' ? 'Recuperar acesso' : 'Entrar'}</Button>
               {mode === 'register' && <p className="auth-privacy">Sua conta cuida só do seu distrito. <a href="/privacidade">Como cuidamos dos dados</a></p>}
             </form>
           </div>
+          {hasSupabaseConfiguration && mode === 'unlock' && <button className="text-button" type="button" onClick={() => void redefinirSenha()} disabled={busy}>Esqueci minha senha</button>}
+          {hasSupabaseConfiguration && mode === 'unlock' && <button className="text-button" type="button" onClick={() => void reenviarConfirmacao()} disabled={busy}>Reenviar confirmação de e-mail</button>}
           {(account || hasSupabaseConfiguration) && mode !== 'recover' && <button className="text-button" onClick={() => setMode('recover')}>Usar chave de recuperação</button>}
           {mode === 'recover' && <button className="text-button" onClick={() => selectMode('unlock')}>Voltar para o acesso</button>}
         </div>

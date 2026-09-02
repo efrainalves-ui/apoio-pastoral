@@ -1,5 +1,5 @@
 import { currentDeviceId } from '../auth/device'
-import { decryptPayload, encryptPayload } from '../crypto/vault'
+import { decryptRecord, encryptPayload } from '../crypto/vault'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { VaultRecord } from '../db/types'
@@ -54,8 +54,8 @@ export class DistrictService {
     const records = await this.repository.list(accountId)
     const matches: DecryptedRecord<T>[] = []
     for (const record of records) {
-      const payload = await decryptPayload(masterKey, record)
-      if (payload.type === type) matches.push({ record, data: payload.data as T })
+      const payload = await decryptRecord(masterKey, record)
+      if (payload?.type === type) matches.push({ record, data: payload.data as T })
     }
     return matches
   }

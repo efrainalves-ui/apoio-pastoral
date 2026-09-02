@@ -5,7 +5,10 @@ import {
   decryptPayload,
   encryptPayload,
   generateMasterKey,
+  generateMasterSecret,
+  importVaultKeys,
   openPasswordEnvelope,
+  openPasswordVault,
   openRecoveryEnvelope,
 } from './vault'
 
@@ -24,31 +27,40 @@ describe('cofre criptográfico', () => {
   })
 
   it('recusa senha incorreta', async () => {
-    const key = await generateMasterKey()
-    const envelope = await createPasswordEnvelope(key, 'senha-ficticia-correta')
+    const envelope = await createPasswordEnvelope(generateMasterSecret(), 'senha-ficticia-correta')
 
     await expect(openPasswordEnvelope(envelope, 'senha-ficticia-incorreta')).rejects.toThrow('Senha incorreta')
   })
 
   it('abre a mesma chave mestra com o código de recuperação', async () => {
-    const key = await generateMasterKey()
-    const recovery = await createRecoveryEnvelope(key)
-    const recoveredKey = await openRecoveryEnvelope(recovery.envelope, recovery.recoveryCode)
-    const envelope = await encryptPayload(key, { schemaVersion: 1, type: 'foundation_fixture', data: 'fixture' }, 'fixture-2')
+    const secret = generateMasterSecret()
+    const keys = await importVaultKeys(secret)
+    const recovery = await createRecoveryEnvelope(secret)
+    const recovered = await openRecoveryEnvelope(recovery.envelope, recovery.recoveryCode)
+    const envelope = await encryptPayload(keys.master, { schemaVersion: 1, type: 'foundation_fixture', data: 'fixture' }, 'fixture-2')
 
-    await expect(decryptPayload(recoveredKey, envelope)).resolves.toMatchObject({ data: 'fixture' })
+    await expect(decryptPayload(recovered.master, envelope)).resolves.toMatchObject({ data: 'fixture' })
   })
 
   it('permite trocar a senha sem recriptografar os dados', async () => {
-    const key = await generateMasterKey()
-    const dataEnvelope = await encryptPayload(key, { schemaVersion: 1, type: 'foundation_fixture', data: 'imutável' }, 'fixture-3')
-    const oldEnvelope = await createPasswordEnvelope(key, 'senha-ficticia-antiga')
-    const unlocked = await openPasswordEnvelope(oldEnvelope, 'senha-ficticia-antiga')
-    const newEnvelope = await createPasswordEnvelope(unlocked, 'senha-ficticia-nova')
+    const secret = generateMasterSecret()
+    const keys = await importVaultKeys(secret)
+    const dataEnvelope = await encryptPayload(keys.master, { schemaVersion: 1, type: 'foundation_fixture', data: 'imutável' }, 'fixture-3')
+    const oldEnvelope = await createPasswordEnvelope(secret, 'senha-ficticia-antiga')
+    const aberto = await openPasswordVault(oldEnvelope, 'senha-ficticia-antiga')
+    const newEnvelope = await createPasswordEnvelope(aberto.secret, 'senha-ficticia-nova')
     const reopened = await openPasswordEnvelope(newEnvelope, 'senha-ficticia-nova')
 
-    await expect(decryptPayload(reopened, dataEnvelope)).resolves.toMatchObject({ data: 'imutável' })
+    await expect(decryptPayload(reopened.master, dataEnvelope)).resolves.toMatchObject({ data: 'imutável' })
     await expect(openPasswordEnvelope(newEnvelope, 'senha-ficticia-antiga')).rejects.toThrow()
+  })
+
+  it('mantém as chaves do cofre fora do alcance de quem só tem a página', async () => {
+    const keys = await importVaultKeys(generateMasterSecret())
+
+    expect(keys.master.extractable).toBe(false)
+    expect(keys.sync.extractable).toBe(false)
+    await expect(crypto.subtle.exportKey('raw', keys.master)).rejects.toThrow()
   })
 })
 

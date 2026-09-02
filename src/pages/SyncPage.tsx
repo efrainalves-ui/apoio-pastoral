@@ -12,7 +12,7 @@ import { createSyncTransport } from '../sync/transport'
 import type { SyncSummary } from '../sync/types'
 
 export function SyncPage() {
-  const { account } = useAuthVault()
+  const { account, syncKey } = useAuthVault()
   const transport = useMemo(() => createSyncTransport(), [])
   const service = useMemo(() => new SyncService(transport), [transport])
   const [pending, setPending] = useState(0)
@@ -34,11 +34,11 @@ export function SyncPage() {
   useEffect(() => { void refresh() }, [refresh])
 
   async function synchronize() {
-    if (!account) return
+    if (!account || !syncKey) return
     setBusy(true)
     setError('')
     try {
-      setSummary(await service.synchronize(account.id, currentDeviceId(account.id)))
+      setSummary(await service.synchronize(account.id, currentDeviceId(account.id), syncKey))
       await refresh()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível sincronizar.')

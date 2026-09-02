@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createPasswordEnvelope, decryptPayload, encryptPayload, generateMasterKey } from '../crypto/vault'
+import { createPasswordEnvelope, decryptPayload, encryptPayload, generateMasterSecret, importVaultKeys } from '../crypto/vault'
 import { ApoioDatabase } from '../db/database'
 import { keyEnvelopeId } from '../db/types'
 
@@ -19,13 +19,14 @@ async function loadRemoteSession(passwordEnvelope: Awaited<ReturnType<typeof cre
     existeEnvelope: true,
     guardados: [] as unknown[],
     signIn: vi.fn(() => Promise.resolve('00000000-0000-4000-8000-000000000001')),
-    authorize: vi.fn(() => Promise.resolve()),
+    authorize: vi.fn(() => Promise.resolve('active')),
   }
   vi.doMock('./supabase', () => ({
     hasSupabaseConfiguration: true,
     signInRemoteAccount: remote.signIn,
     fetchRemotePasswordEnvelope: vi.fn(() => Promise.resolve(remote.envelope)),
     ensureRemoteDevice: remote.authorize,
+    currentRemoteAccountId: vi.fn(() => Promise.resolve('00000000-0000-4000-8000-000000000001')),
     registerRemoteAccount: vi.fn(),
     hasRemotePasswordEnvelope: vi.fn(() => Promise.resolve(remote.existeEnvelope)),
     storeRemotePasswordEnvelope: vi.fn((envelope: unknown) => { remote.guardados.push(envelope); return Promise.resolve() }),
@@ -41,14 +42,15 @@ async function loadRemoteSession(passwordEnvelope: Awaited<ReturnType<typeof cre
 describe('entrada remota em novo dispositivo', () => {
   it('abre o cofre com e-mail e senha e registra uma instalação nova', async () => {
     const password = 'senha-ficticia-segura-2026'
-    const masterKey = await generateMasterKey()
-    const envelope = await createPasswordEnvelope(masterKey, password)
+    const secret = generateMasterSecret()
+    const masterKey = (await importVaultKeys(secret)).master
+    const envelope = await createPasswordEnvelope(secret, password)
     const { remote, session } = await loadRemoteSession(envelope)
     const database = new ApoioDatabase(`remote-session-${crypto.randomUUID()}`)
     databases.push(database)
 
     const result = await session.unlockAccount('conta.ficticia@example.invalid', password, database)
-    const payload = await decryptPayload(result.masterKey, await encryptPayload(masterKey, { schemaVersion: 1, type: 'test', data: { fictional: true } }, '00000000-0000-4000-8000-000000000011'))
+    const payload = await decryptPayload(result.keys.master, await encryptPayload(masterKey, { schemaVersion: 1, type: 'test', data: { fictional: true } }, '00000000-0000-4000-8000-000000000011'))
 
     expect(result.account).toMatchObject({ id: '00000000-0000-4000-8000-000000000001', authMode: 'supabase' })
     expect(payload).toMatchObject({ type: 'test', data: { fictional: true } })
@@ -57,29 +59,44 @@ describe('entrada remota em novo dispositivo', () => {
     expect(remote.authorize).toHaveBeenCalledTimes(1)
   })
 
-  it('deixa a instalação nova aguardando confirmação antes de sincronizar', async () => {
-    // A senha abre o cofre, mas liberar a sincronização ainda depende do aval
-    // de um aparelho que já estava valendo.
+  it('entra normalmente em um aparelho novo com e-mail e senha', async () => {
+    // Quem decide a situação do aparelho é o serviço. O aplicativo apenas
+    // espelha a resposta: declarar-se ativo por conta própria era justamente o
+    // que um cliente alterado poderia fazer.
     const password = 'senha-ficticia-segura-2026'
-    const masterKey = await generateMasterKey()
-    const envelope = await createPasswordEnvelope(masterKey, password)
+    const secret = generateMasterSecret()
+    const envelope = await createPasswordEnvelope(secret, password)
     const { remote, session } = await loadRemoteSession(envelope)
-    const database = new ApoioDatabase(`remote-pending-${crypto.randomUUID()}`)
+    const database = new ApoioDatabase(`remote-novo-aparelho-${crypto.randomUUID()}`)
     databases.push(database)
 
     await session.unlockAccount('conta.ficticia@example.invalid', password, database)
 
     const dispositivo = await database.devices.toCollection().first()
-    expect(dispositivo?.status).toBe('pending')
-    expect(remote.authorize).toHaveBeenCalledWith(dispositivo?.id, expect.any(String), 'pending')
+    expect(dispositivo?.status).toBe('active')
+    expect(remote.authorize).toHaveBeenCalledWith(dispositivo?.id, expect.any(String))
+  })
+
+  it('espelha a situação que o serviço devolve, mesmo quando é pendente', async () => {
+    const password = 'senha-ficticia-segura-2026'
+    const secret = generateMasterSecret()
+    const envelope = await createPasswordEnvelope(secret, password)
+    const { remote, session } = await loadRemoteSession(envelope)
+    remote.authorize.mockImplementation(() => Promise.resolve('pending'))
+    const database = new ApoioDatabase(`remote-pending-${crypto.randomUUID()}`)
+    databases.push(database)
+
+    await session.unlockAccount('conta.ficticia@example.invalid', password, database)
+
+    expect((await database.devices.toCollection().first())?.status).toBe('pending')
   })
 
   it('prepara o envelope remoto a partir de um aparelho que ainda entra', async () => {
     // Conta criada antes do envelope remoto: sem esta recuperação, entrar em um
     // navegador novo exigiria a chave de recuperação para sempre.
     const password = 'senha-ficticia-segura-2026'
-    const masterKey = await generateMasterKey()
-    const envelope = await createPasswordEnvelope(masterKey, password)
+    const secret = generateMasterSecret()
+    const envelope = await createPasswordEnvelope(secret, password)
     const { remote, session } = await loadRemoteSession(envelope)
     remote.existeEnvelope = false
     const database = new ApoioDatabase(`remote-backfill-${crypto.randomUUID()}`)
@@ -98,8 +115,8 @@ describe('entrada remota em novo dispositivo', () => {
 
   it('não regrava o envelope quando o serviço já tem um', async () => {
     const password = 'senha-ficticia-segura-2026'
-    const masterKey = await generateMasterKey()
-    const envelope = await createPasswordEnvelope(masterKey, password)
+    const secret = generateMasterSecret()
+    const envelope = await createPasswordEnvelope(secret, password)
     const { remote, session } = await loadRemoteSession(envelope)
     const database = new ApoioDatabase(`remote-sem-regravar-${crypto.randomUUID()}`)
     databases.push(database)
