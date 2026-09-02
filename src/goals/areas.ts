@@ -1,4 +1,4 @@
-import type { GoalEntity, GoalEntryEntity, GoalMetric } from './types'
+import type { GoalEntity, GoalEntryEntity, GoalHistoryEntity, GoalMetric } from './types'
 
 /** As quatro metas que o pastor acompanha. */
 export type GoalArea = 'financial' | 'baptisms' | 'bible_studies' | 'uapg'
@@ -43,6 +43,8 @@ export interface AreaSources {
   entries: GoalEntryEntity[]
   studies: Array<{ churchId: string; startedAt: string }>
   uapgs: Array<{ churchId: string; createdAt: string; active: boolean }>
+  /** Resultados de anos fechados, guardados só para comparação. */
+  history?: GoalHistoryEntity[]
 }
 
 export interface AreaResult { churchId: string; date: string; amount: number }
@@ -129,4 +131,28 @@ export function churchProgress(area: GoalArea, goals: GoalEntity[], sources: Are
     const result = resultados.filter((item) => item.churchId === churchId).reduce((soma, item) => soma + item.amount, 0)
     return { churchId, target, result, percent: target > 0 ? Math.min(100, Math.round((result / target) * 100)) : 0 }
   })
+}
+
+/**
+ * Resultado de um ano já encerrado. Vale o consolidado que o pastor registrou;
+ * sem ele, vale o que estiver lançado naquele ano. Nunca soma os dois.
+ */
+export function previousResult(area: GoalArea, sources: AreaSources, year: number): number {
+  const consolidado = (sources.history ?? []).find((item) => item.area === area && item.year === year)
+  if (consolidado) return consolidado.amount
+  return areaResults(area, sources, year).reduce((soma, item) => soma + item.amount, 0)
+}
+
+export interface AreaComparison extends AreaProgress {
+  /** Resultado do ano anterior, quando existe. */
+  previous: number
+  hasPrevious: boolean
+  /** Diferença do ano corrente para o anterior. */
+  difference: number
+}
+
+export function areaComparison(area: GoalArea, goals: GoalEntity[], sources: AreaSources, year: number): AreaComparison {
+  const progresso = areaProgress(area, goals, sources, year)
+  const previous = previousResult(area, sources, year - 1)
+  return { ...progresso, previous, hasPrevious: previous > 0, difference: progresso.result - previous }
 }

@@ -74,7 +74,7 @@ export interface CampaignFollowUp { id: string; type: FollowUpType; recordId: st
 export type AdditionalSchedule = 'none' | 'daily' | 'weekly'
 export interface EvangelismCampaignData {
   name: string; objective: CampaignObjective; churchIds: string[]; startDate: string; endDate: string; location: string; address: string; responsibleGeneral: string; mainSpeaker: string; team: TeamAssignment[]; status: CampaignStatus; description: string; notes: string
-  goalId: string | null; planningAreas: PlanningArea[]; additionalSchedule: AdditionalSchedule; mainAgendaEventId: string | null; additionalAgendaEventIds: string[]
+  goalId: string | null; /** Toda campanha nova se apoia numa meta de estudos bíblicos e numa de batismos. */ studyGoalId?: string | null; baptismGoalId?: string | null; planningAreas: PlanningArea[]; additionalSchedule: AdditionalSchedule; mainAgendaEventId: string | null; additionalAgendaEventIds: string[]
   points: EvangelismPoint[]; tasks: EvangelismTask[]; checklist: CampaignChecklistItem[]; plannedBudget: number; budgetItems: CampaignBudgetItem[]; followUps: CampaignFollowUp[]; learnings: string; history: HistoryEntry[]; createdAt: string; updatedAt: string
 }
 export interface EvangelismCampaignEntity extends EvangelismCampaignData { id: string }

@@ -70,6 +70,13 @@ Concluída a criação e restauração de backup local cifrado. O arquivo conté
 - A Agenda aceita Batismo, Santa Ceia, Casamento e Dedicação de criança, com responsável, pessoas aplicáveis e checklists próprios. Os compromissos continuam no mesmo fluxo de Dia, Semana, Mês e Lista; nenhum documento civil ou certificado foi criado.
 - Em 27 de agosto de 2026, lint, TypeScript, build, PWA e 134 testes Vitest em 46 arquivos foram aprovados. O Playwright permanece pendente no CI Linux porque o Chromium headless foi bloqueado pelo sandbox macOS antes de abrir qualquer página.
 
+## Etapa estável: comparação com o ano anterior e campanhas ligadas às metas
+
+- Metas guarda o resultado consolidado de um ano já encerrado para Financeiro e Batismos, em registro próprio. Ele serve só para comparação: não vira lançamento, não altera meta e não entra no resultado do ano corrente. Sem consolidado registrado, vale o que estiver lançado naquele ano — nunca os dois somados.
+- A tela de cada meta mostra resultado do ano anterior, meta do ano, resultado atual, percentual, quanto falta e a diferença para o ano anterior. Os cartões de Metas e o resumo da tela inicial trazem a mesma comparação em uma linha.
+- Toda campanha nova nasce com pelo menos uma igreja envolvida e ligada a uma meta de estudos bíblicos e a uma meta de batismos, escolhidas entre as existentes ou criadas ali mesmo. A campanha mostra as metas ligadas com o resultado real da área, sem lançamento duplicado. Campanhas antigas continuam abrindo e salvando; excluir uma meta solta o vínculo e preserva a campanha.
+- Planejamento Anual, Nova meta do planejamento, Evangelismo e Nova campanha perderam os textos explicativos que poluíam a leitura. A tela interna da campanha ficou com blocos mais próximos, tipografia padronizada, itens de checklist equilibrados com ações discretas de editar e excluir, e o botão Acrescentar item visível, com contraste conferido no claro e no escuro.
+
 ## Etapa estável: Registrar visita e Pedidos de Oração
 
 - A tela de registrar visita ficou com os títulos dos blocos e os campos, sem os textos explicativos que poluíam a leitura. Nada do funcionamento mudou: igreja, membros visitados, perguntas, anotações, pedido de oração, acompanhamento e tarefa continuam iguais.

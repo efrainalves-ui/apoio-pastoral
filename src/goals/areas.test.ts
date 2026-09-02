@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { GoalEntity, GoalEntryEntity } from './types'
-import { areaProgress, areaResults, churchProgress, monthlyResults, type AreaSources } from './areas'
+import type { GoalEntity, GoalEntryEntity, GoalHistoryEntity } from './types'
+import { areaComparison, areaProgress, areaResults, churchProgress, monthlyResults, previousResult, type AreaSources } from './areas'
 
 const ANO = 2026
 const IGREJA_A = 'igreja-ficticia-a'
@@ -114,5 +114,43 @@ describe('metas que aproveitam o que já está cadastrado', () => {
     const sources: AreaSources = { ...vazio, entries: [lancamento({ metric: 'bible_studies', amount: 99 })] }
 
     expect(areaResults('bible_studies', sources, ANO)).toEqual([])
+  })
+})
+
+describe('comparação com o ano anterior', () => {
+  const historico = (partes: Partial<GoalHistoryEntity>): GoalHistoryEntity => ({ id: crypto.randomUUID(), area: 'baptisms', year: 2025, amount: 30, source: 'manual', reference: 'Consolidado 2025', createdAt: '', updatedAt: '', ...partes })
+
+  it('usa o consolidado registrado do ano fechado', () => {
+    const sources: AreaSources = { ...vazio, history: [historico({})] }
+
+    expect(previousResult('baptisms', sources, 2025)).toBe(30)
+  })
+
+  // Sem consolidado, vale o que estiver lançado naquele ano — nunca os dois somados.
+  it('cai para os lançamentos do ano quando não há consolidado', () => {
+    const sources: AreaSources = { ...vazio, entries: [lancamento({ date: '2025-04-10', amount: 4 }), lancamento({ date: '2025-06-10', amount: 3 })] }
+
+    expect(previousResult('baptisms', sources, 2025)).toBe(7)
+    expect(previousResult('baptisms', { ...sources, history: [historico({ amount: 30 })] }, 2025)).toBe(30)
+  })
+
+  it('não deixa o histórico mexer no resultado do ano corrente', () => {
+    const sources: AreaSources = { ...vazio, history: [historico({ amount: 30 })], entries: [lancamento({ date: '2026-03-10', amount: 5 })] }
+    const comparacao = areaComparison('baptisms', [meta({ target: 40, metric: 'baptisms' })], sources, ANO)
+
+    expect(comparacao.result).toBe(5)
+    expect(comparacao.target).toBe(40)
+    expect(comparacao.missing).toBe(35)
+    expect(comparacao.percent).toBe(13)
+    expect(comparacao.previous).toBe(30)
+    expect(comparacao.difference).toBe(-25)
+    expect(comparacao.hasPrevious).toBe(true)
+  })
+
+  it('avisa quando ainda não há ano anterior registrado', () => {
+    const comparacao = areaComparison('financial', [], vazio, ANO)
+
+    expect(comparacao.hasPrevious).toBe(false)
+    expect(comparacao.previous).toBe(0)
   })
 })

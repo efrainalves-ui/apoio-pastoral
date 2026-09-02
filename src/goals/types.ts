@@ -5,3 +5,11 @@ export interface GoalEntryData { churchId: string; metric: GoalMetric; date: str
 export interface GoalEntryEntity extends GoalEntryData { id: string }
 export interface GoalImportPreview { hash: string; entries: Omit<GoalEntryData, 'source' | 'createdAt'>[]; errors: string[] }
 export const GOAL_LABELS: Record<GoalMetric, string> = { tithes_offerings: 'Dízimos e ofertas', baptisms: 'Batismos', rebaptisms: 'Rebatismos', professions_faith: 'Profissões de fé', bible_studies: 'Estudos Bíblicos', uapg: 'UAPG' }
+
+/**
+ * Resultado consolidado de um ano anterior, guardado só para comparação.
+ * Ele não entra nos lançamentos do ano corrente e não altera nenhuma meta.
+ */
+export interface GoalHistoryData { area: 'financial' | 'baptisms'; year: number; amount: number; source: 'manual' | 'pdf'; reference: string; createdAt: string; updatedAt: string }
+export interface GoalHistoryEntity extends GoalHistoryData { id: string }
+export const HISTORY_AREAS: Array<GoalHistoryData['area']> = ['financial', 'baptisms']

@@ -50,7 +50,7 @@ h1, h2, h3, .brand strong { font-family: ui-rounded, "SF Pro Rounded", Inter, ui
 .button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 18px rgb(16 47 41 / 14%); }
 .button:disabled { opacity: .55; cursor: not-allowed; }
 .button--primary { background: var(--green-900); color: white; }
-.button--secondary { border-color: #cdd8d2; background: transparent; color: var(--green-900); }
+.button--secondary { border-color: #7f958d; background: transparent; color: var(--green-900); }
 .button--quiet { background: var(--green-50); color: var(--green-900); }
 .button--danger { background: #f9e7e5; color: #8d2924; }
 .button--full { width: 100%; }
@@ -746,7 +746,21 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .campaign-form-section { display: grid; gap: 14px; }
 .checklist-list { display: grid; gap: 7px; }
 .checklist-list > div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 5px; align-items: center; }
-.checklist-list .confirmation-check { min-width: 0; }
+.checklist-list .confirmation-check { min-width: 0; margin: 0; padding: 11px 13px; align-items: center; }
+.checklist-list .icon-button { width: 40px; height: 40px; color: var(--muted); }
+.checklist-list .icon-button:hover { color: var(--green-900); background: var(--green-50); }
+.checklist-add { margin-top: 14px; }
+.linked-goal-list { display: grid; gap: 10px; }
+
+/* Tela interna da campanha: blocos mais próximos e tipografia igual entre eles. */
+.campaign-detail { gap: 18px; }
+.campaign-detail .campaign-main, .campaign-detail .campaign-aside { gap: 14px; }
+.campaign-detail .card { padding: 20px; }
+.campaign-detail h3 { margin: 18px 0 10px; font-size: 1rem; letter-spacing: -.01em; }
+.campaign-detail small { font-size: .78rem; }
+.campaign-detail .card > .field:first-of-type { margin-top: 0; }
+.campaign-detail .confirmation-check { margin: 12px 0; }
+
 
 .template-editor { display: grid; gap: 10px; margin-top: 14px; }
 .template-editor__text { min-height: 260px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .86rem; line-height: 1.55; white-space: pre-wrap; }
@@ -1063,7 +1077,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   .auth-panel .text-button { color: #9ed4bd; }
   .bottom-nav { background: rgb(22 33 29 / 96%); }
   .page-hero h1 { color: #eef5f1; }
-  .button--secondary { color: #d9e7e1; border-color: #46564f; }
+  .button--secondary { color: #d9e7e1; border-color: #6d8279; }
   .scope-note { color: #dbc58f; background: #3c3322; }
   .privacy-list__blocked { background: #332d21; }
   .danger-card { background: #2c201f; border-color: #70423f; }
@@ -1079,6 +1093,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   .commission-type-card__icon, .commission-kind-page__icon { color: #d9eee5; background: #29463a; }
   .commission-return-note { color: #d9eee5; background: #1e3a30; border-color: #4f7565; }
   .button--secondary:disabled { color: #a6b4ae; border-color: #46564f; opacity: .72; }
+  .checklist-add { background: rgb(255 255 255 / 6%); }
   .budget-metrics .negative { background: #3b2523; border-color: #744b47; }
   .budget-tithe-note, .budget-tithe-choice { color: #ead9a7; background: #342e20; border-color: #756339; }
   .budget-tithe-choice small { color: #d5c28c; }

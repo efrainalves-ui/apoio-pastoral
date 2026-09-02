@@ -1,6 +1,6 @@
 import { Flag } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { GOAL_AREAS, GOAL_AREA_SHORT, areaProgress } from '../goals/areas'
+import { GOAL_AREAS, GOAL_AREA_SHORT, areaComparison } from '../goals/areas'
 import { formatGoalValue } from '../goals/format'
 import { useGoalSources } from '../goals/useGoalSources'
 import { Card } from './ui/Card'
@@ -15,13 +15,14 @@ export function GoalsSummary() {
     <Card title="Metas do ano" eyebrow={String(year)} action={<Flag />}>
       <div className="goal-summary">
         {GOAL_AREAS.map((area) => {
-          const progresso = areaProgress(area, goals, sources, year)
+          const progresso = areaComparison(area, goals, sources, year)
           return (
             <Link key={area} to={`/app/metas/${area}`} className="goal-summary__item">
               <span className="goal-summary__name">{GOAL_AREA_SHORT[area]}</span>
               <span className="goal-summary__percent">{progresso.target > 0 ? `${progresso.percent}%` : '—'}</span>
               <span className="goal-bar"><span style={{ width: `${progresso.percent}%` }} /></span>
               <small>{formatGoalValue(area, progresso.result)}{progresso.target > 0 ? ` · faltam ${formatGoalValue(area, progresso.missing)}` : ' · meta a definir'}</small>
+              {progresso.hasPrevious && <small>{year - 1}: {formatGoalValue(area, progresso.previous)}</small>}
             </Link>
           )
         })}

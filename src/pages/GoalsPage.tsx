@@ -1,7 +1,7 @@
 import { Flag } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/ui/Card'
-import { GOAL_AREAS, GOAL_AREA_LABELS, areaProgress } from '../goals/areas'
+import { GOAL_AREAS, GOAL_AREA_LABELS, areaComparison } from '../goals/areas'
 import { useGoalSources } from '../goals/useGoalSources'
 import { formatGoalValue } from '../goals/format'
 
@@ -19,7 +19,7 @@ export function GoalsPage() {
       </header>
       <div className="goal-cards">
         {GOAL_AREAS.map((area) => {
-          const progresso = areaProgress(area, goals, sources, year)
+          const progresso = areaComparison(area, goals, sources, year)
           return (
             <Card key={area} title={GOAL_AREA_LABELS[area]}>
               <div className="goal-card">
@@ -30,6 +30,7 @@ export function GoalsPage() {
                 </div>
                 <div className="goal-bar" role="img" aria-label={`${progresso.percent}% da meta`}><span style={{ width: `${progresso.percent}%` }} /></div>
                 <p className="goal-card__percent">{progresso.target > 0 ? `${progresso.percent}% alcançado` : 'Defina a meta do ano para acompanhar'}</p>
+                {progresso.hasPrevious && <p className="goal-card__percent">{year - 1}: {formatGoalValue(area, progresso.previous)} · {progresso.difference >= 0 ? '+' : '−'}{formatGoalValue(area, Math.abs(progresso.difference))} neste ano</p>}
                 <Link className="button button--secondary" to={`/app/metas/${area}`}>Acompanhar</Link>
               </div>
             </Card>

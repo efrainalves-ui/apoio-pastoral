@@ -35,7 +35,7 @@ export interface DeviceRecord {
 export interface VaultRecord extends CipherEnvelope {
   id: string
   accountId: string
-  recordType: 'foundation_fixture' | 'district' | 'church' | 'person' | 'family' | 'import_batch' | 'agenda_event' | 'sermon' | 'goal' | 'goal_entry' | 'visit' | 'prayer_request' | 'follow_up' | 'task' | 'visit_round' | 'interest' | 'bible_study' | 'missionary_pair' | 'sabbath_class' | 'small_group' | 'uapg' | 'commission_config' | 'commission_meeting' | 'commission_task' | 'nomination_process' | 'annual_goal' | 'evangelism_campaign' | 'encrypted'
+  recordType: 'foundation_fixture' | 'district' | 'church' | 'person' | 'family' | 'import_batch' | 'agenda_event' | 'sermon' | 'goal' | 'goal_entry' | 'goal_history' | 'visit' | 'prayer_request' | 'follow_up' | 'task' | 'visit_round' | 'interest' | 'bible_study' | 'missionary_pair' | 'sabbath_class' | 'small_group' | 'uapg' | 'commission_config' | 'commission_meeting' | 'commission_task' | 'nomination_process' | 'annual_goal' | 'evangelism_campaign' | 'encrypted'
   version: number
   createdAt: string
   updatedAt: string

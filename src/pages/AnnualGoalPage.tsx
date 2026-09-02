@@ -8,7 +8,7 @@ import { Card } from '../components/ui/Card'
 import { Field } from '../components/ui/Field'
 import { EvangelismPlanningService } from '../evangelism/service'
 import { LINKABLE_AREAS } from '../evangelism/goalTracking'
-import { PLANNING_AREAS, PLANNING_AREA_DESCRIPTIONS, PLANNING_AREA_LABELS, type AnnualGoalInput, type PlanningArea } from '../evangelism/types'
+import { PLANNING_AREAS, PLANNING_AREA_LABELS, type AnnualGoalInput, type PlanningArea } from '../evangelism/types'
 import { GOAL_AREA_LABELS, type GoalArea } from '../goals/areas'
 
 const service = new EvangelismPlanningService()
@@ -57,7 +57,6 @@ export function AnnualGoalPage() {
     <header className="page-hero"><div>
       <p className="eyebrow">Planejamento Anual</p>
       <h1>{goalId ? 'Editar meta do planejamento' : 'Nova meta do planejamento'}</h1>
-      <p>Toda meta é do distrito. Depois de salvar, você acompanha o resultado e divide entre as igrejas se quiser.</p>
     </div></header>
     {error && <div className="alert alert--error" role="alert">{error}</div>}
     <form onSubmit={save}>
@@ -69,7 +68,6 @@ export function AnnualGoalPage() {
             <select id="annual-goal-area" className="field__input" value={draft.area} onChange={(event) => setDraft({ ...draft, area: event.target.value as PlanningArea })}>
               {PLANNING_AREAS.map((area) => <option value={area} key={area}>{PLANNING_AREA_LABELS[area]}</option>)}
             </select>
-            <small className="field__hint">{PLANNING_AREA_DESCRIPTIONS[draft.area]}</small>
           </label>
           <label className="field" htmlFor="annual-goal-link">
             <span className="field__label">Ligar a uma meta acompanhada (opcional)</span>
@@ -77,11 +75,10 @@ export function AnnualGoalPage() {
               <option value="">Sem ligação</option>
               {LINKABLE_AREAS.map((area) => <option value={area} key={area}>{GOAL_AREA_LABELS[area]}</option>)}
             </select>
-            <small className="field__hint">Ligando, o resultado vem sozinho de Metas. Você não lança a mesma informação duas vezes.</small>
           </label>
           <Field label="Data de início" name="annual-goal-start" type="date" value={draft.startDate ?? ''} onChange={(event) => setDraft({ ...draft, startDate: event.target.value })} required />
           <Field label="Data de fim" name="annual-goal-due" type="date" value={draft.dueDate} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value })} required />
-          <Field label="Quantidade esperada" name="annual-goal-target" type="number" min={0} step="any" value={draft.target ?? 0} onChange={(event) => setDraft({ ...draft, target: Number(event.target.value) })} hint="Quanto o distrito quer alcançar dentro do período." />
+          <Field label="Quantidade esperada" name="annual-goal-target" type="number" min={0} step="any" value={draft.target ?? 0} onChange={(event) => setDraft({ ...draft, target: Number(event.target.value) })} />
         </div>
       </Card>
       <div className="form-actions">

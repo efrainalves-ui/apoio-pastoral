@@ -21,6 +21,13 @@ afterEach(async () => {
   localStorage.clear()
 })
 
+/** Toda campanha nova precisa das duas metas ligadas; aqui elas são fictícias. */
+async function metasLigadas(service: EvangelismPlanningService, key: CryptoKey) {
+  const estudos = await service.saveGoal(accountId, key, goal({ title: 'Meta fictícia de estudos', linkedArea: 'bible_studies' }))
+  const batismos = await service.saveGoal(accountId, key, goal({ title: 'Meta fictícia de batismos', linkedArea: 'baptisms' }))
+  return { studyGoalId: estudos.id, baptismGoalId: batismos.id }
+}
+
 function setup() {
   const database = new ApoioDatabase(`evangelism-${crypto.randomUUID()}`); databases.push(database)
   return { database, service: new EvangelismPlanningService(database), agenda: new AgendaService(database) }
@@ -70,7 +77,8 @@ describe('Meta do planejamento e Agenda', () => {
 describe('Planejamento Anual e Evangelismo integrados', () => {
   it('cria campanha e meta na mesma confirmação, liga a Agenda e não grava textos legíveis', async () => {
     const { database, service, agenda } = setup(); const key = await generateMasterKey()
-    const result = await service.saveCampaign(accountId, key, campaign(), undefined, goal())
+    const ligadas = await metasLigadas(service, key)
+    const result = await service.saveCampaign(accountId, key, campaign(ligadas), undefined, goal())
     expect(result.goal?.campaignIds).toContain(result.campaign.id)
     expect(result.campaign.goalId).toBe(result.goal?.id)
     expect(result.createdAgendaEvents).toBe(1)
@@ -82,8 +90,9 @@ describe('Planejamento Anual e Evangelismo integrados', () => {
 
   it('atualiza datas e local no mesmo compromisso, sem duplicar a Agenda, e aceita retorno da Agenda', async () => {
     const { service, agenda } = setup(); const key = await generateMasterKey()
-    const created = (await service.saveCampaign(accountId, key, campaign())).campaign
-    const updated = (await service.saveCampaign(accountId, key, campaign({ name: 'Campanha Renovada Fictícia', startDate: '2026-09-02', location: 'Praça Fictícia' }), created.id)).campaign
+    const ligadas = await metasLigadas(service, key)
+    const created = (await service.saveCampaign(accountId, key, campaign(ligadas))).campaign
+    const updated = (await service.saveCampaign(accountId, key, campaign({ ...ligadas, name: 'Campanha Renovada Fictícia', startDate: '2026-09-02', location: 'Praça Fictícia' }), created.id)).campaign
     expect(updated.mainAgendaEventId).toBe(created.mainAgendaEventId)
     expect(await agenda.listEvents(accountId, key)).toHaveLength(1)
     const linked = (await agenda.getEvent(accountId, key, updated.mainAgendaEventId!))!
@@ -95,7 +104,8 @@ describe('Planejamento Anual e Evangelismo integrados', () => {
 
   it('organiza pontos, equipe, tarefas, orçamento da campanha e acompanhamentos sem duplicar cadastros', async () => {
     const { service, agenda } = setup(); const key = await generateMasterKey()
-    const created = (await service.saveCampaign(accountId, key, campaign())).campaign
+    const ligadas = await metasLigadas(service, key)
+    const created = (await service.saveCampaign(accountId, key, campaign(ligadas))).campaign
     const detailed = campaign({
       points: [{ id: 'ponto-ficticio', name: 'Ponto Fictício A', type: 'hall', churchId: 'igreja-ficticia-a', address: 'Local inventado', schedules: [{ id: 'horario-ficticio', date: '2026-09-02', startTime: '19:00', endTime: '21:00', agendaEventId: null }], responsible: 'Pessoa Fictícia A', speaker: 'Pessoa Fictícia B', teamPersonIds: ['pessoa-ficticia-a'], expectedPeople: 20, status: 'preparing', notes: '' }],
       team: [{ id: 'equipe-ficticia', personId: 'pessoa-ficticia-a', role: 'reception' }],
@@ -114,14 +124,14 @@ describe('Planejamento Anual e Evangelismo integrados', () => {
   it('mantém o orçamento de campanha separado do Orçamento Familiar', async () => {
     const { database, service } = setup(); const key = await generateMasterKey()
     const familyDatabase = new FamilyBudgetDatabase(`family-separate-${crypto.randomUUID()}`); familyDatabases.push(familyDatabase)
-    await service.saveCampaign(accountId, key, campaign({ budgetItems: [{ id: 'despesa-ficticia', kind: 'expense', description: 'Divulgação fictícia', amount: 80, category: 'publicity', responsible: '', status: 'planned', date: '2026-08-25', notes: '' }] }))
+    await service.saveCampaign(accountId, key, campaign({ ...(await metasLigadas(service, key)), budgetItems: [{ id: 'despesa-ficticia', kind: 'expense', description: 'Divulgação fictícia', amount: 80, category: 'publicity', responsible: '', status: 'planned', date: '2026-08-25', notes: '' }] }))
     expect(await familyDatabase.records.count()).toBe(0)
     expect((await database.vaultRecords.where('recordType').equals('evangelism_campaign').count())).toBe(1)
   })
 
   it('avisa conflitos de horário e permite conferir escalas da equipe', async () => {
     const { service } = setup(); const key = await generateMasterKey()
-    const first = (await service.saveCampaign(accountId, key, campaign({ team: [{ id: 'escala-ficticia', personId: 'pessoa-ficticia-a', role: 'music' }] }))).campaign
+    const first = (await service.saveCampaign(accountId, key, campaign({ ...(await metasLigadas(service, key)), team: [{ id: 'escala-ficticia', personId: 'pessoa-ficticia-a', role: 'music' }] }))).campaign
     expect(await service.teamScheduleWarnings(accountId, key, 'pessoa-ficticia-a', campaign({ startDate: '2026-09-05', endDate: '2026-09-10' }), 'outra-campanha')).toEqual([first.name])
     expect(await service.teamScheduleWarnings(accountId, key, 'pessoa-ficticia-b', campaign(), 'outra-campanha')).toEqual([])
     expect((await service.agendaConflicts(accountId, key, '2026-09-01T19:30', '2026-09-01T20:30'))[0]?.kind).toBe('overlap')
@@ -130,7 +140,7 @@ describe('Planejamento Anual e Evangelismo integrados', () => {
   it('calcula atenção, resumo anual, relatório local e preserva registros ao excluir vínculos', async () => {
     const { service } = setup(); const key = await generateMasterKey()
     const savedGoal = await service.saveGoal(accountId, key, goal())
-    const savedCampaign = (await service.saveCampaign(accountId, key, campaign({ goalId: savedGoal.id, tasks: [{ id: 'tarefa-ficticia', pointId: null, title: 'Tarefa Fictícia', description: '', responsibleId: null, responsibleName: '', dueDate: '2026-09-02', priority: 'urgent', status: 'not_started', notes: '', showInAgenda: false, agendaEventId: null }] }))).campaign
+    const savedCampaign = (await service.saveCampaign(accountId, key, campaign({ ...(await metasLigadas(service, key)), goalId: savedGoal.id, tasks: [{ id: 'tarefa-ficticia', pointId: null, title: 'Tarefa Fictícia', description: '', responsibleId: null, responsibleName: '', dueDate: '2026-09-02', priority: 'urgent', status: 'not_started', notes: '', showInAgenda: false, agendaEventId: null }] }))).campaign
     expect(campaignDashboard([savedCampaign], '2026-09-01').urgentTasks).toBe(1)
     expect(isTaskUrgent(savedCampaign.tasks[0]!, '2026-09-01')).toBe(true)
     expect(isTaskDueSoon(savedCampaign.tasks[0]!, '2026-09-01')).toBe(true)
@@ -141,5 +151,58 @@ describe('Planejamento Anual e Evangelismo integrados', () => {
     expect(copied[0]).toMatchObject({ year: 2027, status: 'planned', dueDate: '2027-09-30' })
     await service.deleteGoal(accountId, key, savedGoal.id)
     expect((await service.getCampaign(accountId, key, savedCampaign.id))?.goalId).toBeNull()
+  })
+})
+
+describe('campanha ligada às metas de estudos e batismos', () => {
+  it('recusa campanha nova sem as duas metas ligadas', async () => {
+    const { service } = setup(); const key = await generateMasterKey()
+    const { studyGoalId } = await metasLigadas(service, key)
+
+    await expect(service.saveCampaign(accountId, key, campaign())).rejects.toThrow('meta de estudos bíblicos')
+    await expect(service.saveCampaign(accountId, key, campaign({ studyGoalId }))).rejects.toThrow('meta de batismos')
+  })
+
+  it('exige ao menos uma igreja envolvida', async () => {
+    const { service } = setup(); const key = await generateMasterKey()
+    const ligadas = await metasLigadas(service, key)
+
+    await expect(service.saveCampaign(accountId, key, campaign({ ...ligadas, churchIds: [] }))).rejects.toThrow('igreja envolvida')
+  })
+
+  it('guarda o vínculo nas duas metas, sem repetir', async () => {
+    const { service } = setup(); const key = await generateMasterKey()
+    const ligadas = await metasLigadas(service, key)
+    const { campaign: salva } = await service.saveCampaign(accountId, key, campaign(ligadas))
+    await service.saveCampaign(accountId, key, campaign({ ...ligadas, name: 'Campanha Fictícia Revista' }), salva.id)
+
+    const metas = await service.listGoals(accountId, key)
+    for (const id of [ligadas.studyGoalId, ligadas.baptismGoalId]) {
+      expect(metas.find((meta) => meta.id === id)?.campaignIds).toEqual([salva.id])
+    }
+  })
+
+  // Campanhas antigas continuam salvando, para não travar o que já existe.
+  it('deixa a campanha antiga ser atualizada mesmo sem os vínculos', async () => {
+    const { service, database } = setup(); const key = await generateMasterKey()
+    const ligadas = await metasLigadas(service, key)
+    const { campaign: salva } = await service.saveCampaign(accountId, key, campaign(ligadas))
+    void database
+
+    const atualizada = await service.saveCampaign(accountId, key, campaign({ name: 'Campanha Fictícia Antiga' }), salva.id)
+    expect(atualizada.campaign.studyGoalId ?? null).toBeNull()
+  })
+
+  it('solta o vínculo quando a meta é excluída e preserva a campanha', async () => {
+    const { service } = setup(); const key = await generateMasterKey()
+    const ligadas = await metasLigadas(service, key)
+    const { campaign: salva } = await service.saveCampaign(accountId, key, campaign(ligadas))
+
+    await service.deleteGoal(accountId, key, ligadas.studyGoalId)
+    const atual = await service.getCampaign(accountId, key, salva.id)
+
+    expect(atual?.studyGoalId ?? null).toBeNull()
+    expect(atual?.baptismGoalId).toBe(ligadas.baptismGoalId)
+    expect(atual?.name).toBe('Campanha Esperança Fictícia')
   })
 })

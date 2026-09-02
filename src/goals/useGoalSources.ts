@@ -23,22 +23,23 @@ export interface GoalSources {
 export function useGoalSources(): GoalSources {
   const { account, masterKey } = useAuthVault()
   const [goals, setGoals] = useState<GoalEntity[]>([])
-  const [sources, setSources] = useState<AreaSources>({ entries: [], studies: [], uapgs: [] })
+  const [sources, setSources] = useState<AreaSources>({ entries: [], studies: [], uapgs: [], history: [] })
   const [churches, setChurches] = useState<ChurchEntity[]>([])
   const [ready, setReady] = useState(false)
 
   const reload = useCallback(async () => {
     if (!account || !masterKey) return
     const district = await districtService.getDistrict(account.id, masterKey)
-    const [nextGoals, entries, studies, uapgs, nextChurches] = await Promise.all([
+    const [nextGoals, entries, history, studies, uapgs, nextChurches] = await Promise.all([
       goalsService.listGoals(account.id, masterKey),
       goalsService.listEntries(account.id, masterKey),
+      goalsService.listHistory(account.id, masterKey),
       missionary.listStudies(account.id, masterKey),
       missionary.listUapgs(account.id, masterKey),
       district ? districtService.listChurches(account.id, masterKey, district.id) : [],
     ])
     setGoals(nextGoals)
-    setSources({ entries, studies, uapgs })
+    setSources({ entries, studies, uapgs, history })
     setChurches(nextChurches)
     setReady(true)
   }, [account, masterKey])

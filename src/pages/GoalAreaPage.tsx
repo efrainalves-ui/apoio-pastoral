@@ -7,11 +7,11 @@ import { Card } from '../components/ui/Card'
 import { Field } from '../components/ui/Field'
 import {
   AREA_TARGET_METRIC, AREA_USES_PDF, GOAL_AREAS, GOAL_AREA_LABELS,
-  areaProgress, churchProgress, monthlyResults, type GoalArea,
+  areaComparison, churchProgress, monthlyResults, type GoalArea,
 } from '../goals/areas'
 import { MONTH_LABELS, formatGoalValue } from '../goals/format'
 import { GoalsService, parseGoalsPdf } from '../goals/service'
-import type { GoalImportPreview } from '../goals/types'
+import { HISTORY_AREAS, type GoalHistoryData, type GoalImportPreview } from '../goals/types'
 import { useGoalSources } from '../goals/useGoalSources'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
 
@@ -23,6 +23,7 @@ export function GoalAreaPage() {
   const area = GOAL_AREAS.includes(areaParam as GoalArea) ? areaParam as GoalArea : null
   const { goals, sources, churches, ready, reload } = useGoalSources()
   const [districtInput, setDistrictInput] = useState('')
+  const [previousInput, setPreviousInput] = useState('')
   const [churchInputs, setChurchInputs] = useState<Record<string, string>>({})
   const [preview, setPreview] = useState<GoalImportPreview | null>(null)
   const [busy, setBusy] = useState(false)
@@ -33,7 +34,8 @@ export function GoalAreaPage() {
   if (!area) return <div className="page-stack"><p>Meta não encontrada.</p><Link className="text-link" to="/app/metas">Voltar às metas</Link></div>
   if (!ready) return <div className="app-loading" role="status">Abrindo a meta…</div>
 
-  const progresso = areaProgress(area, goals, sources, year)
+  const progresso = areaComparison(area, goals, sources, year)
+  const guardaHistorico = HISTORY_AREAS.includes(area as GoalHistoryData['area'])
   const meses = monthlyResults(area, sources, year)
   const maiorMes = Math.max(1, ...meses)
   const porIgreja = churchProgress(area, goals, sources, year, churches.map(({ id }) => id))
@@ -50,6 +52,19 @@ export function GoalAreaPage() {
       await reload()
     } catch (motivo) {
       setError(motivo instanceof Error ? motivo.message : 'Não foi possível salvar a meta.')
+    }
+  }
+
+  async function salvarAnoAnterior(event: FormEvent) {
+    event.preventDefault()
+    if (!account || !masterKey || !area || !guardaHistorico) return
+    setError(''); setNotice('')
+    try {
+      await goalsService.saveHistory(account.id, masterKey, { area: area as GoalHistoryData['area'], year: year - 1, amount: Number(previousInput), source: 'manual', reference: `Consolidado ${year - 1}` })
+      setPreviousInput(''); setNotice(`Resultado de ${year - 1} guardado para comparação.`)
+      await reload()
+    } catch (motivo) {
+      setError(motivo instanceof Error ? motivo.message : 'Não foi possível guardar o resultado do ano anterior.')
     }
   }
 
@@ -96,6 +111,21 @@ export function GoalAreaPage() {
         <p className="goal-card__percent">{progresso.target > 0 ? `${progresso.percent}% alcançado` : 'Defina a meta do ano para acompanhar'}</p>
         {anoTerminou && progresso.target > 0 && <p className="card-copy">{progresso.reached ? 'Meta do ano alcançada.' : `Faltaram ${formatGoalValue(area, progresso.missing)} para a meta do ano.`}</p>}
       </Card>
+
+      {guardaHistorico && <Card title={`Comparação com ${year - 1}`}>
+        <div className="goal-card__numbers">
+          <div><small>Resultado {year - 1}</small><strong>{progresso.hasPrevious ? formatGoalValue(area, progresso.previous) : 'A registrar'}</strong></div>
+          <div><small>Meta {year}</small><strong>{progresso.target > 0 ? formatGoalValue(area, progresso.target) : 'A definir'}</strong></div>
+          <div><small>Resultado {year}</small><strong>{formatGoalValue(area, progresso.result)}</strong></div>
+          <div><small>Alcançado</small><strong>{progresso.target > 0 ? `${progresso.percent}%` : '—'}</strong></div>
+          <div><small>Falta</small><strong>{progresso.target > 0 ? formatGoalValue(area, progresso.missing) : '—'}</strong></div>
+          <div><small>Diferença</small><strong>{progresso.hasPrevious ? `${progresso.difference >= 0 ? '+' : '−'}${formatGoalValue(area, Math.abs(progresso.difference))}` : '—'}</strong></div>
+        </div>
+        <form className="inline-form" onSubmit={(event) => void salvarAnoAnterior(event)}>
+          <Field label={`Resultado consolidado de ${year - 1}`} name="previous-year" type="number" min={0} step="any" value={previousInput} onChange={(event) => setPreviousInput(event.target.value)} />
+          <Button type="submit" variant="secondary" disabled={!previousInput}>Guardar</Button>
+        </form>
+      </Card>}
 
       <Card title="Mês a mês">
         <ul className="goal-months">{meses.map((valor, indice) => (

@@ -65,9 +65,18 @@ test('planeja uma meta e uma campanha integradas no computador e no celular', as
   await page.getByLabel('Data de término').fill(isoDate(addDays(campaignStart, 7)))
   await page.getByLabel('Responsável geral').fill('Responsável Fictício')
   await page.getByText('Igreja Modelo Fictícia', { exact: true }).click()
+
+  // Toda campanha nasce ligada a uma meta de estudos bíblicos e a uma de batismos.
+  await page.locator('#campaign-goal-bible_studies').selectOption('nova')
+  await page.getByLabel('Título da meta de estudos bíblicos').fill('Meta Fictícia de Estudos')
+  await page.locator('#campaign-goal-baptisms').selectOption('nova')
+  await page.getByLabel('Título da meta de batismos').fill('Meta Fictícia de Batismos')
+
   await page.getByRole('button', { name: 'Salvar campanha e Agenda' }).click()
   await expect(page.getByRole('heading', { name: 'Campanha Fictícia Integrada' })).toBeVisible()
-  await expect(page.getByText('Meta Fictícia do Planejamento')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Metas vinculadas à campanha' })).toBeVisible()
+  await expect(page.getByText('Meta Fictícia de Estudos')).toBeVisible()
+  await expect(page.getByText('Meta Fictícia de Batismos')).toBeVisible()
 
   await page.getByLabel('Nome do ponto').fill('Ponto Fictício Central')
   await page.locator('#point-date').fill(isoDate(addDays(campaignStart, 1)))
