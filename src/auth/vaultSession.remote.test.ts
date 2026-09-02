@@ -128,3 +128,110 @@ describe('entrada remota em novo dispositivo', () => {
     expect(remote.guardados).toHaveLength(0)
   })
 })
+
+/**
+ * Cadastro, recuperação e troca de senha diante do que dá errado de verdade:
+ * confirmação de e-mail ligada, sessão de outra conta aberta no mesmo
+ * navegador e falha no meio da troca.
+ */
+describe('cadastro e senha com o serviço no meio', () => {
+  async function carregarServico(overrides: Record<string, unknown> = {}) {
+    const registros = {
+      envelopesSenha: [] as unknown[],
+      envelopesRecuperacao: [] as unknown[],
+      senhas: [] as string[],
+      aparelhos: [] as string[],
+      existeEnvelope: false,
+      contaRemota: '00000000-0000-4000-8000-000000000001' as string | null,
+    }
+    vi.doMock('./supabase', () => ({
+      hasSupabaseConfiguration: true,
+      registerRemoteAccount: vi.fn(() => Promise.resolve({ userId: '00000000-0000-4000-8000-000000000001', ready: false })),
+      signInRemoteAccount: vi.fn(() => Promise.resolve('00000000-0000-4000-8000-000000000001')),
+      currentRemoteAccountId: vi.fn(() => Promise.resolve(registros.contaRemota)),
+      ensureRemoteDevice: vi.fn((id: string) => { registros.aparelhos.push(id); return Promise.resolve('active') }),
+      fetchRemotePasswordEnvelope: vi.fn(),
+      fetchRemoteRecoveryEnvelope: vi.fn(),
+      hasRemotePasswordEnvelope: vi.fn(() => Promise.resolve(registros.existeEnvelope)),
+      storeRemotePasswordEnvelope: vi.fn((envelope: unknown) => { registros.envelopesSenha.push(envelope); return Promise.resolve() }),
+      storeRemoteRecoveryEnvelope: vi.fn((envelope: unknown) => { registros.envelopesRecuperacao.push(envelope); return Promise.resolve() }),
+      updateRemotePassword: vi.fn((senha: string) => { registros.senhas.push(senha); return Promise.resolve() }),
+      fetchRemoteDeviceStatus: vi.fn(),
+      revokeRemoteDevice: vi.fn(),
+      ...overrides,
+    }))
+    return { registros, session: await import('./vaultSession') }
+  }
+
+  it('não deixa a conta pela metade quando o serviço espera a confirmação do e-mail', async () => {
+    const { registros, session } = await carregarServico()
+    const database = new ApoioDatabase(`confirmacao-${crypto.randomUUID()}`)
+    databases.push(database)
+
+    const resultado = await session.registerAccount('conta.ficticia@example.invalid', 'frase-ficticia-longa-2026', database)
+
+    expect(resultado.ready).toBe(false)
+    expect(resultado.recoveryCode).toContain('APOIO-1-')
+    expect(registros.envelopesSenha).toHaveLength(0)
+    expect(registros.envelopesRecuperacao).toHaveLength(0)
+    expect(registros.aparelhos).toHaveLength(0)
+    expect(await database.accounts.count()).toBe(1)
+  })
+
+  it('completa o que faltou na primeira entrada depois da confirmação, sem repetir', async () => {
+    const { registros, session } = await carregarServico()
+    const database = new ApoioDatabase(`confirmacao-entrada-${crypto.randomUUID()}`)
+    databases.push(database)
+    await session.registerAccount('conta.ficticia@example.invalid', 'frase-ficticia-longa-2026', database)
+
+    await session.unlockAccount('conta.ficticia@example.invalid', 'frase-ficticia-longa-2026', database)
+    expect(registros.envelopesSenha).toHaveLength(1)
+    expect(registros.envelopesRecuperacao).toHaveLength(1)
+    expect(registros.aparelhos).toHaveLength(1)
+
+    registros.existeEnvelope = true
+    await session.unlockAccount('conta.ficticia@example.invalid', 'frase-ficticia-longa-2026', database)
+    expect(registros.envelopesSenha).toHaveLength(1)
+  })
+
+  it('recusa trocar a senha quando a sessão aberta é de outra conta', async () => {
+    const { registros, session } = await carregarServico()
+    const database = new ApoioDatabase(`troca-outra-conta-${crypto.randomUUID()}`)
+    databases.push(database)
+    const { account } = await session.registerAccount('conta.ficticia@example.invalid', 'frase-ficticia-longa-2026', database)
+    registros.contaRemota = '00000000-0000-4000-8000-000000000099'
+
+    await expect(session.changeVaultPassword(account, 'frase-ficticia-longa-2026', 'outra-frase-ficticia-2027', database))
+      .rejects.toThrow('outra conta')
+    expect(registros.senhas).toHaveLength(0)
+  })
+
+  it('devolve a senha do serviço ao estado anterior quando o envelope não é gravado', async () => {
+    // Sem essa volta atrás, o serviço ficaria com a senha nova e o envelope
+    // antigo: entrar em outro aparelho pararia de funcionar para sempre.
+    const senhas: string[] = []
+    const { session } = await carregarServico({
+      updateRemotePassword: vi.fn((senha: string) => { senhas.push(senha); return Promise.resolve() }),
+      storeRemotePasswordEnvelope: vi.fn(() => { throw new Error('falha fictícia do serviço') }),
+    })
+    const database = new ApoioDatabase(`troca-interrompida-${crypto.randomUUID()}`)
+    databases.push(database)
+    const { account } = await session.registerAccount('conta.ficticia@example.invalid', 'frase-ficticia-longa-2026', database)
+    const envelopeAntes = await database.keyEnvelopes.get(`${account.id}:password`)
+
+    await expect(session.changeVaultPassword(account, 'frase-ficticia-longa-2026', 'outra-frase-ficticia-2027', database))
+      .rejects.toThrow('Nada mudou')
+
+    expect(senhas).toEqual(['outra-frase-ficticia-2027', 'frase-ficticia-longa-2026'])
+    expect(await database.keyEnvelopes.get(`${account.id}:password`)).toEqual(envelopeAntes)
+  })
+
+  it('recusa senha fraca na criação e na troca', async () => {
+    const { session } = await carregarServico()
+    const database = new ApoioDatabase(`senha-fraca-${crypto.randomUUID()}`)
+    databases.push(database)
+
+    await expect(session.registerAccount('conta.ficticia@example.invalid', '123456789012', database)).rejects.toThrow('fácil de adivinhar')
+    await expect(session.registerAccount('conta.ficticia@example.invalid', 'curta', database)).rejects.toThrow('12 caracteres')
+  })
+})

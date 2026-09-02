@@ -227,6 +227,10 @@ declare
   autor uuid := public.active_device_id();
   alterados integer;
 begin
+  -- `autor` existe para exigir que quem revoga seja um aparelho ativo desta
+  -- conta; revogar o próprio aparelho é permitido e é o que acontece ao
+  -- encerrar o distrito.
+  perform autor;
   update public.devices
     set status = 'revoked', revoked_at = now()
     where id = p_device_id and owner_id = conta and status <> 'revoked';
@@ -237,18 +241,23 @@ begin
 
   delete from public.device_key_envelopes e where e.device_id = p_device_id and e.owner_id = conta;
 
+  -- A sessão que está revogando fica de fora: ela acabou de se identificar e
+  -- continua sendo do titular. É o caso de encerrar o distrito, em que o
+  -- próprio aparelho revoga tudo, inclusive a si mesmo, e segue com uma
+  -- autorização nova. Todas as outras sessões daquele aparelho são barradas.
   insert into public.revoked_sessions (session_id, owner_id, device_id)
     select s.session_id, conta, p_device_id from public.device_sessions s
     where s.device_id = p_device_id and s.owner_id = conta
+      and s.session_id is distinct from public.current_session_id()
   on conflict (session_id) do nothing;
 
   if to_regclass('auth.refresh_tokens') is not null then
-    execute 'delete from auth.refresh_tokens t where t.session_id in (select s.session_id from public.device_sessions s where s.device_id = $1 and s.owner_id = $2)'
-      using p_device_id, conta;
+    execute 'delete from auth.refresh_tokens t where t.session_id in (select s.session_id from public.device_sessions s where s.device_id = $1 and s.owner_id = $2 and s.session_id is distinct from $3)'
+      using p_device_id, conta, public.current_session_id();
   end if;
   if to_regclass('auth.sessions') is not null then
-    execute 'delete from auth.sessions x where x.id in (select s.session_id from public.device_sessions s where s.device_id = $1 and s.owner_id = $2)'
-      using p_device_id, conta;
+    execute 'delete from auth.sessions x where x.id in (select s.session_id from public.device_sessions s where s.device_id = $1 and s.owner_id = $2 and s.session_id is distinct from $3)'
+      using p_device_id, conta, public.current_session_id();
   end if;
 
   delete from public.device_sessions s where s.device_id = p_device_id and s.owner_id = conta;

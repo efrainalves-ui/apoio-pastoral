@@ -91,8 +91,11 @@ export class CloseDistrictService {
     }
     if (mutations.length) await this.repository.applyEncryptedMutations(accountId, deviceId, mutations)
 
+    // Os outros primeiro, este por último: revogar a si mesmo antes tiraria a
+    // autorização necessária para revogar os que sobraram.
     const devices = await this.database.devices.where('accountId').equals(accountId).toArray()
-    for (const device of devices) await revokeDevice(device.id, this.database)
+    for (const device of devices.filter(({ id }) => id !== deviceId)) await revokeDevice(device.id, this.database)
+    if (devices.some(({ id }) => id === deviceId)) await revokeDevice(deviceId, this.database)
 
     // A instalação atual continua servindo ao pastor, mas com autorização nova:
     // nada do que valia antes do encerramento volta a valer.

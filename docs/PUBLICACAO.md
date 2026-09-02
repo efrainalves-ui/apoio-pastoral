@@ -112,6 +112,16 @@ Cada ambiente tem o seu próprio projeto Supabase, com URL e chave pública
 próprias, guardadas apenas no painel do provedor e no `.env.local` de quem
 gera a build. Nunca aponte um ambiente para o banco do outro.
 
+Além do `VITE_APP_ENV`, declare também `VITE_SUPABASE_PROJECT_REF` com o
+identificador do projeto daquele ambiente (a parte antes de `.supabase.co` no
+endereço). O aplicativo compara três coisas antes de abrir qualquer conexão: o
+endereço, o projeto declarado e o projeto gravado dentro da chave pública. Se
+os três não forem o mesmo, nenhuma conexão é aberta — é o que impede uma build
+de produção falar com o banco de teste, e o contrário.
+
+O ambiente de homologação mostra uma marca discreta "Homologação" no cabeçalho.
+Se ela aparecer em produção, a build foi gerada com a variável errada.
+
 ## 6. Migrations, na ordem de aplicação
 
 No projeto de produção recém-criado, aplique nesta ordem:
@@ -120,8 +130,19 @@ No projeto de produção recém-criado, aplique nesta ordem:
 |---|---|---|
 | 1 | `supabase/migrations/0001_marco_zero_up.sql` | `devices`, `device_key_envelopes`, `recovery_key_envelopes`, `encrypted_operations`; índice do cursor de sincronização; gatilho que impede reativar aparelho revogado; RLS por dono e privilégios mínimos |
 | 2 | `supabase/migrations/0002_password_key_envelopes_up.sql` | `password_key_envelopes`, com RLS por dono e mínimo de 600 mil iterações |
+| 3 | `supabase/migrations/0003_device_sessions_up.sql` | ordem de chegada (`seq`) e assinatura das operações; `device_sessions` e `revoked_sessions`; funções `claim_device`, `approve_device`, `revoke_device`, `upload_operations`, `download_operations` e `app_schema_version`; retirada da escrita direta em `devices` e `encrypted_operations`; privilégios padrão do schema revogados |
 
-Para desfazer, na ordem inversa: `0002_password_key_envelopes_down.sql` e
+O aplicativo espera a versão de esquema **3** (`app_schema_version()`) e recusa
+sincronizar com um serviço em versão diferente. Aplicar as três migrations é
+obrigatório antes da primeira entrada.
+
+Operações que já existirem no banco sem assinatura de metadados — só é o caso
+de bancos de teste anteriores a esta versão — entram em quarentena no aparelho
+que as receber, sem serem aplicadas. Em um projeto de produção recém-criado
+isso não acontece.
+
+Para desfazer, na ordem inversa: `0003_device_sessions_down.sql`,
+`0002_password_key_envelopes_down.sql` e
 `0001_marco_zero_down.sql`. Desfazer apaga as tabelas e o que estiver nelas —
 faça backup antes e só em ambiente de teste.
 

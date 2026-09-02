@@ -70,6 +70,32 @@ Concluída a criação e restauração de backup local cifrado. O arquivo conté
 - A Agenda aceita Batismo, Santa Ceia, Casamento e Dedicação de criança, com responsável, pessoas aplicáveis e checklists próprios. Os compromissos continuam no mesmo fluxo de Dia, Semana, Mês e Lista; nenhum documento civil ou certificado foi criado.
 - Em 27 de agosto de 2026, lint, TypeScript, build, PWA e 134 testes Vitest em 46 arquivos foram aprovados. O Playwright permanece pendente no CI Linux porque o Chromium headless foi bloqueado pelo sandbox macOS antes de abrir qualquer página.
 
+## Etapa estável: barreiras de servidor, sincronização autenticada e ambientes separados
+
+Resposta à revisão independente que concluiu que o aplicativo não estava pronto
+para uso real. Cada achado foi reproduzido no código antes de qualquer correção.
+
+- **Aparelhos**: `devices` e `encrypted_operations` saíram do alcance direto do
+  cliente. Tudo passa por funções `security definer` que descobrem o aparelho
+  pela sessão (`device_sessions`, a partir do `session_id` do JWT). Revogar
+  apaga o envelope daquele aparelho, derruba as sessões dele e as registra em
+  `revoked_sessions`: nem o mesmo identificador nem um novo voltam a valer sem
+  provar a senha. Entrar com e-mail e senha em aparelho novo continua normal.
+- **Sincronização**: cursor passou a ser a ordem de chegada no servidor (`seq`),
+  o recebimento percorre todas as páginas, cada operação leva HMAC sobre todos
+  os metadados críticos, conflito é decidido por linhagem e o que não confere
+  vai para quarentena. Falha de rede não é mais lida como conta vazia.
+- **Cofre**: chaves não exportáveis; troca de senha idempotente com volta atrás;
+  recuperação usa a senha atual; cadastro trata confirmação de e-mail sem deixar
+  a conta pela metade; Sair encerra a sessão e o cofre se fecha sozinho.
+- **Backup**: leva Leitura e Orçamento Familiar, recusa arquivo de outra conta,
+  de outra versão, truncado ou grande demais.
+- **Ambientes**: endereço, chave e projeto declarado precisam coincidir; a
+  versão do esquema é conferida por sessão; homologação tem marca discreta.
+- **Cabeçalhos**: `public/_headers` versionado e conferido nos dois workflows.
+- **Documentação**: `docs/GOVERNANCA.md` novo; `SECURITY_MODEL.md` e
+  `PUBLICACAO.md` atualizados.
+
 ## Etapa estável: privacidade, direitos do titular e encerramento de distrito
 
 - Regra de dados registrada no produto e em `docs/PRIVACIDADE.md`: uma conta, um pastor, um distrito, sem compartilhamento nem transferência entre pastores.

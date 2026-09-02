@@ -221,3 +221,25 @@ reset role;
 set request.jwt.claims = '{}';
 
 \echo 'Barreiras de aparelho comprovadas no servidor.'
+
+-- ---------------------------------------------------------------------------
+-- 11. Encerrar distrito: o próprio aparelho revoga tudo, inclusive a si mesmo,
+--     e segue com uma autorização nova. A sessão que revoga não é barrada.
+-- ---------------------------------------------------------------------------
+
+set role authenticated;
+set request.jwt.claims = '{"sub":"dddddddd-0000-4000-8000-000000000004","session_id":"d1a00000-0000-4000-8000-00000000000d"}';
+
+select public.revoke_device(:disp_d1);
+select homologacao_testes.exigir(
+  (select status from public.devices where id = :disp_d1) = 'revoked',
+  'D revoga o próprio aparelho ao encerrar o distrito');
+select homologacao_testes.exigir(
+  public.claim_device('d2000000-0000-4000-8000-00000000000d', 'Computador Fictício D novo') = 'active',
+  'a mesma sessão registra a autorização nova depois de encerrar');
+select homologacao_testes.exigir(
+  (select count(*) from public.download_operations(0, 500)) = 0,
+  'a autorização nova funciona e a conta está vazia');
+
+reset role;
+set request.jwt.claims = '{}';
