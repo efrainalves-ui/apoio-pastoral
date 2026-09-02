@@ -70,6 +70,13 @@ Concluída a criação e restauração de backup local cifrado. O arquivo conté
 - A Agenda aceita Batismo, Santa Ceia, Casamento e Dedicação de criança, com responsável, pessoas aplicáveis e checklists próprios. Os compromissos continuam no mesmo fluxo de Dia, Semana, Mês e Lista; nenhum documento civil ou certificado foi criado.
 - Em 27 de agosto de 2026, lint, TypeScript, build, PWA e 134 testes Vitest em 46 arquivos foram aprovados. O Playwright permanece pendente no CI Linux porque o Chromium headless foi bloqueado pelo sandbox macOS antes de abrir qualquer página.
 
+## Etapa estável: topo simples, Leitura enxuta e Orçamento com resumo visual
+
+- O topo do aplicativo ficou só com dois atalhos em ícone: criar (+) e sincronizar. A barra de pesquisa saiu do cabeçalho — a Busca continua em Mais — e a faixa branca deu lugar ao mesmo verde-escuro do menu lateral. A tela inicial perdeu a frase de abertura e os botões com texto; criar qualquer registro passa pelo +.
+- Fidelidade entrou no menu principal e saiu de Mais. O menu Mais lista apenas módulos que não aparecem no menu principal, sem nenhuma ação de criação.
+- Leitura perdeu a frase de abertura, o botão Definir meta ganhou contraste e lugar próprio, e a lista de livros virou uma lista compacta: título, autor e situação, com progresso, meta, concluir, editar e excluir aparecendo só ao tocar no livro. Abrir Adicionar livro leva a tela até o formulário e deixa o cursor no primeiro campo.
+- Orçamento Familiar mantém todos os cálculos como estavam e ganhou, na Visão do mês, o comparativo de entradas e saídas, a distribuição das despesas por categoria, o disponível, a projeção até o fim do mês e dicas curtas com cor, ícone e texto — verde para tudo em ordem, amarelo para atenção e vermelho para risco. Botões de editar, Mês atual, abas ativas e ícones passaram a ter contraste conferido nos temas claro e escuro.
+
 ## Etapa estável: comparação com o ano anterior e campanhas ligadas às metas
 
 - Metas guarda o resultado consolidado de um ano já encerrado para Financeiro e Batismos, em registro próprio. Ele serve só para comparação: não vira lançamento, não altera meta e não entra no resultado do ano corrente. Sem consolidado registrado, vale o que estiver lançado naquele ano — nunca os dois somados.

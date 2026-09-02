@@ -64,7 +64,8 @@ test('cria conta, protege rota, bloqueia, entra e recupera acesso', async ({ pag
 
 test('continua disponível offline depois do primeiro carregamento', async ({ page, context }) => {
   await register(page)
-  await page.getByRole('link', { name: 'Novo compromisso' }).click()
+  await page.getByRole('button', { name: 'Criar' }).click()
+  await page.getByRole('navigation', { name: 'Criar' }).getByRole('link', { name: 'Novo compromisso' }).click()
   await page.getByLabel('Categoria').selectOption({ label: 'Reunião' })
   await page.getByLabel('Título').fill('Compromisso Offline Fictício')
   const appointment = agendaDate()

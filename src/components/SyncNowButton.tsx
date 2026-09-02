@@ -18,7 +18,7 @@ const MENSAGENS: Record<Exclude<Situacao, 'parado'>, string> = {
  * Atalho diário da tela inicial. A tela completa continua em Mais; aqui o
  * pastor só precisa saber se está atualizado — nada de detalhe técnico.
  */
-export function SyncNowButton() {
+export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
   const { account } = useAuthVault()
   const transport = useMemo(() => createSyncTransport(), [])
   const service = useMemo(() => new SyncService(transport), [transport])
@@ -37,6 +37,16 @@ export function SyncNowButton() {
   }, [account, service, situacao])
 
   if (transport.name === 'disabled') return null
+
+  // No cabeçalho o atalho é só o ícone; o aviso aparece logo abaixo dele.
+  if (compact) return (
+    <div className="sync-now">
+      <button type="button" className="icon-button sync-now__trigger" aria-label={situacao === 'sincronizando' ? 'Sincronizando' : 'Sincronizar'} onClick={() => void sincronizar()} disabled={situacao === 'sincronizando'}>
+        <RefreshCw className={situacao === 'sincronizando' ? 'spin' : ''} aria-hidden="true" />
+      </button>
+      {situacao !== 'parado' && <p className="sync-now__toast" role="status">{MENSAGENS[situacao]}</p>}
+    </div>
+  )
 
   return (
     <>

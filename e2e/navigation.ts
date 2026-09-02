@@ -25,6 +25,8 @@ async function clickVisibleLink(page: Page, path: string): Promise<boolean> {
   if (await sidebarLink.count() > 0 && await openMenu.isVisible()) {
     await openMenu.click()
     await expect(sidebar).toHaveClass(/sidebar--open/)
+    // O menu lateral rola no celular; o item precisa ficar inteiro à vista.
+    await sidebarLink.first().scrollIntoViewIfNeeded()
     await expect(sidebarLink.first()).toBeInViewport({ ratio: 1 })
     await sidebarLink.first().click()
     return true

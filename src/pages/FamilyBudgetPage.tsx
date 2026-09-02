@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import { ArrowLeft, ArrowRight, Banknote, CalendarClock, Check, ChevronRight, CircleDollarSign, Copy, CreditCard, Download, FileBarChart, HandCoins, LayoutDashboard, Plus, ReceiptText, Trash2, WalletCards } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Banknote, CalendarClock, Check, CheckCircle2, ChevronRight, CircleDollarSign, Copy, CreditCard, Download, FileBarChart, HandCoins, LayoutDashboard, OctagonAlert, Plus, ReceiptText, Trash2, TriangleAlert, WalletCards } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { budgetTips, categoryShares, flowBars, monthOutlook } from '../family-budget/monthInsight'
 import { categorySpending, currency, debtEndEstimate, debtPlan, debtProgress, effectivePaymentStatus, forecastSummary, monthKey, monthLabel, monthlySummary, planTotals, shiftMonth, upcomingBills } from '../family-budget/core'
 import { downloadBudgetCsv, downloadBudgetPdf } from '../family-budget/export'
 import { FamilyBudgetService } from '../family-budget/service'
@@ -104,6 +105,9 @@ export function FamilyBudgetPage() {
   const summary = monthlySummary(snapshot)
   const planned = planTotals(snapshot.plan, snapshot.expenses, snapshot.bills)
   const dueSoon = upcomingBills(snapshot.bills, month === monthKey(new Date()) ? new Date() : new Date(`${month}-01T12:00:00`))
+  const outlook = monthOutlook(summary.available, snapshot)
+  const tips = budgetTips(snapshot, outlook)
+  const shares = categoryShares(snapshot)
   const hasRecords = snapshot.incomes.length + snapshot.expenses.length + snapshot.bills.length + snapshot.debts.length + snapshot.goals.length > 0
 
   return <div className="page-stack family-budget-page">
@@ -118,6 +122,30 @@ export function FamilyBudgetPage() {
         <section className="budget-metrics" aria-label="Resumo financeiro do mês">
           <div><span>Entradas</span><strong>{currency(summary.income)}</strong></div><div><span>Saídas</span><strong>{currency(summary.outflow)}</strong></div><div className={summary.available < 0 ? 'negative' : 'positive'}><span>Disponível</span><strong>{currency(summary.available)}</strong></div><div><span>Reservado para metas</span><strong>{currency(summary.reserved)}</strong></div><div><span>Total das dívidas</span><strong>{currency(summary.debtTotal)}</strong></div><div><span>Vencem em 7 dias</span><strong>{dueSoon.length}</strong></div>
         </section>
+        <div className="home-grid">
+          <Card title="Entradas e saídas" eyebrow="No mês">
+            <div className="budget-flow">{flowBars(summary.income, summary.outflow).map((barra) => <div key={barra.label} className={`budget-flow__row budget-flow__row--${barra.tone}`}>
+              <span>{barra.label}</span>
+              <span className="budget-flow__bar" aria-hidden="true"><span style={{ width: `${barra.percent}%` }} /></span>
+              <strong>{currency(barra.amount)}</strong>
+            </div>)}</div>
+            <div className={`budget-outlook budget-outlook--${outlook.tone}`}>
+              <p><strong>Disponível agora:</strong> {currency(outlook.available)}</p>
+              <p><strong>Projeção até o fim do mês:</strong> {currency(outlook.projected)}</p>
+              <small>Considera {currency(outlook.expectedIncome)} de entradas previstas e {currency(outlook.planned)} de compromissos em aberto.</small>
+            </div>
+            <ul className="budget-tips">{tips.map((dica) => <li key={dica.id} className={`budget-tips__item budget-tips__item--${dica.tone}`}>
+              {dica.tone === 'ok' ? <CheckCircle2 aria-hidden="true" /> : dica.tone === 'atencao' ? <TriangleAlert aria-hidden="true" /> : <OctagonAlert aria-hidden="true" />}
+              <span>{dica.text}</span>
+            </li>)}</ul>
+          </Card>
+          <Card title="Despesas por categoria" eyebrow="No mês">
+            {shares.length ? <div className="budget-shares">{shares.map((fatia) => <div key={fatia.category}>
+              <span>{fatia.label}<strong>{currency(fatia.amount)} · {fatia.percent}%</strong></span>
+              <span className="budget-flow__bar" aria-hidden="true"><span style={{ width: `${fatia.percent}%` }} /></span>
+            </div>)}</div> : <p className="muted">Nenhuma despesa registrada neste mês.</p>}
+          </Card>
+        </div>
         <div className="home-grid">
           <Card title="Situação do mês" eyebrow="Resumo"><p className="budget-summary-text">{summary.available >= 0 ? `Depois dos compromissos registrados, restam ${currency(summary.available)} no mês.` : `Os compromissos registrados ultrapassam as entradas em ${currency(Math.abs(summary.available))}. Revise o planejamento.`}</p><div className="budget-plan-compare"><span>Planejado<strong>{currency(planned.planned)}</strong></span><span>Gasto registrado<strong>{currency(planned.spent)}</strong></span><progress max={Math.max(planned.planned, planned.spent, 1)} value={planned.spent} /></div>{(summary.titheRecorded > 0 || summary.titheToReturn > 0) && <div className="budget-tithe-note"><strong>Dízimo</strong>{summary.titheRecorded > 0 && <span>{currency(summary.titheRecorded)} somente registrado, sem descontar novamente.</span>}{summary.titheToReturn > 0 && <span>{currency(summary.titheToReturn)} ainda precisa ser devolvido.</span>}</div>}</Card>
           <Card title="Metas da família" eyebrow="Progresso">{snapshot.goals.length ? <div className="budget-goal-mini">{snapshot.goals.slice(0, 3).map((goal) => <div key={goal.id}><span><strong>{goal.name}</strong><small>{currency(goal.reservedAmount)} de {currency(goal.targetAmount)}</small></span><progress max={goal.targetAmount || 1} value={goal.reservedAmount} /></div>)}</div> : <p className="muted">Nenhuma meta cadastrada.</p>}<Link className="text-link" to={`/app/orcamento/metas?mes=${month}`}>Ver metas <ChevronRight /></Link></Card>

@@ -17,7 +17,7 @@ async function register(page: Page) {
   await expect(page.getByRole('heading', { name: 'Visão do distrito' })).toBeVisible()
 }
 
-test('barra inferior, busca do cabeçalho e botão de criar funcionam', async ({ page }, testInfo) => {
+test('barra inferior, atalhos do topo e botão de criar funcionam', async ({ page }, testInfo) => {
   await register(page)
 
   if (testInfo.project.name === 'mobile-chromium') {
@@ -31,12 +31,9 @@ test('barra inferior, busca do cabeçalho e botão de criar funcionam', async ({
     await expect(page).toHaveURL(/\/app$/)
   }
 
-  const search = page.getByRole('searchbox', { name: 'Buscar pessoa, família ou igreja' })
-  await expect(search).toBeVisible()
-  await search.fill('Distrito Fictício')
-  await search.press('Enter')
-  await expect(page).toHaveURL(/\/app\/busca\?termo=/)
-  await expect(page.getByRole('heading', { name: 'Busca global' })).toBeVisible()
+  // O topo tem só dois atalhos, os dois em ícone.
+  await expect(page.getByRole('searchbox', { name: 'Buscar pessoa, família ou igreja' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Nova visita' })).toHaveCount(0)
 
   const create = page.getByRole('button', { name: 'Criar' })
   await expect(create).toHaveAttribute('aria-expanded', 'false')

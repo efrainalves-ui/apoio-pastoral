@@ -22,8 +22,8 @@ import {
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
-import { GlobalSearchField } from './GlobalSearchField'
 import { QuickActions } from './QuickActions'
+import { SyncNowButton } from './SyncNowButton'
 import { Button } from './ui/Button'
 
 const primaryNav = [
@@ -38,6 +38,7 @@ const primaryNav = [
   { to: '/app/planejamento', label: 'Planejamento Anual', icon: CalendarRange },
   { to: '/app/evangelismo', label: 'Evangelismo', icon: Megaphone },
   { to: '/app/comissoes', label: 'Comissões', icon: ClipboardList },
+  { to: '/app/fidelidade', label: 'Fidelidade', icon: ShieldCheck },
   { to: '/app/leitura', label: 'Leitura', icon: Library, personal: true },
   { to: '/app/orcamento', label: 'Orçamento Familiar', icon: WalletCards, personal: true },
   { to: '/app/mais', label: 'Mais', icon: MoreHorizontal },
@@ -101,8 +102,10 @@ export function AppShell() {
         <header className="app-header">
           <button className="icon-button app-header__menu" aria-label="Abrir menu" onClick={() => setOpen(true)}><Menu /></button>
           <span className="app-header__brand">Apoio Pastoral</span>
-          <GlobalSearchField />
-          <QuickActions />
+          <div className="app-header__actions">
+            <QuickActions />
+            <SyncNowButton compact />
+          </div>
           <button className="icon-button app-header__leave" aria-label="Sair" onClick={leave}><LogOut /></button>
         </header>
         <main id="conteudo" className="content" tabIndex={-1}><Outlet /></main>

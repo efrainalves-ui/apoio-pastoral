@@ -45,7 +45,16 @@ test('pedidos de oração, leitura e cerimônias são acessíveis no computador 
   await page.getByLabel('Título').fill('Livro Fictício E2E')
   await page.getByLabel('Autor').fill('Autor Fictício E2E')
   await page.getByRole('button', { name: 'Salvar livro' }).click()
-  await expect(page.getByRole('heading', { name: 'Livro Fictício E2E' })).toBeVisible()
+
+  // A lista fica compacta; os detalhes só aparecem ao tocar no livro.
+  const livro = page.locator('.reading-list button.entity-row').filter({ hasText: 'Livro Fictício E2E' })
+  await expect(livro).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(0)
+  await livro.click()
+  await expect(page.getByRole('button', { name: 'Editar' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Concluir' })).toBeVisible()
+  await livro.click()
+  await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(0)
 
   await openMenuOnMobile(page, testInfo.project.name)
   await mainNavigation(page).getByRole('link', { name: 'Agenda', exact: true }).click()

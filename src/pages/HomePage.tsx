@@ -1,4 +1,4 @@
-import { BookHeart, Cake, CalendarDays, ChevronRight, Church, Heart, HeartHandshake, ListChecks, Megaphone, Plus, ShieldCheck, SquareCheck, UsersRound } from 'lucide-react'
+import { BookHeart, Cake, CalendarDays, ChevronRight, Church, Heart, HeartHandshake, ListChecks, Megaphone, ShieldCheck, SquareCheck, UsersRound } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
@@ -6,7 +6,6 @@ import { AgendaService } from '../agenda/service'
 import type { AgendaEventEntity } from '../agenda/types'
 import { CareService } from '../care/service'
 import type { FollowUpEntity, PrayerRequestEntity, TaskEntity, VisitRoundEntity } from '../care/types'
-import { SyncNowButton } from '../components/SyncNowButton'
 import { GoalsSummary } from '../components/GoalsSummary'
 import { VisitAnswersSummary } from '../components/VisitAnswersSummary'
 import { Card } from '../components/ui/Card'
@@ -86,7 +85,7 @@ export function HomePage() {
     .filter(({ motivo }) => motivo.length > 0)
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
 
-  return <div className="page-stack"><header className="page-hero"><div><p className="eyebrow">Hoje</p><h1>Visão do distrito</h1><p>O que merece sua atenção pastoral neste momento.</p></div><div className="page-actions"><SyncNowButton /><Link className="button button--secondary" to="/app/visitas/nova"><HeartHandshake />Nova visita</Link><Link className="button" to="/app/agenda/novo"><Plus />Novo compromisso</Link></div></header>
+  return <div className="page-stack"><header className="page-hero"><div><p className="eyebrow">Hoje</p><h1>Visão do distrito</h1></div></header>
     <GoalsSummary />
     <VisitAnswersSummary />
     <section className="dashboard-metrics" aria-label="Resumo do distrito"><Link to="/app/pessoas"><small>Pessoas</small><strong>{people.length}</strong><span>{people.filter(({ pastoralStatus }) => pastoralStatus === 'active').length} ativas</span></Link><Link to="/app/pessoas"><small>Acompanhar</small><strong>{people.filter(({ pastoralStatus }) => pastoralStatus === 'rescue').length}</strong><span>pessoas a resgatar</span></Link><Link to="/app/familias"><small>Famílias</small><strong>{families}</strong><span>laços cadastrados</span></Link><Link to="/app/aniversarios"><small>Aniversários hoje</small><strong>{todayBirthdays.length}</strong><span>ver mensagens</span></Link></section>
