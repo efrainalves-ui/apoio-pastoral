@@ -24,9 +24,9 @@ test('barra inferior, atalhos do topo e botão de criar funcionam', async ({ pag
     // A Bíblia do Produto define exatamente estas cinco entradas, nesta ordem.
     const bottom = page.getByLabel('Navegação principal móvel')
     await expect(bottom).toBeVisible()
-    await expect(bottom.getByRole('link')).toHaveText(['Início', 'Agenda', 'Pessoas', 'Distrito', 'Mais'])
-    await bottom.getByRole('link', { name: 'Distrito' }).click()
-    await expect(page).toHaveURL(/\/app\/distrito$/)
+    await expect(bottom.getByRole('link')).toHaveText(['Início', 'Agenda', 'Distrito', 'Visitação', 'Mais'])
+    await bottom.getByRole('link', { name: 'Visitação' }).click()
+    await expect(page).toHaveURL(/\/app\/visitacao$/)
     await bottom.getByRole('link', { name: 'Início' }).click()
     await expect(page).toHaveURL(/\/app$/)
   }
@@ -34,6 +34,15 @@ test('barra inferior, atalhos do topo e botão de criar funcionam', async ({ pag
   // O topo tem só dois atalhos, os dois em ícone.
   await expect(page.getByRole('searchbox', { name: 'Buscar pessoa, família ou igreja' })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Nova visita' })).toHaveCount(0)
+
+  // Mais não repete o que já está no menu principal e não cria registros.
+  await navigateInsideApp(page, '/app/mais', page.getByRole('heading', { name: 'Mais', exact: true }))
+  const mais = page.locator('main')
+  for (const repetido of ['Visitas e cuidados', 'Pedidos de Oração', 'Famílias', 'Cuidados pastorais', 'Importar pessoas', 'Fidelidade', 'Leitura', 'Orçamento Familiar']) {
+    await expect(mais.getByRole('link', { name: repetido })).toHaveCount(0)
+  }
+  await expect(mais.getByRole('link', { name: 'Aniversários' })).toBeVisible()
+  await navigateInsideApp(page, '/app', page.getByRole('heading', { name: 'Visão do distrito' }))
 
   const create = page.getByRole('button', { name: 'Criar' })
   await expect(create).toHaveAttribute('aria-expanded', 'false')

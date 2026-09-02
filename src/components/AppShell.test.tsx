@@ -17,11 +17,13 @@ function renderShell() {
 describe('menu do aplicativo', () => {
   it('oferece os atalhos principais e a área Mais sem linguagem técnica', () => {
     renderShell()
-    for (const label of ['Início', 'Agenda', 'Distrito e igrejas', 'Pessoas e famílias', 'Visitas e cuidados', 'Pedidos de Oração', 'Sermões', 'Metas', 'Planejamento Anual', 'Evangelismo', 'Leitura', 'Orçamento Familiar', 'Mais']) expect(screen.getAllByRole('link', { name: label }).length).toBeGreaterThan(0)
+    for (const label of ['Início', 'Agenda', 'Distrito', 'Visitação', 'Fidelidade', 'Sermões', 'Metas', 'Planejamento Anual', 'Evangelismo', 'Leitura', 'Orçamento Familiar', 'Mais']) expect(screen.getAllByRole('link', { name: label }).length).toBeGreaterThan(0)
     expect(screen.queryByText('V1 · Cuidado pastoral')).not.toBeInTheDocument()
     expect(screen.queryByText('Cofre desbloqueado')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Orçamento Familiar' })).toHaveClass('nav-item--personal')
     expect(screen.getByRole('link', { name: 'Leitura' })).toHaveClass('nav-item--personal')
+    // Pessoas, famílias e cuidado pastoral moram dentro de Distrito e Visitação.
+    for (const label of ['Pessoas e famílias', 'Visitas e cuidados', 'Pedidos de Oração']) expect(screen.queryByRole('link', { name: label })).not.toBeInTheDocument()
   })
 
   it('pede confirmação antes de sair e preserva a proteção de bloqueio', async () => {

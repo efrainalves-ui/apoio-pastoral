@@ -1,4 +1,4 @@
-import { BookOpen, CalendarPlus, Church, ClipboardList, Heart, HeartHandshake, Megaphone, Plus, SquareCheck, UserRound, UsersRound } from 'lucide-react'
+import { BookOpen, CalendarPlus, Church, ClipboardList, Heart, HeartHandshake, Megaphone, Plus, RotateCcw, SquareCheck, UserRound, UsersRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 
@@ -7,8 +7,9 @@ const actions = [
   { to: '/app/visitas/nova', label: 'Nova visita', icon: HeartHandshake },
   { to: '/app/pessoas/nova', label: 'Nova pessoa', icon: UserRound },
   { to: '/app/familias/nova', label: 'Nova família', icon: UsersRound },
-  { to: '/app/pedidos-oracao', label: 'Novo pedido de oração', icon: Heart },
-  { to: '/app/cuidados#tarefas', label: 'Nova tarefa', icon: SquareCheck },
+  { to: '/app/visitacao?aba=oracao', label: 'Novo pedido de oração', icon: Heart },
+  { to: '/app/visitacao?aba=acompanhamentos', label: 'Novo acompanhamento', icon: RotateCcw },
+  { to: '/app/visitacao?aba=tarefas', label: 'Nova tarefa', icon: SquareCheck },
   { to: '/app/sermoes/novo', label: 'Novo sermão', icon: BookOpen },
   { to: '/app/evangelismo/nova', label: 'Nova campanha', icon: Megaphone },
   { to: '/app/comissoes', label: 'Nova reunião', icon: ClipboardList },

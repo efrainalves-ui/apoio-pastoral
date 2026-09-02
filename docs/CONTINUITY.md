@@ -70,6 +70,13 @@ Concluída a criação e restauração de backup local cifrado. O arquivo conté
 - A Agenda aceita Batismo, Santa Ceia, Casamento e Dedicação de criança, com responsável, pessoas aplicáveis e checklists próprios. Os compromissos continuam no mesmo fluxo de Dia, Semana, Mês e Lista; nenhum documento civil ou certificado foi criado.
 - Em 27 de agosto de 2026, lint, TypeScript, build, PWA e 134 testes Vitest em 46 arquivos foram aprovados. O Playwright permanece pendente no CI Linux porque o Chromium headless foi bloqueado pelo sandbox macOS antes de abrir qualquer página.
 
+## Etapa estável: Distrito como centro e Visitação unificada
+
+- O menu principal ficou com Início, Agenda, Distrito, Visitação, Sermões, Metas, Planejamento Anual, Evangelismo, Comissões, Fidelidade, Leitura, Orçamento Familiar e Mais. Pessoas, Famílias, Cuidado pastoral, Visitas e Importar lista de membros deixaram de ser módulos próprios; o Mais lista apenas o que não está no menu principal e não oferece nenhuma ação de criação.
+- Distrito abre com a lista de igrejas e uma busca única que encontra igreja, membro e família. A igreja abre em abas: Visão geral, Membros, Famílias, Agenda, Histórico e Indicadores. A aba Membros traz Cadastrar membro e Importar lista de membros, e a importação acontece já dentro da igreja escolhida, sem perguntar a igreja de novo. A importação fictícia simulada saiu da interface.
+- Visitação reúne Visitas, Acompanhamentos, Pedidos de oração e Tarefas em abas, mais as rodadas de visitação. Nada foi migrado nem duplicado: as telas antigas de Visitas, Cuidados e Pedidos de Oração redirecionam para a aba correspondente, e todos os registros continuam sendo lidos dos mesmos dados cifrados.
+- O botão + segue como atalho único de criação e agora oferece também Novo acompanhamento e Nova tarefa, apontando para as abas de Visitação.
+
 ## Etapa estável: topo simples, Leitura enxuta e Orçamento com resumo visual
 
 - O topo do aplicativo ficou só com dois atalhos em ícone: criar (+) e sincronizar. A barra de pesquisa saiu do cabeçalho — a Busca continua em Mais — e a faixa branca deu lugar ao mesmo verde-escuro do menu lateral. A tela inicial perdeu a frase de abertura e os botões com texto; criar qualquer registro passa pelo +.

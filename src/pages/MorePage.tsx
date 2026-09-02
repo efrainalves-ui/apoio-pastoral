@@ -1,13 +1,10 @@
-import { ArchiveRestore, BookHeart, Cake, ChevronRight, Cloud, FileText, FileUp, GitCompare, HeartHandshake, LockKeyhole, Search, UsersRound } from 'lucide-react'
+import { ArchiveRestore, BookHeart, Cake, ChevronRight, Cloud, FileText, GitCompare, LockKeyhole, Search, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/ui/Card'
 
 const groups = [
-  { title: 'Pessoas e cuidado', links: [
-    { to: '/app/familias', icon: UsersRound, title: 'Famílias', detail: 'Organize os lares do distrito' },
-    { to: '/app/cuidados', icon: HeartHandshake, title: 'Cuidados pastorais', detail: 'Pedidos, tarefas e rodadas' },
+  { title: 'Pessoas', links: [
     { to: '/app/aniversarios', icon: Cake, title: 'Aniversários', detail: 'Acompanhe as próximas datas' },
-    { to: '/app/pessoas/importar', icon: FileUp, title: 'Importar pessoas', detail: 'Revise e organize os cadastros' },
   ] },
   { title: 'Missão e relatórios', links: [
     { to: '/app/missionario', icon: BookHeart, title: 'Interessados e estudos bíblicos', detail: 'Acompanhe cada pessoa' },

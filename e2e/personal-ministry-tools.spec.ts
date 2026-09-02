@@ -25,8 +25,9 @@ test('pedidos de oração, leitura e cerimônias são acessíveis no computador 
   await registerAndEnter(page)
 
   await openMenuOnMobile(page, testInfo.project.name)
-  await mainNavigation(page).getByRole('link', { name: 'Pedidos de Oração', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Pedidos de Oração' })).toBeVisible()
+  await mainNavigation(page).getByRole('link', { name: 'Visitação', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Visitação', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Pedidos de oração' }).click()
 
   // Sem nenhum pedido, a tela mostra só o convite para cadastrar o primeiro.
   await expect(page.getByText('Cadastre seu primeiro pedido de oração.')).toBeVisible()
@@ -84,7 +85,8 @@ test('acompanhamento dos pedidos abre por igreja, pessoa e pedido', async ({ pag
   await page.getByRole('button', { name: 'Salvar pessoa' }).click()
   await expect(page.getByRole('heading', { name: 'Membro Fictício da Oração' })).toBeVisible()
 
-  await navigateInsideApp(page, '/app/pedidos-oracao', page.getByRole('heading', { name: 'Pedidos de Oração' }))
+  await navigateInsideApp(page, '/app/visitacao', page.getByRole('heading', { name: 'Visitação', exact: true }))
+  await page.getByRole('button', { name: 'Pedidos de oração' }).click()
 
   // Membro da igreja: a lista aparece sozinha depois de escolher a igreja.
   await page.getByRole('button', { name: 'Novo pedido' }).click()

@@ -84,6 +84,14 @@ h1, h2, h3, .brand strong { font-family: ui-rounded, "SF Pro Rounded", Inter, ui
 .alert--warning { color: #6b4c14; background: #fdf4e3; border: 1px solid #ecd9ae; }
 .row-actions { display: flex; gap: 10px; align-items: center; }
 .plain-list { display: grid; gap: 6px; margin: 0 0 14px; padding-left: 18px; color: var(--muted); }
+
+/* Distrito, igreja e visitação seguem a mesma escala e o mesmo respiro. */
+.church-page, .visitation-page { gap: 18px; }
+.church-page .card, .visitation-page .card { padding: 20px; }
+.church-page .card__title, .visitation-page .card__title { font-size: 1.06rem; }
+.church-page .page-actions, .visitation-page .page-actions { margin-bottom: 14px; }
+.church-page .empty-state, .visitation-page .empty-state { padding: 24px 12px; }
+.church-page .detail-list dd { font-size: .95rem; }
 .plain-list strong { color: var(--ink); }
 .status-pill { min-height: 30px; padding: 5px 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: .76rem; font-weight: 700; white-space: nowrap; }
 .status-pill--success { background: #e3f1e9; color: #25614f; }
@@ -309,6 +317,13 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .entity-badge--active { color: #235c4c; background: #e3f1e9; }
 .entity-badge--archived { color: #59635f; background: #e9eceb; }
 .filter-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, .42fr); gap: 16px; }
+
+/* Abas de módulo: uma faixa só, que rola no celular em vez de empilhar. */
+.tab-bar { display: flex; gap: 6px; overflow-x: auto; padding: 5px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); scrollbar-width: thin; }
+.tab-bar .button { min-height: 40px; padding: 0 14px; border: 0; border-radius: 9px; font-size: .82rem; white-space: nowrap; }
+.tab-bar .button:hover:not(:disabled) { transform: none; box-shadow: none; }
+.tab-bar .button--secondary { color: var(--muted); background: transparent; }
+.tab-bar .button--secondary:hover { color: var(--ink); background: var(--green-50); }
 .search-only { max-width: 620px; }
 .search-input { min-height: 49px; border: 1px solid #cbd5d0; border-radius: 11px; padding: 0 13px; display: flex; align-items: center; gap: 9px; background: white; }
 .search-input:focus-within { border-color: var(--green-700); box-shadow: 0 0 0 3px rgb(44 108 90 / 13%); }
@@ -1139,7 +1154,8 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   .text-button, .nomination-page summary, .accent-icon, .readiness-card__check, .quick-actions__menu svg { color: #9ed4bd; }
   .readiness-card__icon, .device-row__icon, .church-card__icon, .fixture-row > span:first-child, .avatar, .birthday-date, .file-picker, .budget-hero > svg { color: #d9eee5; }
   .detail-highlight svg, .privacy-list li > svg, .check-list svg, .search-results > a > svg, .budget-quick-actions svg { color: #9ed4bd; }
-  .budget-nav a.active { color: #0e1714; background: #9ed4bd; }
+  .budget-nav a.active, .tab-bar .button--primary { color: #0e1714; background: #9ed4bd; }
+  .tab-bar .button--secondary { color: #b9c7c1; }
   .budget-metrics .positive { border-color: #4f7565; background: #1e3a30; }
   .budget-outlook--ok { border-color: #4f7565; background: #1e3a30; }
   .budget-outlook--atencao { border-color: #6d5c3a; background: #3a3121; }

@@ -28,8 +28,8 @@ describe('completude do que o aplicativo promete', () => {
 
   it('mantém todas as áreas do produto com rota própria', () => {
     const areas = [
-      'agenda', 'distrito', 'pessoas', 'familias', 'pessoas/importar', 'aniversarios',
-      'visitas', 'sermoes', 'fidelidade', 'pedidos-oracao', 'leitura', 'orcamento',
+      'agenda', 'distrito', 'pessoas', 'familias', 'aniversarios',
+      'visitacao', 'sermoes', 'fidelidade', 'leitura', 'orcamento',
       'comissoes', 'comissoes/nomeacoes', 'evangelismo', 'planejamento', 'relatorios',
       'backup', 'sincronizacao', 'seguranca',
     ]

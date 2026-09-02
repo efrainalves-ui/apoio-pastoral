@@ -19,7 +19,6 @@ import { FamiliesPage } from '../pages/FamiliesPage'
 import { FamilyDetailPage } from '../pages/FamilyDetailPage'
 import { FamilyFormPage } from '../pages/FamilyFormPage'
 import { HomePage } from '../pages/HomePage'
-import { MemberImportPage } from '../pages/MemberImportPage'
 import { MorePage } from '../pages/MorePage'
 import { PeoplePage } from '../pages/PeoplePage'
 import { PersonDetailPage } from '../pages/PersonDetailPage'
@@ -45,7 +44,6 @@ import { CommissionKindPage } from '../pages/CommissionKindPage'
 import { CommissionMeetingPage } from '../pages/CommissionMeetingPage'
 import { NominationProcessesPage } from '../pages/NominationProcessesPage'
 import { NominationProcessPage } from '../pages/NominationProcessPage'
-import { PrayerRequestsPage } from '../pages/PrayerRequestsPage'
 import { ReadingPage } from '../pages/ReadingPage'
 import { AnnualPlanningPage } from '../pages/AnnualPlanningPage'
 import { AnnualGoalPage } from '../pages/AnnualGoalPage'
@@ -54,11 +52,10 @@ import { EvangelismPage } from '../pages/EvangelismPage'
 import { CampaignPage } from '../pages/CampaignPage'
 import { DistrictService } from '../district/service'
 
-const CarePage = lazy(() => import('../pages/CarePage').then((module) => ({ default: module.CarePage })))
 const FidelityPage = lazy(() => import('../pages/FidelityPage').then((module) => ({ default: module.FidelityPage })))
 const VisitDetailPage = lazy(() => import('../pages/VisitDetailPage').then((module) => ({ default: module.VisitDetailPage })))
 const VisitFormPage = lazy(() => import('../pages/VisitFormPage').then((module) => ({ default: module.VisitFormPage })))
-const VisitsPage = lazy(() => import('../pages/VisitsPage').then((module) => ({ default: module.VisitsPage })))
+const VisitationPage = lazy(() => import('../pages/VisitationPage').then((module) => ({ default: module.VisitationPage })))
 const FamilyBudgetPage = lazy(() => import('../pages/FamilyBudgetPage').then((module) => ({ default: module.FamilyBudgetPage })))
 
 const districtService = new DistrictService()
@@ -178,7 +175,6 @@ export function App() {
         <Route path="missionario/grupos" element={<CommunityGroupsPage />} />
         <Route path="pessoas" element={<PeoplePage />} />
         <Route path="pessoas/nova" element={<PersonFormPage />} />
-        <Route path="pessoas/importar" element={<MemberImportPage />} />
         <Route path="pessoas/:personId" element={<PersonDetailPage />} />
         <Route path="pessoas/:personId/editar" element={<PersonFormPage />} />
         <Route path="familias" element={<FamiliesPage />} />
@@ -197,12 +193,13 @@ export function App() {
         <Route path="comissoes/:meetingId" element={<CommissionMeetingPage />} />
         <Route path="orcamento" element={<Navigate to="/app/orcamento/resumo" replace />} />
         <Route path="orcamento/:section" element={<FamilyBudgetPage />} />
-        <Route path="visitas" element={<VisitsPage />} />
+        <Route path="visitacao" element={<VisitationPage />} />
+        <Route path="visitas" element={<Navigate to="/app/visitacao" replace />} />
         <Route path="visitas/nova" element={<VisitFormPage />} />
         <Route path="visitas/:visitId" element={<VisitDetailPage />} />
-        <Route path="pedidos-oracao" element={<PrayerRequestsPage />} />
+        <Route path="pedidos-oracao" element={<Navigate to="/app/visitacao?aba=oracao" replace />} />
         <Route path="leitura" element={<ReadingPage />} />
-        <Route path="cuidados" element={<CarePage />} />
+        <Route path="cuidados" element={<Navigate to="/app/visitacao?aba=acompanhamentos" replace />} />
         <Route path="distrito" element={<DistrictPage />} />
         <Route path="distrito/igrejas/nova" element={<ChurchFormPage />} />
         <Route path="distrito/igrejas/:churchId" element={<ChurchDetailPage />} />

@@ -1,4 +1,4 @@
-import { Archive, Building2, Church, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Archive, Building2, Church, MapPin, Pencil, Plus, Search, Trash2, UsersRound } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
@@ -9,10 +9,15 @@ import { DistrictService } from '../district/service'
 import { ImportedChurchRepairService, previewImportedChurchNameCorrections, type ChurchNameCorrection } from '../district/importedChurchRepair'
 import { CHURCH_STATUS_LABELS, CHURCH_TYPE_LABELS, type ChurchEntity, type DistrictEntity } from '../district/types'
 import { DomainValidationError } from '../district/validation'
+import { FamilyService } from '../families/service'
+import type { FamilyEntity } from '../families/types'
 import { PeopleService } from '../people/service'
+import type { PersonEntity } from '../people/types'
+import { normalizePersonName } from '../people/validation'
 
 const service = new DistrictService()
 const peopleService = new PeopleService()
+const familyService = new FamilyService()
 const repairService = new ImportedChurchRepairService()
 
 function messageFrom(error: unknown): string {
@@ -31,6 +36,9 @@ export function DistrictPage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [corrections, setCorrections] = useState<ChurchNameCorrection[] | null>(null)
+  const [people, setPeople] = useState<PersonEntity[]>([])
+  const [families, setFamilies] = useState<FamilyEntity[]>([])
+  const [query, setQuery] = useState('')
 
   const load = useCallback(async () => {
     if (!account || !masterKey) return
@@ -42,8 +50,10 @@ export function DistrictPage() {
       setName(nextDistrict?.name ?? '')
       const nextChurches = nextDistrict ? await service.listChurches(account.id, masterKey, nextDistrict.id) : []
       setChurches(nextChurches)
-      const people = await peopleService.listPeople(account.id, masterKey)
-      setCorrections(previewImportedChurchNameCorrections(nextChurches, people))
+      const [nextPeople, nextFamilies] = await Promise.all([peopleService.listPeople(account.id, masterKey), familyService.listFamilies(account.id, masterKey)])
+      setPeople(nextPeople)
+      setFamilies(nextFamilies)
+      setCorrections(previewImportedChurchNameCorrections(nextChurches, nextPeople))
     } catch (loadError) {
       setError(messageFrom(loadError))
     } finally {
@@ -119,13 +129,20 @@ export function DistrictPage() {
     )
   }
 
+  const termo = normalizePersonName(query)
+  const churchName = (id: string) => churches.find((church) => church.id === id)?.name ?? 'Igreja não encontrada'
+  const achados = {
+    churches: termo ? churches.filter((church) => normalizePersonName(church.name).includes(termo)).slice(0, 8) : [],
+    people: termo ? people.filter((person) => normalizePersonName(person.name).includes(termo)).slice(0, 8) : [],
+    families: termo ? families.filter((family) => normalizePersonName(family.name).includes(termo)).slice(0, 8) : [],
+  }
   const activeCount = churches.filter(({ status }) => status === 'active').length
   const archivedCount = churches.length - activeCount
 
   return (
     <div className="page-stack">
       <header className="page-hero district-hero">
-        <div><p className="eyebrow">Distrito</p><h1>{district.name}</h1><p>Organize as igrejas do seu distrito.</p></div>
+        <div><p className="eyebrow">Distrito</p><h1>{district.name}</h1></div>
         <div className="page-actions">
           <Button variant="secondary" onClick={() => { setName(district.name); setEditing(true); setConfirmDelete(false) }} icon={<Pencil size={17} />}>Editar distrito</Button>
           <Button variant="danger" onClick={() => { setConfirmDelete(true); setEditing(false) }} icon={<Trash2 size={17} />}>Excluir distrito</Button>
@@ -162,6 +179,20 @@ export function DistrictPage() {
         <div><small>Ativas</small><strong>{activeCount}</strong></div>
         <div><small>Arquivadas</small><strong>{archivedCount}</strong></div>
       </section>
+
+      <Card title="Buscar no distrito">
+        <label className="field search-only" htmlFor="district-search">
+          <span className="field__label">Igreja, membro ou família</span>
+          <span className="search-input"><Search /><input id="district-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Digite um nome" /></span>
+        </label>
+        {termo && (achados.churches.length + achados.people.length + achados.families.length === 0
+          ? <p className="muted">Nada encontrado com esse nome.</p>
+          : <div className="entity-list">
+            {achados.churches.map((item) => <Link className="entity-row" key={item.id} to={`/app/distrito/igrejas/${item.id}`}><Church aria-hidden="true" /><span><strong>{item.name}</strong><small>Igreja</small></span><span>Abrir</span></Link>)}
+            {achados.people.map((item) => <Link className="entity-row" key={item.id} to={`/app/pessoas/${item.id}`}><span className="avatar">{item.name.slice(0, 1).toUpperCase()}</span><span><strong>{item.name}</strong><small>Membro · {churchName(item.currentChurchId)}</small></span><span>Abrir</span></Link>)}
+            {achados.families.map((item) => <Link className="entity-row" key={item.id} to={`/app/familias/${item.id}`}><UsersRound aria-hidden="true" /><span><strong>{item.name}</strong><small>Família · {churchName(item.primaryChurchId)}</small></span><span>Abrir</span></Link>)}
+          </div>)}
+      </Card>
 
       <Card eyebrow="Igrejas" title="Unidades do distrito" action={<Link className="button button--primary" to="/app/distrito/igrejas/nova"><Plus size={18} /><span>Nova igreja</span></Link>}>
         {churches.length === 0 ? (

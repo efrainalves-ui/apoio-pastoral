@@ -29,7 +29,7 @@ type View =
   | { level: 'naoCadastrado'; key: string }
   | { level: 'semIdentificacao' }
 
-export function PrayerRequestsPage() {
+export function PrayerRequestsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { account, masterKey } = useAuthVault()
   const [prayers, setPrayers] = useState<PrayerRequestEntity[]>([])
   const [churches, setChurches] = useState<ChurchEntity[]>([])
@@ -156,7 +156,10 @@ export function PrayerRequestsPage() {
     <div className="form-actions"><Button type="submit" disabled={busy}>{busy ? 'Salvando…' : 'Salvar pedido'}</Button><Button type="button" variant="secondary" onClick={() => { setDraft(null); setEditingId('') }}>Cancelar</Button></div>
   </form></Card>
 
-  const cabecalho = <header className="page-hero"><div><p className="eyebrow">Cuidado e intercessão</p><h1>Pedidos de Oração</h1></div><Button icon={<Plus />} onClick={novoPedido}>Novo pedido</Button></header>
+  // Dentro de Visitação o título já é da aba; aqui fica só o botão de criar.
+  const cabecalho = embedded
+    ? <div className="page-actions"><Button icon={<Plus />} onClick={novoPedido}>Novo pedido</Button></div>
+    : <header className="page-hero"><div><p className="eyebrow">Cuidado e intercessão</p><h1>Pedidos de Oração</h1></div><Button icon={<Plus />} onClick={novoPedido}>Novo pedido</Button></header>
 
   // Enquanto não existe nenhum pedido, a tela mostra só o caminho para o primeiro.
   if (!prayers.length && !draft) return <div className="page-stack prayer-page">

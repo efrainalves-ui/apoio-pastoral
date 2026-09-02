@@ -8,10 +8,8 @@ import {
   Menu,
   MoreHorizontal,
   ShieldCheck,
-  Users,
   Flag,
   ClipboardList,
-  Heart,
   Library,
   WalletCards,
   CalendarRange,
@@ -29,10 +27,8 @@ import { Button } from './ui/Button'
 const primaryNav = [
   { to: '/app', label: 'Início', icon: Home, end: true },
   { to: '/app/agenda', label: 'Agenda', icon: CalendarDays },
-  { to: '/app/distrito', label: 'Distrito e igrejas', icon: Church },
-  { to: '/app/pessoas', label: 'Pessoas e famílias', icon: Users },
-  { to: '/app/visitas', label: 'Visitas e cuidados', icon: HeartHandshake },
-  { to: '/app/pedidos-oracao', label: 'Pedidos de Oração', icon: Heart },
+  { to: '/app/distrito', label: 'Distrito', icon: Church },
+  { to: '/app/visitacao', label: 'Visitação', icon: HeartHandshake },
   { to: '/app/sermoes', label: 'Sermões', icon: BookOpen },
   { to: '/app/metas', label: 'Metas', icon: Flag },
   { to: '/app/planejamento', label: 'Planejamento Anual', icon: CalendarRange },
@@ -44,14 +40,13 @@ const primaryNav = [
   { to: '/app/mais', label: 'Mais', icon: MoreHorizontal },
 ]
 
-// A Bíblia do Produto define estas cinco entradas, nesta ordem, com rótulos
-// curtos para caber no celular. Visitas e cuidados continua a um toque pelo
-// Início, por "Mais" e pelos vínculos de cada pessoa e família.
+// Cinco entradas, nesta ordem, com rótulos curtos para caber no celular.
+// Membros e famílias ficam dentro da igreja, em Distrito.
 const mobileNav = [
   { to: '/app', label: 'Início', icon: Home, end: true },
   { to: '/app/agenda', label: 'Agenda', icon: CalendarDays, end: false },
-  { to: '/app/pessoas', label: 'Pessoas', icon: Users, end: false },
   { to: '/app/distrito', label: 'Distrito', icon: Church, end: false },
+  { to: '/app/visitacao', label: 'Visitação', icon: HeartHandshake, end: false },
   { to: '/app/mais', label: 'Mais', icon: MoreHorizontal, end: false },
 ]
 

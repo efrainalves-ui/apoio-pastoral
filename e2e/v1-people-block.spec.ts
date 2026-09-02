@@ -46,8 +46,21 @@ test('pessoas, família, aniversários, busca e importações privadas funcionam
   await page.getByRole('button', { name: 'Salvar família' }).click()
   await expect(page.getByRole('heading', { name: 'Família Sol Fictícia' })).toBeVisible()
 
-  await navigateInsideApp(page, '/app/pessoas/importar', page.getByRole('heading', { name: 'Importar lista de membros' }))
-  await page.getByRole('button', { name: 'Usar importação fictícia simulada' }).click()
+  // O distrito acha igreja, membro e família na mesma busca.
+  await navigateInsideApp(page, '/app/distrito', page.getByRole('heading', { name: 'Distrito Pessoas Fictício' }))
+  await page.getByLabel('Igreja, membro ou família').fill('Sol')
+  const achados = page.locator('.card').filter({ hasText: 'Buscar no distrito' })
+  await expect(achados.getByText('Pessoa Sol Fictícia')).toBeVisible()
+  await expect(achados.getByText('Família Sol Fictícia')).toBeVisible()
+  await page.getByLabel('Igreja, membro ou família').fill('')
+
+  // A importação acontece dentro da igreja e não pergunta a igreja de novo.
+  await page.getByRole('link', { name: /Igreja Aurora Fictícia/ }).click()
+  await page.getByRole('button', { name: 'Membros' }).click()
+  await page.getByRole('button', { name: 'Importar lista de membros' }).click()
+  await expect(page.getByLabel('Igreja desta lista')).toHaveCount(0)
+  await page.getByRole('textbox', { name: /Lista de membros/ }).fill('Pessoa Aurora Fictícia; 21/08/1990\nPessoa Horizonte Fictícia; 10/05/1985')
+  await page.getByRole('button', { name: 'Conferir lista colada' }).click()
   await expect(page.getByRole('heading', { name: 'Confira antes de salvar' })).toBeVisible()
   await page.getByRole('checkbox').check()
   await page.getByRole('button', { name: 'Confirmar e aplicar' }).click()

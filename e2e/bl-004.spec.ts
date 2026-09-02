@@ -45,7 +45,8 @@ test('CRUD e histórico de evolução da igreja', async ({ page }) => {
   await page.getByLabel(/Situação/).selectOption('archived')
   await page.getByRole('button', { name: 'Salvar igreja' }).click()
 
-  await expect(page.getByText('Grupo · disponível sem internet.')).toBeVisible()
+  await expect(page.getByText(/Grupo · \d+ membro/)).toBeVisible()
+  await page.getByRole('button', { name: 'Histórico' }).click()
   await expect(page.getByText('Tipo alterado de Ponto de pregação para Grupo')).toBeVisible()
   await expect(page.getByText('Situação alterada de Ativa para Arquivada')).toBeVisible()
 })
