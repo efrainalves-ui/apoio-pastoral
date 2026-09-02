@@ -11,6 +11,7 @@ import { parseFidelityText } from '../imports/parsers'
 import { ImportService } from '../imports/service'
 import type { FidelityImportPreview, ImportBatchEntity, ImportIssue } from '../imports/types'
 import { PeopleService } from '../people/service'
+import { isAutomatedTest } from '../sync/config'
 import { FIDELITY_CATEGORY_LABELS, type FidelitySnapshot, type PersonEntity } from '../people/types'
 import { fidelityCareSummary, isFaithfulByAge, isFidelityCareCandidate } from '../people/fidelitySummary'
 import { calculateAge } from '../people/dates'
@@ -148,7 +149,7 @@ export function FidelityPage() {
     <Card eyebrow={churchId ? churchName(churchId) : 'Distrito'} title="Fidelidade da igreja"><div className="private-summary"><div><span>Fiéis</span><strong>{careSummary.faithful}</strong></div><div><span>Em acompanhamento</span><strong>{careSummary.followingUp}</strong></div><button type="button" onClick={() => setAssessmentOpen(true)}><span>A avaliar</span><strong>{careSummary.toEvaluate}</strong></button></div><p className="field__hint">Fiéis reúne dizimistas, pessoas sem renda e pessoas de até 15 anos. A partir de 16 anos, quem não for dizimista sistemático entra na avaliação normal.</p></Card>
     <Card eyebrow="Importação local" title="Selecionar PDF de fidelidade">
       <label className="file-picker"><FileUp /><span><strong>{busy ? 'Lendo o PDF…' : 'Escolher PDF'}</strong><small>O arquivo é processado somente neste dispositivo e não é mantido.</small></span><input type="file" accept="application/pdf,.pdf" disabled={busy} onChange={(event) => { void selectFile(event.target.files?.[0]); event.currentTarget.value = '' }} /></label>
-      <div className="form-actions"><Button variant="secondary" onClick={() => void simulate()} disabled={busy} icon={<FileSearch />}>Usar importação fictícia simulada</Button><Button variant="secondary" disabled={!preview || busy} onClick={locateAutomatically}>Tentar localizar automaticamente</Button></div>
+      <div className="form-actions">{isAutomatedTest && <Button variant="secondary" onClick={() => void simulate()} disabled={busy} icon={<FileSearch />}>Usar importação fictícia simulada</Button>}<Button variant="secondary" disabled={!preview || busy} onClick={locateAutomatically}>Tentar localizar automaticamente</Button></div>
     </Card>
     {preview && <Card eyebrow="Prévia obrigatória" title="Conferir fidelidade">
       {preview.alreadyImported && <div className="alert alert--success">Este PDF já foi aplicado com a classificação atual; nada será duplicado.</div>}
