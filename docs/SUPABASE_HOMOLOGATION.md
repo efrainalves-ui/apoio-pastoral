@@ -16,7 +16,7 @@ As migrations de `0001_marco_zero_up.sql` a `0004_sessao_revogada_e_ambiente_up.
 - barrar a sessão de um aparelho revogado nos envelopes de senha, de recuperação e de chave, e na lista de aparelhos — o token que ele já tinha na mão para de valer na hora, e não só quando expira;
 - revogar todos os aparelhos da conta em um único comando, que é o que o encerramento de distrito precisa;
 - exigir que o próprio banco declare se é homologação ou produção;
-- deixar toda tabela e função futura de `public` fora do alcance do navegador até alguém conceder explicitamente.
+- deixar toda tabela futura de `public` fora do alcance do navegador até alguém conceder explicitamente, e exigir que cada função traga o próprio `revoke`, conferido pela prova de isolamento.
 
 Essas garantias têm testes estáticos e unitários locais. Ainda precisam ser comprovadas no Supabase de homologação; nenhuma migration foi aplicada remotamente nesta preparação.
 
@@ -66,6 +66,7 @@ Inserir os valores somente no computador privado do avaliador. Não versionar `.
 | Sair | Entrar com A em dois dispositivos e sair em um | O outro continua com a sessão aberta | Sair derruba o outro dispositivo |
 | Ambiente declarado | Apontar a build de homologação para um projeto sem a linha de ambiente, ou com `producao` | O aplicativo recusa sincronizar e diz por quê | A sincronização acontece |
 | Tabela futura | Criar uma tabela qualquer em `public` pelo editor SQL e consultá-la como conta fictícia | Acesso negado antes mesmo da RLS | A tabela responde ao navegador |
+| Função futura | Criar uma função qualquer em `public` e rodar `supabase/tests/01_rls_isolation.sql` | A prova reprova enquanto faltar o `revoke` da função | A prova passa com a função aberta a PUBLIC |
 | Conteúdo remoto | Sincronizar registro pastoral fictício e inspecionar tabelas | Somente IDs, versões, ciphertext, IV, AAD e timestamps; envelope de senha não contém senha nem chave legível | Qualquer conteúdo legível aparece |
 | Envio e recebimento | Alterar registro fictício no computador A e receber no celular A | Uma cópia lógica, sem duplicidade e com conteúdo correto após desbloqueio | Perda, duplicidade ou texto legível no transporte |
 | Isolamento do pull | Sincronizar A e executar pull como B | B não recebe operação de A | B recebe ID, envelope ou contagem de A |

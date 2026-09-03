@@ -338,14 +338,17 @@ select homologacao_testes.exigir(
 -- Uma função em public é chamável pela API. Nenhuma pode ficar ao alcance de
 -- quem não entrou na conta, e as que rodam como dono precisam ser exatamente
 -- as que este projeto escreveu de propósito.
+-- PUBLIC aparece em `aclexplode` com grantee 0, que não tem linha em pg_roles:
+-- o `join` derrubava exatamente o caso do padrão do PostgreSQL, que concede
+-- EXECUTE a PUBLIC em toda função nova. Era o caso que mais importava pegar.
 select homologacao_testes.exigir(
   not exists (
     select 1 from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
     cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) as a
-    join pg_roles r on r.oid = a.grantee
-    where n.nspname = 'public' and r.rolname in ('anon', 'public')),
-  'anon não executa nenhuma função de public');
+    left join pg_roles r on r.oid = a.grantee
+    where n.nspname = 'public' and (a.grantee = 0 or r.rolname = 'anon')),
+  'nem anon nem PUBLIC executam qualquer função de public');
 
 -- Por nome, e não por contagem: uma função definidora nova precisa ser uma
 -- decisão consciente, escrita aqui. Contar só avisaria que o número mudou.

@@ -228,8 +228,20 @@ as $$ select 4 $$;
 -- nova de public. A migration anterior revogava só TRUNCATE, REFERENCES e
 -- TRIGGER: uma tabela criada depois nasceria com SELECT, INSERT, UPDATE e
 -- DELETE ao alcance do navegador e, sem RLS ligada, sem barreira nenhuma.
--- Aqui o padrão passa a ser nada, e cada objeto recebe o que precisa, na mão.
+-- Para tabelas, o padrão passa a ser nada, e isso está provado em
+-- `03_sessao_revogada.sql`.
+--
+-- Para funções é diferente, e vale registrar em vez de prometer: o EXECUTE que
+-- o PostgreSQL concede a PUBLIC continua aparecendo em função nova mesmo com o
+-- `alter default privileges` abaixo — a prova no CI mostrou isso. Quem protege
+-- de verdade é a conferência de `01_rls_isolation.sql`, que reprova qualquer
+-- função de public ao alcance de PUBLIC ou de anon. Toda função precisa, por
+-- isso, do seu `revoke` escrito à mão — inclusive a de gatilho da 0001, que
+-- estava aberta desde então.
 -- ---------------------------------------------------------------------------
+
+revoke all on function public.prevent_revoked_device_reactivation()
+  from public, anon, authenticated;
 
 revoke all on public.service_environment from public, anon, authenticated;
 

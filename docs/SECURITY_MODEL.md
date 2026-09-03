@@ -171,7 +171,16 @@ esse ambiente. Uma build de produção apontada para o banco de homologação �
 contrário — não sincroniza, e um banco que não declara nada também não. O
 ambiente de homologação mostra uma marca discreta no cabeçalho.
 
-Toda tabela e função criada depois nasce fora do alcance de `anon` e
-`authenticated`: os privilégios padrão de `public` foram zerados, e cada objeto
-recebe na mão o que precisa. Antes, uma tabela nova nasceria legível e gravável
-pelo navegador, e sem RLS ligada não haveria barreira nenhuma.
+Toda **tabela** criada depois nasce fora do alcance de `anon` e `authenticated`:
+os privilégios padrão de `public` foram zerados. Antes, uma tabela nova nasceria
+legível e gravável pelo navegador, e sem RLS ligada não haveria barreira nenhuma.
+
+Com **função** a garantia é outra, e vale dizer exatamente qual: o PostgreSQL
+concede EXECUTE a `PUBLIC` em toda função nova, e o `alter default privileges`
+não alcança esse caso — a prova no CI mostrou isso. O que protege é a
+conferência de `01_rls_isolation.sql`, que reprova qualquer função de `public`
+ao alcance de `PUBLIC` ou de `anon`; toda função precisa trazer o próprio
+`revoke` escrito. Essa conferência tinha um furo: `PUBLIC` aparece com
+identificador zero, sem linha em `pg_roles`, e o `join` a descartava justamente
+no caso que mais importava. Corrigido, ele apanhou a função de gatilho da
+primeira migration, aberta desde então.

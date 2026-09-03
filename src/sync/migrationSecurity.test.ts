@@ -150,6 +150,19 @@ describe('migration de homologação', () => {
     // ligada, sem barreira nenhuma.
     const tudo = paresDeMigration().map(({ subida }) => subida).join('\n')
     expect(tudo).toMatch(/alter default privileges in schema public\s+revoke all on tables from anon, authenticated/u)
-    expect(tudo).toMatch(/alter default privileges in schema public\s+revoke execute on functions from public, anon, authenticated/u)
+
+    // Função é outro caso: o EXECUTE que o PostgreSQL concede a PUBLIC vem de
+    // qualquer jeito, então cada função precisa de um revoke escrito à mão. Sem
+    // isso a prova de isolamento reprova — e é ela que garante, não o padrão.
+    // A conferência é sobre o conjunto, não sobre cada arquivo: uma função pode
+    // ter sido criada em uma migration e fechada em outra, mais tarde, que é o
+    // caso da função de gatilho aberta desde a primeira.
+    for (const { nome, subida } of paresDeMigration()) {
+      for (const funcao of funcoesCriadas(subida)) {
+        expect(tudo, `${nome}: ${funcao} sem revoke de public em nenhuma migration`).toMatch(
+          new RegExp(`revoke all on function[^;]*public\\.${funcao}\\b[^;]*from[^;]*\\bpublic\\b`, 'isu'),
+        )
+      }
+    }
   })
 })

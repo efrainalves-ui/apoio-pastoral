@@ -12,6 +12,8 @@ alter default privileges in schema public
 alter default privileges in schema public
   revoke execute on functions from public, anon;
 
+grant execute on function public.prevent_revoked_device_reactivation() to public;
+
 create or replace function public.app_schema_version()
 returns integer
 language sql

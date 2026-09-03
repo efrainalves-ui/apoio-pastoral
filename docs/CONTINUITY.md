@@ -141,8 +141,12 @@ tinha citado e que também foi fechado.
 - **Ambientes e privilégios**: declarar o projeto virou obrigatório, o banco
   declara em `public.service_environment` se é homologação ou produção, e a
   conferência acontece logo depois de entrar, antes de qualquer envelope. Os
-  privilégios padrão de `public` foram zerados: tabela ou função criada depois
-  não nasce ao alcance do navegador.
+  privilégios padrão de `public` foram zerados: tabela criada depois não nasce
+  ao alcance do navegador. Com função o CI mostrou que essa promessa não se
+  sustenta — o EXECUTE de PUBLIC continua vindo —, então quem protege é a
+  conferência de isolamento, que tinha um furo (não enxergava PUBLIC) e, uma vez
+  corrigida, apanhou a função de gatilho da primeira migration, aberta desde
+  então.
 
 Novos arquivos: `supabase/migrations/0004_sessao_revogada_e_ambiente_{up,down}.sql`
 e `supabase/tests/03_sessao_revogada.sql`. `scripts/api-barreiras.mjs` e

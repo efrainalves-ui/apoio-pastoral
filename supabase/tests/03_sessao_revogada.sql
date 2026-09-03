@@ -193,11 +193,28 @@ select homologacao_testes.exigir(
   'uma tabela criada depois desta migration não nasce ao alcance do navegador');
 drop table public.tabela_futura_ficticia;
 
+-- Para funções a promessa é outra, e é preciso ser exato: o PostgreSQL concede
+-- EXECUTE a PUBLIC em toda função nova, e o `alter default privileges` não
+-- alcançou esse caso — foi o CI que mostrou. Então o que se prova aqui não é
+-- que a função nasce fechada, e sim que a conferência de 01 pega uma função
+-- deixada aberta. É ela que obriga cada função a trazer o próprio `revoke`.
 create function public.funcao_futura_ficticia() returns integer language sql immutable as $$ select 1 $$;
+select homologacao_testes.exigir(
+  exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) as a
+    where n.nspname = 'public' and p.proname = 'funcao_futura_ficticia' and a.grantee = 0),
+  'a conferência de funções enxerga uma função nova deixada ao alcance de PUBLIC');
+drop function public.funcao_futura_ficticia();
+
+-- E, fechado o `revoke`, ela some da conferência.
+create function public.funcao_futura_ficticia() returns integer language sql immutable as $$ select 1 $$;
+revoke all on function public.funcao_futura_ficticia() from public, anon, authenticated;
 select homologacao_testes.exigir(
   not has_function_privilege('authenticated', 'public.funcao_futura_ficticia()', 'execute')
   and not has_function_privilege('anon', 'public.funcao_futura_ficticia()', 'execute'),
-  'uma função criada depois desta migration não nasce executável pelo navegador');
+  'com o revoke escrito, a função nova fica fora do alcance do navegador');
 drop function public.funcao_futura_ficticia();
 
 delete from public.service_environment;
