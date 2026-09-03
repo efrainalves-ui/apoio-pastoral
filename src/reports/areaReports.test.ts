@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { AgendaEventEntity } from '../agenda/types'
 import type { VisitEntity, VisitRoundEntity } from '../care/types'
 import { agendaReportLines, goalsReportLines, sermonReportLines, visitReportLines } from './areaReports'
+import { CommissionService } from '../commissions/service'
+import { campaignReportLines } from '../evangelism/report'
+import { publicReportText } from '../nominations/core'
+import { NOME_OMITIDO, personNameResolver } from './includeNames'
 
 const IGREJA = 'igreja-ficticia'
 const nomeIgreja = (id: string | null) => (id === IGREJA ? 'Igreja Fictícia' : 'Distrito')
@@ -82,4 +86,51 @@ describe('relatórios de cada área', () => {
     expect(agendaReportLines([evento({ category: 'visit', title: 'Visita a Pessoa Fictícia' })], nomeIgreja, true).join('\n'))
       .toContain('Visita a Pessoa Fictícia')
   })
+
+})
+
+describe('a confirmação de nomes é a mesma em todo documento', () => {
+  it('a pauta e a ata da comissão saem sem nomear ninguém por padrão', () => {
+    const reuniao = {
+      id: 'r1', churchId: 'i1', kind: 'board' as const, date: '2026-05-01', time: '19:30', location: 'Igreja Fictícia',
+      presidentId: 'p1', secretaryId: 'p2', participantIds: ['p1', 'p2'], guestNames: [], votingGuestNames: [],
+      openingPrayer: '', reflection: '', notes: '', agenda: [], createdAt: '', updatedAt: '',
+    }
+    const nome = (id: string) => (id === 'p1' ? 'Pessoa Fictícia Presidente' : 'Pessoa Fictícia Secretária')
+    const service = new CommissionService()
+
+    const semNomes = service.agendaDocument(reuniao, 'Igreja Fictícia', personNameResolver(false, nome))
+    const comNomes = service.agendaDocument(reuniao, 'Igreja Fictícia', personNameResolver(true, nome))
+
+    expect(semNomes).not.toContain('Pessoa Fictícia Presidente')
+    expect(semNomes).toContain(NOME_OMITIDO)
+    expect(comNomes).toContain('Pessoa Fictícia Presidente')
+
+    const ata = service.minutesDocument(reuniao, 'Igreja Fictícia', 2, personNameResolver(false, nome))
+    expect(ata).not.toContain('Pessoa Fictícia Secretária')
+  })
+
+  it('o relatório da comissão de nomeações sai sem os indicados por padrão', () => {
+    const processo = { period: '2026-2027', formation: {}, offices: [], candidates: [], meetings: [], reports: [], objections: [], officialVotes: [], vacancyProcesses: [], tasks: [], history: [], churchId: 'i1', status: 'ready', createdAt: '', updatedAt: '' } as never
+    const versao = { id: 'v1', version: 1, createdAt: '', presentationDate: '2026-06-01', officialVoteDate: '', lines: [{ officeId: 'o1', officeTitle: 'Ancião', personId: 'p1', personName: 'Pessoa Fictícia Indicada' }], openOffices: [], publicNote: '' }
+
+    expect(publicReportText('Igreja Fictícia', processo, versao)).not.toContain('Pessoa Fictícia Indicada')
+    expect(publicReportText('Igreja Fictícia', processo, versao)).toContain('Ancião')
+    expect(publicReportText('Igreja Fictícia', processo, versao, true)).toContain('Pessoa Fictícia Indicada')
+  })
+
+  it('o relatório da campanha só nomeia quem está em acompanhamento quando pedido', () => {
+    const campanha = {
+      id: 'c1', name: 'Campanha Fictícia', objective: 'other' as const, churchIds: [], startDate: '2026-01-01', endDate: '2026-01-10',
+      location: '', address: '', responsibleGeneral: '', mainSpeaker: '', team: [], status: 'completed' as const, description: '', notes: '',
+      goalId: null, planningAreas: [], additionalSchedule: 'none' as const, mainAgendaEventId: null, additionalAgendaEventIds: [],
+      points: [], tasks: [], checklist: [], plannedBudget: 0, budgetItems: [],
+      followUps: [{ id: 'f1', type: 'person' as const, recordId: 'p1', churchId: null, displayName: 'Pessoa Fictícia Acompanhada', status: 'following' as const, notes: '' }],
+      learnings: '', history: [], createdAt: '', updatedAt: '',
+    }
+
+    expect(campaignReportLines(campanha).join('\n')).not.toContain('Pessoa Fictícia Acompanhada')
+    expect(campaignReportLines(campanha, true).join('\n')).toContain('Pessoa Fictícia Acompanhada')
+  })
+
 })

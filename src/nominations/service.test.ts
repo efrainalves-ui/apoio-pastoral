@@ -35,12 +35,12 @@ describe('regras da Comissão de Nomeações',()=>{
     await expect(service.updateMeeting(account,key,process.id,{...process.meetings[0]!,location:'Outro local'})).rejects.toThrow('protegido')
     process=await service.addMeetingCorrection(account,key,process.id,meeting.id,'Correção fictícia complementar');expect(process.meetings[0]?.corrections).toHaveLength(1)
     process=await service.addMeetingToAgenda(account,key,process.id,meeting.id);expect(process.meetings[0]?.agendaEventId).toBeTruthy()
-    process=await service.generateReport(account,key,process.id,people);let report=process.reports[0]!;const publicText=publicReportText('Igreja Fictícia',process,report)
+    process=await service.generateReport(account,key,process.id,people);let report=process.reports[0]!;const publicText=publicReportText('Igreja Fictícia',process,report,true)
     expect(publicText).toContain('Pessoa Fictícia Três');expect(publicText).not.toContain('Nota confidencial');expect(publicText).not.toContain('dizimista');expect(publicText).not.toContain('favoráveis')
     process=await service.updateReport(account,key,process.id,{...report,presentationDate:'2026-09-05'});expect(process.status).toBe('presented')
     process=await service.addObjection(account,key,process.id,'Objeção fictícia','Conteúdo confidencial da objeção','2026-09-06');expect(process.status).toBe('objections')
     process=await service.decideObjection(account,key,process.id,process.objections[0]!.id,'changed');process=await service.generateReport(account,key,process.id,people);expect(process.reports.map((item)=>item.version)).toEqual([1,2])
-    report=process.reports.at(-1)!;expect(service.reportText('Igreja Fictícia',process,report)).not.toContain('Conteúdo confidencial da objeção')
+    report=process.reports.at(-1)!;expect(service.reportText('Igreja Fictícia',process,report, true)).not.toContain('Conteúdo confidencial da objeção')
     process=await service.prepareOfficialVote(account,key,process.id,'complete','regular_church');let official=process.officialVotes[0]!;process=await service.updateOfficialVote(account,key,process.id,{...official,participantIds:['p1','p2','p3'],quorum:3,presidentId:'p1',secretaryId:'p2'});official=process.officialVotes[0]!
     process=await service.voteOfficial(account,key,process.id,official.id,2,1,0);expect(process.offices.find((office)=>office.id===custom.id)?.officialStatus).toBe('elected');expect(process.candidates[0]?.electedAt).toBeTruthy()
     await expect(service.updateOfficialVote(account,key,process.id,{...process.officialVotes[0]!,location:'Outro'})).rejects.toThrow('protegida')
@@ -122,7 +122,9 @@ describe('indicação de associados', () => {
     atual = await service.voteCandidate('account-fixture', key, atual.id, atual.candidates[0]!.id, atual.meetings[0]!.id, 3, 0, 0)
     atual = await service.generateReport('account-fixture', key, atual.id, [pessoa])
 
-    expect(publicReportText('Igreja Fictícia', atual, atual.reports[0]!)).toContain('Patrimônio (associado): Pessoa Fictícia Três')
+    expect(publicReportText('Igreja Fictícia', atual, atual.reports[0]!, true)).toContain('Patrimônio (associado): Pessoa Fictícia Três')
+    // Sem pedir nomes, o relatório mostra os cargos e não quem foi indicado.
+    expect(publicReportText('Igreja Fictícia', atual, atual.reports[0]!)).not.toContain('Pessoa Fictícia Três')
   })
 
   // Cargo digitado à mão também obedece à regra, sem depender do catálogo.

@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { IncludeNames, personNameResolver } from '../reports/includeNames'
 import { agendaText, canDeliberate, elderPresidencyAllowed, isTie, pastorLabel, presidentMayBreakTie, reorderAgenda, requiredMajority, tieBreakNote } from '../commissions/core'
 import { CommissionService } from '../commissions/service'
 import type { CommissionAgendaItem, CommissionConfigData, CommissionEntity, CommissionMeetingData, CommissionTaskData, DecisionDestination, DecisionType, PresidentTieBreak, TaskStatus } from '../commissions/types'
@@ -62,12 +63,18 @@ export function CommissionMeetingPage() {
 
   useEffect(() => { void load() }, [load])
   const personName = useCallback((id: string) => people.find((person) => person.id === id)?.name ?? (id ? 'Pessoa não localizada' : 'A confirmar'), [people])
+  // A pauta e a ata nomeiam presidente, secretário, participantes e
+  // responsáveis. Documentos assim existem para serem lidos por outras
+  // pessoas, então a decisão de nomear passou a ser explícita, como em todo o
+  // resto do aplicativo.
+  const [comNomes, setComNomes] = useState(false)
+  const nomeNoDocumento = useMemo(() => personNameResolver(comNomes, personName), [comNomes, personName])
   const churchName = church?.name ?? 'Igreja'
   const present = (meeting?.participantIds.length ?? 0) + (meeting?.votingGuestNames.length ?? 0)
   const hasQuorum = canDeliberate(present, quorum)
   const frozen = Boolean(meeting?.finalizedAt)
-  const agendaDoc = useMemo(() => meeting ? service.agendaDocument(meeting, churchName, personName) : '', [meeting, churchName, personName])
-  const minutesDoc = useMemo(() => meeting ? service.minutesDocument(meeting, churchName, quorum, personName) : '', [meeting, churchName, quorum, personName])
+  const agendaDoc = useMemo(() => meeting ? service.agendaDocument(meeting, churchName, nomeNoDocumento) : '', [meeting, churchName, nomeNoDocumento])
+  const minutesDoc = useMemo(() => meeting ? service.minutesDocument(meeting, churchName, quorum, nomeNoDocumento) : '', [meeting, churchName, quorum, nomeNoDocumento])
 
   async function run(action: () => Promise<void>, success?: string) {
     setBusy(true); setError(''); setMessage('')
@@ -196,7 +203,7 @@ export function CommissionMeetingPage() {
         <div className="form-actions no-print">{!frozen && !entry.vote && <><Button variant="secondary" onClick={() => editItem(entry)}>Editar</Button><Button variant="secondary" disabled={index === 0} aria-label="Mover para cima" onClick={() => moveItem(index, index - 1)} icon={<ChevronUp />} /><Button variant="secondary" disabled={index === meeting.agenda.length - 1} aria-label="Mover para baixo" onClick={() => moveItem(index, index + 1)} icon={<ChevronDown />} /><Button variant="danger" aria-label="Remover assunto" onClick={() => removeItem(entry.id)} icon={<Trash2 />} /></>}</div>
       </article>)}</div> : <div className="empty-state"><FileText /><strong>Nenhum assunto na pauta</strong></div>}
       {!frozen && meeting.agenda.length > 0 && <div className="form-actions"><Button disabled={busy} onClick={() => void saveMeeting()} icon={<Check />}>Salvar pauta</Button><Button variant="secondary" onClick={() => { setCurrent(0); setTab('realizar') }}>Ir para a comissão</Button></div>}</Card>
-      <Card title="Pauta para imprimir" action={<FileText />}><pre className="preserved-text commission-document">{agendaDoc}</pre><div className="form-actions no-print"><Button variant="secondary" onClick={() => void copy(agendaDoc)} icon={<Copy />}>Copiar pauta</Button><Button variant="secondary" onClick={() => window.print()} icon={<Printer />}>Imprimir / salvar em PDF</Button></div></Card>
+      <Card title="Pauta para imprimir" action={<FileText />}><div className="no-print"><IncludeNames checked={comNomes} onChange={setComNomes} detalhe="Com nomes, entram presidente, secretário, participantes e responsáveis." /></div><pre className="preserved-text commission-document">{agendaDoc}</pre><div className="form-actions no-print"><Button variant="secondary" onClick={() => void copy(agendaDoc)} icon={<Copy />}>Copiar pauta</Button><Button variant="secondary" onClick={() => window.print()} icon={<Printer />}>Imprimir / salvar em PDF</Button></div></Card>
     </>}
 
     {tab === 'realizar' && <>
@@ -236,7 +243,7 @@ export function CommissionMeetingPage() {
     {tab === 'ata' && <>
       {!minutesReady ? <Card title="Ata ainda não pode ser gerada"><p className="muted">{meeting.agenda.length ? `Registre a decisão de ${pending.length} assunto(s) na etapa 2 antes de gerar a ata.` : 'Prepare a pauta e realize a comissão antes de gerar a ata.'}</p><Button variant="secondary" onClick={() => setTab('realizar')}>Voltar à comissão</Button></Card> : <>
         {!frozen && <Card title="Revisão final dos textos"><p className="muted">Confira como cada decisão vai aparecer na ata. Depois de finalizar, o texto fica protegido.</p><div className="entity-list">{decided.map((entry) => <div className="entity-row commission-agenda-item" key={entry.id}><div><strong>{entry.order}. {entry.title}</strong><small>{entry.vote?.voteNumber ?? 'Decisão sem número'} · {resultLabels[entry.vote!.result]}</small><label className="field"><span className="field__label">Texto final da ata</span><textarea className="field__input field__textarea" value={entry.vote?.finalText ?? ''} onChange={(event) => updateFinalText(entry, event.target.value)} /></label></div></div>)}</div><Button disabled={busy} onClick={() => void saveMeeting()} icon={<Check />}>Salvar textos da ata</Button></Card>}
-        <Card title="Ata da reunião"><pre className="preserved-text commission-document">{minutesDoc}</pre><div className="form-actions no-print"><Button variant="secondary" onClick={() => void copy(minutesDoc)} icon={<Copy />}>Copiar ata</Button><Button variant="secondary" onClick={() => window.print()} icon={<Printer />}>Imprimir / salvar em PDF</Button>{!frozen && <Button disabled={busy} onClick={() => void finalize()}>Finalizar ata</Button>}</div></Card>
+        <Card title="Ata da reunião"><div className="no-print"><IncludeNames checked={comNomes} onChange={setComNomes} detalhe="Com nomes, entram presidente, secretário, participantes e responsáveis." /></div><pre className="preserved-text commission-document">{minutesDoc}</pre><div className="form-actions no-print"><Button variant="secondary" onClick={() => void copy(minutesDoc)} icon={<Copy />}>Copiar ata</Button><Button variant="secondary" onClick={() => window.print()} icon={<Printer />}>Imprimir / salvar em PDF</Button>{!frozen && <Button disabled={busy} onClick={() => void finalize()}>Finalizar ata</Button>}</div></Card>
       </>}
     </>}
 
