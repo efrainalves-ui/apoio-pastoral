@@ -195,7 +195,11 @@ select public.upload_operations(jsonb_build_array(jsonb_build_object(
   'operation', 'upsert', 'base_version', 0, 'record_version', 1, 'schema_version', 1,
   'ciphertext', 'x', 'iv', 'x', 'aad', 'x')));
 
-set role postgres;
+-- `reset role`, e não `set role postgres`: quem lê aqui é o dono da tabela, que
+-- no Supabase gerenciado é o papel das migrations e não se chama `postgres` em
+-- lugar nenhum por obrigação. Nomear o papel amarrava a prova a um ambiente de
+-- superusuário — o mesmo engano que deixou a homologação parar na 0005.
+reset role;
 select homologacao_testes.exigir(
   (select owner_id from public.encrypted_operations where id = 'b1000000-0000-4000-8000-00000000000b') = :conta_b,
   'operação enviada por B fica em nome de B mesmo declarando a conta de A');
