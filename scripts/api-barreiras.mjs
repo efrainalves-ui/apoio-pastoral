@@ -117,11 +117,32 @@ const aparelhoB2 = crypto.randomUUID()
 const claimB2 = await rpc(b2, 'claim_device', { p_device_id: aparelhoB2, p_label: 'Teste Fictício B2' })
 exigir(claimB2.status === 200, 'a conta B entra com a senha em um segundo aparelho')
 
-const envelopesAntes = await tabela(b2, 'password_key_envelopes?select=owner_id')
-exigir(envelopesAntes.status === 200, 'o segundo aparelho ativo alcança o envelope de senha da conta')
+// Os envelopes precisam existir para as provas seguintes valerem alguma coisa.
+//
+// Sem eles, "o revogado não lê o envelope" passava porque não havia envelope
+// nenhum para ler — a prova aprovava sozinha. Quem grava esses envelopes no uso
+// real é o aplicativo, ao criar a conta; aqui a rodada cria os seus, cifra
+// fictícia, pelo mesmo caminho que o aplicativo usa.
+const cifra = { ciphertext: 'cifra-ficticia', iv: 'iv-ficticio', aad: 'aad-ficticio', salt: 'sal-ficticio' }
+const semeouSenha = await tabela(b2, 'password_key_envelopes', {
+  method: 'POST', headers: { ...cabecalhos(b2), prefer: 'resolution=merge-duplicates' },
+  body: JSON.stringify({ owner_id: b2.user.id, ...cifra, iterations: 600000 }),
+})
+exigir(semeouSenha.status < 300, 'o aparelho ativo grava o envelope de senha da própria conta')
+const semeouRecuperacao = await tabela(b2, 'recovery_key_envelopes', {
+  method: 'POST', headers: { ...cabecalhos(b2), prefer: 'resolution=merge-duplicates' },
+  body: JSON.stringify({ owner_id: b2.user.id, ...cifra }),
+})
+exigir(semeouRecuperacao.status < 300, 'o aparelho ativo grava o envelope de recuperação da própria conta')
 
+const envelopesAntes = await tabela(b2, 'password_key_envelopes?select=owner_id')
+exigir(envelopesAntes.status === 200 && envelopesAntes.corpo.trim() !== '[]',
+  'o segundo aparelho ativo alcança o envelope de senha da conta')
+
+// `revoke_device` devolve void, e o PostgREST responde 204 a isso. Exigir 200
+// reprovava uma revogação que tinha acontecido — e o erro estava aqui, não lá.
 const revogadoPeloOutro = await rpc(b, 'revoke_device', { p_device_id: aparelhoB2 })
-exigir(revogadoPeloOutro.status === 200, 'o primeiro aparelho revoga o segundo')
+exigir(revogadoPeloOutro.status < 300, 'o primeiro aparelho revoga o segundo')
 
 const envelopeDepois = await tabela(b2, 'password_key_envelopes?select=owner_id')
 exigir(envelopeDepois.corpo.trim() === '[]', 'o aparelho revogado não lê mais o envelope de senha')

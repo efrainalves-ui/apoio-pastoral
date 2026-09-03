@@ -141,6 +141,45 @@ Migrations novas: `0005_ambiente_antes_da_senha`, `0006_expurgo_de_historico` e
 `0007_funcao_nova_fechada`. Versão de esquema 7. Banco local na versão 12, com
 `pendingActions`.
 
+## Rodada de homologação: as barreiras provadas por HTTP
+
+Em 3 de setembro de 2026, com duas contas fictícias `@example.test` criadas e
+apagadas na mesma sessão, as barreiras foram provadas falando direto com a API
+do projeto de homologação — sem o aplicativo no meio, que é como um atacante
+falaria.
+
+`pnpm test:api`: **35 verificações, todas aprovadas**. Validações adicionais de
+paginação, reenvio, conflito, expurgo, encerramento e configuração divergente:
+**23 verificações, todas aprovadas**.
+
+Duas falhas apareceram na primeira execução, e as duas eram **do script de
+validação**, não do produto:
+
+- `revoke_device` devolve `void`, e o PostgREST responde **204**. O script
+  exigia 200 e reprovava uma revogação que tinha acontecido.
+- O script assumia que os envelopes de senha e de recuperação já existiam. Como
+  as contas da rodada foram criadas pelo endpoint de cadastro, e não pelo
+  aplicativo, as tabelas estavam vazias — e três asserções passavam **a vazio**:
+  "o revogado não lê o envelope" aprovava porque não havia envelope para ler.
+  Agora a rodada grava os próprios envelopes, pelo mesmo caminho do aplicativo,
+  antes de revogar.
+
+A segunda foi a mais séria das duas, e é o tipo de coisa que só aparece quando a
+prova roda contra um serviço de verdade: um teste que aprova sozinho é pior do
+que teste nenhum, porque dá confiança sem dar garantia.
+
+Backup e restauração não têm prova HTTP porque não têm HTTP: o arquivo é local,
+cifrado com o código do pastor, e nunca toca o serviço. Quem prova isso são os
+14 testes unitários de `backup/service.test.ts`.
+
+**Limpeza**: ao fim da rodada, `auth.users`, `auth.sessions`, aparelhos,
+vínculos de sessão, sessões revogadas, operações e os três tipos de envelope
+ficaram todos em zero. Restou apenas a linha de `service_environment` com
+`homologacao`, que é configuração e não dado de teste. As credenciais efêmeras
+foram geradas e consumidas dentro do processo e o arquivo local foi apagado.
+
+Produção continua vazia e nunca foi consultada.
+
 ## Rodada de homologação: migrations aplicadas no Supabase gerenciado
 
 Em 3 de setembro de 2026, as nove migrations foram aplicadas no projeto
