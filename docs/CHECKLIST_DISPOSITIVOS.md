@@ -82,6 +82,31 @@ No iPhone, repita 3.1 a 3.6 no Safari e no aplicativo aberto pelo ícone da Tela
 | 6.2 | Tentar restaurar com o código errado | É recusado sem alterar nada | Restaura ou corrompe os dados |
 | 6.3 | Restaurar com o código certo | Exige a confirmação escrita e restaura por inteiro | Restaura pela metade ou sem confirmar |
 
+## 6b. Áreas novas: Orçamento, Materiais, ACMS e Links
+
+Tudo com dados fictícios. Nenhuma planilha real do ACMS entra nesta rodada.
+
+| # | O que fazer | Aprova se | Reprova se |
+|---|---|---|---|
+| 6b.1 | Abrir Orçamento | Abre em **Pessoal**, com Pessoal e Trabalho visíveis o tempo todo | Abre sem a divisão, ou a divisão some ao trocar de aba |
+| 6b.2 | Trabalho → Auxílios: registrar R$ 400 de combustível. Depois Despesas: R$ 520 de combustível | A Visão do mês mostra **R$ 120 pagos do próprio bolso** | O valor do bolso não aparece ou está errado |
+| 6b.3 | Registrar despesa de alimentação de R$ 75 | Ela nasce "do próprio bolso" e soma ao total | Ela consome algum auxílio |
+| 6b.4 | Percorrer todas as telas de Trabalho, inclusive Quilometragem | **Nenhum pedido de permissão de localização** em momento nenhum | O navegador pede localização |
+| 6b.5 | Quilometragem: dois deslocamentos para a mesma igreja | O total por igreja soma os dois | O total não bate |
+| 6b.6 | Pessoal → Lista de compras: dois itens com valor, um confirmado | O total do carrinho acompanha a cada toque | O total só atualiza ao recarregar |
+| 6b.7 | Desligar a rede e usar a lista de compras | Continua funcionando e somando | Trava ou perde o que foi digitado |
+| 6b.8 | Lançar as compras confirmadas como despesa pessoal | Pede confirmação, lança em Despesas e tira os itens confirmados da lista | Lança sozinho, sem confirmação |
+| 6b.9 | Materiais → registrar 30 pacotes e distribuir 12 pela regra | A prévia aparece **antes** de confirmar, com sobra e falta | Distribui sem prévia |
+| 6b.10 | Pedir uma divisão maior do que o disponível | O botão trava e a falta é explicada | Aceita distribuir o que não existe |
+| 6b.11 | Confirmar uma entrega com quantidade menor e nome escrito à mão | Registra e o disponível muda | Aceita entrega sem dizer a quem |
+| 6b.12 | Necessidades → criar pedido e marcar "Recebi" | Vira item de estoque | Não vira, ou vira sozinho antes de marcar |
+| 6b.13 | ACMS → importar uma planilha **fictícia** feita por você | Mostra prévia por igreja e só grava depois de confirmar | Grava sem prévia |
+| 6b.14 | ACMS → importar um `.xlsx` qualquer, que não seja o modelo | Recusa com explicação e **não importa nada** | Importa algum número |
+| 6b.15 | ACMS → importar dois trimestres e comparar | Mostra a diferença por indicador | Não compara ou soma os dois |
+| 6b.16 | Configurações → Referências → Links úteis | Abre a lista; os endereços abrem em aba nova | Algum endereço não é `https` |
+| 6b.17 | Encerrar distrito (na conta fictícia de descarte) | A prévia lista Materiais, Auxílios, Despesas do ministério, Quilometragem e Relatórios ACMS | Alguma dessas áreas não aparece |
+| 6b.18 | Depois de encerrar, conferir Leitura, Orçamento Familiar e Lista de compras | Continuam intactos | Alguma área pessoal foi apagada |
+
 ## 7. Encerramento
 
 | # | O que fazer | Aprova se | Reprova se |

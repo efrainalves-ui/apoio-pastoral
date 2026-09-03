@@ -141,6 +141,43 @@ Migrations novas: `0005_ambiente_antes_da_senha`, `0006_expurgo_de_historico` e
 `0007_funcao_nova_fechada`. Versão de esquema 7. Banco local na versão 12, com
 `pendingActions`.
 
+## Rodada de homologação: migrations aplicadas no Supabase gerenciado
+
+Em 3 de setembro de 2026, as nove migrations foram aplicadas no projeto
+`apoio-pastoral-homologacao`, uma de cada vez, na ordem documentada. Produção
+não foi consultada nem alterada.
+
+O que a rodada provou, no ambiente real:
+
+- **A `0005` e a `0007` redesenhadas passam.** Eram exatamente as duas que
+  pararam a tentativa anterior. A `0005` declarou privilégio padrão para
+  `postgres` e registrou `supabase_admin` como fora do alcance; a `0007`
+  concluiu sem gatilho de evento, com a auditoria do catálogo no lugar.
+- **Versão de esquema 9**, dez migrations registradas, oito tabelas.
+- **Parada obrigatória aprovada**: `protecao_de_funcao_nova()` responde `true` e
+  `funcoes_publicas_abertas()` devolve zero linhas.
+- **RLS ligada nas oito tabelas**, todas com política, `anon` sem leitura em
+  nenhuma, `authenticated` sem leitura em `device_sessions`,
+  `revoked_sessions`, `encrypted_operations` e `service_environment`, e sem
+  TRUNCATE em lugar nenhum.
+- **14 funções definidoras, todas com `search_path` fixo**; nenhuma view em
+  `public`; nenhum bucket de armazenamento; `anon` executa apenas
+  `app_environment` e `app_schema_version`.
+- **Ambiente declarado**: `public.service_environment` recebeu `homologacao`.
+- **Provas HTTP sem conta**: o serviço responde versão 9 e `homologacao` antes
+  de qualquer credencial; nenhuma das oito tabelas devolve linha; nenhuma das
+  oito funções da aplicação responde; escrever o ambiente declarado é recusado.
+- Os avisos do linter do Supabase são todos `WARN` e todos do desenho
+  pretendido: funções `security definer` ao alcance de `authenticated` são a
+  arquitetura — o cliente só age por elas, nunca pelas tabelas.
+
+**O que falta para aprovar a homologação**, e depende do responsável: criar as
+duas contas fictícias `@example.test` e rodar `pnpm test:api`, mais a checklist
+física de `CHECKLIST_DISPOSITIVOS.md`. Criar conta e manipular senha não é
+tarefa que o assistente execute.
+
+Produção continua vazia e nunca foi consultada.
+
 ## Etapa estável: Orçamento em duas áreas, Materiais, ACMS e Links úteis
 
 Quatro entregas funcionais, nenhuma delas tocando autenticação, segurança ou
