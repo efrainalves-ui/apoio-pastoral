@@ -226,20 +226,61 @@ describe('encerrar distrito', () => {
     expect(await pendingDistrictClosure(CONTA, banco)).toBe(false)
   })
 
-  it('retoma também quando parou antes de revogar, e não trava se o serviço recusar', async () => {
+  it('quando o serviço já não tem nada para revogar, a retomada conclui', async () => {
+    // "Já estava revogado" agora chega como zero, não como erro: é assim que a
+    // retomada distingue trabalho já feito de serviço fora do ar.
     const banco = novoBanco(); const chave = await generateMasterKey()
     await distritoFicticio(banco, chave)
     const antigo = currentDeviceId(CONTA)
     await banco.devices.put({ id: antigo, accountId: CONTA, label: 'Computador', status: 'active', createdAt: '', lastSeenAt: '' })
-    await banco.pendingActions.put({ id: `${CONTA}:close_district`, accountId: CONTA, kind: 'close_district', createdAt: new Date().toISOString(), stage: 'revoking' })
+    await banco.pendingActions.put({ id: `${CONTA}:close_district`, accountId: CONTA, kind: 'close_district', createdAt: new Date().toISOString(), stage: 'revoking', newDeviceId: 'aparelho-ficticio-novo' })
 
-    // O serviço recusa porque este aparelho já estava revogado lá: a retomada
-    // segue para a autorização nova em vez de travar.
-    const { newDeviceId } = await resumeDistrictClosure(CONTA, banco, () => Promise.reject(new Error('aparelho sem autorizacao ativa')))
+    const { newDeviceId } = await resumeDistrictClosure(CONTA, banco, () => Promise.resolve(0))
 
+    expect(newDeviceId).toBe('aparelho-ficticio-novo')
     expect((await banco.devices.get(antigo))?.status).toBe('revoked')
     expect((await banco.devices.get(newDeviceId))?.status).toBe('active')
     expect(await pendingDistrictClosure(CONTA, banco)).toBe(false)
+  })
+
+  it('falha de rede interrompe a retomada e preserva a pendência', async () => {
+    // Seguir para a autorização nova depois de a revogação falhar deixaria os
+    // outros aparelhos ativos num distrito que o pastor mandou encerrar.
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    await distritoFicticio(banco, chave)
+    const antigo = currentDeviceId(CONTA)
+    await banco.devices.put({ id: antigo, accountId: CONTA, label: 'Computador', status: 'active', createdAt: '', lastSeenAt: '' })
+    await banco.pendingActions.put({ id: `${CONTA}:close_district`, accountId: CONTA, kind: 'close_district', createdAt: new Date().toISOString(), stage: 'revoking', newDeviceId: 'aparelho-ficticio-novo' })
+
+    await expect(resumeDistrictClosure(CONTA, banco, () => Promise.reject(new Error('sem rede')))).rejects.toThrow('sem rede')
+
+    expect(await pendingDistrictClosure(CONTA, banco)).toBe(true)
+    expect(currentDeviceId(CONTA)).toBe(antigo)
+    expect((await banco.devices.get(antigo))?.status).toBe('active')
+  })
+
+  it('retomar várias vezes deixa exatamente um aparelho ativo', async () => {
+    // O identificador é escolhido uma vez e fica gravado. Sortear um novo a
+    // cada tentativa deixaria na conta um aparelho ativo por interrupção.
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    await distritoFicticio(banco, chave)
+    const antigo = currentDeviceId(CONTA)
+    await banco.devices.put({ id: antigo, accountId: CONTA, label: 'Computador', status: 'active', createdAt: '', lastSeenAt: '' })
+    await banco.pendingActions.put({ id: `${CONTA}:close_district`, accountId: CONTA, kind: 'close_district', createdAt: new Date().toISOString(), stage: 'revoking', newDeviceId: 'aparelho-ficticio-novo' })
+
+    // Primeira tentativa cai na rede depois de revogar; segunda e terceira
+    // concluem. O resultado precisa ser o mesmo de uma única execução limpa.
+    let tentativas = 0
+    const instavel = () => { tentativas += 1; return tentativas === 1 ? Promise.reject(new Error('sem rede')) : Promise.resolve(0) }
+    await resumeDistrictClosure(CONTA, banco, instavel).catch(() => undefined)
+    const primeira = await resumeDistrictClosure(CONTA, banco, instavel)
+    await banco.pendingActions.put({ id: `${CONTA}:close_district`, accountId: CONTA, kind: 'close_district', createdAt: new Date().toISOString(), stage: 'reauthorizing', newDeviceId: primeira.newDeviceId })
+    const segunda = await resumeDistrictClosure(CONTA, banco, instavel)
+
+    expect(segunda.newDeviceId).toBe(primeira.newDeviceId)
+    const ativos = (await banco.devices.where('accountId').equals(CONTA).toArray()).filter(({ status }) => status === 'active')
+    expect(ativos).toHaveLength(1)
+    expect(ativos[0]!.id).toBe(primeira.newDeviceId)
   })
 
   it('não retoma o que não começou', async () => {

@@ -372,9 +372,10 @@ select homologacao_testes.exigir(
    where n.nspname = 'public' and p.prosecdef)
   = array[
       'active_device_id', 'app_environment', 'approve_device', 'claim_device',
-      'current_device_id', 'download_operations', 'purge_record_history',
-      'revogar_execute_publico_em_funcao_nova', 'revoke_all_devices', 'revoke_device',
-      'session_is_authorized', 'session_is_not_revoked', 'upload_operations'
+      'current_device_id', 'download_operations', 'protecao_de_funcao_nova',
+      'purge_record_history', 'revogar_execute_publico_em_funcao_nova',
+      'revoke_all_devices', 'revoke_device', 'session_is_authorized',
+      'session_is_not_revoked', 'upload_operations'
     ]::name[],
   'só as funções previstas rodam com os privilégios do dono');
 

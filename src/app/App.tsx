@@ -5,7 +5,7 @@ import { DeviceApprovalPage } from '../pages/DeviceApprovalPage'
 import { db } from '../db/database'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { pendingDistrictClosure } from '../district/closeDistrict'
-import { SyncService, firstSyncPending } from '../sync/service'
+import { SyncService, firstSyncPending, syncConfirmed } from '../sync/service'
 import { createSyncTransport } from '../sync/transport'
 import { AppShell } from '../components/AppShell'
 import { AuthPage } from '../pages/AuthPage'
@@ -93,21 +93,18 @@ export function useDistrictPresence(): DistrictPresence {
       if (!district) {
         const transport = createSyncTransport()
         if (transport.name !== 'disabled' && syncKey) {
+          // Offline, erro, cancelamento, páginas faltando ou cursor parado são
+          // a mesma coisa aqui: a rodada não terminou. Enquanto este aparelho
+          // nunca tiver concluído uma sincronização desta conta, "nada aqui"
+          // não quer dizer "conta vazia" — e mandar criar um distrito agora
+          // criaria um segundo por cima do primeiro.
+          let confirmada: boolean
           try {
-            const resumo = await new SyncService(transport).synchronize(account.id, currentDeviceId(account.id), syncKey)
-            // Rodada que não chegou ao fim não prova conta vazia: o distrito
-            // pode estar nas páginas que faltaram. Sem esta linha, um distrito
-            // grande levava o pastor à tela de criar distrito, e ele criaria um
-            // segundo por cima do primeiro.
-            if (resumo.incomplete) { if (!cancelled) setPresenca('indisponivel'); return }
-            district = await districtService.getDistrict(account.id, masterKey)
-          } catch {
-            // Não deu para receber. Se este aparelho nunca completou uma
-            // sincronização desta conta, "nada aqui" não quer dizer "conta
-            // vazia" — mandar o pastor criar um distrito agora criaria um
-            // segundo distrito e duplicaria tudo.
-            if (!cancelled && await firstSyncPending(account.id)) { setPresenca('indisponivel'); return }
-          }
+            confirmada = syncConfirmed(await new SyncService(transport).synchronize(account.id, currentDeviceId(account.id), syncKey))
+          } catch { confirmada = false }
+          if (cancelled) return
+          if (!confirmada && await firstSyncPending(account.id)) { if (!cancelled) setPresenca('indisponivel'); return }
+          district = await districtService.getDistrict(account.id, masterKey)
         }
       }
       if (!cancelled) setPresenca(Boolean(district))

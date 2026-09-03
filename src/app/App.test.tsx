@@ -24,6 +24,7 @@ const nuvem = vi.hoisted(() => ({
   sincronizacoes: 0,
   falhaAoSincronizar: false,
   primeiraSincronizacaoPendente: false,
+  resumoDaSincronizacao: null as { status: string; pushed: number; pulled: number; conflicts: number; incomplete: boolean } | null,
 }))
 
 vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => auth }))
@@ -42,13 +43,16 @@ vi.mock('../sync/transport', () => ({
 
 vi.mock('../sync/service', () => ({
   firstSyncPending: () => Promise.resolve(nuvem.primeiraSincronizacaoPendente),
+  // Mesma regra do módulo verdadeiro: offline ou incompleta não é confirmada.
+  syncConfirmed: (resumo: { status: string; incomplete: boolean }) => resumo.status !== 'offline' && !resumo.incomplete,
   SyncService: class {
     synchronize() {
       nuvem.sincronizacoes += 1
       if (nuvem.falhaAoSincronizar) return Promise.reject(new Error('sem rede'))
+      if (nuvem.resumoDaSincronizacao) return Promise.resolve(nuvem.resumoDaSincronizacao)
       // Receber do serviço é o que preenche o cofre local do aparelho novo.
       nuvem.distritoLocal = nuvem.distritoNaNuvem
-      return Promise.resolve({ status: 'synced', pushed: 0, pulled: 1, conflicts: 0 })
+      return Promise.resolve({ status: 'synced', pushed: 0, pulled: 1, conflicts: 0, incomplete: false })
     }
   },
 }))
@@ -56,6 +60,7 @@ vi.mock('../sync/service', () => ({
 afterEach(cleanup)
 
 beforeEach(() => {
+  nuvem.resumoDaSincronizacao = null
   auth.account = null
   auth.masterKey = null
   auth.syncKey = null
@@ -93,6 +98,38 @@ describe('shell do aplicativo', () => {
     // inicial e criaria um distrito duplicado na mesma conta.
     await waitFor(() => expect(result.current).toBe(true))
     expect(nuvem.sincronizacoes).toBe(1)
+  })
+
+  it.each([
+    ['offline', { status: 'offline', pushed: 0, pulled: 0, conflicts: 0, incomplete: false }],
+    ['páginas faltando', { status: 'synced', pushed: 0, pulled: 200, conflicts: 0, incomplete: true }],
+  ])('não libera a criação de distrito quando a rodada terminou %s', async (_situacao, resumo) => {
+    // Enquanto a primeira sincronização não foi confirmada, "nada aqui" não é
+    // "conta vazia". Antes só a paginação incompleta era tratada assim, e uma
+    // rodada offline seguia adiante como se tivesse recebido tudo.
+    auth.account = { id: 'conta-ficticia', email: 'conta.ficticia@example.invalid' }
+    auth.masterKey = {} as CryptoKey
+    auth.syncKey = {} as CryptoKey
+    nuvem.transporte = 'supabase'
+    nuvem.primeiraSincronizacaoPendente = true
+    nuvem.resumoDaSincronizacao = resumo
+
+    const { result } = renderHook(() => useDistrictPresence())
+
+    await waitFor(() => expect(result.current).toBe('indisponivel'))
+  })
+
+  it('libera a criação de distrito quando a rodada foi confirmada e a conta está mesmo vazia', async () => {
+    auth.account = { id: 'conta-ficticia', email: 'conta.ficticia@example.invalid' }
+    auth.masterKey = {} as CryptoKey
+    auth.syncKey = {} as CryptoKey
+    nuvem.transporte = 'supabase'
+    nuvem.primeiraSincronizacaoPendente = false
+    nuvem.resumoDaSincronizacao = { status: 'empty', pushed: 0, pulled: 0, conflicts: 0, incomplete: false }
+
+    const { result } = renderHook(() => useDistrictPresence())
+
+    await waitFor(() => expect(result.current).toBe(false))
   })
 
   it('mantém a configuração inicial quando a conta realmente não tem distrito', async () => {

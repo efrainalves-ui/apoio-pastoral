@@ -29,9 +29,19 @@ export function currentDeviceId(accountId: string): string {
  * a valer com outro identificador, sem herdar nada da anterior.
  */
 export function rotateDeviceId(accountId: string): string {
-  const novo = crypto.randomUUID()
-  localStorage.setItem(`${DEVICE_ID_KEY}:${accountId}`, novo)
-  return novo
+  return adoptDeviceId(accountId, crypto.randomUUID())
+}
+
+/**
+ * Passa a valer, nesta instalação, um identificador já escolhido.
+ *
+ * O encerramento de distrito escolhe o identificador novo uma vez e o guarda
+ * antes de usá-lo. Se a retomada acontecer duas vezes, ela adota o mesmo — do
+ * contrário cada interrupção deixaria mais um aparelho ativo na conta.
+ */
+export function adoptDeviceId(accountId: string, deviceId: string): string {
+  localStorage.setItem(`${DEVICE_ID_KEY}:${accountId}`, deviceId)
+  return deviceId
 }
 
 function deviceLabel(): string {

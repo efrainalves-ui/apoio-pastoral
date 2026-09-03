@@ -478,13 +478,16 @@ export class PersonDataService {
     if (!mutations.length) return { removed: 0, edited: 0, purge: { local: 0, queued: 0 } }
 
     // O que já estava na fila antes desta exclusão é o que precisa sair; o que
-    // ela acabou de criar é o que leva a remoção aos outros aparelhos.
+    // ela acabou de criar é o que leva a remoção aos outros aparelhos — e é
+    // também a versão que o serviço vai exigir que ainda seja a última antes
+    // de apagar o histórico daquele registro.
     const filaAnterior = new Set((await this.database.outbox.where('accountId').equals(accountId).toArray()).map(({ id }) => id))
     await this.repository.applyEncryptedMutations(accountId, deviceId, mutations)
-    const criadas = new Set((await this.database.outbox.where('accountId').equals(accountId).toArray())
-      .map(({ id }) => id).filter((id) => !filaAnterior.has(id)))
+    const criadas = (await this.database.outbox.where('accountId').equals(accountId).toArray())
+      .filter(({ id }) => !filaAnterior.has(id))
+    const alvos = criadas.map(({ id, recordId }) => ({ recordId, operationId: id }))
 
-    const purge = await purgeRecordHistory(accountId, mutations.map(({ recordId }) => recordId), criadas, this.database)
+    const purge = await purgeRecordHistory(accountId, alvos, this.database)
     return { removed: removed.length, edited: edited.length, purge }
   }
 }

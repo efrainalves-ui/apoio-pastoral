@@ -40,6 +40,7 @@ psql_run -f "$migrations/0004_sessao_revogada_e_ambiente_up.sql"
 psql_run -f "$migrations/0005_ambiente_antes_da_senha_up.sql"
 psql_run -f "$migrations/0006_expurgo_de_historico_up.sql"
 psql_run -f "$migrations/0007_funcao_nova_fechada_up.sql"
+psql_run -f "$migrations/0008_revogacao_idempotente_up.sql"
 
 tabelas="$(contar_tabelas)"
 if [ "$tabelas" -ne 8 ]; then
@@ -54,6 +55,7 @@ psql_run -f "$testes/02_device_barriers.sql"
 psql_run -f "$testes/03_sessao_revogada.sql"
 
 echo "==> 4/6 Revertendo as migrations"
+psql_run -f "$migrations/0008_revogacao_idempotente_down.sql"
 psql_run -f "$migrations/0007_funcao_nova_fechada_down.sql"
 psql_run -f "$migrations/0006_expurgo_de_historico_down.sql"
 psql_run -f "$migrations/0005_ambiente_antes_da_senha_down.sql"
@@ -76,7 +78,8 @@ restos="$(psql_run --tuples-only --no-align -c \
                        'revoke_device', 'upload_operations', 'download_operations',
                        'current_session_id', 'current_device_id', 'active_device_id',
                        'app_schema_version', 'session_is_authorized', 'session_is_not_revoked',
-                       'purge_record_history', 'revogar_execute_publico_em_funcao_nova',
+                       'protecao_de_funcao_nova', 'purge_record_history',
+                       'revogar_execute_publico_em_funcao_nova',
                        'revoke_all_devices',
                        'app_environment');")"
 if [ "$restos" -ne 0 ]; then
@@ -93,6 +96,7 @@ psql_run -f "$migrations/0004_sessao_revogada_e_ambiente_up.sql"
 psql_run -f "$migrations/0005_ambiente_antes_da_senha_up.sql"
 psql_run -f "$migrations/0006_expurgo_de_historico_up.sql"
 psql_run -f "$migrations/0007_funcao_nova_fechada_up.sql"
+psql_run -f "$migrations/0008_revogacao_idempotente_up.sql"
 
 tabelas="$(contar_tabelas)"
 if [ "$tabelas" -ne 8 ]; then

@@ -1,4 +1,4 @@
-import { authorizeCurrentDevice, currentDeviceId, revokeDevice, rotateDeviceId } from '../auth/device'
+import { adoptDeviceId, authorizeCurrentDevice, currentDeviceId, revokeDevice } from '../auth/device'
 import { fetchRemoteDevices, revokeAllRemoteDevices, type RemoteDevice } from '../auth/supabase'
 import { encryptPayload, decryptPayload } from '../crypto/vault'
 import { db, type ApoioDatabase } from '../db/database'
@@ -126,12 +126,17 @@ export class CloseDistrictService {
     // navegador aí deixava a conta abrindo neste aparelho e sem entrar mais no
     // serviço, sem nada na tela explicando. A marca abaixo é o que permite
     // retomar, e só sai quando a autorização nova está de pé.
+    // O identificador que este aparelho vai adotar é escolhido agora e gravado
+    // junto da marca. Sortear um novo a cada retomada deixaria na conta um
+    // aparelho ativo por interrupção.
+    const newDeviceId = crypto.randomUUID()
     await this.database.pendingActions.put({
       id: pendingActionId(accountId, 'close_district'),
       accountId,
       kind: 'close_district',
       createdAt: agora,
       stage: 'revoking',
+      newDeviceId,
     })
 
     // Quem revoga é o servidor, de uma vez só. Percorrer a lista local revogava
@@ -154,7 +159,7 @@ export class CloseDistrictService {
 
     // A instalação atual continua servindo ao pastor, mas com autorização nova:
     // nada do que valia antes do encerramento volta a valer.
-    const newDeviceId = rotateDeviceId(accountId)
+    adoptDeviceId(accountId, newDeviceId)
     await authorizeCurrentDevice(accountId, this.database)
     await this.database.pendingActions.delete(pendingActionId(accountId, 'close_district'))
 
@@ -174,12 +179,15 @@ export async function pendingDistrictClosure(accountId: string, database: ApoioD
 
 /**
  * Termina um encerramento interrompido: garante a revogação e devolve a este
- * aparelho uma autorização nova.
+ * aparelho a autorização nova que já estava escolhida.
  *
- * É idempotente de propósito, porque não dá para saber onde exatamente parou.
- * A revogação no servidor acontece em uma transação só — ou valeu inteira, ou
- * não valeu —, então repeti-la é seguro: se o aparelho já está revogado, o
- * serviço recusa e o que falta é justamente a autorização nova.
+ * Duas coisas fazem a retomada terminar sempre com um aparelho ativo, e não
+ * com um a mais por tentativa. A primeira é o identificador: ele foi sorteado
+ * uma vez, no começo do encerramento, e fica gravado — cada retomada adota o
+ * mesmo. A segunda é a revogação, que o serviço passou a aceitar repetida:
+ * zero significa "não havia nada para revogar" e uma exceção volta a
+ * significar falha de verdade, que interrompe a retomada em vez de seguir por
+ * cima dela.
  */
 export async function resumeDistrictClosure(
   accountId: string,
@@ -190,19 +198,20 @@ export async function resumeDistrictClosure(
   if (!marca) throw new Error('Não há encerramento pendente nesta conta.')
 
   if (marca.stage === 'revoking') {
-    try {
-      await revokeAll()
-    } catch {
-      // Este aparelho já não tem autorização para revogar, o que só acontece
-      // quando a revogação anterior valeu. Seguir para a autorização nova.
-    }
+    // Sem `catch`: uma falha aqui é falha de rede ou de serviço, e seguir para
+    // a autorização nova deixaria os outros aparelhos ativos num distrito que
+    // o pastor mandou encerrar. A marca permanece e a tela pede para tentar de
+    // novo. "Já estava revogado" não chega mais como erro: chega como zero.
+    await revokeAll()
     const agora = new Date().toISOString()
     const locais = await database.devices.where('accountId').equals(accountId).toArray()
     await database.devices.bulkPut(locais.map((device) => ({ ...device, status: 'revoked' as const, revokedAt: device.revokedAt ?? agora })))
     await database.pendingActions.update(marca.id, { stage: 'reauthorizing' })
   }
 
-  const newDeviceId = rotateDeviceId(accountId)
+  const newDeviceId = marca.newDeviceId ?? crypto.randomUUID()
+  if (!marca.newDeviceId) await database.pendingActions.update(marca.id, { newDeviceId })
+  adoptDeviceId(accountId, newDeviceId)
   await authorizeCurrentDevice(accountId, database)
   await database.pendingActions.delete(marca.id)
   return { newDeviceId }

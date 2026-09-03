@@ -144,9 +144,21 @@ select homologacao_testes.exigir(
   'nenhum aparelho da conta continua ativo depois do encerramento');
 set role authenticated;
 
+-- Repetir é a situação da retomada: o encerramento parou no meio e alguém
+-- abriu o aplicativo de novo. Antes isto levantava exceção e quem chamava não
+-- distinguia "já foi revogado" de "a rede caiu".
+select homologacao_testes.exigir(
+  public.revoke_all_devices() = 0,
+  'revogar tudo de novo devolve zero em vez de erro');
+
 select homologacao_testes.exigir(
   public.claim_device('e4000000-0000-4000-8000-00000000000e', 'Computador Fictício E novo') = 'active',
   'a sessão que encerrou o distrito registra a autorização nova');
+reset role;
+select homologacao_testes.exigir(
+  (select count(*) from public.devices where owner_id = :conta_e and status = 'active') = 1,
+  'a conta termina com exatamente um aparelho ativo');
+set role authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 5. Ambiente declarado no banco.
@@ -167,7 +179,7 @@ select homologacao_testes.exigir(
   public.app_environment() = 'homologacao',
   'com a linha escrita pelo responsável, o banco declara o ambiente');
 select homologacao_testes.exigir(
-  public.app_schema_version() = 7,
+  public.app_schema_version() = 8,
   'a versão do esquema acompanha esta migration');
 
 reset role;
@@ -207,8 +219,11 @@ select homologacao_testes.exigir(
   'as três versões do registro chegaram ao serviço');
 
 select homologacao_testes.exigir(
-  public.purge_record_history(array['fa000000-0000-4000-8000-00000000000f']::uuid[]) = 2,
-  'o expurgo apaga as versões anteriores do registro');
+  (select count(*) from public.purge_record_history(
+    jsonb_build_array(jsonb_build_object(
+      'record_id', 'fa000000-0000-4000-8000-00000000000f',
+      'operation_id', 'f3000000-0000-4000-8000-00000000000f')))) = 1,
+  'o expurgo acontece quando a lápide esperada ainda é a versão vigente');
 
 select homologacao_testes.exigir(
   (select count(*) from public.download_operations(0, 500)) = 1,
@@ -220,9 +235,37 @@ select homologacao_testes.exigir(
   not exists (select 1 from public.download_operations(0, 500) o where o.ciphertext like 'versao-%'),
   'nenhuma versão anterior continua recuperável no serviço');
 
+-- Alteração concorrente: outro aparelho gravou o registro depois de este ter
+-- decidido apagá-lo. O histórico dele não pode sumir por baixo de um trabalho
+-- que ninguém pediu para apagar.
+select public.upload_operations(jsonb_build_array(
+  jsonb_build_object('id', 'f4000000-0000-4000-8000-00000000000f', 'record_id', 'fb000000-0000-4000-8000-00000000000f',
+    'operation', 'upsert', 'base_version', 0, 'record_version', 1, 'schema_version', 1,
+    'ciphertext', 'versao-antiga-ficticia', 'iv', 'iv', 'aad', 'aad', 'mac', 'mac', 'mac_version', 3),
+  jsonb_build_object('id', 'f5000000-0000-4000-8000-00000000000f', 'record_id', 'fb000000-0000-4000-8000-00000000000f',
+    'operation', 'delete', 'base_version', 1, 'record_version', 2, 'schema_version', 1,
+    'ciphertext', 'lapide-ficticia', 'iv', 'iv', 'aad', 'aad', 'mac', 'mac', 'mac_version', 3),
+  jsonb_build_object('id', 'f6000000-0000-4000-8000-00000000000f', 'record_id', 'fb000000-0000-4000-8000-00000000000f',
+    'operation', 'upsert', 'base_version', 2, 'record_version', 3, 'schema_version', 1,
+    'ciphertext', 'alteracao-concorrente-ficticia', 'iv', 'iv', 'aad', 'aad', 'mac', 'mac', 'mac_version', 3)
+));
+
 select homologacao_testes.exigir(
-  public.purge_record_history(array[]::uuid[]) = 0,
+  (select count(*) from public.purge_record_history(
+    jsonb_build_array(jsonb_build_object(
+      'record_id', 'fb000000-0000-4000-8000-00000000000f',
+      'operation_id', 'f5000000-0000-4000-8000-00000000000f')))) = 0,
+  'com alteração concorrente, o expurgo não acontece e o registro não volta na lista');
+select homologacao_testes.exigir(
+  (select count(*) from public.download_operations(0, 500) o where o.record_id = 'fb000000-0000-4000-8000-00000000000f') = 3,
+  'e nada do histórico daquele registro foi apagado');
+
+select homologacao_testes.exigir(
+  (select count(*) from public.purge_record_history('[]'::jsonb)) = 0,
   'expurgo sem registro nenhum não faz nada');
+select homologacao_testes.exigir_recusa(
+  $cmd$select public.purge_record_history('{"nao":"e uma lista"}'::jsonb)$cmd$,
+  'lote de expurgo que não é lista é recusado');
 
 -- As provas de privilégio a seguir criam objetos, e quem cria é o dono.
 reset role;
@@ -272,6 +315,20 @@ select homologacao_testes.exigir(
     where n.nspname = 'public' and p.proname = 'funcao_futura_ficticia' and a.grantee = 0),
   'e PUBLIC não aparece na lista de privilégios dela');
 drop function public.funcao_futura_ficticia();
+
+-- Procedimento é outra porta, e `call` a abre do mesmo jeito.
+create procedure public.procedimento_futuro_ficticio() language sql as $$ select 1 $$;
+select homologacao_testes.exigir(
+  not has_function_privilege('authenticated', 'public.procedimento_futuro_ficticio()', 'execute')
+  and not has_function_privilege('anon', 'public.procedimento_futuro_ficticio()', 'execute'),
+  'um procedimento criado sem revoke nenhum também nasce fora do alcance do navegador');
+drop procedure public.procedimento_futuro_ficticio();
+
+-- A proteção é lida do catálogo, não afirmada: se alguém apagar ou desabilitar
+-- o gatilho, esta resposta muda e a homologação reprova.
+select homologacao_testes.exigir(
+  public.protecao_de_funcao_nova(),
+  'o gatilho que fecha função e procedimento novos está ativo e verificável');
 
 delete from public.service_environment;
 set request.jwt.claims = '{}';

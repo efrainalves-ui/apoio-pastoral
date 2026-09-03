@@ -72,6 +72,7 @@ export async function registerRemoteAccount(email: string, password: string): Pr
 
 /** Reenvia o e-mail de confirmação de uma conta recém-criada. */
 export async function resendConfirmationEmail(email: string): Promise<void> {
+  await assertServiceIdentity()
   const { error } = await getSupabaseClient().auth.resend({ type: 'signup', email })
   if (error) throw falhaRemota(error, 'Não foi possível reenviar a confirmação agora.')
 }
@@ -81,6 +82,7 @@ export async function resendConfirmationEmail(email: string): Promise<void> {
  * chave de recuperação: ela não sai do aparelho do pastor, por e-mail nenhum.
  */
 export async function requestPasswordReset(email: string, redirectTo: string): Promise<void> {
+  await assertServiceIdentity()
   const { error } = await getSupabaseClient().auth.resetPasswordForEmail(email, { redirectTo })
   if (error) throw falhaRemota(error, 'Não foi possível enviar o e-mail de redefinição agora.')
 }
@@ -100,9 +102,21 @@ export function onPasswordRecovery(aoReceber: () => void): () => void {
 
 /** Conta autenticada agora no serviço, ou `null` quando não há sessão. */
 export async function currentRemoteAccountId(): Promise<string | null> {
+  return (await currentRemoteAccount())?.id ?? null
+}
+
+/**
+ * Conta autenticada agora, com o e-mail que o serviço reconhece.
+ *
+ * O e-mail importa: um link de redefinição abre a sessão da conta dele, e é
+ * preciso conferir que é a mesma conta que o titular digitou antes de gravar
+ * qualquer coisa em nome dela.
+ */
+export async function currentRemoteAccount(): Promise<{ id: string; email: string } | null> {
   if (!hasSupabaseConfiguration) return null
   const { data: { user } } = await getSupabaseClient().auth.getUser()
-  return user?.id ?? null
+  if (!user) return null
+  return { id: user.id, email: (user.email ?? '').trim().toLowerCase() }
 }
 
 export async function signInRemoteAccount(email: string, password: string): Promise<string> {
@@ -198,7 +212,13 @@ export async function assertServiceSchema(): Promise<void> {
 export async function assertServiceIdentity(): Promise<void> {
   if (!hasSupabaseConfiguration || servicoConferido) return
   const versao = await remoteSchemaVersion()
-  if (versao === null) return
+  // Resposta nula, de outro tipo ou inesperada não é "seguir em frente": é um
+  // serviço que não sabe dizer o que é. Antes isto passava direto, e uma
+  // instalação apontada para um projeto sem as funções de identificação
+  // sincronizava como se estivesse tudo certo.
+  if (versao === null) {
+    throw new Error('Este serviço não respondeu qual versão ele tem. Nenhuma sincronização foi feita.')
+  }
   if (versao !== EXPECTED_SCHEMA_VERSION) {
     throw new Error('O serviço desta conta está em uma versão diferente da deste aplicativo. Atualize o aplicativo antes de sincronizar.')
   }
@@ -217,7 +237,10 @@ export async function remoteEnvironment(): Promise<string | null> {
   if (!hasSupabaseConfiguration) return null
   const resposta = await getSupabaseClient().rpc('app_environment')
   if (resposta.error) throw falhaRemota(resposta.error, 'Não foi possível conferir o ambiente do serviço.')
-  return typeof resposta.data === 'string' && resposta.data ? resposta.data : null
+  // Só dois valores existem. Qualquer outra coisa é resposta inesperada, e
+  // resposta inesperada aqui é motivo para não falar com este serviço.
+  const declarado: unknown = resposta.data
+  return declarado === 'homologacao' || declarado === 'producao' ? declarado : null
 }
 
 /** Versão do esquema que o serviço está usando, para conferir o ambiente. */
@@ -225,7 +248,7 @@ export async function remoteSchemaVersion(): Promise<number | null> {
   if (!hasSupabaseConfiguration) return null
   const resposta = await getSupabaseClient().rpc('app_schema_version')
   if (resposta.error) throw falhaRemota(resposta.error, 'Não foi possível conferir a versão do serviço.')
-  return typeof resposta.data === 'number' ? resposta.data : null
+  return Number.isInteger(resposta.data) ? (resposta.data as number) : null
 }
 
 export async function storeRemoteRecoveryEnvelope(envelope: RecoveryKeyEnvelope): Promise<void> {
@@ -402,17 +425,35 @@ export async function revokeRemoteDevice(deviceId: string): Promise<void> {
 
 /**
  * Apaga no serviço as versões anteriores dos registros indicados, deixando só
- * a última — a lápide que os outros aparelhos ainda precisam receber.
+ * a operação que este aparelho publicou — a lápide ou a redação que os outros
+ * aparelhos ainda precisam receber.
  *
- * Sem isto, apagar uma pessoa trocava o envelope atual por uma lápide e
- * deixava todo o passado dela guardado, cifrado com a mesma chave que o
- * titular usa todo dia. Devolve `null` quando não há serviço remoto.
+ * O serviço só apaga quando aquela operação ainda é a última do registro.
+ * Qualquer coisa mais recente é alteração concorrente de outro aparelho, e o
+ * histórico dela não pode sumir por causa de uma decisão tomada antes de ela
+ * existir: o registro simplesmente não volta na lista e a pendência fica.
+ *
+ * Devolve os registros de fato expurgados, ou `null` sem serviço remoto.
  */
-export async function purgeRemoteRecordHistory(recordIds: string[]): Promise<number | null> {
-  if (!hasSupabaseConfiguration || recordIds.length === 0) return null
-  const resposta = await getSupabaseClient().rpc('purge_record_history', { p_record_ids: recordIds })
+export interface PurgeTarget {
+  recordId: string
+  /** Operação que este aparelho publicou e que precisa ainda ser a última. */
+  operationId: string
+}
+
+/** Teto por chamada, igual ao do serviço. */
+export const PURGE_BATCH_SIZE = 500
+
+export async function purgeRemoteRecordHistory(targets: PurgeTarget[]): Promise<string[] | null> {
+  if (!hasSupabaseConfiguration) return null
+  if (targets.length === 0) return []
+  if (targets.length > PURGE_BATCH_SIZE) throw new Error('Lote de expurgo maior do que o serviço aceita.')
+  const resposta = await getSupabaseClient().rpc('purge_record_history', {
+    p_expected: targets.map(({ recordId, operationId }) => ({ record_id: recordId, operation_id: operationId })),
+  })
   if (resposta.error) throw falhaRemota(resposta.error, 'Não foi possível apagar o histórico no serviço.')
-  return typeof resposta.data === 'number' ? resposta.data : null
+  const linhas = (resposta.data ?? []) as Array<string | { purge_record_history: string }>
+  return linhas.map((linha) => (typeof linha === 'string' ? linha : linha.purge_record_history))
 }
 
 /**

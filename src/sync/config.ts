@@ -77,4 +77,4 @@ export function remoteProjectProblem({ url, anonKey, declaredRef }: RemoteProjec
 export const declaredProjectRef = import.meta.env.VITE_SUPABASE_PROJECT_REF as string | undefined
 
 /** Versão do esquema do serviço que esta versão do aplicativo espera. */
-export const EXPECTED_SCHEMA_VERSION = 7
+export const EXPECTED_SCHEMA_VERSION = 8

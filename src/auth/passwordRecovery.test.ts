@@ -21,6 +21,7 @@ interface ServicoFicticio {
   senhaDoServico: string
   envelopeGuardado: unknown
   sessaoAberta: boolean
+  emailDaSessao: string
   falharAoGuardarEnvelope: boolean
   falharAoVoltarSenha: boolean
 }
@@ -30,6 +31,7 @@ async function carregar(estado: Partial<ServicoFicticio> = {}) {
     senhaDoServico: 'senha-ficticia-antiga-2026',
     envelopeGuardado: null,
     sessaoAberta: true,
+    emailDaSessao: EMAIL,
     falharAoGuardarEnvelope: false,
     falharAoVoltarSenha: false,
     ...estado,
@@ -39,6 +41,7 @@ async function carregar(estado: Partial<ServicoFicticio> = {}) {
   vi.doMock('./supabase', () => ({
     hasSupabaseConfiguration: true,
     currentRemoteAccountId: vi.fn(() => Promise.resolve(servico.sessaoAberta ? CONTA : null)),
+    currentRemoteAccount: vi.fn(() => Promise.resolve(servico.sessaoAberta ? { id: CONTA, email: servico.emailDaSessao } : null)),
     signInRemoteAccount: vi.fn((_email: string, senha: string) => senha === servico.senhaDoServico
       ? Promise.resolve(CONTA)
       : Promise.reject(new Error('E-mail ou senha inválidos.'))),
@@ -334,5 +337,55 @@ describe('troca de senha interrompida entre o serviço e o envelope', () => {
 
     await expect(session.unlockAccount(EMAIL, 'senha-ficticia-antiga-2026', database)).resolves.toBeDefined()
     expect(await database.keyEnvelopes.get(`${CONTA}:password-pendente`)).toBeUndefined()
+  })
+})
+
+describe('redefinição por e-mail interrompida', () => {
+  it('recusa quando o e-mail digitado não é o da sessão do link', async () => {
+    // Conferir só o identificador não bastava: quem digita o e-mail é o
+    // titular, e trocar a senha da conta errada só apareceria pelo bloqueio.
+    const { servico, chamadas, database, session } = await carregar({ emailDaSessao: 'outro.ficticio@example.invalid' })
+    const { recoveryCode } = await contaInstalada(database, 'senha-ficticia-antiga-2026')
+
+    await expect(session.completePasswordReset(EMAIL, recoveryCode, 'senha-ficticia-nova-2027', database))
+      .rejects.toThrow('de outra conta')
+
+    expect(servico.senhaDoServico).toBe('senha-ficticia-antiga-2026')
+    expect(chamadas.atualizacoesDeSenha).toHaveLength(0)
+  })
+
+  it('não deixa registro local desta conta quando a chave está errada', async () => {
+    // Aparelho que ainda não conhece a conta: gravar a conta e o envelope de
+    // recuperação antes de a chave conferir deixava rastro de uma recuperação
+    // que nunca aconteceu.
+    const { servico, database, session } = await carregar()
+    const secret = generateMasterSecret()
+    servico.envelopeGuardado = await createPasswordEnvelope(secret, 'senha-ficticia-antiga-2026')
+    secret.fill(0)
+
+    await expect(session.completePasswordReset(EMAIL, 'CHAVE-FICTICIA-ERRADA', 'senha-ficticia-nova-2027', database)).rejects.toThrow()
+
+    expect(await database.accounts.count()).toBe(0)
+    expect(await database.keyEnvelopes.count()).toBe(0)
+  })
+
+  it('interrompida entre a senha do serviço e o envelope, a entrada seguinte conclui', async () => {
+    const { servico, database, session } = await carregar({ falharAoGuardarEnvelope: true, falharAoVoltarSenha: true })
+    const { recoveryCode } = await contaInstalada(database, 'senha-ficticia-antiga-2026')
+
+    await expect(session.completePasswordReset(EMAIL, recoveryCode, 'senha-ficticia-nova-2027', database))
+      .rejects.toThrow('já vale neste aparelho e no serviço')
+
+    // O serviço já está com a senha nova e este aparelho também: a conta não
+    // ficou trancada, só falta o envelope subir.
+    expect(servico.senhaDoServico).toBe('senha-ficticia-nova-2027')
+    const guardado = await database.keyEnvelopes.get(keyEnvelopeId(CONTA, 'password'))
+    expect(guardado?.pendingRemote).toBe(true)
+    await expect(openPasswordEnvelope(guardado!.envelope as never, 'senha-ficticia-nova-2027')).resolves.toBeDefined()
+
+    servico.falharAoGuardarEnvelope = false
+    await session.unlockAccount(EMAIL, 'senha-ficticia-nova-2027', database)
+    expect(servico.envelopeGuardado).toBeTruthy()
+    expect((await database.keyEnvelopes.get(keyEnvelopeId(CONTA, 'password')))?.pendingRemote).toBe(false)
   })
 })

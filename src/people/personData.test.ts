@@ -278,6 +278,11 @@ describe('exportação e exclusão de uma pessoa', () => {
     expect(fila.every(({ operation }) => operation === 'delete')).toBe(true)
     // E o histórico do serviço fica na fila de expurgo, para depois de a
     // lápide subir: apagá-lo antes deixaria os outros sem saber da exclusão.
-    expect((await pendingRemotePurge(CONTA, banco)).sort()).toEqual([oracao, pessoa].sort())
+    // Cada registro leva junto a operação que este aparelho publicou: é ela
+    // que o serviço vai exigir que ainda seja a última antes de apagar.
+    const aExpurgar = await pendingRemotePurge(CONTA, banco)
+    expect(aExpurgar.map(({ recordId }) => recordId).sort()).toEqual([oracao, pessoa].sort())
+    const publicadas = new Set((await banco.outbox.toArray()).map(({ id }) => id))
+    expect(aExpurgar.every(({ operationId }) => publicadas.has(operationId))).toBe(true)
   })
 })

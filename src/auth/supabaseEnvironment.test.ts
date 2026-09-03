@@ -105,7 +105,7 @@ describe('o serviço precisa declarar o próprio ambiente', () => {
     vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'chave-publica-ficticia')
     vi.stubEnv('VITE_SUPABASE_PROJECT_REF', 'homolog-fake')
     const rpc = vi.fn((nome: string) => Promise.resolve({
-      data: nome === 'app_schema_version' ? 7 : ambienteDoBanco,
+      data: nome === 'app_schema_version' ? 8 : ambienteDoBanco,
       error: null,
     }))
     vi.doMock('@supabase/supabase-js', () => ({ createClient: () => ({ rpc, auth: {} }) }))
@@ -144,7 +144,7 @@ describe('o serviço precisa declarar o próprio ambiente', () => {
     vi.stubEnv('VITE_SUPABASE_PROJECT_REF', 'homolog-fake')
     vi.doMock('@supabase/supabase-js', () => ({
       createClient: () => ({
-        rpc: (nome: string) => { ordem.push(`rpc:${nome}`); return Promise.resolve({ data: nome === 'app_schema_version' ? 7 : 'homologacao', error: null }) },
+        rpc: (nome: string) => { ordem.push(`rpc:${nome}`); return Promise.resolve({ data: nome === 'app_schema_version' ? 8 : 'homologacao', error: null }) },
         auth: {
           signInWithPassword: () => { ordem.push('senha-enviada'); return Promise.resolve({ data: { user: { id: 'x' } }, error: null }) },
           signUp: () => { ordem.push('senha-enviada'); return Promise.resolve({ data: { user: { id: 'x' }, session: {} }, error: null }) },
@@ -160,5 +160,51 @@ describe('o serviço precisa declarar o próprio ambiente', () => {
 
     expect(ordem).not.toContain('senha-enviada')
     expect(ordem[0]).toBe('rpc:app_schema_version')
+  })
+
+  it('falha fechado quando o serviço não sabe dizer sua versão ou seu ambiente', async () => {
+    // Antes, resposta nula era "siga em frente": uma instalação apontada para
+    // um projeto sem as funções de identificação sincronizava normalmente.
+    for (const resposta of [null, 'quatro', 4.5, 'encenacao'] as const) {
+      vi.resetModules()
+      vi.stubEnv('VITE_APP_ENV', 'homologacao')
+      vi.stubEnv('VITE_SUPABASE_URL', 'https://homolog-fake.supabase.co')
+      vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'chave-publica-ficticia')
+      vi.stubEnv('VITE_SUPABASE_PROJECT_REF', 'homolog-fake')
+      vi.doMock('@supabase/supabase-js', () => ({
+        createClient: () => ({ rpc: () => Promise.resolve({ data: resposta, error: null }), auth: {} }),
+      }))
+      const { assertServiceIdentity } = await import('./supabase')
+
+      await expect(assertServiceIdentity()).rejects.toThrow()
+      vi.doUnmock('@supabase/supabase-js')
+    }
+  })
+
+  it('confere o ambiente antes de pedir redefinição de senha e reenvio de confirmação', async () => {
+    const ordem: string[] = []
+    vi.resetModules()
+    vi.stubEnv('VITE_APP_ENV', 'producao')
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://homolog-fake.supabase.co')
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'chave-publica-ficticia')
+    vi.stubEnv('VITE_SUPABASE_PROJECT_REF', 'homolog-fake')
+    vi.doMock('@supabase/supabase-js', () => ({
+      createClient: () => ({
+        rpc: (nome: string) => { ordem.push(`rpc:${nome}`); return Promise.resolve({ data: nome === 'app_schema_version' ? 8 : 'homologacao', error: null }) },
+        auth: {
+          resetPasswordForEmail: () => { ordem.push('e-mail-enviado'); return Promise.resolve({ error: null }) },
+          resend: () => { ordem.push('e-mail-enviado'); return Promise.resolve({ error: null }) },
+        },
+      }),
+    }))
+    const supabase = await import('./supabase')
+
+    await expect(supabase.requestPasswordReset('conta.ficticia@example.invalid', 'https://exemplo.invalid/acesso'))
+      .rejects.toThrow(/ambientes diferentes/u)
+    await expect(supabase.resendConfirmationEmail('conta.ficticia@example.invalid'))
+      .rejects.toThrow(/ambientes diferentes/u)
+
+    expect(ordem).not.toContain('e-mail-enviado')
+    vi.doUnmock('@supabase/supabase-js')
   })
 })

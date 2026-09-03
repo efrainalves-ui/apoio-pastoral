@@ -8,6 +8,6 @@ security invoker
 set search_path = ''
 as $$ select 5 $$;
 
-drop function if exists public.purge_record_history(uuid[]);
+drop function if exists public.purge_record_history(jsonb);
 
 commit;

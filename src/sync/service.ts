@@ -1,5 +1,5 @@
 import { assertDeviceCanSync, assertRemoteDeviceStillActive, type RemoteDeviceStatusReader } from '../auth/device'
-import { fetchRemoteDeviceStatus, purgeRemoteRecordHistory } from '../auth/supabase'
+import { fetchRemoteDeviceStatus, purgeRemoteRecordHistory, PURGE_BATCH_SIZE, type PurgeTarget } from '../auth/supabase'
 import { db, type ApoioDatabase } from '../db/database'
 import { clearRemotePurge, pendingRemotePurge } from '../db/purge'
 import type { OutboxRecord, QuarantinedOperationRecord, SyncConflictRecord, VaultRecord } from '../db/types'
@@ -57,7 +57,7 @@ export class SyncService {
     private readonly database: ApoioDatabase = db,
     private readonly online: () => boolean = () => navigator.onLine,
     private readonly readRemoteDeviceStatus: RemoteDeviceStatusReader = fetchRemoteDeviceStatus,
-    private readonly purgeRemoteHistory: (recordIds: string[]) => Promise<number | null> = purgeRemoteRecordHistory,
+    private readonly purgeRemoteHistory: (targets: PurgeTarget[]) => Promise<string[] | null> = purgeRemoteRecordHistory,
   ) {}
 
   /**
@@ -90,8 +90,16 @@ export class SyncService {
     const aExpurgar = await pendingRemotePurge(accountId, this.database)
     if (aExpurgar.length > 0) {
       try {
-        await this.purgeRemoteHistory(aExpurgar)
-        await clearRemotePurge(accountId, aExpurgar, this.database)
+        // Em lotes, porque o serviço tem teto por chamada e uma exclusão de
+        // pessoa com muitos vínculos passa dele com facilidade.
+        for (let inicio = 0; inicio < aExpurgar.length; inicio += PURGE_BATCH_SIZE) {
+          const lote = aExpurgar.slice(inicio, inicio + PURGE_BATCH_SIZE)
+          const apagados = await this.purgeRemoteHistory(lote)
+          // `null` é ausência de serviço remoto: nada a limpar da fila. Uma
+          // lista menor do que o lote são registros com alteração concorrente,
+          // que continuam pendentes de propósito.
+          if (apagados) await clearRemotePurge(accountId, apagados, this.database)
+        }
       } catch {
         // Sem rede ou serviço recusando: a fila permanece e a próxima
         // sincronização tenta de novo. Nunca é descartada em silêncio.
@@ -220,6 +228,19 @@ export class SyncService {
 
     return { aplicadas, conflitos, quarentena }
   }
+}
+
+/**
+ * Uma rodada só conta como confirmada quando ela realmente terminou.
+ *
+ * Enquanto `firstSyncAt` estiver vazio, uma lista vazia não prova conta vazia,
+ * e qualquer outro desfecho — offline, erro, cancelamento, páginas faltando ou
+ * cursor parado — significa a mesma coisa: ainda não sabemos. Antes só a
+ * paginação incompleta era tratada assim, e uma rodada offline seguia adiante
+ * como se tivesse recebido tudo.
+ */
+export function syncConfirmed(summary: SyncSummary): boolean {
+  return summary.status !== 'offline' && !summary.incomplete
 }
 
 /**

@@ -144,6 +144,21 @@ export interface PendingActionRecord {
    * depois que a lápide subir — o que pode ser em outro dia, com outra rede.
    */
   recordIds?: string[]
+  /**
+   * Registros à espera de expurgo e a operação que este aparelho publicou para
+   * cada um. O serviço só apaga o histórico quando aquela operação ainda é a
+   * última do registro — do contrário houve alteração concorrente e a decisão
+   * precisa ser tomada de novo.
+   */
+  purgeTargets?: Array<{ recordId: string; operationId: string }>
+  /**
+   * Identificador que este aparelho vai adotar ao concluir o encerramento.
+   *
+   * Fica gravado porque a retomada pode acontecer várias vezes: sortear um
+   * novo a cada tentativa deixaria para trás uma fila de aparelhos ativos na
+   * conta, um por interrupção.
+   */
+  newDeviceId?: string
 }
 
 export function pendingActionId(accountId: string, kind: PendingActionRecord['kind']): string {

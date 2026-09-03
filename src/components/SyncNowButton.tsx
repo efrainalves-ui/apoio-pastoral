@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { currentDeviceId } from '../auth/device'
 import { countPendingChanges, pendingLabel } from '../sync/pending'
-import { SyncService } from '../sync/service'
+import { SyncService, syncConfirmed } from '../sync/service'
 import { createSyncTransport } from '../sync/transport'
 
 type Situacao = 'parado' | 'sincronizando' | 'pronto' | 'incompleto' | 'offline' | 'erro'
@@ -50,7 +50,9 @@ export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
     setSituacao('sincronizando')
     try {
       const resumo = await service.synchronize(account.id, currentDeviceId(account.id), syncKey)
-      setSituacao(resumo.incomplete ? 'incompleto' : 'pronto')
+      // "Dados atualizados" é uma afirmação, e ela só pode ser feita quando a
+      // rodada terminou de verdade.
+      setSituacao(syncConfirmed(resumo) ? 'pronto' : resumo.status === 'offline' ? 'offline' : 'incompleto')
     } catch {
       setSituacao(navigator.onLine ? 'erro' : 'offline')
     } finally {

@@ -6,6 +6,7 @@ import { VaultRepository } from '../db/repository'
 import type { OutboxRecord } from '../db/types'
 import { SyncService, firstSyncPending } from './service'
 import { withOperationMac } from './operationMac'
+import { PURGE_BATCH_SIZE, type PurgeTarget } from '../auth/supabase'
 import { LocalDevelopmentTransport, PAGE_SIZE, resetLocalDevelopmentTransport } from './transport'
 import type { EncryptedOperation, PullResult, PushResult, SyncTransport } from './types'
 
@@ -305,32 +306,79 @@ describe('sincronização cifrada', () => {
     // A ordem importa: apagar o histórico antes de a lápide subir deixaria os
     // outros aparelhos sem nunca saber da exclusão.
     const { database, accountId, deviceId, keys } = await fixture()
+    const alvos = [
+      { recordId: 'registro-ficticio-1', operationId: 'operacao-ficticia-1' },
+      { recordId: 'registro-ficticio-2', operationId: 'operacao-ficticia-2' },
+    ]
     await database.pendingActions.put({
       id: `${accountId}:purge_history`, accountId, kind: 'purge_history',
-      createdAt: new Date().toISOString(), recordIds: ['registro-ficticio-1', 'registro-ficticio-2'],
+      createdAt: new Date().toISOString(), purgeTargets: alvos,
     })
     const transport = new CaptureTransport()
-    const expurgados: string[][] = []
+    const pedidos: PurgeTarget[][] = []
 
-    await new SyncService(transport, database, () => true, () => Promise.resolve(null), (ids) => { expurgados.push(ids); return Promise.resolve(ids.length) })
-      .synchronize(accountId, deviceId, keys.sync)
+    await new SyncService(transport, database, () => true, () => Promise.resolve(null), (alvo) => {
+      pedidos.push(alvo)
+      return Promise.resolve(alvo.map(({ recordId }) => recordId))
+    }).synchronize(accountId, deviceId, keys.sync)
 
     expect(transport.pushed).toHaveLength(1)
-    expect(expurgados).toEqual([['registro-ficticio-1', 'registro-ficticio-2']])
+    expect(pedidos).toEqual([alvos])
+    expect(await database.pendingActions.count()).toBe(0)
+  })
+
+  it('mantém pendente o registro que teve alteração concorrente', async () => {
+    // O serviço devolve só o que apagou. O que não voltou continua na fila de
+    // propósito: o expurgo não pode desaparecer em silêncio porque outro
+    // aparelho mexeu no registro depois da decisão de apagar.
+    const { database, accountId, deviceId, keys } = await fixture()
+    await database.pendingActions.put({
+      id: `${accountId}:purge_history`, accountId, kind: 'purge_history', createdAt: new Date().toISOString(),
+      purgeTargets: [
+        { recordId: 'registro-ficticio-1', operationId: 'operacao-ficticia-1' },
+        { recordId: 'registro-ficticio-concorrente', operationId: 'operacao-ficticia-2' },
+      ],
+    })
+
+    await new SyncService(new CaptureTransport(), database, () => true, () => Promise.resolve(null),
+      () => Promise.resolve(['registro-ficticio-1'])).synchronize(accountId, deviceId, keys.sync)
+
+    expect((await database.pendingActions.get(`${accountId}:purge_history`))?.purgeTargets)
+      .toEqual([{ recordId: 'registro-ficticio-concorrente', operationId: 'operacao-ficticia-2' }])
+  })
+
+  it('divide o expurgo em lotes que o serviço aceita', async () => {
+    const { database, accountId, deviceId, keys } = await fixture()
+    const alvos = Array.from({ length: PURGE_BATCH_SIZE + 3 }, (_valor, indice) => ({
+      recordId: `registro-ficticio-${indice}`, operationId: `operacao-ficticia-${indice}`,
+    }))
+    await database.pendingActions.put({
+      id: `${accountId}:purge_history`, accountId, kind: 'purge_history',
+      createdAt: new Date().toISOString(), purgeTargets: alvos,
+    })
+    const tamanhos: number[] = []
+
+    await new SyncService(new CaptureTransport(), database, () => true, () => Promise.resolve(null), (lote) => {
+      tamanhos.push(lote.length)
+      return Promise.resolve(lote.map(({ recordId }) => recordId))
+    }).synchronize(accountId, deviceId, keys.sync)
+
+    expect(tamanhos).toEqual([PURGE_BATCH_SIZE, 3])
     expect(await database.pendingActions.count()).toBe(0)
   })
 
   it('sem rede, a fila de expurgo permanece para a próxima vez', async () => {
     const { database, accountId, deviceId, keys } = await fixture()
+    const alvos = [{ recordId: 'registro-ficticio-1', operationId: 'operacao-ficticia-1' }]
     await database.pendingActions.put({
       id: `${accountId}:purge_history`, accountId, kind: 'purge_history',
-      createdAt: new Date().toISOString(), recordIds: ['registro-ficticio-1'],
+      createdAt: new Date().toISOString(), purgeTargets: alvos,
     })
 
     await new SyncService(new CaptureTransport(), database, () => true, () => Promise.resolve(null), () => Promise.reject(new Error('sem rede')))
       .synchronize(accountId, deviceId, keys.sync)
 
-    expect((await database.pendingActions.get(`${accountId}:purge_history`))?.recordIds).toEqual(['registro-ficticio-1'])
+    expect((await database.pendingActions.get(`${accountId}:purge_history`))?.purgeTargets).toEqual(alvos)
   })
 })
 

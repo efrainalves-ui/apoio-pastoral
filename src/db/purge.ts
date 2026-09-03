@@ -1,3 +1,4 @@
+import type { PurgeTarget } from '../auth/supabase'
 import { db, type ApoioDatabase } from './database'
 import { pendingActionId } from './types'
 
@@ -35,12 +36,12 @@ export interface PurgeResult {
  */
 export async function purgeRecordHistory(
   accountId: string,
-  recordIds: string[],
-  keepOperationIds: Set<string>,
+  targets: PurgeTarget[],
   database: ApoioDatabase = db,
 ): Promise<PurgeResult> {
-  if (recordIds.length === 0) return { local: 0, queued: 0 }
-  const alvos = new Set(recordIds)
+  if (targets.length === 0) return { local: 0, queued: 0 }
+  const alvos = new Set(targets.map(({ recordId }) => recordId))
+  const keepOperationIds = new Set(targets.map(({ operationId }) => operationId))
   let local = 0
 
   await database.transaction('rw', database.outbox, database.syncConflicts, database.quarantine, database.pendingActions, async () => {
@@ -64,31 +65,41 @@ export async function purgeRecordHistory(
 
     const id = pendingActionId(accountId, 'purge_history')
     const pendente = await database.pendingActions.get(id)
-    const juntos = [...new Set([...(pendente?.recordIds ?? []), ...recordIds])]
+    // Um registro apagado de novo substitui o alvo anterior: vale sempre a
+    // última operação que este aparelho publicou para ele.
+    const porRegistro = new Map((pendente?.purgeTargets ?? []).map((alvo) => [alvo.recordId, alvo]))
+    for (const alvo of targets) porRegistro.set(alvo.recordId, alvo)
     await database.pendingActions.put({
       id,
       accountId,
       kind: 'purge_history',
       createdAt: pendente?.createdAt ?? new Date().toISOString(),
-      recordIds: juntos,
+      purgeTargets: [...porRegistro.values()],
     })
   })
 
-  return { local, queued: recordIds.length }
+  return { local, queued: targets.length }
 }
 
-/** Registros à espera do expurgo no serviço, se houver. */
-export async function pendingRemotePurge(accountId: string, database: ApoioDatabase = db): Promise<string[]> {
+/** Registros à espera do expurgo no serviço, com a operação esperada de cada um. */
+export async function pendingRemotePurge(accountId: string, database: ApoioDatabase = db): Promise<PurgeTarget[]> {
   const pendente = await database.pendingActions.get(pendingActionId(accountId, 'purge_history'))
-  return pendente?.recordIds ?? []
+  return pendente?.purgeTargets ?? []
 }
 
-/** Tira da fila o que o serviço já apagou. */
+/**
+ * Tira da fila apenas o que o serviço confirmou ter apagado.
+ *
+ * O que não voltou na lista teve alteração concorrente: continua pendente, de
+ * propósito, para o pastor decidir de novo em vez de o expurgo desaparecer em
+ * silêncio.
+ */
 export async function clearRemotePurge(accountId: string, apagados: string[], database: ApoioDatabase = db): Promise<void> {
   const id = pendingActionId(accountId, 'purge_history')
   const pendente = await database.pendingActions.get(id)
   if (!pendente) return
-  const restantes = (pendente.recordIds ?? []).filter((recordId) => !apagados.includes(recordId))
+  const concluidos = new Set(apagados)
+  const restantes = (pendente.purgeTargets ?? []).filter(({ recordId }) => !concluidos.has(recordId))
   if (restantes.length === 0) { await database.pendingActions.delete(id); return }
-  await database.pendingActions.put({ ...pendente, recordIds: restantes })
+  await database.pendingActions.put({ ...pendente, purgeTargets: restantes })
 }

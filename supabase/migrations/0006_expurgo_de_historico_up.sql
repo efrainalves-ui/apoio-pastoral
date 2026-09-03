@@ -21,41 +21,58 @@ begin;
 --     os carimbos não são segredo em nenhum momento.
 -- ---------------------------------------------------------------------------
 
-create function public.purge_record_history(p_record_ids uuid[])
-returns integer
+create function public.purge_record_history(p_expected jsonb)
+returns setof uuid
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
   conta uuid := auth.uid();
-  apagadas integer;
+  item jsonb;
+  registro uuid;
+  esperada uuid;
+  vigente uuid;
 begin
   perform public.active_device_id();
-  if p_record_ids is null or array_length(p_record_ids, 1) is null then
-    return 0;
+  if jsonb_typeof(p_expected) <> 'array' then
+    raise exception 'lote de expurgo invalido';
   end if;
-  if array_length(p_record_ids, 1) > 500 then
+  if jsonb_array_length(p_expected) > 500 then
     raise exception 'lote de expurgo grande demais';
   end if;
 
-  with ultimas as (
-    select o.record_id, max(o.seq) as seq
-    from public.encrypted_operations o
-    where o.owner_id = conta and o.record_id = any(p_record_ids)
-    group by o.record_id
-  )
-  delete from public.encrypted_operations o
-  using ultimas u
-  where o.owner_id = conta and o.record_id = u.record_id and o.seq < u.seq;
+  for item in select * from jsonb_array_elements(p_expected)
+  loop
+    registro := (item ->> 'record_id')::uuid;
+    esperada := (item ->> 'operation_id')::uuid;
+    if registro is null or esperada is null then
+      raise exception 'item de expurgo sem registro ou sem operacao esperada';
+    end if;
 
-  get diagnostics apagadas = row_count;
-  return apagadas;
+    select o.id into vigente
+    from public.encrypted_operations o
+    where o.owner_id = conta and o.record_id = registro
+    order by o.seq desc
+    limit 1;
+
+    -- Só expurga quando a operação que este aparelho publicou ainda é a última
+    -- daquele registro. Qualquer coisa mais recente é alteração concorrente de
+    -- outro aparelho: apagar o histórico por baixo dela destruiria um trabalho
+    -- que ninguém pediu para apagar, e a decisão de expurgar foi tomada antes
+    -- de essa alteração existir. Nesse caso o registro simplesmente não volta
+    -- na lista, e quem chamou mantém a pendência para decidir de novo.
+    if vigente is not null and vigente = esperada then
+      delete from public.encrypted_operations o
+      where o.owner_id = conta and o.record_id = registro and o.id <> esperada;
+      return next registro;
+    end if;
+  end loop;
 end;
 $$;
 
-comment on function public.purge_record_history(uuid[]) is
-  'Apaga as versões anteriores dos registros indicados, preservando apenas a última — a lápide que os outros aparelhos precisam receber.';
+comment on function public.purge_record_history(jsonb) is
+  'Apaga as versões anteriores de cada registro indicado, e somente quando a operação esperada ainda é a última dele. Devolve os registros que foram de fato expurgados.';
 
 create or replace function public.app_schema_version()
 returns integer
@@ -65,7 +82,7 @@ security invoker
 set search_path = ''
 as $$ select 6 $$;
 
-revoke all on function public.purge_record_history(uuid[]) from public, anon;
-grant execute on function public.purge_record_history(uuid[]) to authenticated;
+revoke all on function public.purge_record_history(jsonb) from public, anon;
+grant execute on function public.purge_record_history(jsonb) to authenticated;
 
 commit;
