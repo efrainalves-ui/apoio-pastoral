@@ -373,8 +373,8 @@ select homologacao_testes.exigir(
   = array[
       'active_device_id', 'app_environment', 'approve_device', 'claim_device',
       'current_device_id', 'download_operations', 'purge_record_history',
-      'revoke_all_devices', 'revoke_device', 'session_is_authorized',
-      'session_is_not_revoked', 'upload_operations'
+      'revogar_execute_publico_em_funcao_nova', 'revoke_all_devices', 'revoke_device',
+      'session_is_authorized', 'session_is_not_revoked', 'upload_operations'
     ]::name[],
   'só as funções previstas rodam com os privilégios do dono');
 

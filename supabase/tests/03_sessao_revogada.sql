@@ -167,7 +167,7 @@ select homologacao_testes.exigir(
   public.app_environment() = 'homologacao',
   'com a linha escrita pelo responsável, o banco declara o ambiente');
 select homologacao_testes.exigir(
-  public.app_schema_version() = 6,
+  public.app_schema_version() = 7,
   'a versão do esquema acompanha esta migration');
 
 reset role;
@@ -242,15 +242,13 @@ select homologacao_testes.exigir(
   'uma tabela criada depois desta migration não nasce ao alcance do navegador');
 drop table public.tabela_futura_ficticia;
 
--- Para funções a promessa é outra, e é preciso ser exato: o PostgreSQL concede
--- EXECUTE a PUBLIC em toda função nova. O que se prova aqui é que a conferência
--- de 01 pega uma função deixada aberta — é ela que obriga cada função a trazer
--- o próprio `revoke`. O aviso abaixo mostra o estado real dos privilégios
--- padrão, para a afirmação na documentação continuar batendo com o banco.
+-- Função nova também nasce fechada, agora por gatilho de evento. O aviso abaixo
+-- mostra por que ela não podia depender do privilégio padrão: para tabelas o
+-- `alter default privileges` deixa entrada em `pg_default_acl`; para funções,
+-- não deixa nenhuma, e o EXECUTE de PUBLIC vinha do padrão embutido.
 do $$
 declare
   padrao text;
-  concedido text;
 begin
   select coalesce(string_agg(format('%s:%s', d.defaclobjtype, d.defaclacl::text), ' | '), 'nenhum')
     into padrao
@@ -258,33 +256,21 @@ begin
   join pg_namespace n on n.oid = d.defaclnamespace
   where n.nspname = 'public';
   raise notice 'diagnóstico: privilégios padrão em public = %', padrao;
-
-  execute 'create function public.funcao_diagnostico_ficticia() returns integer language sql immutable as $f$ select 1 $f$';
-  select coalesce(p.proacl::text, 'nulo (padrão embutido: EXECUTE para PUBLIC)') into concedido
-  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname = 'public' and p.proname = 'funcao_diagnostico_ficticia';
-  raise notice 'diagnóstico: função nova nasce com acl = %', concedido;
-  execute 'drop function public.funcao_diagnostico_ficticia()';
 end;
 $$;
 
 create function public.funcao_futura_ficticia() returns integer language sql immutable as $$ select 1 $$;
 select homologacao_testes.exigir(
-  exists (
+  not has_function_privilege('authenticated', 'public.funcao_futura_ficticia()', 'execute')
+  and not has_function_privilege('anon', 'public.funcao_futura_ficticia()', 'execute'),
+  'uma função criada sem revoke nenhum já nasce fora do alcance do navegador');
+select homologacao_testes.exigir(
+  not exists (
     select 1 from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
     cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) as a
     where n.nspname = 'public' and p.proname = 'funcao_futura_ficticia' and a.grantee = 0),
-  'a conferência de funções enxerga uma função nova deixada ao alcance de PUBLIC');
-drop function public.funcao_futura_ficticia();
-
--- E, fechado o `revoke`, ela some da conferência.
-create function public.funcao_futura_ficticia() returns integer language sql immutable as $$ select 1 $$;
-revoke all on function public.funcao_futura_ficticia() from public, anon, authenticated;
-select homologacao_testes.exigir(
-  not has_function_privilege('authenticated', 'public.funcao_futura_ficticia()', 'execute')
-  and not has_function_privilege('anon', 'public.funcao_futura_ficticia()', 'execute'),
-  'com o revoke escrito, a função nova fica fora do alcance do navegador');
+  'e PUBLIC não aparece na lista de privilégios dela');
 drop function public.funcao_futura_ficticia();
 
 delete from public.service_environment;

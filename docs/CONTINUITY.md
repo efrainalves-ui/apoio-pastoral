@@ -128,14 +128,18 @@ trouxeram junto um efeito que a revisão não citava.
 - **Ambiente antes da senha**: as funções que identificam o serviço respondem a
   quem ainda não entrou, e a conferência acontece antes de a credencial sair.
 - **Encerrar distrito**: o trabalho começado fica gravado e uma tela conclui.
-- **Privilégios de função**: o padrão do PostgreSQL concede EXECUTE a PUBLIC e
-  o `alter default privileges` não alcançou isso — está declarado assim. Quem
-  garante é a conferência de isolamento, agora capaz de enxergar PUBLIC.
+- **Privilégios de função**: um diagnóstico no CI mostrou que
+  `alter default privileges` não deixa entrada nenhuma para funções — para
+  tabelas deixa, e é por isso que tabela futura já nascia fechada. Um gatilho
+  de evento passou a tirar o EXECUTE de PUBLIC de toda função criada em
+  `public`, inclusive fora das migrations. A conferência de isolamento
+  continua como rede, agora capaz de enxergar PUBLIC.
 - **Assinatura**: cobre a versão declarada do MAC. `deviceId` fica de fora com
   a limitação escrita por extenso em `operationMac.ts`.
 
-Migrations novas: `0005_ambiente_antes_da_senha` e `0006_expurgo_de_historico`.
-Versão de esquema 6. Banco local na versão 12, com `pendingActions`.
+Migrations novas: `0005_ambiente_antes_da_senha`, `0006_expurgo_de_historico` e
+`0007_funcao_nova_fechada`. Versão de esquema 7. Banco local na versão 12, com
+`pendingActions`.
 
 ## Etapa estável: segunda revisão independente
 

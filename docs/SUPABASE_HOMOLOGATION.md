@@ -4,7 +4,7 @@ Este roteiro é exclusivo para um projeto Supabase novo, vazio, privado e separa
 
 ## Preparação já feita localmente
 
-As migrations de `0001_marco_zero_up.sql` a `0006_expurgo_de_historico_up.sql` mantêm somente metadados técnicos e conteúdo cifrado. Elas foram reforçadas para:
+As migrations de `0001_marco_zero_up.sql` a `0007_funcao_nova_fechada_up.sql` mantêm somente metadados técnicos e conteúdo cifrado. Elas foram reforçadas para:
 
 - impedir que um envelope de uma conta aponte para dispositivo de outra conta;
 - aceitar novo envelope apenas para dispositivo ativo da mesma conta;
@@ -37,7 +37,7 @@ Inserir os valores somente no computador privado do avaliador. Não versionar `.
 1. Confirmar que o CI Linux da branch passou integralmente, inclusive Playwright desktop e celular.
 2. Criar um projeto Supabase vazio e identificado claramente como homologação; conferir que não é produção.
 3. Em Auth, permitir somente as contas fictícias da rodada. Se necessário, desabilitar confirmação de e-mail apenas nesse projeto temporário.
-4. Aplicar, nesta ordem, `0001_marco_zero_up.sql`, `0002_password_key_envelopes_up.sql`, `0003_device_sessions_up.sql`, `0004_sessao_revogada_e_ambiente_up.sql`, `0005_ambiente_antes_da_senha_up.sql` e `0006_expurgo_de_historico_up.sql`. Não aplicar os arquivos `*_down.sql` na validação normal.
+4. Aplicar, nesta ordem, `0001_marco_zero_up.sql`, `0002_password_key_envelopes_up.sql`, `0003_device_sessions_up.sql`, `0004_sessao_revogada_e_ambiente_up.sql`, `0005_ambiente_antes_da_senha_up.sql`, `0006_expurgo_de_historico_up.sql` e `0007_funcao_nova_fechada_up.sql`. Não aplicar os arquivos `*_down.sql` na validação normal.
 5. Declarar o ambiente no próprio banco, uma única vez, pelo editor SQL do projeto:
 
    ```sql
@@ -68,7 +68,7 @@ Inserir os valores somente no computador privado do avaliador. Não versionar `.
 | Sair | Entrar com A em dois dispositivos e sair em um | O outro continua com a sessão aberta | Sair derruba o outro dispositivo |
 | Ambiente declarado | Apontar a build de homologação para um projeto sem a linha de ambiente, ou com `producao` | O aplicativo recusa sincronizar e diz por quê | A sincronização acontece |
 | Tabela futura | Criar uma tabela qualquer em `public` pelo editor SQL e consultá-la como conta fictícia | Acesso negado antes mesmo da RLS | A tabela responde ao navegador |
-| Função futura | Criar uma função qualquer em `public` e rodar `supabase/tests/01_rls_isolation.sql` | A prova reprova enquanto faltar o `revoke` da função | A prova passa com a função aberta a PUBLIC |
+| Função futura | Criar uma função qualquer em `public` pelo editor SQL, sem `revoke`, e consultar os privilégios dela | PUBLIC não aparece: o gatilho de evento fecha na hora | PUBLIC continua com EXECUTE — confira se a migration 0007 avisou que o gatilho não pôde ser criado |
 | Ambiente antes da senha | Apontar a build para o projeto errado e tentar entrar | O aplicativo recusa antes de enviar e-mail e senha | A credencial chega ao serviço errado |
 | Expurgo | Apagar uma pessoa fictícia com histórico, sincronizar e inspecionar `encrypted_operations` | Sobra apenas a lápide daquele registro | Alguma versão anterior continua no serviço |
 | Encerramento interrompido | Fechar a aba entre revogar e reautorizar; abrir de novo | A tela oferece concluir e o aparelho volta a ter autorização | A conta abre e não entra mais no serviço |

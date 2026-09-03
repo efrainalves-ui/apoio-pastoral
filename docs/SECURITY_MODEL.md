@@ -225,12 +225,17 @@ Toda **tabela** criada depois nasce fora do alcance de `anon` e `authenticated`:
 os privilégios padrão de `public` foram zerados. Antes, uma tabela nova nasceria
 legível e gravável pelo navegador, e sem RLS ligada não haveria barreira nenhuma.
 
-Com **função** a garantia é outra, e vale dizer exatamente qual: o PostgreSQL
+Com **função** o caminho foi outro, e vale registrar por que: o PostgreSQL
 concede EXECUTE a `PUBLIC` em toda função nova, e o `alter default privileges`
-não alcança esse caso — a prova no CI mostrou isso. O que protege é a
-conferência de `01_rls_isolation.sql`, que reprova qualquer função de `public`
-ao alcance de `PUBLIC` ou de `anon`; toda função precisa trazer o próprio
-`revoke` escrito. Essa conferência tinha um furo: `PUBLIC` aparece com
-identificador zero, sem linha em `pg_roles`, e o `join` a descartava justamente
-no caso que mais importava. Corrigido, ele apanhou a função de gatilho da
-primeira migration, aberta desde então.
+não deixa entrada nenhuma em `pg_default_acl` para funções — um diagnóstico no
+CI mostrou isso preto no branco, depois de a afirmação contrária ter sido
+escrita aqui e desmentida pela própria prova. Quem fecha é um gatilho de
+evento: toda função criada em `public` perde o EXECUTE de `PUBLIC` na hora,
+inclusive uma criada fora das migrations, pelo editor SQL do painel.
+
+A conferência de `01_rls_isolation.sql` continua no lugar e continua sendo ela
+quem reprova se algo escapar — um gatilho que não pôde ser criado, em algum
+ambiente gerenciado, não pode virar garantia silenciosa. Essa conferência tinha
+um furo: `PUBLIC` aparece com identificador zero, sem linha em `pg_roles`, e o
+`join` a descartava justamente no caso que mais importava. Corrigido, ele
+apanhou a função de gatilho da primeira migration, aberta desde então.
