@@ -68,6 +68,7 @@ export function SyncPage() {
       <Card title="Sincronização manual" action={navigator.onLine ? <Cloud /> : <CloudOff />}>
         <p className="card-copy">{transport.name === 'disabled' ? 'A sincronização não está habilitada. Suas informações permanecem somente neste dispositivo.' : 'Se houver uma interrupção, as alterações pendentes serão mantidas para uma nova tentativa.'}</p>
         {summary && <div className="alert alert--success" role="status">Envio: {summary.pushed}. Recebimento: {summary.pulled}. Conflitos: {summary.conflicts}.</div>}
+        {summary?.incomplete && <div className="alert alert--error" role="alert">Ainda há alterações para receber: esta rodada parou no limite de uma vez só. Toque em Sincronizar de novo até este aviso sumir.</div>}
         {conflicts > 0 && <div className="alert alert--warning" role="status">Há alterações concorrentes preservadas para revisão. Nenhuma versão foi apagada automaticamente. <Link className="text-link" to="/app/sincronizacao/conflitos">Revisar agora</Link></div>}
         {conflicts === 0 && resolved > 0 && <p className="card-copy">{resolved === 1 ? '1 revisão já foi resolvida.' : `${resolved} revisões já foram resolvidas.`} As versões preteridas continuam guardadas. <Link className="text-link" to="/app/sincronizacao/conflitos">Ver histórico</Link></p>}
         {error && <div className="alert alert--error" role="alert">{error}</div>}

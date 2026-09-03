@@ -16,6 +16,15 @@ export interface KeyEnvelopeRecord {
   accountId: string
   envelope: PasswordKeyEnvelope | RecoveryKeyEnvelope
   updatedAt: string
+  /**
+   * Este envelope ainda precisa subir para o serviço.
+   *
+   * A troca de senha muda a senha do serviço e o envelope que a acompanha. Se
+   * o segundo passo falha e o primeiro não volta atrás, a conta fica com a
+   * senha nova e o envelope antigo: um aparelho novo entraria e não abriria o
+   * cofre. A pendência marca isso e a próxima entrada com rede conclui.
+   */
+  pendingRemote?: boolean
 }
 
 export function keyEnvelopeId(accountId: string, kind: KeyEnvelopeKind): string {

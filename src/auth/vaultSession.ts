@@ -126,8 +126,12 @@ async function ensureRemoteProvisioning(account: AccountRecord, database: ApoioD
   if (account.authMode !== 'supabase' || !hasSupabaseConfiguration) return
   await assertRemoteSessionMatches(account)
   const senha = await database.keyEnvelopes.get(keyEnvelopeId(account.id, 'password'))
-  if (senha?.envelope.kind === 'password' && !await hasRemotePasswordEnvelope()) {
+  // `pendingRemote` é uma troca de senha que avançou aqui e no serviço, mas
+  // cujo envelope não chegou a subir. Sem esta volta, um aparelho novo baixaria
+  // o envelope antigo e não abriria o cofre com a senha que agora vale.
+  if (senha?.envelope.kind === 'password' && (senha.pendingRemote || !await hasRemotePasswordEnvelope())) {
     await storeRemotePasswordEnvelope(senha.envelope)
+    if (senha.pendingRemote) await database.keyEnvelopes.put({ ...senha, pendingRemote: false })
   }
   const recuperacao = await database.keyEnvelopes.get(keyEnvelopeId(account.id, 'recovery'))
   if (recuperacao?.envelope.kind === 'recovery') await storeRemoteRecoveryEnvelope(recuperacao.envelope)
@@ -164,7 +168,7 @@ export async function unlockAccount(
   if (!envelopeRecord || envelopeRecord.accountId !== account.id || envelopeRecord.envelope.kind !== 'password') {
     throw new Error('Este dispositivo precisa ser autorizado com a chave de recuperação.')
   }
-  const keys = await openPasswordEnvelope(envelopeRecord.envelope, password)
+  const keys = await abrirEnvelopeDeSenha(account, envelopeRecord, password, database)
   // Conta criada antes do envelope de senha remoto, ou criada com confirmação
   // de e-mail pendente: este aparelho acabou de provar a senha, então completa
   // o que falta. Sem isso, entrar em um navegador novo exigiria a chave de
@@ -176,6 +180,37 @@ export async function unlockAccount(
   // situação é o serviço.
   await authorizeCurrentDevice(account.id, database)
   return { account, keys }
+}
+
+/**
+ * Abre o cofre com o envelope deste aparelho e, se ele não abrir, com o do
+ * serviço.
+ *
+ * O caso é a senha trocada em outro aparelho: o serviço já aceitou a senha
+ * nova — foi ela que abriu a sessão logo acima —, mas este aparelho ainda tem
+ * o envelope cifrado pela antiga. Sem esta volta, o pastor via "Senha
+ * incorreta" com a senha certa e o aparelho ficava inutilizável até apagar
+ * tudo. O envelope que abrir fica guardado aqui.
+ */
+async function abrirEnvelopeDeSenha(
+  account: AccountRecord,
+  envelopeRecord: KeyEnvelopeRecord,
+  password: string,
+  database: ApoioDatabase,
+): Promise<VaultKeys> {
+  if (envelopeRecord.envelope.kind !== 'password') throw new Error('Envelope de senha indisponível.')
+  try {
+    return await openPasswordEnvelope(envelopeRecord.envelope, password)
+  } catch (falha) {
+    if (account.authMode !== 'supabase' || !hasSupabaseConfiguration) throw falha
+    let remoto
+    try {
+      remoto = await fetchRemotePasswordEnvelope()
+    } catch { throw falha }
+    const keys = await openPasswordEnvelope(remoto, password)
+    await database.keyEnvelopes.put({ ...envelopeRecord, envelope: remoto, updatedAt: new Date().toISOString(), pendingRemote: false })
+    return keys
+  }
 }
 
 /**
@@ -231,14 +266,30 @@ export async function recoverAccount(
   return { account, keys }
 }
 
+/** Tenta devolver a senha do serviço ao valor anterior. */
+async function desfazerSenhaDoServico(anterior: string): Promise<boolean> {
+  try {
+    await updateRemotePassword(anterior)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
- * Troca de senha em três passos que aguentam interrupção.
+ * Troca de senha em passos que aguentam interrupção, e que nunca mentem sobre
+ * o que ficou valendo.
  *
- * A senha do serviço e o envelope que abre o cofre precisam combinar. Se o
- * envelope novo ficasse gravado e a senha do serviço não mudasse, entrar em
- * outro aparelho pararia de funcionar; na ordem inversa, o cofre é que não
- * abriria. Por isso a senha muda primeiro, o envelope logo depois, e um erro no
- * meio devolve o envelope antigo ao lugar em que estava.
+ * A senha do serviço e o envelope que abre o cofre precisam combinar: envelope
+ * novo com senha antiga trava a entrada em outro aparelho; senha nova com
+ * envelope antigo trava o cofre. A senha muda primeiro e o envelope logo
+ * depois. Se o envelope falha, a senha do serviço volta atrás e nada mudou.
+ *
+ * O buraco estava no caso seguinte: quando nem a volta atrás dava certo, a
+ * conta ficava com a senha nova no serviço e o envelope antigo em todo lugar —
+ * e o pastor lia "nada mudou", que era falso. Agora este aparelho avança junto
+ * com o serviço, marca a pendência do envelope e diz exatamente o que
+ * aconteceu; a próxima entrada com rede conclui sozinha.
  */
 export async function changeVaultPassword(
   account: AccountRecord,
@@ -253,22 +304,58 @@ export async function changeVaultPassword(
   const { keys, secret } = await openPasswordVault(passwordRecord.envelope, currentPassword)
   const replacement = await createPasswordEnvelope(secret, newPassword)
   secret.fill(0)
-  const remoto = account.authMode === 'supabase' && hasSupabaseConfiguration
-  if (remoto) {
-    await assertRemoteSessionMatches(account)
-    await updateRemotePassword(newPassword)
-    try {
-      await storeRemotePasswordEnvelope(replacement)
-    } catch (falha) {
-      // O serviço já está com a senha nova; sem o envelope novo lá, um aparelho
-      // novo não abriria o cofre. Volta a senha do serviço para o estado antigo
-      // e avisa, em vez de deixar a conta em dois estados diferentes.
-      await updateRemotePassword(currentPassword).catch(() => undefined)
+  const guardar = async (pendingRemote: boolean) => {
+    await database.keyEnvelopes.put({ ...passwordRecord, envelope: replacement, updatedAt: new Date().toISOString(), pendingRemote })
+  }
+
+  if (account.authMode !== 'supabase' || !hasSupabaseConfiguration) {
+    await guardar(false)
+    return keys
+  }
+
+  await assertRemoteSessionMatches(account)
+  await updateRemotePassword(newPassword)
+  try {
+    await storeRemotePasswordEnvelope(replacement)
+  } catch (falha) {
+    if (await desfazerSenhaDoServico(currentPassword)) {
       throw new Error('Não foi possível concluir a troca de senha. Nada mudou; tente de novo.', { cause: falha })
     }
+    await guardar(true)
+    throw new Error('A senha nova já vale neste aparelho e no serviço, mas o acesso em aparelhos novos ainda não foi atualizado. Entre de novo com a senha nova, com internet, para concluir.', { cause: falha })
   }
-  await database.keyEnvelopes.put({ ...passwordRecord, envelope: replacement, updatedAt: new Date().toISOString() })
+  await guardar(false)
   return keys
+}
+
+/**
+ * Conclui a redefinição de senha aberta pelo link do e-mail.
+ *
+ * O link do serviço abre uma sessão e nada mais: sozinho, ele nunca chegava a
+ * trocar senha nenhuma, e o aviso na tela mandava o pastor entrar com uma senha
+ * nova que jamais fora definida. Aqui a senha do serviço é definida de fato.
+ *
+ * A chave de recuperação continua obrigatória neste caminho, e não por
+ * burocracia: o cofre é aberto pela senha antiga, que se perdeu. Sem a chave,
+ * nem este aplicativo nem o serviço têm como abrir o conteúdo — é o que
+ * significa o servidor não poder ler nada.
+ */
+export async function completePasswordReset(
+  email: string,
+  recoveryCode: string,
+  newPassword: string,
+  database: ApoioDatabase = db,
+): Promise<{ account: AccountRecord; keys: VaultKeys }> {
+  const problema = passwordProblem(newPassword)
+  if (problema) throw new Error(problema)
+  if (!hasSupabaseConfiguration) throw new Error('A redefinição por e-mail só existe com o serviço configurado.')
+  if (!await currentRemoteAccountId()) {
+    throw new Error('Este link de redefinição não está mais valendo. Peça outro e abra-o neste mesmo aparelho.')
+  }
+  await updateRemotePassword(newPassword)
+  // A senha do serviço já é a nova: `recoverAccount` recebe as duas iguais e,
+  // por isso, não tenta trocá-la de novo — só recria o envelope do cofre.
+  return recoverAccount(email, recoveryCode, newPassword, database, newPassword)
 }
 
 export async function findLocalAccount(database: ApoioDatabase = db): Promise<AccountRecord | undefined> {

@@ -5,6 +5,7 @@ import { useAutoLock } from './autoLock'
 import { resendConfirmationEmail, requestPasswordReset, signOutRemoteAccount } from './supabase'
 import {
   changeVaultPassword,
+  completePasswordReset,
   findLocalAccount,
   listLocalAccounts,
   recoverAccount,
@@ -28,6 +29,8 @@ interface AuthVaultContextValue {
   sendPasswordReset: (email: string) => Promise<void>
   unlock: (email: string, password: string) => Promise<void>
   recover: (email: string, recoveryCode: string, newPassword: string) => Promise<void>
+  /** Conclui a redefinição aberta pelo link do e-mail: define a senha e reabre o cofre. */
+  completeReset: (email: string, recoveryCode: string, newPassword: string) => Promise<void>
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>
   lock: () => void
   /** Fecha o cofre e volta ao acesso, sem apagar nada da conta atual. */
@@ -102,6 +105,14 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
     setSyncKey(result.keys.sync)
   }, [])
 
+  const completeReset = useCallback(async (email: string, code: string, newPassword: string) => {
+    const result = await completePasswordReset(email, code, newPassword)
+    setAccount(result.account)
+    setMasterKey(result.keys.master)
+    setSyncKey(result.keys.sync)
+    await refreshAccounts()
+  }, [refreshAccounts])
+
   const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
     if (!account) throw new Error('Nenhuma conta ativa.')
     const chaves = await changeVaultPassword(account, currentPassword, newPassword)
@@ -155,12 +166,13 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
     sendPasswordReset,
     unlock,
     recover,
+    completeReset,
     changePassword,
     lock,
     switchAccount,
     signOut,
     clearRecoveryCode: () => setRecoveryCode(null),
-  }), [account, accounts, masterKey, syncKey, initialized, recoveryCode, awaitingConfirmation, register, resendConfirmation, sendPasswordReset, unlock, recover, changePassword, lock, switchAccount, signOut])
+  }), [account, accounts, masterKey, syncKey, initialized, recoveryCode, awaitingConfirmation, register, resendConfirmation, sendPasswordReset, unlock, recover, completeReset, changePassword, lock, switchAccount, signOut])
 
   return <AuthVaultContext.Provider value={value}>{children}</AuthVaultContext.Provider>
 }

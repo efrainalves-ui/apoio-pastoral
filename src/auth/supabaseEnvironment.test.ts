@@ -84,4 +84,51 @@ describe('separação entre homologação e produção', () => {
     expect(remoteProjectProblem({ url: 'https://exemplo.invalid', anonKey: undefined, declaredRef: undefined }))
       .toMatch(/formato esperado/u)
   })
+
+  it('recusa a conexão quando a instalação não declara projeto nenhum', async () => {
+    // Antes, a declaração ausente simplesmente pulava a conferência: bastava
+    // esquecer a variável para uma build falar com qualquer projeto.
+    const { remoteProjectProblem } = await import('../sync/config')
+
+    expect(remoteProjectProblem({ url: 'https://homolog-fake.supabase.co', anonKey: undefined, declaredRef: undefined }))
+      .toMatch(/não declara com qual projeto/u)
+    expect(remoteProjectProblem({ url: 'https://homolog-fake.supabase.co', anonKey: undefined, declaredRef: '   ' }))
+      .toMatch(/não declara com qual projeto/u)
+  })
+})
+
+describe('o serviço precisa declarar o próprio ambiente', () => {
+  async function carregarServico(appEnv: string, ambienteDoBanco: string | null) {
+    vi.resetModules()
+    vi.stubEnv('VITE_APP_ENV', appEnv)
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://homolog-fake.supabase.co')
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'chave-publica-ficticia')
+    vi.stubEnv('VITE_SUPABASE_PROJECT_REF', 'homolog-fake')
+    const rpc = vi.fn((nome: string) => Promise.resolve({
+      data: nome === 'app_schema_version' ? 4 : ambienteDoBanco,
+      error: null,
+    }))
+    vi.doMock('@supabase/supabase-js', () => ({ createClient: () => ({ rpc, auth: {} }) }))
+    return { rpc, supabase: await import('./supabase') }
+  }
+
+  afterEach(() => { vi.doUnmock('@supabase/supabase-js') })
+
+  it('sincroniza quando aplicativo e banco declaram o mesmo ambiente', async () => {
+    const { supabase } = await carregarServico('homologacao', 'homologacao')
+
+    await expect(supabase.assertServiceSchema()).resolves.toBeUndefined()
+  })
+
+  it('recusa a build de produção apontada para o banco de homologação', async () => {
+    const { supabase } = await carregarServico('producao', 'homologacao')
+
+    await expect(supabase.assertServiceSchema()).rejects.toThrow(/ambientes diferentes/u)
+  })
+
+  it('recusa um banco que não declara ambiente nenhum', async () => {
+    const { supabase } = await carregarServico('homologacao', null)
+
+    await expect(supabase.assertServiceSchema()).rejects.toThrow(/não declara/u)
+  })
 })

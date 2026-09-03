@@ -198,6 +198,13 @@ export class ConflictService {
   /**
    * Aplica a escolha do pastor. Nada é descartado: a versão que não ficar
    * ativa continua guardada, cifrada, dentro do próprio conflito resolvido.
+   *
+   * Toda escolha é publicada em cima da versão do outro aparelho. Antes,
+   * "ficar com a deste aparelho" só marcava a revisão como resolvida: o outro
+   * aparelho nunca ficava sabendo, seguia com a versão dele, e os dois
+   * discordavam para sempre sem nenhum aviso. E uma exclusão feita no outro
+   * aparelho não tinha como ser aceita: o único caminho era manter a versão
+   * daqui, então apagar um registro em um aparelho nunca chegava ao outro.
    */
   async resolve(accountId: string, masterKey: CryptoKey, conflictId: string, choice: ConflictChoice): Promise<void> {
     const conflict = await this.database.syncConflicts.get(conflictId)
@@ -208,26 +215,46 @@ export class ConflictService {
     const localPayload: CipherEnvelope | undefined = localRecord
       ? { algorithm: localRecord.algorithm, ciphertext: localRecord.ciphertext, iv: localRecord.iv, aad: localRecord.aad, keyVersion: localRecord.keyVersion }
       : undefined
+    const recordType: VaultRecord['recordType'] = localRecord?.recordType ?? 'encrypted'
+    const deviceId = currentDeviceId(accountId)
+    const remoteIsDeletion = conflict.remoteOperation === 'delete'
+
+    if (choice === 'keep_both' && remoteIsDeletion) {
+      throw new Error('O outro aparelho apagou este registro: não há duas versões para manter. Escolha manter a daqui ou aceitar a exclusão.')
+    }
 
     let keptRecordId: string | undefined
 
-    if (choice === 'keep_remote' || choice === 'keep_both') {
-      if (conflict.remoteOperation === 'delete') throw new Error('A versão do outro aparelho é uma exclusão e não pode ser copiada.')
+    if (choice === 'keep_remote' && remoteIsDeletion) {
+      // Aceitar a exclusão do outro aparelho. O registro sai daqui e a saída é
+      // publicada por cima da versão remota, para não voltar como conflito.
+      if (localRecord && !localRecord.deletedAt) {
+        await this.repository.applyEncryptedMutations(accountId, deviceId, [{
+          recordId: conflict.recordId,
+          recordType,
+          operation: 'delete',
+          supersedes: conflict.remoteVersion,
+          envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: 'tombstone', data: { deletedAt: new Date().toISOString() } }, conflict.recordId),
+        }])
+      }
+    } else if (choice === 'keep_remote' || choice === 'keep_both') {
       const payload = await decryptPayload(masterKey, conflict.remotePayload)
-      const recordType: VaultRecord['recordType'] = localRecord?.recordType ?? 'encrypted'
 
       if (choice === 'keep_remote') {
         const envelope = await encryptPayload(masterKey, payload, conflict.recordId)
-        await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), conflict.recordId, envelope, recordType)
+        await this.repository.applyEncryptedMutations(accountId, deviceId, [{ recordId: conflict.recordId, recordType, envelope, supersedes: conflict.remoteVersion }])
         keptRecordId = conflict.recordId
       } else {
         // Guarda a versão do outro aparelho como um registro novo e separado,
         // para que as duas continuem existindo lado a lado.
         const novoId = crypto.randomUUID()
         const envelope = await encryptPayload(masterKey, payload, novoId)
-        await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), novoId, envelope, recordType)
+        await this.repository.saveEncrypted(accountId, deviceId, novoId, envelope, recordType)
         keptRecordId = novoId
+        await this.publicarVersaoLocal(accountId, deviceId, conflict.recordId, recordType, localPayload, localRecord?.deletedAt, conflict.remoteVersion)
       }
+    } else {
+      await this.publicarVersaoLocal(accountId, deviceId, conflict.recordId, recordType, localPayload, localRecord?.deletedAt, conflict.remoteVersion)
     }
 
     await this.database.syncConflicts.put({
@@ -238,5 +265,23 @@ export class ConflictService {
       ...(localPayload ? { localPayload } : {}),
       ...(keptRecordId ? { keptRecordId } : {}),
     })
+  }
+
+  /**
+   * Reenvia a versão deste aparelho por cima da versão do outro. Um registro
+   * que já foi apagado aqui não é reenviado: a exclusão local já está na fila
+   * e é justamente ela que o outro aparelho precisa receber.
+   */
+  private async publicarVersaoLocal(
+    accountId: string,
+    deviceId: string,
+    recordId: string,
+    recordType: VaultRecord['recordType'],
+    localPayload: CipherEnvelope | undefined,
+    deletedAt: string | undefined,
+    remoteVersion: number,
+  ): Promise<void> {
+    if (!localPayload || deletedAt) return
+    await this.repository.applyEncryptedMutations(accountId, deviceId, [{ recordId, recordType, envelope: localPayload, supersedes: remoteVersion }])
   }
 }

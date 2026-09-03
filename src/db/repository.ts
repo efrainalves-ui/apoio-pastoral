@@ -10,6 +10,16 @@ export interface EncryptedMutation {
   envelope: CipherEnvelope
   recordType: VaultRecordType
   operation?: 'upsert' | 'delete'
+  /**
+   * Versão do outro aparelho que esta gravação resolve.
+   *
+   * Existe para a revisão de alterações concorrentes. A linhagem só aceita por
+   * cima o que foi feito sobre a versão que o aparelho tem; sem dizer que esta
+   * gravação nasce em cima da versão remota, a escolha do pastor voltaria como
+   * um conflito novo do outro lado, e os dois aparelhos ficariam para sempre
+   * discordando.
+   */
+  supersedes?: number
 }
 
 export class VaultRepository {
@@ -48,7 +58,8 @@ export class VaultRepository {
       const existing = existingRecords[index]
       if (existing && existing.accountId !== accountId) throw new Error('Registro pertence a outra conta.')
       if (mutation.operation === 'delete' && (!existing || existing.deletedAt)) throw new Error('Registro não encontrado.')
-      const version = (existing?.version ?? 0) + 1
+      const baseVersion = Math.max(existing?.version ?? 0, mutation.supersedes ?? 0)
+      const version = baseVersion + 1
       const deletedAt = mutation.operation === 'delete' ? now : undefined
       const record: VaultRecord = {
         id: mutation.recordId,
@@ -67,7 +78,7 @@ export class VaultRepository {
         deviceId,
         recordId: mutation.recordId,
         operation: mutation.operation ?? 'upsert',
-        baseVersion: existing?.version ?? 0,
+        baseVersion,
         recordVersion: version,
         payload: mutation.envelope,
         schemaVersion: 1,

@@ -41,4 +41,10 @@ export interface SyncSummary {
   conflicts: number
   /** Operações recebidas que não passaram na conferência e ficaram de lado. */
   quarantined: number
+  /**
+   * Verdadeiro quando o serviço ainda tinha alterações e a sincronização parou
+   * no teto de páginas. O cursor já está guardado: sincronizar de novo continua
+   * de onde parou. Sem este aviso, o aparelho dizia "em dia" com dados faltando.
+   */
+  incomplete: boolean
 }

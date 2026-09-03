@@ -84,6 +84,19 @@ export async function requestPasswordReset(email: string, redirectTo: string): P
   if (error) throw falhaRemota(error, 'Não foi possível enviar o e-mail de redefinição agora.')
 }
 
+/**
+ * Avisa quando a sessão aberta veio do link de redefinição. O endereço já pode
+ * ter sido limpo pelo cliente do serviço quando a tela monta; este aviso chega
+ * de qualquer forma. Devolve como cancelar a assinatura.
+ */
+export function onPasswordRecovery(aoReceber: () => void): () => void {
+  if (!hasSupabaseConfiguration) return () => undefined
+  const { data } = getSupabaseClient().auth.onAuthStateChange((evento) => {
+    if (evento === 'PASSWORD_RECOVERY') aoReceber()
+  })
+  return () => data.subscription.unsubscribe()
+}
+
 /** Conta autenticada agora no serviço, ou `null` quando não há sessão. */
 export async function currentRemoteAccountId(): Promise<string | null> {
   if (!hasSupabaseConfiguration) return null
@@ -108,13 +121,17 @@ export async function updateRemotePassword(password: string): Promise<void> {
 }
 
 /**
- * Sair encerra a sessão em todo o serviço (`global`), não só a aba atual: é o
- * que o pastor espera de "Sair" e o que faz diferença num aparelho emprestado.
- * Bloquear o cofre é outra coisa e não passa por aqui.
+ * Sair encerra a sessão **deste** aparelho, e só dele.
+ *
+ * Antes o escopo era `global`: sair no celular derrubava o computador, o
+ * tablet e qualquer outra instalação, sem aviso e sem que ninguém tivesse
+ * pedido isso. Quem quer tirar outro aparelho da conta usa Revogar, na tela de
+ * Segurança, que é a ação que existe para isso e que também apaga o envelope
+ * de chave daquele aparelho.
  */
 export async function signOutRemoteAccount(): Promise<void> {
   if (!hasSupabaseConfiguration) return
-  const { error } = await getSupabaseClient().auth.signOut({ scope: 'global' })
+  const { error } = await getSupabaseClient().auth.signOut({ scope: 'local' })
   if (error) throw falhaRemota(error, 'Não foi possível encerrar a sessão no serviço.')
 }
 
@@ -143,21 +160,41 @@ export async function approveRemoteDevice(deviceId: string): Promise<void> {
   if (error) throw falhaRemota(error, 'Não foi possível confirmar o aparelho no serviço.')
 }
 
-let esquemaConferido: number | null = null
+let servicoConferido = false
 
 /**
- * Confere uma vez por sessão que o serviço está na versão de esquema que esta
- * build espera. Um serviço atrasado não tem as funções de autorização novas, e
- * seguir assim seria voltar às barreiras antigas sem ninguém perceber.
+ * Confere uma vez por sessão que o serviço é o esperado: a versão de esquema e
+ * o ambiente declarado dentro do próprio banco.
+ *
+ * A versão sozinha não bastava. Endereço, chave e projeto declarado são todos
+ * escritos na build; nada impedia uma build de produção conversar com o banco
+ * de homologação, ou o contrário, e ninguém perceberia até o dado estar no
+ * lugar errado. O banco passou a dizer o que ele é, e as duas declarações
+ * precisam bater. Um banco que não declara nada não recebe sincronização.
  */
 export async function assertServiceSchema(): Promise<void> {
-  if (!hasSupabaseConfiguration || esquemaConferido === EXPECTED_SCHEMA_VERSION) return
+  if (!hasSupabaseConfiguration || servicoConferido) return
   const versao = await remoteSchemaVersion()
   if (versao === null) return
   if (versao !== EXPECTED_SCHEMA_VERSION) {
     throw new Error('O serviço desta conta está em uma versão diferente da deste aplicativo. Atualize o aplicativo antes de sincronizar.')
   }
-  esquemaConferido = versao
+  const ambiente = await remoteEnvironment()
+  if (!ambiente) {
+    throw new Error('Este serviço não declara se é homologação ou produção. Nenhuma sincronização foi feita.')
+  }
+  if (ambiente !== declaredEnvironment) {
+    throw new Error('Este aplicativo e este serviço são de ambientes diferentes. Nenhuma sincronização foi feita.')
+  }
+  servicoConferido = true
+}
+
+/** Ambiente que o próprio serviço declara, ou `null` quando ele não declara. */
+export async function remoteEnvironment(): Promise<string | null> {
+  if (!hasSupabaseConfiguration) return null
+  const resposta = await getSupabaseClient().rpc('app_environment')
+  if (resposta.error) throw falhaRemota(resposta.error, 'Não foi possível conferir o ambiente do serviço.')
+  return typeof resposta.data === 'string' && resposta.data ? resposta.data : null
 }
 
 /** Versão do esquema que o serviço está usando, para conferir o ambiente. */
@@ -338,4 +375,21 @@ export async function revokeRemoteDevice(deviceId: string): Promise<void> {
   if (!hasSupabaseConfiguration) return
   const { error } = await getSupabaseClient().rpc('revoke_device', { p_device_id: deviceId })
   if (error) throw falhaRemota(error, 'Não foi possível revogar o aparelho no serviço.')
+}
+
+/**
+ * Revoga todos os aparelhos da conta em uma única transação do serviço.
+ *
+ * Encerrar o distrito não pode depender da lista local: cada instalação só
+ * guarda a si mesma, então percorrer o que este aparelho conhece revogava
+ * apenas ele. O servidor é quem sabe quantos aparelhos existem. A sessão que
+ * chama continua valendo e registra uma autorização nova em seguida.
+ *
+ * Devolve quantos aparelhos foram revogados, ou `null` sem serviço remoto.
+ */
+export async function revokeAllRemoteDevices(): Promise<number | null> {
+  if (!hasSupabaseConfiguration) return null
+  const resposta = await getSupabaseClient().rpc('revoke_all_devices')
+  if (resposta.error) throw falhaRemota(resposta.error, 'Não foi possível revogar os aparelhos no serviço.')
+  return typeof resposta.data === 'number' ? resposta.data : null
 }

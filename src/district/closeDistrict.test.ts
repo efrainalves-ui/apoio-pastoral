@@ -7,7 +7,7 @@ import { FamilyBudgetDatabase } from '../family-budget/database'
 import { VaultRepository } from '../db/repository'
 import { ReadingDatabase } from '../reading/database'
 import { ReadingService } from '../reading/service'
-import { CloseDistrictService, isPersonalRecord } from './closeDistrict'
+import { CloseDistrictService, isPersonalRecord, type CloseDistrictRemote } from './closeDistrict'
 
 vi.mock('../auth/supabase', async (importarOriginal) => ({
   ...await importarOriginal<Record<string, unknown>>(),
@@ -153,5 +153,46 @@ describe('encerrar distrito', () => {
     expect((await banco.vaultRecords.get(vizinho))?.deletedAt).toBeUndefined()
     const filaVizinha = await banco.outbox.where('accountId').equals(OUTRA_CONTA).toArray()
     expect(filaVizinha.some(({ operation }) => operation === 'delete')).toBe(false)
+  })
+
+  it('revoga no servidor os aparelhos que este aplicativo nunca conheceu', async () => {
+    // O buraco: cada instalação guarda só a si mesma. Percorrer a lista local
+    // revogava apenas este aparelho, e os outros seguiam sincronizando um
+    // distrito que o pastor acabara de encerrar.
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    await distritoFicticio(banco, chave)
+    const antigo = currentDeviceId(CONTA)
+    await banco.devices.put({ id: antigo, accountId: CONTA, label: 'Computador', status: 'active', createdAt: '', lastSeenAt: '' })
+    let revogouTudo = 0
+    const servico: CloseDistrictRemote = {
+      listDevices: () => Promise.resolve([
+        { id: antigo, label: 'Computador', status: 'active' as const, lastSeenAt: null },
+        { id: 'celular-so-do-servico', label: 'Celular', status: 'active' as const, lastSeenAt: null },
+        { id: 'tablet-so-do-servico', label: 'Tablet', status: 'active' as const, lastSeenAt: null },
+      ]),
+      revokeAll: () => { revogouTudo += 1; return Promise.resolve(3) },
+    }
+
+    const previa = await new CloseDistrictService(banco, servico).preview(CONTA, chave)
+    const resultado = await new CloseDistrictService(banco, servico).close(CONTA, chave)
+
+    expect(previa.devices).toBe(3)
+    expect(revogouTudo).toBe(1)
+    expect(resultado.revokedDevices).toBe(3)
+    expect((await banco.devices.get(antigo))?.status).toBe('revoked')
+    expect((await banco.devices.get(resultado.newDeviceId))?.status).toBe('active')
+  })
+
+  it('sem serviço remoto continua revogando o que este aparelho conhece', async () => {
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    await distritoFicticio(banco, chave)
+    const antigo = currentDeviceId(CONTA)
+    await banco.devices.put({ id: antigo, accountId: CONTA, label: 'Computador', status: 'active', createdAt: '', lastSeenAt: '' })
+    const servico: CloseDistrictRemote = { listDevices: () => Promise.resolve(null), revokeAll: () => Promise.resolve(null) }
+
+    const resultado = await new CloseDistrictService(banco, servico).close(CONTA, chave)
+
+    expect(resultado.revokedDevices).toBe(1)
+    expect((await banco.devices.get(antigo))?.status).toBe('revoked')
   })
 })

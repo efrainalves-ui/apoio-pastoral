@@ -1,15 +1,16 @@
 import { KeyRound, Leaf } from 'lucide-react'
-import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useAuthVault } from '../auth/AuthVaultContext'
-import { hasSupabaseConfiguration } from '../auth/supabase'
+import { openedFromPasswordReset } from '../auth/passwordReset'
+import { hasSupabaseConfiguration, onPasswordRecovery } from '../auth/supabase'
 import { Button } from '../components/ui/Button'
 import { Field } from '../components/ui/Field'
 
-type Mode = 'register' | 'unlock' | 'recover'
+type Mode = 'register' | 'unlock' | 'recover' | 'reset'
 
 export function AuthPage() {
-  const { account, accounts, register, unlock, recover, recoveryCode, clearRecoveryCode, awaitingConfirmation, resendConfirmation, sendPasswordReset } = useAuthVault()
-  const [mode, setMode] = useState<Mode>(account ? 'unlock' : 'register')
+  const { account, accounts, register, unlock, recover, completeReset, recoveryCode, clearRecoveryCode, awaitingConfirmation, resendConfirmation, sendPasswordReset } = useAuthVault()
+  const [mode, setMode] = useState<Mode>(openedFromPasswordReset ? 'reset' : account ? 'unlock' : 'register')
   const [email, setEmail] = useState(account?.email ?? '')
   const [password, setPassword] = useState('')
   const [recovery, setRecovery] = useState('')
@@ -18,6 +19,10 @@ export function AuthPage() {
   const [busy, setBusy] = useState(false)
   const unlockTab = useRef<HTMLButtonElement>(null)
   const registerTab = useRef<HTMLButtonElement>(null)
+
+  // O endereço já pode ter sido limpo pelo cliente do serviço antes desta tela
+  // montar; o aviso do próprio serviço chega de qualquer forma.
+  useEffect(() => onPasswordRecovery(() => setMode('reset')), [])
 
   function selectMode(nextMode: Extract<Mode, 'register' | 'unlock'>) {
     setMode(nextMode)
@@ -38,7 +43,7 @@ export function AuthPage() {
     setBusy(true)
     try {
       await sendPasswordReset(email)
-      setAviso('Enviamos um link de redefinição para o seu e-mail. Depois de definir a senha nova, entre aqui com ela. Se este aparelho ainda não conhece sua conta, você também vai precisar da chave de recuperação.')
+      setAviso('Enviamos um link de redefinição para o seu e-mail. Abra o link neste aparelho: lá você define a senha nova e informa a sua chave de recuperação para reabrir o cofre.')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível enviar o link agora.')
     } finally {
@@ -79,6 +84,7 @@ export function AuthPage() {
     try {
       if (mode === 'register') await register(email, password)
       else if (mode === 'unlock') await unlock(email, password)
+      else if (mode === 'reset') await completeReset(email, recovery, password)
       else await recover(email, recovery, password)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível concluir a operação.')
@@ -115,25 +121,27 @@ export function AuthPage() {
       </section>
       <section className="auth-panel">
         <div className="auth-form-wrap">
-          <h2>{mode === 'register' ? 'Crie sua conta' : mode === 'recover' ? 'Recupere o acesso' : 'Entre na sua conta'}</h2>
-          {mode !== 'recover' && accounts.length > 0 && <div className="account-switcher">
+          <h2>{mode === 'register' ? 'Crie sua conta' : mode === 'recover' ? 'Recupere o acesso' : mode === 'reset' ? 'Defina sua senha nova' : 'Entre na sua conta'}</h2>
+          {mode === 'reset' && <p className="field__hint">Este link define a senha nova da sua conta. Como o cofre era aberto pela senha anterior, informe também a sua chave de recuperação: nem o serviço nem este aplicativo conseguem abrir o conteúdo sem ela.</p>}
+          {mode !== 'recover' && mode !== 'reset' && accounts.length > 0 && <div className="account-switcher">
             <p className="field__hint">Contas neste aparelho</p>
             <ul>{accounts.map((conta) => <li key={conta.id}><button type="button" className={`account-switcher__option${email.trim().toLowerCase() === conta.email ? ' account-switcher__option--on' : ''}`} onClick={() => { setMode('unlock'); setEmail(conta.email); setPassword(''); setError('') }}>{conta.email}</button></li>)}</ul>
             <p className="field__hint">Cada conta tem os próprios dados neste aparelho. Escolha uma e informe a senha dela.</p>
           </div>}
-          {mode !== 'recover' && <div className="auth-tabs" role="tablist" aria-label="Acesso">
+          {mode !== 'recover' && mode !== 'reset' && <div className="auth-tabs" role="tablist" aria-label="Acesso">
             <button ref={unlockTab} id="auth-tab-unlock" type="button" role="tab" aria-controls="auth-panel-unlock" aria-selected={mode === 'unlock'} tabIndex={mode === 'unlock' ? 0 : -1} onClick={() => selectMode('unlock')} onKeyDown={moveBetweenTabs}>Entrar</button>
             <button ref={registerTab} id="auth-tab-register" type="button" role="tab" aria-controls="auth-panel-register" aria-selected={mode === 'register'} tabIndex={mode === 'register' ? 0 : -1} onClick={() => selectMode('register')} onKeyDown={moveBetweenTabs}>Criar conta</button>
           </div>}
-          <div id={mode === 'recover' ? undefined : `auth-panel-${mode}`} role={mode === 'recover' ? undefined : 'tabpanel'} aria-labelledby={mode === 'recover' ? undefined : `auth-tab-${mode}`}>
+          {(() => { const semAba = mode === 'recover' || mode === 'reset'; return <div id={semAba ? undefined : `auth-panel-${mode}`} role={semAba ? undefined : 'tabpanel'} aria-labelledby={semAba ? undefined : `auth-tab-${mode}`}>
             <form onSubmit={(event) => void submit(event)} noValidate>
               <Field label="E-mail" name="email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
               {mode === 'recover' && <><p className="field__hint">Use este caminho só quando perdeu a senha e todos os aparelhos. Redefina a senha pelo e-mail primeiro e informe abaixo a senha nova junto da sua chave.</p><Field label="Chave de recuperação" name="recovery" autoComplete="off" required value={recovery} onChange={(event) => setRecovery(event.target.value)} /></>}
+              {mode === 'reset' && <Field label="Chave de recuperação" name="recovery" autoComplete="off" required value={recovery} onChange={(event) => setRecovery(event.target.value)} />}
               <Field
-                label={mode === 'recover' ? 'Senha da conta' : 'Senha'}
+                label={mode === 'recover' ? 'Senha da conta' : mode === 'reset' ? 'Senha nova' : 'Senha'}
                 name="password"
                 type="password"
-                autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                autoComplete={mode === 'register' || mode === 'reset' ? 'new-password' : 'current-password'}
                 required
                 minLength={12}
                 hint="Mínimo de 12 caracteres"
@@ -142,14 +150,14 @@ export function AuthPage() {
               />
               {error && <div className="alert alert--error" role="alert">{error}</div>}
               {aviso && <div className="alert alert--success" role="status">{aviso}</div>}
-              <Button type="submit" full disabled={busy}>{busy ? 'Processando…' : mode === 'register' ? 'Criar conta' : mode === 'recover' ? 'Recuperar acesso' : 'Entrar'}</Button>
+              <Button type="submit" full disabled={busy}>{busy ? 'Processando…' : mode === 'register' ? 'Criar conta' : mode === 'recover' ? 'Recuperar acesso' : mode === 'reset' ? 'Definir senha nova' : 'Entrar'}</Button>
               {mode === 'register' && <p className="auth-privacy">Sua conta cuida só do seu distrito. <a href="/privacidade">Como cuidamos dos dados</a></p>}
             </form>
-          </div>
+          </div> })()}
           {hasSupabaseConfiguration && mode === 'unlock' && <button className="text-button" type="button" onClick={() => void redefinirSenha()} disabled={busy}>Esqueci minha senha</button>}
           {hasSupabaseConfiguration && mode === 'unlock' && <button className="text-button" type="button" onClick={() => void reenviarConfirmacao()} disabled={busy}>Reenviar confirmação de e-mail</button>}
-          {(account || hasSupabaseConfiguration) && mode !== 'recover' && <button className="text-button" onClick={() => setMode('recover')}>Usar chave de recuperação</button>}
-          {mode === 'recover' && <button className="text-button" onClick={() => selectMode('unlock')}>Voltar para o acesso</button>}
+          {(account || hasSupabaseConfiguration) && mode !== 'recover' && mode !== 'reset' && <button className="text-button" onClick={() => setMode('recover')}>Usar chave de recuperação</button>}
+          {(mode === 'recover' || mode === 'reset') && <button className="text-button" onClick={() => selectMode('unlock')}>Voltar para o acesso</button>}
         </div>
       </section>
     </main>

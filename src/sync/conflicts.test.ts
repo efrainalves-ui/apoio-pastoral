@@ -136,7 +136,9 @@ describe('revisão de alterações concorrentes', () => {
 
     const record = await database.vaultRecords.get(recordId)
     expect(await decryptPayload(key, record!)).toMatchObject({ data: { name: 'Pessoa Fictícia do Celular' } })
-    expect(record?.version).toBe(2)
+    // A escolha nasce por cima da versão do outro aparelho: sem isso ela
+    // voltaria como um conflito novo lá, e os dois nunca convergiriam.
+    expect(record?.version).toBe(conflict.remoteVersion + 1)
     const resolved = await database.syncConflicts.get(conflict.id)
     expect(resolved?.localPayload?.ciphertext).toBe(antes?.ciphertext)
     expect(await decryptPayload(key, resolved!.localPayload!)).toMatchObject({ data: { name: 'Pessoa Fictícia do Computador' } })
@@ -167,5 +169,81 @@ describe('revisão de alterações concorrentes', () => {
 
     await expect(service.resolve(accountId, key, conflict.id, 'keep_remote')).rejects.toThrow('já foi resolvida')
     await expect(service.resolve('outra-conta-ficticia', key, conflict.id, 'keep_local')).rejects.toThrow('não foi encontrada')
+  })
+
+  /** O outro aparelho apagou o registro que este aqui continuou editando. */
+  async function cenarioDeExclusao() {
+    const base = await cenario()
+    const conflict: SyncConflictRecord = {
+      ...base.conflict,
+      id: crypto.randomUUID(),
+      remoteOperation: 'delete',
+      remotePayload: await encryptPayload(base.key, { schemaVersion: 1, type: 'person_tombstone', data: { deletedAt: new Date().toISOString() } }, base.recordId),
+    }
+    await base.database.syncConflicts.delete(base.conflict.id)
+    await base.database.syncConflicts.put(conflict)
+    return { ...base, conflict }
+  }
+
+  it('aceita a exclusão feita no outro aparelho', async () => {
+    // Antes não havia como aceitar: a única saída era manter a versão daqui, e
+    // apagar um registro em um aparelho nunca chegava ao outro.
+    const { database, key, recordId, conflict, service } = await cenarioDeExclusao()
+    databases.push(database)
+    await database.outbox.clear()
+
+    await service.resolve(accountId, key, conflict.id, 'keep_remote')
+
+    expect((await database.vaultRecords.get(recordId))?.deletedAt).toBeTruthy()
+    expect(await database.syncConflicts.get(conflict.id)).toMatchObject({ status: 'resolved', choice: 'keep_remote' })
+    const [enviada] = await database.outbox.toArray()
+    expect(enviada).toMatchObject({ recordId, operation: 'delete', baseVersion: conflict.remoteVersion })
+  })
+
+  it('manter o registro contra a exclusão do outro aparelho o devolve para lá', async () => {
+    const { database, key, recordId, conflict, service } = await cenarioDeExclusao()
+    databases.push(database)
+    await database.outbox.clear()
+
+    await service.resolve(accountId, key, conflict.id, 'keep_local')
+
+    expect((await database.vaultRecords.get(recordId))?.deletedAt).toBeUndefined()
+    const [enviada] = await database.outbox.toArray()
+    // Sem republicar por cima da versão do outro, ele seguiria com a exclusão
+    // dele e os dois aparelhos discordariam para sempre, em silêncio.
+    expect(enviada).toMatchObject({ recordId, operation: 'upsert', baseVersion: conflict.remoteVersion })
+    expect(await decryptPayload(key, enviada!.payload)).toMatchObject({ data: { name: 'Pessoa Fictícia do Computador' } })
+  })
+
+  it('não oferece manter as duas quando o outro aparelho apagou o registro', async () => {
+    const { database, key, conflict, service } = await cenarioDeExclusao()
+    databases.push(database)
+
+    await expect(service.resolve(accountId, key, conflict.id, 'keep_both')).rejects.toThrow('não há duas versões')
+    expect(await database.syncConflicts.get(conflict.id)).toMatchObject({ status: 'pending' })
+  })
+
+  it('ficar com a versão deste aparelho a republica por cima da do outro', async () => {
+    const { database, key, recordId, conflict, service } = await cenario()
+    databases.push(database)
+    await database.outbox.clear()
+
+    await service.resolve(accountId, key, conflict.id, 'keep_local')
+
+    const [enviada] = await database.outbox.toArray()
+    expect(enviada).toMatchObject({ recordId, operation: 'upsert', baseVersion: conflict.remoteVersion, recordVersion: conflict.remoteVersion + 1 })
+  })
+
+  it('manter as duas também republica a versão daqui, para o outro aparelho parar de discordar', async () => {
+    const { database, key, recordId, conflict, service } = await cenario()
+    databases.push(database)
+    await database.outbox.clear()
+
+    await service.resolve(accountId, key, conflict.id, 'keep_both')
+
+    const enviadas = await database.outbox.toArray()
+    const original = enviadas.find((operacao) => operacao.recordId === recordId)
+    expect(original).toMatchObject({ baseVersion: conflict.remoteVersion })
+    expect(enviadas).toHaveLength(2)
   })
 })

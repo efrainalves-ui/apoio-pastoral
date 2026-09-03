@@ -2,31 +2,42 @@ import { fromBase64Url, toBase64Url, utf8 } from '../crypto/encoding'
 import type { EncryptedOperation } from './types'
 
 /**
- * Versão 2: os metadados da operação passaram a ser autenticados.
+ * Versão 3: a assinatura passou a cobrir todo metadado que muda o resultado.
  *
  * O texto cifrado sempre esteve amarrado ao registro e ao formato pelo AAD, mas
  * o resto viajava solto — de qual conta a operação era, se era gravação ou
- * exclusão, em cima de qual versão ela foi feita. Quem controlasse o serviço
- * podia trocar um `upsert` por um `delete`, rebaixar a versão para provocar um
- * conflito ou pendurar a operação em outra conta, e o aparelho que recebia não
- * tinha como perceber. Esta assinatura fecha isso.
+ * exclusão, em cima de qual versão ela foi feita. A versão 2 fechou isso e
+ * deixou duas frestas: o identificador da operação e o carimbo de tempo.
+ *
+ * Nenhum dos dois é decorativo. O carimbo vira `createdAt`, `updatedAt` e
+ * `deletedAt` do registro guardado neste aparelho: quem controlasse o serviço
+ * podia reescrever a data de uma visita ou de uma exclusão sem quebrar a
+ * assinatura. O identificador é a chave de idempotência, de conflito e de
+ * quarentena: repetir a mesma operação assinada com outro identificador
+ * multiplicava conflitos que o pastor teria de revisar um por um.
  */
-export const MAC_VERSION = 2
+export const MAC_VERSION = 3
 
 /**
  * O que entra na assinatura. A ordem é fixa porque o valor precisa ser o mesmo
  * nos dois lados; o texto cifrado entra junto para que assinatura e conteúdo
  * não possam ser recombinados de operações diferentes.
+ *
+ * `deviceId` fica de fora de propósito: ele é atribuído pelo servidor a partir
+ * da sessão, não pelo aparelho que assina, então assiná-lo aqui só produziria
+ * assinaturas que nunca conferem na volta.
  */
 function corpo(operation: EncryptedOperation): Uint8Array<ArrayBuffer> {
   return utf8(JSON.stringify([
     MAC_VERSION,
+    operation.id,
     operation.ownerId,
     operation.recordId,
     operation.operation,
     operation.baseVersion,
     operation.recordVersion,
     operation.schemaVersion,
+    operation.createdAt,
     operation.payload.keyVersion,
     operation.payload.ciphertext,
     operation.payload.iv,

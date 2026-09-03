@@ -1,4 +1,5 @@
 import { authorizeCurrentDevice, currentDeviceId, revokeDevice, rotateDeviceId } from '../auth/device'
+import { fetchRemoteDevices, revokeAllRemoteDevices, type RemoteDevice } from '../auth/supabase'
 import { encryptPayload, decryptPayload } from '../crypto/vault'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository, type EncryptedMutation } from '../db/repository'
@@ -43,9 +44,38 @@ export interface CloseDistrictResult {
   newDeviceId: string
 }
 
+/**
+ * O servidor é quem conhece os aparelhos da conta: cada instalação guarda só a
+ * si mesma. Estas duas dependências entram pelo construtor para o encerramento
+ * poder ser provado com aparelhos que este aplicativo nunca viu.
+ */
+export interface CloseDistrictRemote {
+  listDevices: () => Promise<RemoteDevice[] | null>
+  revokeAll: () => Promise<number | null>
+}
+
 export class CloseDistrictService {
   private readonly repository: VaultRepository
-  constructor(private readonly database: ApoioDatabase = db) { this.repository = new VaultRepository(database) }
+
+  constructor(
+    private readonly database: ApoioDatabase = db,
+    private readonly remote: CloseDistrictRemote = { listDevices: fetchRemoteDevices, revokeAll: revokeAllRemoteDevices },
+  ) { this.repository = new VaultRepository(database) }
+
+  /**
+   * Quantos aparelhos a conta tem, segundo quem sabe. Sem serviço remoto vale
+   * o que este aparelho conhece, que no desenvolvimento local é tudo que há.
+   */
+  private async contarAparelhos(accountId: string): Promise<number> {
+    const locais = await this.database.devices.where('accountId').equals(accountId).count()
+    try {
+      const remotos = await this.remote.listDevices()
+      if (!remotos) return locais
+      return remotos.filter(({ status }) => status !== 'revoked').length
+    } catch {
+      return locais
+    }
+  }
 
   private async classify(accountId: string, key: CryptoKey) {
     const records = await this.database.vaultRecords.where('accountId').equals(accountId).filter((record) => !record.deletedAt).toArray()
@@ -66,7 +96,7 @@ export class CloseDistrictService {
       districtRecords: district.length,
       personalRecords: personal,
       removedLabels: tipos.map((type) => TYPE_LABELS[type] ?? 'Outros registros do distrito').sort((a, b) => a.localeCompare(b, 'pt-BR')),
-      devices: await this.database.devices.where('accountId').equals(accountId).count(),
+      devices: await this.contarAparelhos(accountId),
     }
   }
 
@@ -91,17 +121,32 @@ export class CloseDistrictService {
     }
     if (mutations.length) await this.repository.applyEncryptedMutations(accountId, deviceId, mutations)
 
-    // Os outros primeiro, este por último: revogar a si mesmo antes tiraria a
-    // autorização necessária para revogar os que sobraram.
-    const devices = await this.database.devices.where('accountId').equals(accountId).toArray()
-    for (const device of devices.filter(({ id }) => id !== deviceId)) await revokeDevice(device.id, this.database)
-    if (devices.some(({ id }) => id === deviceId)) await revokeDevice(deviceId, this.database)
+    // Quem revoga é o servidor, de uma vez só. Percorrer a lista local revogava
+    // apenas este aparelho — cada instalação guarda somente a si mesma —, e os
+    // outros continuavam sincronizando um distrito que o pastor acabara de
+    // encerrar. Sem serviço remoto sobra a lista local, que ali é tudo que há.
+    const locais = await this.database.devices.where('accountId').equals(accountId).toArray()
+    const revogadosNoServico = await this.remote.revokeAll()
+    if (revogadosNoServico === null) {
+      // Os outros primeiro, este por último: revogar a si mesmo antes tiraria a
+      // autorização necessária para revogar os que sobraram.
+      for (const device of locais.filter(({ id }) => id !== deviceId)) await revokeDevice(device.id, this.database)
+      if (locais.some(({ id }) => id === deviceId)) await revokeDevice(deviceId, this.database)
+    } else {
+      const agoraRevogado = new Date().toISOString()
+      await this.database.devices.bulkPut(locais.map((device) => ({ ...device, status: 'revoked' as const, revokedAt: agoraRevogado })))
+    }
 
     // A instalação atual continua servindo ao pastor, mas com autorização nova:
     // nada do que valia antes do encerramento volta a valer.
     const newDeviceId = rotateDeviceId(accountId)
     await authorizeCurrentDevice(accountId, this.database)
 
-    return { removedRecords: mutations.length, preservedRecords: personal, revokedDevices: devices.length, newDeviceId }
+    return {
+      removedRecords: mutations.length,
+      preservedRecords: personal,
+      revokedDevices: revogadosNoServico ?? locais.length,
+      newDeviceId,
+    }
   }
 }

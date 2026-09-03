@@ -58,7 +58,13 @@ export function remoteProjectProblem({ url, anonKey, declaredRef }: RemoteProjec
   const daUrl = projectRefFromUrl(url)
   if (!daUrl) return 'O endereço do serviço não tem o formato esperado. Confira a configuração desta instalação.'
   const declarado = declaredRef?.trim().toLowerCase()
-  if (declarado && declarado !== daUrl) {
+  // Antes, a declaração ausente simplesmente pulava a conferência: bastava
+  // esquecer a variável para uma build falar com qualquer projeto. Declarar o
+  // projeto passou a ser obrigatório para abrir conexão remota.
+  if (!declarado) {
+    return 'Esta instalação não declara com qual projeto ela fala. Defina VITE_SUPABASE_PROJECT_REF antes de conectar.'
+  }
+  if (declarado !== daUrl) {
     return 'Esta instalação está apontada para um serviço diferente do declarado. Nenhuma conexão foi aberta.'
   }
   const daChave = projectRefFromKey(anonKey)
@@ -71,4 +77,4 @@ export function remoteProjectProblem({ url, anonKey, declaredRef }: RemoteProjec
 export const declaredProjectRef = import.meta.env.VITE_SUPABASE_PROJECT_REF as string | undefined
 
 /** Versão do esquema do serviço que esta versão do aplicativo espera. */
-export const EXPECTED_SCHEMA_VERSION = 3
+export const EXPECTED_SCHEMA_VERSION = 4

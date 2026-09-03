@@ -5,7 +5,12 @@ import type { OutboxRecord, QuarantinedOperationRecord, SyncConflictRecord, Vaul
 import { operationMacIsValid, withOperationMac } from './operationMac'
 import type { EncryptedOperation, SyncSummary, SyncTransport } from './types'
 
-/** Teto de páginas por sincronização, para não prender a tela indefinidamente. */
+/**
+ * Teto de páginas por sincronização, para não prender a tela indefinidamente.
+ * Bater no teto não é erro nem fim: o cursor fica guardado e a próxima
+ * sincronização continua. O que não pode é o aparelho dizer que está em dia —
+ * por isso o resumo carrega `incomplete`.
+ */
 const MAX_PAGES = 50
 
 function toOperation(record: OutboxRecord): EncryptedOperation {
@@ -60,7 +65,7 @@ export class SyncService {
    */
   async synchronize(accountId: string, deviceId: string, syncKey: CryptoKey): Promise<SyncSummary> {
     await assertDeviceCanSync(accountId, deviceId, this.database)
-    if (!this.online()) return { status: 'offline', pushed: 0, pulled: 0, conflicts: 0, quarantined: 0 }
+    if (!this.online()) return { status: 'offline', pushed: 0, pulled: 0, conflicts: 0, quarantined: 0, incomplete: false }
     // Antes de enviar e antes de receber: só o serviço sabe se outro aparelho
     // revogou este aqui.
     await assertRemoteDeviceStillActive(accountId, deviceId, this.database, this.readRemoteDeviceStatus)
@@ -80,6 +85,7 @@ export class SyncService {
     let recebidas = 0
     let conflitos = 0
     let quarentena = 0
+    let incompleto = false
     let cursor = (await this.database.syncState.get(accountId))?.cursor ?? null
 
     // Página por página até o serviço não ter mais nada. Parar na primeira
@@ -109,6 +115,9 @@ export class SyncService {
       })
 
       if (!pullResult.hasMore || pullResult.operations.length === 0) break
+      // Última volta permitida e o serviço ainda tem página: a conta não está
+      // em dia, e quem chamou precisa saber disso.
+      if (pagina === MAX_PAGES - 1) incompleto = true
     }
 
     const estado = await this.database.syncState.get(accountId)
@@ -120,11 +129,12 @@ export class SyncService {
     })
 
     return {
-      status: pending.length === 0 && recebidas === 0 && conflitos === 0 ? 'empty' : 'synced',
+      status: !incompleto && pending.length === 0 && recebidas === 0 && conflitos === 0 ? 'empty' : 'synced',
       pushed: pushResult.acceptedIds.length,
       pulled: recebidas,
       conflicts: pushResult.conflicts.length + conflitos,
       quarantined: quarentena,
+      incomplete: incompleto,
     }
   }
 

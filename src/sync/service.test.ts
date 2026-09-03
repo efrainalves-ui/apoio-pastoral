@@ -40,6 +40,19 @@ class PaginatedTransport extends CaptureTransport {
   }
 }
 
+/**
+ * Serviço que sempre tem mais uma página. É assim que se prova o teto: uma
+ * operação por página, e nunca um fim.
+ */
+class InfiniteTransport extends CaptureTransport {
+  constructor(private readonly paginas: EncryptedOperation[]) { super() }
+  override pull(_ownerId: string, cursor: string | null): Promise<PullResult> {
+    const desde = cursor ? Number(cursor) : 0
+    this.pulls += 1
+    return Promise.resolve({ operations: [this.paginas[desde % this.paginas.length]!], cursor: String(desde + 1), hasMore: true })
+  }
+}
+
 describe('sincronização cifrada', () => {
   const databases: ApoioDatabase[] = []
   afterEach(async () => {
@@ -220,6 +233,37 @@ describe('sincronização cifrada', () => {
     const operation = await withOperationMac(keys.sync, { id: crypto.randomUUID(), ownerId: 'outra-conta-ficticia', deviceId, recordId: crypto.randomUUID(), operation: 'upsert', baseVersion: 0, recordVersion: 1, schemaVersion: 1, payload: await encryptPayload(await generateMasterKey(), { schemaVersion: 1, type: 'foundation_fixture', data: 'registro fictício' }, 'remote-record'), createdAt: '2026-08-02T00:00:00.000Z' })
     await expect(new SyncService(new PullTransport({ operations: [operation], cursor: '1' }), database, () => true).synchronize(accountId, deviceId, keys.sync)).rejects.toThrow('outra conta')
     expect(await database.vaultRecords.get(operation.recordId)).toBeUndefined()
+  })
+
+  it('avisa quando parou no teto de páginas em vez de dizer que está em dia', async () => {
+    const { database, accountId, deviceId, keys } = await fixture()
+    const paginas = await Promise.all(Array.from({ length: 60 }, async () => {
+      const recordId = crypto.randomUUID()
+      return withOperationMac(keys.sync, {
+        id: crypto.randomUUID(), ownerId: accountId, deviceId: crypto.randomUUID(), recordId,
+        operation: 'upsert' as const, baseVersion: 0, recordVersion: 1, schemaVersion: 1,
+        payload: await encryptPayload(keys.master, { schemaVersion: 1, type: 'foundation_fixture', data: 'ficticio' }, recordId),
+        createdAt: new Date().toISOString(),
+      })
+    }))
+    const transport = new InfiniteTransport(paginas)
+
+    const summary = await new SyncService(transport, database, () => true).synchronize(accountId, deviceId, keys.sync)
+
+    // Antes o resumo voltava sem nenhuma marca e o aparelho seguia achando que
+    // tinha recebido tudo, com o serviço ainda cheio de operações.
+    expect(summary.incomplete).toBe(true)
+    expect(summary.status).toBe('synced')
+    // O cursor avançou: sincronizar de novo continua de onde parou.
+    expect((await database.syncState.get(accountId))?.cursor).toBe(String(transport.pulls))
+  })
+
+  it('não marca sincronização incompleta quando o serviço entregou tudo', async () => {
+    const { database, accountId, deviceId, keys } = await fixture()
+
+    const summary = await new SyncService(new CaptureTransport(), database, () => true).synchronize(accountId, deviceId, keys.sync)
+
+    expect(summary.incomplete).toBe(false)
   })
 })
 

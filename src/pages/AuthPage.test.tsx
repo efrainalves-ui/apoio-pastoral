@@ -17,6 +17,7 @@ const ambiente = vi.hoisted(() => ({ temServicoRemoto: false }))
 
 vi.mock('../auth/supabase', () => ({
   get hasSupabaseConfiguration() { return ambiente.temServicoRemoto },
+  onPasswordRecovery: () => () => undefined,
 }))
 
 vi.mock('../auth/AuthVaultContext', () => ({
