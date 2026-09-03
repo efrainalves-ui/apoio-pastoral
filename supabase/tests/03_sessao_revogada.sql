@@ -285,10 +285,20 @@ select homologacao_testes.exigir(
   'uma tabela criada depois desta migration não nasce ao alcance do navegador');
 drop table public.tabela_futura_ficticia;
 
--- Função nova também nasce fechada, agora por gatilho de evento. O aviso abaixo
--- mostra por que ela não podia depender do privilégio padrão: para tabelas o
--- `alter default privileges` deixa entrada em `pg_default_acl`; para funções,
--- não deixa nenhuma, e o EXECUTE de PUBLIC vinha do padrão embutido.
+-- ---------------------------------------------------------------------------
+-- Função aberta em `public` é detectada, tenha ela nascido fechada ou não.
+--
+-- A garantia mudou de forma, e a mudança é honesta. A versão anterior prometia
+-- que um gatilho de evento fecharia toda função nova; o Supabase gerenciado
+-- não deixa criar gatilho de evento sem superusuário, e o papel das migrations
+-- não é superusuário. A promessa era impossível de cumprir lá.
+--
+-- O que se prova aqui é o que existe: uma função aberta **aparece** na
+-- auditoria do catálogo. O privilégio padrão continua sendo tentado e, quando
+-- a plataforma o honra, a função já nasce fechada — o aviso abaixo registra
+-- qual dos dois aconteceu, sem transformar isso em asserção.
+-- ---------------------------------------------------------------------------
+
 do $$
 declare
   padrao text;
@@ -302,33 +312,90 @@ begin
 end;
 $$;
 
+-- Antes de abrir nada, a auditoria precisa estar limpa.
+select homologacao_testes.exigir(
+  public.protecao_de_funcao_nova(),
+  'a auditoria começa limpa: nenhuma função de public ao alcance de PUBLIC ou de anon');
+
 create function public.funcao_futura_ficticia() returns integer language sql immutable as $$ select 1 $$;
-select homologacao_testes.exigir(
-  not has_function_privilege('authenticated', 'public.funcao_futura_ficticia()', 'execute')
-  and not has_function_privilege('anon', 'public.funcao_futura_ficticia()', 'execute'),
-  'uma função criada sem revoke nenhum já nasce fora do alcance do navegador');
-select homologacao_testes.exigir(
-  not exists (
+
+do $$
+declare
+  fechada boolean;
+begin
+  select not exists (
     select 1 from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
     cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) as a
-    where n.nspname = 'public' and p.proname = 'funcao_futura_ficticia' and a.grantee = 0),
-  'e PUBLIC não aparece na lista de privilégios dela');
+    where n.nspname = 'public' and p.proname = 'funcao_futura_ficticia' and a.grantee = 0)
+  into fechada;
+  raise notice 'diagnóstico: função criada sem revoke nasceu %',
+    case when fechada then 'FECHADA (o privilégio padrão alcançou este papel)'
+         else 'ABERTA para PUBLIC (o privilégio padrão não alcança função neste papel)' end;
+end;
+$$;
+
+-- Esta é a asserção, e ela vale nos dois casos: se a função nasceu aberta, a
+-- auditoria precisa dizer isso. Uma proteção que não detecta a própria falha
+-- não é proteção.
+do $$
+declare
+  nasceu_aberta boolean;
+begin
+  select exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) as a
+    where n.nspname = 'public' and p.proname = 'funcao_futura_ficticia' and a.grantee = 0)
+  into nasceu_aberta;
+
+  if nasceu_aberta then
+    if public.protecao_de_funcao_nova() then
+      raise exception 'FALHOU: função aberta para PUBLIC e a auditoria não percebeu';
+    end if;
+    if not exists (select 1 from public.funcoes_publicas_abertas() f where f.funcao like '%funcao_futura_ficticia%') then
+      raise exception 'FALHOU: a auditoria não nomeia a função aberta';
+    end if;
+    raise notice 'ok: %', 'a auditoria detecta e nomeia a função aberta';
+  else
+    if not public.protecao_de_funcao_nova() then
+      raise exception 'FALHOU: função nasceu fechada e a auditoria acusou abertura';
+    end if;
+    raise notice 'ok: %', 'a função nasceu fechada e a auditoria confirma';
+  end if;
+end;
+$$;
+
 drop function public.funcao_futura_ficticia();
 
 -- Procedimento é outra porta, e `call` a abre do mesmo jeito.
 create procedure public.procedimento_futuro_ficticio() language sql as $$ select 1 $$;
-select homologacao_testes.exigir(
-  not has_function_privilege('authenticated', 'public.procedimento_futuro_ficticio()', 'execute')
-  and not has_function_privilege('anon', 'public.procedimento_futuro_ficticio()', 'execute'),
-  'um procedimento criado sem revoke nenhum também nasce fora do alcance do navegador');
+do $$
+begin
+  if exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) as a
+    where n.nspname = 'public' and p.proname = 'procedimento_futuro_ficticio' and a.grantee = 0)
+     and public.protecao_de_funcao_nova() then
+    raise exception 'FALHOU: procedimento aberto para PUBLIC e a auditoria não percebeu';
+  end if;
+  raise notice 'ok: %', 'procedimento aberto também aparece na auditoria';
+end;
+$$;
 drop procedure public.procedimento_futuro_ficticio();
 
--- A proteção é lida do catálogo, não afirmada: se alguém apagar ou desabilitar
--- o gatilho, esta resposta muda e a homologação reprova.
+-- Depois de apagar as duas, a auditoria volta a ficar limpa. Sem isto, um
+-- "false" preso mascararia qualquer prova posterior.
 select homologacao_testes.exigir(
   public.protecao_de_funcao_nova(),
-  'o gatilho que fecha função e procedimento novos está ativo e verificável');
+  'com as funções fictícias apagadas, a auditoria volta a aprovar');
+
+-- A auditoria não pode ser alcançada por quem ela audita.
+select homologacao_testes.exigir(
+  not has_function_privilege('anon', 'public.protecao_de_funcao_nova()', 'execute')
+  and not has_function_privilege('anon', 'public.funcoes_publicas_abertas()', 'execute'),
+  'anon não executa a auditoria de funções abertas');
 
 -- ---------------------------------------------------------------------------
 -- As tabelas de sessão não são alcançáveis pelo cliente.

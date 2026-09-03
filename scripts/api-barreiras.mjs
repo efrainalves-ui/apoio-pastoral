@@ -161,15 +161,27 @@ const escritaAmbiente = await tabela(a, 'service_environment', {
 })
 exigir(escritaAmbiente.status >= 400, 'o navegador não reescreve o ambiente declarado')
 
-// 8. A proteção de função nova é lida do catálogo, não afirmada por ninguém.
+// 8. Nenhuma função de public ao alcance de PUBLIC ou de anon.
 //
-// Esta é a verificação obrigatória da migration 0007: o Supabase gerenciado
-// pode recusar `create event trigger` ao papel que aplica migrations. Se ela
-// falhar, a homologação PARA — não se segue em frente com uma proteção
-// automática que não existe, nem se enfraquece a migration para ela passar.
+// Verificação obrigatória da 0007. Ela não pergunta se existe um mecanismo:
+// pergunta o estado real do catálogo. O Supabase gerenciado não deixa uma
+// migration criar gatilho de evento — `create event trigger` exige
+// superusuário —, então a garantia é detecção, e detecção só vale se for
+// consultada. Respondeu falso, a homologação PARA: há função aberta.
 const protecao = await rpc(a, 'protecao_de_funcao_nova')
 exigir(protecao.corpo.trim() === 'true',
-  'o gatilho que fecha função e procedimento novos está ativo neste projeto (0007; se falhar, PARE a homologação)')
+  'nenhuma função de public está ao alcance de PUBLIC nem de anon (0007; se falhar, PARE a homologação)')
+if (protecao.corpo.trim() !== 'true') {
+  // Sem nome, "false" é um beco sem saída. Com nome, é uma tarefa.
+  const abertas = await rpc(a, 'funcoes_publicas_abertas')
+  console.error(`  funções abertas: ${abertas.corpo}`)
+}
+
+// A própria auditoria não pode responder a quem ainda não entrou.
+const auditoriaAnonima = await fetch(`${url}/rest/v1/rpc/protecao_de_funcao_nova`, {
+  method: 'POST', headers: { apikey: anon, 'content-type': 'application/json' }, body: '{}',
+})
+exigir(auditoriaAnonima.status >= 400, 'a auditoria de funções abertas não responde a quem não entrou')
 
 // 8b. As tabelas de sessão não são alcançáveis pelo navegador.
 //

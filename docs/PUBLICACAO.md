@@ -173,7 +173,7 @@ No projeto de produção recém-criado, aplique nesta ordem:
 | 4 | `supabase/migrations/0004_sessao_revogada_e_ambiente_up.sql` | `session_is_not_revoked` e `session_is_authorized`; políticas dos envelopes exigindo sessão não revogada; `service_environment` e `app_environment`; `revoke_all_devices` |
 | 5 | `supabase/migrations/0005_ambiente_antes_da_senha_up.sql` | `app_schema_version` e `app_environment` respondem antes da autenticação, para a conferência acontecer antes de a credencial sair |
 | 6 | `supabase/migrations/0006_expurgo_de_historico_up.sql` | `purge_record_history`, que apaga o histórico de um registro somente quando a operação esperada ainda é a última dele |
-| 7 | `supabase/migrations/0007_funcao_nova_fechada_up.sql` | gatilho de evento que tira o EXECUTE de PUBLIC de toda função e procedimento criados em `public`, e `protecao_de_funcao_nova()` para conferir isso pelo catálogo |
+| 7 | `supabase/migrations/0007_funcao_nova_fechada_up.sql` | auditoria do catálogo: `funcoes_publicas_abertas()` lista as funções de `public` ao alcance de PUBLIC ou de anon, e `protecao_de_funcao_nova()` responde se a lista está vazia |
 | 8 | `supabase/migrations/0008_revogacao_idempotente_up.sql` | `revoke_all_devices` idempotente: repetir devolve zero em vez de erro, e é assim que a retomada distingue trabalho já feito de falha |
 | 9 | `supabase/migrations/0009_sessoes_fora_de_alcance_up.sql` | `device_sessions` e `revoked_sessions` saem do alcance direto do cliente, e suas políticas passam a exigir sessão não revogada |
 
@@ -181,12 +181,18 @@ O aplicativo espera a versão de esquema **9** (`app_schema_version()`) e recusa
 sincronizar com um serviço em versão diferente. Aplicar as nove migrations é
 obrigatório antes da primeira entrada.
 
-**A migration 7 pode não ser aplicável em todo projeto Supabase gerenciado**:
-ela depende de `create event trigger`, e essa permissão ainda não foi comprovada.
-Se o Supabase recusar, a transação aborta e a migration falha — que é o
-comportamento certo. A conferência obrigatória e o que fazer nesse caso estão em
-[SUPABASE_HOMOLOGATION.md](SUPABASE_HOMOLOGATION.md), na seção "Parada
-obrigatória". Enquanto ela não passar, a homologação fechada não começa.
+As nove são aplicáveis em Supabase gerenciado, e isso deixou de ser suposição.
+A `0007` chegou a depender de `create event trigger`, que exige superusuário: a
+primeira tentativa de homologação provou que o papel que aplica migrations não é
+superusuário, e a `0005` provou o mesmo para `alter default privileges` de um
+papel do qual ela não é membro. As duas foram redesenhadas para trabalhar dentro
+dessas fronteiras, e a prova de banco do CI passou a rodar com elas.
+
+Depois de aplicar, a **parada obrigatória** de
+[SUPABASE_HOMOLOGATION.md](SUPABASE_HOMOLOGATION.md): `app_schema_version()`
+responde `9`, `protecao_de_funcao_nova()` responde `true` e
+`funcoes_publicas_abertas()` devolve zero linhas. Enquanto isso não passar, a
+homologação fechada não começa.
 
 Operações que já existirem no banco sem assinatura de metadados — só é o caso
 de bancos de teste anteriores a esta versão — entram em quarentena no aparelho

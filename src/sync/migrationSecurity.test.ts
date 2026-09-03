@@ -20,6 +20,32 @@ function funcoesCriadas(sql: string): string[] {
   return [...sql.matchAll(/create function public\.(\w+)/gu)].map((ocorrencia) => ocorrencia[1] ?? '')
 }
 
+/** Procedimentos novos. `call` é outra porta, e abre do mesmo jeito. */
+function procedimentosCriados(sql: string): string[] {
+  return [...sql.matchAll(/create procedure public\.(\w+)/gu)].map((ocorrencia) => ocorrencia[1] ?? '')
+}
+
+/**
+ * As duas únicas funções que podem responder a quem ainda não entrou.
+ *
+ * Elas existem para a build conferir com qual serviço está falando antes de
+ * mandar e-mail e senha. Uma devolve um número de versão, a outra a palavra
+ * `homologacao` ou `producao`. Uma terceira função aberta a `anon` precisa ser
+ * uma decisão escrita aqui, não um `grant` que passou despercebido.
+ */
+const ABERTAS_A_ANON = ['app_schema_version', 'app_environment']
+
+/**
+ * O SQL sem os comentários.
+ *
+ * Estas provas leem o que a migration **faz**, e um comentário que explica por
+ * que algo não é feito — "não use `create event trigger`" — não pode reprovar a
+ * migration que justamente o evita.
+ */
+function semComentarios(sql: string): string {
+  return sql.replace(/--[^\n]*/gu, '')
+}
+
 /** Cada migration de subida com o conteúdo da reversão correspondente. */
 function paresDeMigration(): Array<{ nome: string; subida: string; reversao: string }> {
   return Object.entries(migrations)
@@ -158,11 +184,74 @@ describe('migration de homologação', () => {
     // ter sido criada em uma migration e fechada em outra, mais tarde, que é o
     // caso da função de gatilho aberta desde a primeira.
     for (const { nome, subida } of paresDeMigration()) {
-      for (const funcao of funcoesCriadas(subida)) {
+      for (const funcao of [...funcoesCriadas(subida), ...procedimentosCriados(subida)]) {
         expect(tudo, `${nome}: ${funcao} sem revoke de public em nenhuma migration`).toMatch(
           new RegExp(`revoke all on function[^;]*public\\.${funcao}\\b[^;]*from[^;]*\\bpublic\\b`, 'isu'),
         )
       }
     }
+  })
+
+  // ---------------------------------------------------------------------
+  // A porta do CI para função nova.
+  //
+  // O Supabase gerenciado não deixa uma migration criar gatilho de evento —
+  // `create event trigger` exige superusuário, e o papel que aplica migrations
+  // não é. A prevenção automática dentro do banco, então, não existe: o
+  // privilégio padrão é melhor esforço, e o dono do projeto sempre pode criar
+  // uma função aberta à mão.
+  //
+  // O que **pode** ser garantido é o que passa por aqui: uma função nova entra
+  // no repositório fechada, ou não entra. Estas provas são essa porta.
+  // ---------------------------------------------------------------------
+  describe('função nova só entra fechada', () => {
+    it('nenhuma migration concede execute a anon fora das duas de identificação', () => {
+      for (const { nome, subida } of paresDeMigration()) {
+        for (const concessao of semComentarios(subida).matchAll(/grant execute on function([^;]+);/gisu)) {
+          const trecho = concessao[1] ?? ''
+          if (!/\banon\b/u.test(trecho)) continue
+          const nomeados = [...trecho.matchAll(/public\.(\w+)/gu)].map((item) => item[1] ?? '')
+          for (const funcao of nomeados) {
+            expect(ABERTAS_A_ANON, `${nome}: ${funcao} não pode responder a anon`).toContain(funcao)
+          }
+        }
+      }
+    })
+
+    it('nenhuma migration concede a PUBLIC', () => {
+      for (const { nome, subida } of paresDeMigration()) {
+        expect(semComentarios(subida), `${nome}: concede a PUBLIC`).not.toMatch(/grant[^;]*\bto\b[^;]*\bpublic\b/isu)
+      }
+    })
+
+    it('a auditoria que substitui o gatilho de evento existe e é lida do catálogo', () => {
+      const auditoria = migrations['../../supabase/migrations/0007_funcao_nova_fechada_up.sql'] ?? ''
+      expect(auditoria).toContain('create function public.funcoes_publicas_abertas()')
+      expect(auditoria).toContain('create function public.protecao_de_funcao_nova()')
+      // Lê o catálogo em vez de afirmar: é o que mantém a resposta verdadeira
+      // quando alguém abre uma função por fora das migrations.
+      expect(auditoria).toContain('pg_catalog.pg_proc')
+      // E não volta a prometer o que o Supabase gerenciado não permite.
+      expect(semComentarios(auditoria)).not.toMatch(/create event trigger/iu)
+    })
+
+    it('nenhuma migration depende de superusuário', () => {
+      // `create event trigger` e `alter default privileges for role
+      // <papel de que não somos membros>` foram os dois que pararam a
+      // homologação. Nenhum dos dois pode voltar sem passar por aqui.
+      const tudo = paresDeMigration().flatMap(({ subida, reversao }) => [semComentarios(subida), semComentarios(reversao)]).join('\n')
+      expect(tudo).not.toMatch(/create event trigger/iu)
+      expect(tudo).not.toMatch(/alter system/iu)
+      expect(tudo).not.toMatch(/create extension/iu)
+      // Mexer em privilégio padrão de outro papel só com a conferência de
+      // pertencimento ao lado — existir não é poder.
+      for (const { nome, subida, reversao } of paresDeMigration()) {
+        for (const conteudo of [subida, reversao]) {
+          if (/alter default privileges for role/iu.test(semComentarios(conteudo))) {
+            expect(conteudo, `${nome}: mexe em privilégio padrão sem conferir pertencimento`).toMatch(/pg_has_role\(/u)
+          }
+        }
+      }
+    })
   })
 })

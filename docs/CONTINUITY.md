@@ -141,6 +141,48 @@ Migrations novas: `0005_ambiente_antes_da_senha`, `0006_expurgo_de_historico` e
 `0007_funcao_nova_fechada`. Versão de esquema 7. Banco local na versão 12, com
 `pendingActions`.
 
+## Etapa estável: a segurança que cabe em Supabase gerenciado
+
+A primeira tentativa de homologação parou na `0005`, e o que ela mostrou vale
+mais do que a rodada: **o CI aplicava as migrations com mais poder do que a
+nuvem jamais teria**. Um teste que roda como superusuário não estava testando um
+ambiente onde ninguém é superusuário.
+
+Dois fatos comprovados no próprio projeto de homologação:
+
+- o papel que aplica migrations é `postgres`, **não superusuário**, e **não
+  membro de `supabase_admin`` — por isso `alter default privileges for role
+  supabase_admin` foi recusado e a `0005` abortou inteira;
+- `create event trigger` exige superusuário, e todos os gatilhos de evento do
+  projeto pertencem a `supabase_admin`, criados pelo provisionamento da
+  plataforma — por isso a `0007`, como estava, jamais se aplicaria ali.
+
+**`0005`** passou a conferir `pg_has_role` em vez de existência do papel:
+existir não é poder. Ela avisa por `notice` quais papéis ficaram de fora e falha
+se não alcançar nenhum.
+
+**`0007`** perdeu o gatilho de evento. No lugar entraram três coisas que existem
+de verdade: o privilégio padrão da `0005`, dito como melhor esforço; a auditoria
+do catálogo — `funcoes_publicas_abertas()` nomeia as funções de `public` ao
+alcance de PUBLIC ou de `anon`, e `protecao_de_funcao_nova()` responde se a
+lista está vazia; e a porta do CI, que recusa migration com função aberta,
+`grant` a PUBLIC, `execute` a `anon` fora das duas de identificação, ou qualquer
+volta à dependência de superusuário.
+
+O limite ficou escrito onde precisa estar: quem tem acesso administrativo ao
+próprio projeto pode abrir uma função à mão, e nenhuma migration impede isso —
+nem a versão com gatilho impediria, porque superusuário também apaga gatilho. O
+que o desenho garante é que a abertura **aparece**.
+
+A prova de banco do CI passou a rodar com um papel `apoio_migracao` sem
+superusuário, fora de `supabase_admin`, com `supabase_admin` existindo ao lado —
+as fronteiras exatas da nuvem. Uma guarda no início reprova se a simulação
+degradar.
+
+Estado do ambiente: homologação limpa (dados e contas apagados) e parada na
+versão 4, com `0003` e `0004` aplicadas. Produção continua vazia e nunca foi
+consultada.
+
 ## Etapa estável: quarta revisão independente
 
 Treze achados de uma auditoria independente do commit `8421f8e`. Cada um foi

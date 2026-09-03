@@ -1,58 +1,86 @@
 begin;
 
 -- ---------------------------------------------------------------------------
--- Função e procedimento novos nascem fechados para PUBLIC.
+-- Nenhuma função de `public` ao alcance de PUBLIC ou de `anon`.
 --
--- O diagnóstico no CI resolveu a dúvida que ficou da rodada anterior:
--- `alter default privileges ... revoke execute on functions from public` não
--- deixa entrada nenhuma em `pg_default_acl` para funções. Para tabelas deixa —
--- e por isso tabela futura já nascia fechada. Para função, não: ela continuava
--- nascendo com o EXECUTE que o PostgreSQL concede a PUBLIC, e a única defesa
--- era lembrar de escrever o `revoke` à mão.
+-- A versão anterior desta migration fazia isso com `create event trigger`, que
+-- fecharia automaticamente toda função criada no schema. A homologação provou
+-- que esse caminho não existe em Supabase gerenciado: `create event trigger`
+-- exige superusuário, o papel que aplica migrations (`postgres`) não é
+-- superusuário, e todos os gatilhos de evento do projeto pertencem a
+-- `supabase_admin`, criado pelo provisionamento da plataforma. O editor SQL do
+-- painel roda com o mesmo papel, então fazer à mão não contorna. Depender de
+-- suporte manual da plataforma também não é solução: seria uma proteção que
+-- ninguém consegue reaplicar sozinho ao recriar o projeto.
 --
--- Um gatilho de evento fecha isso de verdade, inclusive para uma função criada
--- fora das migrations — pelo editor SQL do painel, por exemplo, que é
--- justamente o caso em que ninguém lembra.
+-- Trocamos prevenção automática impossível por três coisas que existem de
+-- verdade:
+--
+--   1. **Privilégio padrão**, onde a plataforma permite. Declarado na 0005
+--      para cada papel sobre o qual esta migration tem poder — e no Supabase
+--      gerenciado esse papel é o mesmo do editor SQL do painel. É melhor
+--      esforço, e está dito como tal.
+--
+--   2. **Auditoria do catálogo**, aqui. `protecao_de_funcao_nova()` não afirma
+--      que existe um mecanismo: ela olha o estado real e responde se hoje
+--      alguma função de `public` está aberta. `funcoes_publicas_abertas()` diz
+--      quais são, para o problema ter nome em vez de virar um "false" mudo.
+--
+--   3. **Porta no CI**, fora do banco. `src/sync/migrationSecurity.test.ts`
+--      recusa uma migration que crie função ou procedimento em `public` sem o
+--      `revoke ... from public` escrito ao lado, e `supabase/tests` reprova o
+--      catálogo aberto. Uma função nova entra no repositório fechada, ou não
+--      entra.
+--
+-- O limite, dito sem rodeio: quem tem acesso administrativo ao próprio projeto
+-- pode criar uma função aberta à mão, e nenhuma migration impede isso — nem a
+-- versão com gatilho de evento impediria, porque quem é superusuário também
+-- apaga o gatilho. O que este desenho garante é que a abertura **aparece**: a
+-- auditoria responde falso, a checklist de homologação reprova e `pnpm
+-- test:api` reprova. Prevenir o dono de si mesmo não é uma promessa que um
+-- banco de dados possa cumprir; detectar e recusar seguir, é.
 -- ---------------------------------------------------------------------------
 
-create function public.revogar_execute_publico_em_funcao_nova()
-returns event_trigger
-language plpgsql
+-- Funções de `public` alcançáveis por quem não deveria alcançá-las.
+--
+-- `app_environment` e `app_schema_version` são a exceção declarada: as duas
+-- respondem a `anon` de propósito, porque a build precisa conferir com qual
+-- serviço está falando **antes** de mandar e-mail e senha. Qualquer terceira
+-- função ao alcance de `anon` aparece aqui.
+--
+-- PUBLIC entra por `grantee = 0`, que não tem linha em `pg_roles`: é assim que
+-- o EXECUTE embutido do PostgreSQL se apresenta, e era justamente o caso que
+-- um `join` com `pg_roles` deixava passar.
+create function public.funcoes_publicas_abertas()
+returns table (funcao text, alcance text)
+language sql
+stable
 security definer
 set search_path = ''
 as $$
-declare
-  criado record;
-begin
-  for criado in select * from pg_event_trigger_ddl_commands()
-  loop
-    if criado.schema_name = 'public' and criado.object_type in ('function', 'procedure') then
-      execute format('revoke all on routine %s from public', criado.object_identity);
-    end if;
-  end loop;
-end;
+  select p.oid::regprocedure::text,
+         case when a.grantee = 0 then 'PUBLIC' else 'anon' end
+  from pg_catalog.pg_proc p
+  join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+  cross join lateral pg_catalog.aclexplode(
+    coalesce(p.proacl, pg_catalog.acldefault('f', p.proowner))
+  ) as a
+  where n.nspname = 'public'
+    and a.privilege_type = 'EXECUTE'
+    and (
+      a.grantee = 0
+      or (
+        a.grantee = (select r.oid from pg_catalog.pg_roles r where r.rolname = 'anon')
+        and p.proname not in ('app_environment', 'app_schema_version')
+      )
+    )
+  order by 1, 2;
 $$;
 
--- Procedimento entra junto: `call` também é uma porta, e uma porta esquecida.
-create event trigger fechar_funcao_nova
-  on ddl_command_end
-  when tag in ('CREATE FUNCTION', 'CREATE PROCEDURE')
-  execute function public.revogar_execute_publico_em_funcao_nova();
+comment on function public.funcoes_publicas_abertas() is
+  'Funções de public ao alcance de PUBLIC ou de anon, com quem as alcança. Vazio é o estado correto.';
 
--- ---------------------------------------------------------------------------
--- A proteção precisa ser verificável, e não afirmada.
---
--- Um ambiente gerenciado pode recusar gatilho de evento ao papel que aplica
--- migrations. Se isso acontecer, o `create event trigger` acima aborta a
--- transação inteira e a migration falha com a mensagem do próprio PostgreSQL —
--- que é o comportamento certo: melhor a migration parar e alguém decidir do
--- que ela passar dizendo que existe uma proteção automática que não existe.
---
--- A função abaixo não afirma nada por conta própria: ela olha o catálogo. Se
--- alguém apagar ou desabilitar o gatilho depois, ela passa a responder falso,
--- e a checklist de homologação e `pnpm test:api` reprovam.
--- ---------------------------------------------------------------------------
-
+-- A resposta curta, para a checklist e para `pnpm test:api`.
 create function public.protecao_de_funcao_nova()
 returns boolean
 language sql
@@ -60,26 +88,40 @@ stable
 security definer
 set search_path = ''
 as $$
-  select exists (
-    select 1 from pg_event_trigger
-    where evtname = 'fechar_funcao_nova' and evtenabled <> 'D'
-  );
+  select not exists (select 1 from public.funcoes_publicas_abertas());
 $$;
 
 comment on function public.protecao_de_funcao_nova() is
-  'Verdadeiro quando o gatilho que fecha função e procedimento novos está ativo. Olha o catálogo: não é uma afirmação, é uma leitura.';
+  'Verdadeiro quando nenhuma função de public está ao alcance de PUBLIC nem de anon, fora as duas de identificação do serviço. Lê o catálogo: não é uma afirmação, é uma leitura.';
+
+-- ---------------------------------------------------------------------------
+-- A migration não conclui afirmando um estado que não conferiu.
+--
+-- Se alguma função de `public` estiver aberta neste ponto — inclusive as duas
+-- criadas logo acima, caso o `revoke` abaixo não tenha alcançado —, a
+-- transação inteira volta atrás e a mensagem diz quais são.
+-- ---------------------------------------------------------------------------
+
+revoke all on function public.funcoes_publicas_abertas(),
+  public.protecao_de_funcao_nova() from public, anon;
+grant execute on function public.funcoes_publicas_abertas(),
+  public.protecao_de_funcao_nova() to authenticated;
 
 do $$
+declare
+  abertas text;
 begin
-  if not public.protecao_de_funcao_nova() then
-    raise exception 'o gatilho que fecha função nova não ficou ativo; a migration não pode concluir afirmando uma proteção que não existe';
+  select string_agg(format('%s (%s)', f.funcao, f.alcance), '; ')
+    into abertas
+  from public.funcoes_publicas_abertas() f;
+
+  if abertas is not null then
+    raise exception 'ha funcao de public ao alcance de PUBLIC ou de anon: %', abertas;
   end if;
+
+  raise notice 'auditoria: nenhuma funcao de public ao alcance de PUBLIC ou de anon';
 end;
 $$;
-
-revoke all on function public.revogar_execute_publico_em_funcao_nova(),
-  public.protecao_de_funcao_nova() from public, anon;
-grant execute on function public.protecao_de_funcao_nova() to authenticated;
 
 create or replace function public.app_schema_version()
 returns integer

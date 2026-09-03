@@ -26,31 +26,60 @@ set search_path = ''
 as $$ select 5 $$;
 
 -- ---------------------------------------------------------------------------
--- 2. Privilégio padrão de função, dito de novo e de forma explícita.
+-- 2. Privilégio padrão, declarado só onde esta migration tem poder.
 --
--- A prova no CI mostrou que a forma sem `for role` não impediu o EXECUTE que o
--- PostgreSQL concede a PUBLIC em função nova. A entrada de privilégio padrão
--- pertence ao papel que cria o objeto, então ela é declarada aqui para cada
--- papel que de fato cria função neste projeto — o dono da migration e, no
--- Supabase, o papel administrativo do painel.
+-- A entrada de privilégio padrão pertence ao papel que cria o objeto, então
+-- ela precisa ser declarada por papel. A versão anterior perguntava se o papel
+-- **existia** — e foi por isso que a homologação parou aqui.
+--
+-- No Supabase gerenciado o papel que aplica migrations é `postgres`, que não é
+-- superusuário e não é membro de `supabase_admin`. `supabase_admin` existe, a
+-- condição antiga dava verdadeiro, e o `alter default privileges for role
+-- supabase_admin` era recusado com "permission denied to change default
+-- privileges", abortando a migration inteira. Existir não é poder: quem
+-- responde isso é `pg_has_role`.
+--
+-- O que fica coberto é o que importa na prática: o papel desta migration, que
+-- no Supabase gerenciado é o mesmo papel do editor SQL do painel. Objeto criado
+-- por `supabase_admin` — o provisionamento do próprio Supabase — está fora do
+-- alcance de qualquer migration, e isso está dito por extenso em
+-- `docs/SECURITY_MODEL.md`.
 --
 -- Isto é cinto e suspensório, não a garantia principal. Quem garante é a
--- conferência de `01_rls_isolation.sql`: nenhuma função de `public` pode ficar
--- ao alcance de PUBLIC ou de `anon`, e é ela que reprova quando alguém cria
--- uma função e esquece o `revoke`.
+-- conferência de `01_rls_isolation.sql` e a auditoria de
+-- `public.protecao_de_funcao_nova()`, criada na 0007: nenhuma função de
+-- `public` pode ficar ao alcance de PUBLIC ou de `anon`.
 -- ---------------------------------------------------------------------------
 
 do $$
 declare
   papel text;
+  cobertos text[] := '{}';
+  ignorados text[] := '{}';
 begin
   foreach papel in array array['postgres', 'supabase_admin', current_user]
   loop
-    if exists (select 1 from pg_roles where rolname = papel) then
-      execute format('alter default privileges for role %I in schema public revoke execute on functions from public', papel);
-      execute format('alter default privileges for role %I in schema public revoke all on tables from anon, authenticated', papel);
+    if not exists (select 1 from pg_roles where rolname = papel) then
+      continue;
     end if;
+    if not pg_has_role(current_user, papel, 'USAGE') then
+      ignorados := ignorados || papel;
+      continue;
+    end if;
+    execute format('alter default privileges for role %I in schema public revoke execute on functions from public', papel);
+    execute format('alter default privileges for role %I in schema public revoke all on tables from anon, authenticated', papel);
+    cobertos := cobertos || papel;
   end loop;
+
+  -- O aviso é parte da prova: quem aplica precisa enxergar quais papéis
+  -- ficaram de fora, em vez de supor que a proteção alcançou todos.
+  raise notice 'privilegios padrao declarados para: %; fora do alcance desta migration: %',
+    coalesce(array_to_string(cobertos, ', '), 'nenhum'),
+    coalesce(nullif(array_to_string(ignorados, ', '), ''), 'nenhum');
+
+  if cobertos = '{}' then
+    raise exception 'a migration nao conseguiu declarar privilegios padrao para papel nenhum';
+  end if;
 end;
 $$;
 

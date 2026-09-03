@@ -1,12 +1,14 @@
 begin;
 
+-- A mesma regra da subida: desfaz só onde a migration tinha poder para fazer.
 do $$
 declare
   papel text;
 begin
   foreach papel in array array['postgres', 'supabase_admin', current_user]
   loop
-    if exists (select 1 from pg_roles where rolname = papel) then
+    if exists (select 1 from pg_roles where rolname = papel)
+       and pg_has_role(current_user, papel, 'USAGE') then
       execute format('alter default privileges for role %I in schema public grant execute on functions to public', papel);
       execute format('alter default privileges for role %I in schema public grant all on tables to anon, authenticated', papel);
     end if;

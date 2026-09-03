@@ -284,20 +284,47 @@ Toda **tabela** criada depois nasce fora do alcance de `anon` e `authenticated`:
 os privilégios padrão de `public` foram zerados. Antes, uma tabela nova nasceria
 legível e gravável pelo navegador, e sem RLS ligada não haveria barreira nenhuma.
 
-Com **função e procedimento** o caminho foi outro, e vale registrar por que: o
-PostgreSQL concede EXECUTE a `PUBLIC` em toda função nova, e o
-`alter default privileges` não deixa entrada nenhuma em `pg_default_acl` para
-funções — um diagnóstico no CI mostrou isso preto no branco, depois de a
-afirmação contrária ter sido escrita aqui e desmentida pela própria prova. Quem
-fecha é um gatilho de evento: toda função e todo procedimento criados em
-`public` perdem o EXECUTE de `PUBLIC` na hora, inclusive fora das migrations,
-pelo editor SQL do painel.
+Com **função e procedimento** o caminho foi outro, e a história vale ser contada
+inteira porque ela corrige uma promessa que este documento já fez e não podia
+cumprir. O PostgreSQL concede EXECUTE a `PUBLIC` em toda função nova. A resposta
+escrita aqui antes era um gatilho de evento, que fecharia automaticamente toda
+função criada no schema. A homologação provou que esse caminho não existe em
+Supabase gerenciado: `create event trigger` exige superusuário, o papel que
+aplica migrations não é superusuário, e todos os gatilhos de evento do projeto
+pertencem ao papel administrativo da plataforma. O editor SQL do painel roda com
+o mesmo papel, então fazer à mão não contorna. Depender de suporte manual da
+plataforma também não serve: seria uma proteção que ninguém consegue reaplicar
+ao recriar o projeto.
 
-Se o ambiente não permitir criar o gatilho, a migration `0007` **falha** e não
-conclui: melhor parar e alguém decidir do que passar afirmando uma proteção
-automática que não existe. E a garantia não é afirmada em lugar nenhum —
-`public.protecao_de_funcao_nova()` lê o catálogo, então apagar ou desabilitar o
-gatilho depois faz a checklist de homologação e `pnpm test:api` reprovarem.
+No lugar da prevenção automática impossível ficaram três coisas que existem:
+
+1. **Privilégio padrão**, onde a plataforma permite. A `0005` declara para cada
+   papel sobre o qual ela tem poder, conferido por `pg_has_role` — e avisa quais
+   ficaram de fora, em vez de supor que alcançou todos. É melhor esforço, e está
+   dito como tal.
+2. **Auditoria do catálogo**. `public.protecao_de_funcao_nova()` não afirma que
+   existe um mecanismo: olha o estado real e responde se hoje alguma função de
+   `public` está ao alcance de `PUBLIC` ou de `anon`.
+   `public.funcoes_publicas_abertas()` diz quais são, para o problema ter nome.
+3. **Porta no CI**, fora do banco. `src/sync/migrationSecurity.test.ts` recusa
+   uma migration que crie função ou procedimento em `public` sem o `revoke`
+   escrito ao lado, recusa `grant` a `PUBLIC`, recusa `execute` a `anon` fora
+   das duas funções de identificação e recusa qualquer migration que volte a
+   depender de superusuário. Função nova entra fechada, ou não entra.
+
+**O limite, sem rodeio.** Quem tem acesso administrativo ao próprio projeto pode
+criar uma função aberta à mão, e nenhuma migration impede isso — nem a versão
+com gatilho de evento impediria, porque quem é superusuário também apaga o
+gatilho. Prevenir o dono de si mesmo não é promessa que um banco de dados possa
+cumprir. O que este desenho cobre de verdade é o aplicativo, as migrations
+versionadas e os acessos de usuários; sobre o resto, ele garante que a abertura
+**aparece**: a auditoria responde falso, a checklist de homologação reprova e
+`pnpm test:api` reprova.
+
+A prova de banco do CI passou a rodar com as mesmas fronteiras da nuvem — papel
+sem superusuário, fora de `supabase_admin`. Um teste com mais poder do que a
+produção não estava testando a produção, e foi exatamente por isso que as duas
+impossibilidades só apareceram na homologação.
 
 A conferência de `01_rls_isolation.sql` continua no lugar e continua sendo ela
 quem reprova se algo escapar. Essa conferência tinha
