@@ -131,6 +131,9 @@ test('jornada completa e confidencial da Comissão de Nomeações', async ({ pag
   await page.getByRole('button', { name: 'Relatório e objeções' }).click()
   await page.getByRole('button', { name: 'Gerar nova versão' }).click()
   await expect(page.getByText(/versão 1/)).toBeVisible()
+  // Por padrão o relatório mostra os cargos e não quem foi indicado.
+  await expect(page.locator('.public-report')).not.toContainText('Pessoa Fictícia Beta')
+  await page.getByRole('checkbox', { name: /Incluir nomes/u }).check()
   await expect(page.locator('.public-report')).toContainText('Patrimônio (associado): Pessoa Fictícia Beta')
   await expect(page.locator('.public-report')).not.toContainText('dizimista')
   await expect(page.locator('.public-report')).not.toContainText('favoráveis')

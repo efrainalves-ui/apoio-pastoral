@@ -69,7 +69,7 @@ test('cartões e criação de reuniões conduzem ao fluxo correto', async ({ pag
   await expect(page).toHaveURL(/\/app\/comissoes\/[0-9a-f-]+$/)
   await expect(page.getByText('Comissão Diretiva', { exact: true }).first()).toBeVisible()
   // Sem escolher ninguém, quem preside é o pastor.
-  await expect(page.getByLabel('Presidente')).toHaveValue('pastor')
+  await expect(page.locator('#meeting-president')).toHaveValue('pastor')
 
 
   await page.getByRole('link', { name: 'Voltar a Comissões' }).click()
