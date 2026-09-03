@@ -141,6 +141,54 @@ Migrations novas: `0005_ambiente_antes_da_senha`, `0006_expurgo_de_historico` e
 `0007_funcao_nova_fechada`. Versão de esquema 7. Banco local na versão 12, com
 `pendingActions`.
 
+## Etapa estável: Orçamento em duas áreas, Materiais, ACMS e Links úteis
+
+Quatro entregas funcionais, nenhuma delas tocando autenticação, segurança ou
+sincronização além do necessário.
+
+**Orçamento virou duas áreas.** Pessoal reúne o orçamento familiar e a lista de
+compras; Trabalho reúne os auxílios do ministério, as despesas e a
+quilometragem. A separação é o ponto, não a organização: sem ela o pastor não
+sabe quanto do próprio bolso saiu para o trabalho. O saldo aparece por auxílio
+— combustível, água, internet, telefone e outros — e o que passa de cada um é
+somado às despesas sem auxílio apontado, no número "pago do próprio bolso".
+
+A quilometragem é digitada: data, igreja, motivo opcional, quilômetros e gasto
+opcional, com total por mês e por igreja. **Sem GPS, sem rastreamento e sem
+localização automática** — um aplicativo pastoral que sabe por onde o pastor
+andou é um aplicativo que sabe demais.
+
+A lista de compras fica em Pessoal, no banco pessoal, ao lado do orçamento
+familiar: compra de casa é dinheiro de casa, e no cofre pastoral ela sairia no
+encerramento de distrito junto com o que é da igreja. Funciona offline, sugere
+itens frequentes a partir do histórico e soma em tempo real. A conversão em
+despesa pessoal **nunca acontece sozinha**: é um botão, depois de o pastor
+conferir o total.
+
+**Materiais entrou no menu principal.** Estoque com recebido, distribuído,
+reservado e disponível; distribuição por regra do tipo de igreja (editável),
+igualitária ou manual, sempre com prévia mostrando sobra e falta antes de
+confirmar; entrega confirmada com quantidade real, data e a quem foi entregue —
+membro cadastrado ou nome escrito à mão. Necessidades e pedidos à Associação
+ficam na mesma área, e o pedido recebido vira item de estoque por ação do
+pastor. Materiais e necessidades são dados do distrito e saem no encerramento.
+
+**Relatório ACMS** é lido de uma planilha `.xlsx` dentro do aparelho, com
+leitor próprio: um `.xlsx` é um ZIP com XML, e o navegador já traz o que abre os
+dois. O arquivo bruto **não é gravado, não sobe para o serviço e não entra em
+teste nenhum** — é aberto na memória, mostrado em prévia por igreja e
+descartado. O que fica são os indicadores numéricos por igreja: Escola
+Sabatina, presença, PG, UAPG, estudos bíblicos, evangelismo e até quatro pontos
+estratégicos, estes com o rótulo que a própria planilha usa, porque inventar
+nome para eles seria escrever no relatório do pastor uma palavra que a
+Associação não usou. Formato não reconhecido é recusado com explicação, e nada
+é importado. As fixtures de teste são inteiramente inventadas, incluindo um
+`.xlsx` montado no próprio teste.
+
+**Links úteis** é uma página só, com a lista versionada no código: atualizar um
+link exige publicar o aplicativo. É de propósito — área comum editável precisa
+de conta administradora e moderação, e nada disso existe ainda.
+
 ## Etapa estável: a segurança que cabe em Supabase gerenciado
 
 A primeira tentativa de homologação parou na `0005`, e o que ela mostrou vale

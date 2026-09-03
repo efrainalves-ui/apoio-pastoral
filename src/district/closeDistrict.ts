@@ -30,6 +30,13 @@ const TYPE_LABELS: Record<string, string> = {
   commission_meeting: 'Reuniões de comissão', commission_task: 'Pendências de comissão',
   nomination_process: 'Processos de nomeações', annual_goal: 'Metas do planejamento',
   evangelism_campaign: 'Campanhas de evangelismo',
+  // O orçamento do trabalho é do distrito: os auxílios vêm das igrejas dele e
+  // a quilometragem é entre elas. O orçamento familiar e a lista de compras
+  // ficam no banco pessoal e não passam por aqui.
+  work_allowance: 'Auxílios do ministério', work_expense: 'Despesas do ministério',
+  mileage: 'Quilometragem',
+  material: 'Materiais', material_distribution: 'Distribuições de material',
+  material_need: 'Necessidades e pedidos', acms_report: 'Relatórios ACMS importados',
 }
 
 export interface CloseDistrictPreview {

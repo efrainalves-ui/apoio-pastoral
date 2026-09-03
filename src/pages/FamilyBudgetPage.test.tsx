@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -22,12 +22,21 @@ function renderBudget(entry: string) {
   render(<MemoryRouter initialEntries={[entry]}><Routes><Route path="/app/orcamento/:section" element={<FamilyBudgetPage />} /></Routes></MemoryRouter>)
 }
 
-describe('interface do Orçamento Familiar', () => {
+describe('interface do orçamento pessoal', () => {
   it('mostra estado vazio acolhedor e todas as áreas do módulo', async () => {
     renderBudget('/app/orcamento/resumo?mes=2026-08')
-    expect(await screen.findByRole('heading', { name: 'Orçamento Familiar' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Pessoal' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Comece com o que já sabe' })).toBeInTheDocument()
-    for (const label of ['Visão do mês', 'Entradas', 'Despesas', 'Planejamento', 'Contas', 'Dívidas', 'Metas', 'Relatórios']) expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
+    for (const label of ['Visão do mês', 'Entradas', 'Despesas', 'Planejamento', 'Contas', 'Dívidas', 'Metas', 'Lista de compras', 'Relatórios']) expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
+  })
+
+  it('as duas áreas do Orçamento ficam visíveis o tempo todo', async () => {
+    // A separação entre o dinheiro da família e o do ministério é o ponto do
+    // módulo: ela não pode depender de o pastor lembrar de abrir um menu.
+    renderBudget('/app/orcamento/resumo?mes=2026-08')
+    const areas = await screen.findByRole('navigation', { name: 'Áreas do Orçamento' })
+    expect(within(areas).getByRole('link', { name: 'Pessoal' })).toHaveClass('active')
+    expect(within(areas).getByRole('link', { name: 'Trabalho' })).toHaveAttribute('href', expect.stringContaining('/app/orcamento/trabalho/resumo'))
   })
 
   it('explica e registra o dízimo somente como acompanhamento', async () => {

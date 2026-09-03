@@ -39,7 +39,7 @@ test('barra inferior, atalhos do topo e botão de criar funcionam', async ({ pag
   await expect(page.getByRole('link', { name: 'Mais' })).toHaveCount(0)
   await navigateInsideApp(page, '/app/configuracoes', page.getByRole('heading', { name: 'Configurações', exact: true }))
   const mais = page.locator('main')
-  for (const repetido of ['Visitas e cuidados', 'Pedidos de Oração', 'Famílias', 'Cuidados pastorais', 'Importar pessoas', 'Fidelidade', 'Leitura', 'Orçamento Familiar', 'Relatórios', 'Aniversários', 'Interessados e estudos bíblicos', 'Duplas missionárias', 'Escola Sabatina, PG e UAPG']) {
+  for (const repetido of ['Visitas e cuidados', 'Pedidos de Oração', 'Famílias', 'Cuidados pastorais', 'Importar pessoas', 'Fidelidade', 'Leitura', 'Orçamento', 'Materiais', 'Relatórios', 'Aniversários', 'Interessados e estudos bíblicos', 'Duplas missionárias', 'Escola Sabatina, PG e UAPG']) {
     await expect(mais.getByRole('link', { name: repetido })).toHaveCount(0)
   }
   await expect(mais.getByRole('link', { name: 'Backup' })).toBeVisible()

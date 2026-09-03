@@ -551,8 +551,8 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .import-issue > span { display: grid; gap: 3px; }
 .visit-form { display: grid; gap: 20px; }
 .segmented { width: fit-content; margin-bottom: 18px; padding: 4px; border-radius: 11px; display: flex; background: var(--green-50); }
-.segmented button { min-height: 38px; padding: 7px 14px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font: inherit; font-weight: 700; cursor: pointer; }
-.segmented button.active { color: var(--green-900); background: var(--paper); box-shadow: 0 2px 8px rgb(14 55 40 / 10%); }
+.segmented button, .segmented a { min-height: 38px; padding: 7px 14px; border: 0; border-radius: 8px; display: grid; place-items: center; color: var(--muted); background: transparent; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+.segmented button.active, .segmented a.active { color: var(--green-900); background: var(--paper); box-shadow: 0 2px 8px rgb(14 55 40 / 10%); }
 .participant-grid, .family-selector { margin: 12px 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
 .participant-grid label, .family-selector label { min-height: 54px; padding: 11px; border: 1px solid var(--line); border-radius: 11px; display: flex; gap: 9px; align-items: center; }
 .participant-grid span { display: grid; gap: 2px; }
@@ -632,9 +632,9 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .budget-tips__item--risco svg { color: #a13a33; }
 .budget-hero > svg { width: 48px; height: 48px; padding: 11px; border-radius: 14px; color: var(--green-800); background: var(--green-50); }
 .budget-nav { padding: 5px; display: flex; gap: 4px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); scrollbar-width: thin; }
-.budget-nav a { min-height: 40px; padding: 8px 13px; border-radius: 9px; display: grid; place-items: center; color: var(--muted); text-decoration: none; white-space: nowrap; font-size: .78rem; font-weight: 750; }
-.budget-nav a:hover { color: var(--ink); background: var(--green-50); }
-.budget-nav a.active { color: white; background: var(--green-800); }
+.budget-nav a, .budget-nav button { min-height: 40px; padding: 8px 13px; border: 0; border-radius: 9px; display: grid; place-items: center; color: var(--muted); background: transparent; font: inherit; text-decoration: none; white-space: nowrap; font-size: .78rem; font-weight: 750; cursor: pointer; }
+.budget-nav a:hover, .budget-nav button:hover { color: var(--ink); background: var(--green-50); }
+.budget-nav a.active, .budget-nav button.active { color: white; background: var(--green-800); }
 .budget-month-nav { display: flex; gap: 9px; align-items: center; }
 .budget-month-nav strong { min-width: 170px; text-align: center; text-transform: capitalize; }
 .budget-month-nav .button { min-height: 40px; }
@@ -1204,3 +1204,34 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 /* Marca discreta de homologação: presente o bastante para ninguém confundir
    com o ambiente real, apagada o bastante para não disputar a tela. */
 .app-header__env { font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .45); color: #fff; }
+
+
+/* --------------------------------------------------------------------------
+   Materiais, lista de compras e relatório ACMS.
+   Compacto e com o mesmo contraste do resto: nenhum tamanho de fonte menor do
+   que os que já estavam aprovados na varredura de interface.
+   -------------------------------------------------------------------------- */
+.chip-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.field--inline { max-width: 132px; }
+.field--inline .field__input { min-height: 40px; }
+.entity-row--done > span:nth-child(2) strong { color: var(--muted); text-decoration: line-through; }
+
+.table-scroll { overflow-x: auto; }
+.data-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.data-table th, .data-table td { padding: 9px 11px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.data-table thead th { color: var(--muted); font-size: .74rem; font-weight: 750; text-align: right; }
+.data-table th[scope="row"], .data-table thead th:first-child { text-align: left; }
+.data-table tbody th { font-weight: 700; }
+
+.acms-bar { display: grid; grid-template-columns: minmax(0, 9rem) minmax(0, 1fr) auto; gap: 11px; align-items: center; padding: 7px 0; }
+.acms-bar span { min-width: 0; color: var(--muted); font-size: .78rem; font-weight: 700; overflow-wrap: anywhere; }
+.acms-bar__track { height: 12px; border-radius: 999px; background: var(--green-50); overflow: hidden; }
+.acms-bar__fill { height: 100%; border-radius: 999px; background: var(--green-700); }
+
+.entity-row strong.positive { color: var(--green-700); }
+.entity-row strong.negative { color: var(--red); }
+
+@media (max-width: 620px) {
+  .acms-bar { grid-template-columns: minmax(0, 1fr) auto; }
+  .acms-bar__track { grid-column: 1 / -1; }
+}

@@ -54,6 +54,10 @@ import { AnnualGoalPage } from '../pages/AnnualGoalPage'
 import { GoalTrackingPage } from '../pages/GoalTrackingPage'
 import { EvangelismPage } from '../pages/EvangelismPage'
 import { CampaignPage } from '../pages/CampaignPage'
+import { MaterialsPage } from '../pages/MaterialsPage'
+import { WorkBudgetPage } from '../pages/WorkBudgetPage'
+import { AcmsPage } from '../pages/AcmsPage'
+import { UsefulLinksPage } from '../pages/UsefulLinksPage'
 import { DistrictService } from '../district/service'
 
 const FidelityPage = lazy(() => import('../pages/FidelityPage').then((module) => ({ default: module.FidelityPage })))
@@ -275,7 +279,13 @@ export function App() {
         <Route path="comissoes/nomeacoes/:processId" element={<NominationProcessPage />} />
         <Route path="comissoes/:meetingId" element={<CommissionMeetingPage />} />
         <Route path="orcamento" element={<Navigate to="/app/orcamento/resumo" replace />} />
+        {/* Trabalho vem antes: um segmento fixo precisa vencer o `:section`. */}
+        <Route path="orcamento/trabalho" element={<Navigate to="/app/orcamento/trabalho/resumo" replace />} />
+        <Route path="orcamento/trabalho/:section" element={<WorkBudgetPage />} />
         <Route path="orcamento/:section" element={<FamilyBudgetPage />} />
+        <Route path="materiais" element={<MaterialsPage />} />
+        <Route path="metas/acms" element={<AcmsPage />} />
+        <Route path="links" element={<UsefulLinksPage />} />
         <Route path="visitacao" element={<VisitationPage />} />
         <Route path="visitas" element={<Navigate to="/app/visitacao" replace />} />
         <Route path="visitas/nova" element={<VisitFormPage />} />

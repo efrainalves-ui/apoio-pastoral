@@ -80,3 +80,19 @@ pedido de oração e anotações, o aplicativo orienta em uma linha a registrar 
 essencial pastoral e evitar detalhes íntimos desnecessários, sem bloquear o uso.
 Esse conteúdo não aparece em relatórios padrão, buscas globais, mensagens de
 erro nem notificações — o aplicativo não envia notificações.
+
+## Orçamento, materiais e relatório ACMS
+
+- O **orçamento do trabalho** — auxílios, despesas do ministério e quilometragem
+  — é dado do distrito: fica no cofre cifrado, sincroniza entre os seus
+  aparelhos e sai no encerramento de distrito. O **orçamento familiar** e a
+  **lista de compras** ficam no banco pessoal e não saem.
+- A quilometragem é **digitada por você**. O aplicativo não usa GPS, não
+  registra localização e não acompanha deslocamento.
+- **Materiais e necessidades** são do distrito e saem no encerramento.
+- O **relatório ACMS** é lido da planilha dentro do aparelho. O arquivo não é
+  salvo, não é enviado ao serviço e não entra no backup: ficam apenas os
+  indicadores numéricos por igreja, depois de você confirmar a prévia. Nenhum
+  nome de membro é extraído.
+- **Links úteis** abre endereços em uma aba nova do navegador; nada do seu
+  distrito é enviado a eles.

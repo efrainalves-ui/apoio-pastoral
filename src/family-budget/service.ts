@@ -1,7 +1,7 @@
 import { decryptRecord, encryptPayload } from '../crypto/vault'
 import { familyBudgetDb, type FamilyBudgetDatabase } from './database'
 import { monthKey } from './core'
-import type { BudgetBillData, BudgetDataByType, BudgetEntity, BudgetExpenseData, BudgetGoalData, BudgetIncomeData, BudgetPlanData, BudgetSkipData, BudgetSnapshot, FamilyBudgetRecordType, FamilyBudgetStoredRecord } from './types'
+import type { BudgetBillData, BudgetDataByType, BudgetEntity, BudgetExpenseData, BudgetGoalData, BudgetIncomeData, BudgetPayloadType, BudgetPlanData, BudgetSkipData, BudgetSnapshot, FamilyBudgetStoredRecord } from './types'
 
 const now = () => new Date().toISOString()
 const dayInMonth = (date: string, month: string) => `${month}-${String(Math.min(Number(date.slice(8, 10)) || 1, new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate())).padStart(2, '0')}`
@@ -9,17 +9,17 @@ const dayInMonth = (date: string, month: string) => `${month}-${String(Math.min(
 export class FamilyBudgetService {
   constructor(private readonly database: FamilyBudgetDatabase = familyBudgetDb) {}
 
-  private async decode<T extends FamilyBudgetRecordType>(record: FamilyBudgetStoredRecord, masterKey: CryptoKey, type: T): Promise<BudgetEntity<BudgetDataByType[T]> | null> {
+  private async decode<T extends BudgetPayloadType>(record: FamilyBudgetStoredRecord, masterKey: CryptoKey, type: T): Promise<BudgetEntity<BudgetDataByType[T]> | null> {
     const payload = await decryptRecord(masterKey, record)
     return payload?.type === `family_budget_${type}` ? { id: record.id, ...(payload.data as BudgetDataByType[T]) } : null
   }
 
-  private async list<T extends FamilyBudgetRecordType>(accountId: string, masterKey: CryptoKey, type: T): Promise<BudgetEntity<BudgetDataByType[T]>[]> {
+  private async list<T extends BudgetPayloadType>(accountId: string, masterKey: CryptoKey, type: T): Promise<BudgetEntity<BudgetDataByType[T]>[]> {
     const records = await this.database.records.where('accountId').equals(accountId).filter((record) => record.recordType === type).toArray()
     return (await Promise.all(records.map((record) => this.decode(record, masterKey, type)))).flatMap((item) => item ? [item] : [])
   }
 
-  private async save<T extends FamilyBudgetRecordType>(accountId: string, masterKey: CryptoKey, type: T, input: BudgetDataByType[T], id: string = crypto.randomUUID()): Promise<BudgetEntity<BudgetDataByType[T]>> {
+  private async save<T extends BudgetPayloadType>(accountId: string, masterKey: CryptoKey, type: T, input: BudgetDataByType[T], id: string = crypto.randomUUID()): Promise<BudgetEntity<BudgetDataByType[T]>> {
     const existing = await this.database.records.get(id)
     if (existing && existing.accountId !== accountId) throw new Error('Este registro pertence a outra conta.')
     const timestamp = now()

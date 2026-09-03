@@ -1,4 +1,4 @@
-import { ArchiveRestore, ChevronRight, Cloud, GitCompare, LockKeyhole, Search, ShieldCheck, TriangleAlert } from 'lucide-react'
+import { ArchiveRestore, ChevronRight, Cloud, GitCompare, Link2, LockKeyhole, Search, ShieldCheck, TriangleAlert } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/ui/Card'
 
@@ -6,6 +6,9 @@ const groups = [
   { title: 'Privacidade e dados', links: [
     { to: '/app/configuracoes/privacidade', icon: ShieldCheck, title: 'Privacidade', detail: 'Como o aplicativo cuida dos dados do seu distrito' },
     { to: '/app/configuracoes/encerrar-distrito', icon: TriangleAlert, title: 'Encerrar distrito', detail: 'Apaga os dados do distrito e mantém a conta e suas áreas pessoais' },
+  ] },
+  { title: 'Referências', links: [
+    { to: '/app/links', icon: Link2, title: 'Links úteis', detail: 'Endereços oficiais e material de apoio' },
   ] },
   { title: 'Dados e acesso', links: [
     { to: '/app/busca', icon: Search, title: 'Busca', detail: 'Encontre informações rapidamente' },

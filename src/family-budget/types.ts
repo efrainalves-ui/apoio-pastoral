@@ -46,10 +46,24 @@ export interface BudgetGoalData extends BudgetTimestamps {
 export interface BudgetPlanData extends BudgetTimestamps { month: string; limits: Partial<Record<ExpenseCategory, number>> }
 export interface BudgetSkipData extends BudgetTimestamps { recordType: 'income' | 'expense' | 'bill'; recurrenceId: string; month: string }
 
-export type FamilyBudgetRecordType = 'income' | 'expense' | 'bill' | 'debt' | 'goal' | 'plan' | 'skip'
+/**
+ * `shopping` é a lista de compras: área pessoal, guardada no mesmo banco do
+ * orçamento familiar porque compra de casa é dinheiro de casa. Ela não entra
+ * em `BudgetDataByType` — tem serviço próprio, em `src/shopping`.
+ */
+export type FamilyBudgetRecordType = 'income' | 'expense' | 'bill' | 'debt' | 'goal' | 'plan' | 'skip' | 'shopping'
 export type BudgetDataByType = {
   income: BudgetIncomeData; expense: BudgetExpenseData; bill: BudgetBillData; debt: BudgetDebtData; goal: BudgetGoalData; plan: BudgetPlanData; skip: BudgetSkipData
 }
+
+/**
+ * Os tipos que o serviço do orçamento familiar abre e grava.
+ *
+ * É um subconjunto de `FamilyBudgetRecordType` de propósito: `shopping` divide
+ * o mesmo banco pessoal, mas tem serviço próprio e forma própria, e não passa
+ * pelos cálculos do mês.
+ */
+export type BudgetPayloadType = keyof BudgetDataByType
 export type BudgetEntity<T extends object> = T & { id: string; projected?: boolean; sourceId?: string }
 
 export interface FamilyBudgetStoredRecord extends CipherEnvelope {

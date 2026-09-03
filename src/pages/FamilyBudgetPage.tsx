@@ -3,6 +3,8 @@ import { ArrowLeft, ArrowRight, Banknote, CalendarClock, Check, CheckCircle2, Ch
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { BudgetAreaNav } from '../components/BudgetAreaNav'
+import { ShoppingListView } from './ShoppingListView'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { budgetTips, categoryShares, flowBars, monthOutlook } from '../family-budget/monthInsight'
@@ -14,7 +16,7 @@ import { DEBT_STATUS_LABELS, DEBT_TYPE_LABELS, EXPENSE_CATEGORIES, EXPENSE_CATEG
 const service = new FamilyBudgetService()
 const timestamp = () => new Date().toISOString()
 const today = () => new Date().toISOString().slice(0, 10)
-const sectionLabels = { resumo: 'Visão do mês', entradas: 'Entradas', despesas: 'Despesas', planejamento: 'Planejamento', contas: 'Contas', dividas: 'Dívidas', metas: 'Metas', relatorios: 'Relatórios' } as const
+const sectionLabels = { resumo: 'Visão do mês', entradas: 'Entradas', despesas: 'Despesas', planejamento: 'Planejamento', contas: 'Contas', dividas: 'Dívidas', metas: 'Metas', compras: 'Lista de compras', relatorios: 'Relatórios' } as const
 type BudgetSection = keyof typeof sectionLabels
 
 const emptyIncome = (): BudgetIncomeData => ({ category: 'salary', description: '', amount: 0, date: today(), responsible: '', notes: '', recurring: false, createdAt: timestamp(), updatedAt: timestamp() })
@@ -30,7 +32,7 @@ const dateInMonth = (month: string, day: number | string) => {
 const withSelectedMonth = <T extends { date: string }>(draft: T, month: string): T => ({ ...draft, date: dateInMonth(month, draft.date.slice(8, 10)) })
 
 function BudgetNav({ section, month }: { section: BudgetSection; month: string }) {
-  return <nav className="budget-nav" aria-label="Áreas do Orçamento Familiar">
+  return <nav className="budget-nav" aria-label="Áreas do orçamento pessoal">
     {(Object.keys(sectionLabels) as BudgetSection[]).map((key) => <Link className={section === key ? 'active' : ''} key={key} to={`/app/orcamento/${key}?mes=${month}`}>{sectionLabels[key]}</Link>)}
   </nav>
 }
@@ -111,7 +113,8 @@ export function FamilyBudgetPage() {
   const hasRecords = snapshot.incomes.length + snapshot.expenses.length + snapshot.bills.length + snapshot.debts.length + snapshot.goals.length > 0
 
   return <div className="page-stack family-budget-page">
-    <header className="page-hero budget-hero"><div><p className="eyebrow">Área pessoal</p><h1>Orçamento Familiar</h1></div><WalletCards /></header>
+    <header className="page-hero budget-hero"><div><p className="eyebrow">Orçamento</p><h1>Pessoal</h1></div><WalletCards /></header>
+    <BudgetAreaNav area="pessoal" month={month} />
     <BudgetNav section={section} month={month} />
     <div className="budget-month-nav"><Button variant="secondary" aria-label="Mês anterior" icon={<ArrowLeft />} onClick={() => go(section, shiftMonth(month, -1))} /><strong>{monthLabel(month)}</strong><Button variant="secondary" aria-label="Próximo mês" icon={<ArrowRight />} onClick={() => go(section, shiftMonth(month, 1))} /><Button variant="quiet" onClick={() => go(section, monthKey(new Date()))}>Mês atual</Button></div>
     {notice && <div className="alert alert--success" role="status">{notice}</div>}
@@ -171,6 +174,7 @@ export function FamilyBudgetPage() {
     {section === 'contas' && <BillsView snapshot={snapshot} draft={billDraft} setDraft={setBillDraft} editId={billId} setEditId={setBillId} save={() => void saveBill()} remove={(id) => void remove(id, 'esta conta')} accountId={account?.id ?? ''} masterKey={masterKey} month={month} done={done} fail={fail} />}
     {section === 'dividas' && <DebtsView snapshot={snapshot} draft={debtDraft} setDraft={setDebtDraft} editId={debtId} setEditId={setDebtId} save={() => void saveDebt()} remove={(id) => void remove(id, 'esta dívida')} mode={debtMode} setMode={setDebtMode} accountId={account?.id ?? ''} masterKey={masterKey} month={month} done={done} fail={fail} />}
     {section === 'metas' && <GoalsView snapshot={snapshot} draft={goalDraft} setDraft={setGoalDraft} editId={goalId} setEditId={setGoalId} save={() => void saveGoal()} remove={(id) => void remove(id, 'esta meta')} accountId={account?.id ?? ''} masterKey={masterKey} done={done} fail={fail} />}
+    {section === 'compras' && <ShoppingListView accountId={account?.id ?? ''} masterKey={masterKey} onDone={done} onFail={fail} />}
     {section === 'relatorios' && <ReportsView snapshot={snapshot} previous={previous} summary={summary} />}
   </div>
 }

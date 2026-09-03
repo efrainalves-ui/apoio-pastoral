@@ -17,10 +17,12 @@ function renderShell() {
 describe('menu do aplicativo', () => {
   it('oferece os atalhos principais sem linguagem técnica', () => {
     renderShell()
-    for (const label of ['Início', 'Agenda', 'Distrito', 'Visitação', 'Fidelidade', 'Sermões', 'Metas', 'Planejamento Anual', 'Evangelismo', 'Leitura', 'Orçamento Familiar']) expect(screen.getAllByRole('link', { name: label }).length).toBeGreaterThan(0)
+    for (const label of ['Início', 'Agenda', 'Distrito', 'Visitação', 'Fidelidade', 'Sermões', 'Metas', 'Planejamento Anual', 'Evangelismo', 'Leitura', 'Orçamento', 'Materiais']) expect(screen.getAllByRole('link', { name: label }).length).toBeGreaterThan(0)
     expect(screen.queryByText('V1 · Cuidado pastoral')).not.toBeInTheDocument()
     expect(screen.queryByText('Cofre desbloqueado')).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Orçamento Familiar' })).toHaveClass('nav-item--personal')
+    // Orçamento continua marcado como área pessoal no menu, mesmo agora que
+    // ele reúne Pessoal e Trabalho: quem entra ali entra pelo lado da família.
+    expect(screen.getByRole('link', { name: 'Orçamento' })).toHaveClass('nav-item--personal')
     expect(screen.getByRole('link', { name: 'Leitura' })).toHaveClass('nav-item--personal')
     // Pessoas, famílias e cuidado pastoral moram dentro de Distrito e Visitação.
     for (const label of ['Pessoas e famílias', 'Visitas e cuidados', 'Pedidos de Oração']) expect(screen.queryByRole('link', { name: label })).not.toBeInTheDocument()

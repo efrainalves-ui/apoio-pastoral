@@ -19,9 +19,13 @@ test('orçamento pessoal funciona no computador e no celular sem misturar dados 
   await registerAndEnter(page)
 
   if (testInfo.project.name === 'mobile-chromium') await page.getByRole('button', { name: 'Abrir menu' }).click()
-  await page.getByRole('link', { name: 'Orçamento Familiar' }).click()
+  await page.getByRole('link', { name: 'Orçamento' }).click()
 
-  await expect(page.getByRole('heading', { name: 'Orçamento Familiar' })).toBeVisible()
+  // Orçamento abre em Pessoal, com as duas áreas visíveis o tempo todo.
+  await expect(page.getByRole('heading', { name: 'Pessoal' })).toBeVisible()
+  const areas = page.getByRole('navigation', { name: 'Áreas do Orçamento' })
+  await expect(areas.getByRole('link', { name: 'Pessoal' })).toHaveClass(/active/)
+  await expect(areas.getByRole('link', { name: 'Trabalho' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Comece com o que já sabe' })).toBeVisible()
   await page.getByRole('button', { name: 'Registrar entrada' }).click()
   await page.getByLabel('Valor').fill('3500')
@@ -43,4 +47,43 @@ test('orçamento pessoal funciona no computador e no celular sem misturar dados 
   await expect(summary.getByText('R$ 500,00')).toBeVisible()
   await expect(summary.getByText('R$ 3.000,00')).toBeVisible()
   await expect(page.getByText('Entrada Fictícia da Família')).toHaveCount(0)
+})
+
+test('as duas áreas do Orçamento não misturam o dinheiro da família com o do ministério', async ({ page }, testInfo) => {
+  await registerAndEnter(page)
+
+  if (testInfo.project.name === 'mobile-chromium') await page.getByRole('button', { name: 'Abrir menu' }).click()
+  await page.getByRole('link', { name: 'Orçamento' }).click()
+
+  // Trabalho: um auxílio e uma despesa maior do que ele.
+  await page.getByRole('navigation', { name: 'Áreas do Orçamento' }).getByRole('link', { name: 'Trabalho' }).click()
+  await expect(page.getByRole('heading', { name: 'Trabalho' })).toBeVisible()
+
+  await page.getByRole('link', { name: 'Auxílios' }).click()
+  await page.getByRole('button', { name: 'Novo auxílio' }).click()
+  await page.getByLabel('Auxílio ou cartão').fill('Cartão fictício de combustível')
+  await page.getByLabel('Valor').fill('400')
+  await page.getByRole('button', { name: 'Salvar auxílio' }).click()
+  await expect(page.getByText('Auxílio registrado.')).toBeVisible()
+
+  await page.getByRole('link', { name: 'Despesas' }).click()
+  await page.getByRole('button', { name: 'Nova despesa' }).click()
+  await page.getByLabel('Descrição').fill('Abastecimento fictício')
+  await page.getByLabel('Valor').fill('520')
+  await page.getByRole('button', { name: 'Salvar despesa' }).click()
+  await expect(page.getByText('Despesa registrada.')).toBeVisible()
+
+  // O que passou do auxílio saiu do bolso, e a tela diz isso sem conta de cabeça.
+  await page.getByRole('link', { name: 'Visão do mês' }).click()
+  await expect(page.getByText('do bolso', { exact: false }).first()).toBeVisible()
+
+  // A lista de compras é da área pessoal e soma em tempo real.
+  await page.getByRole('navigation', { name: 'Áreas do Orçamento' }).getByRole('link', { name: 'Pessoal' }).click()
+  await page.getByRole('link', { name: 'Lista de compras' }).click()
+  await page.getByRole('button', { name: 'Novo item' }).click()
+  await page.getByLabel('Item').fill('Arroz fictício')
+  await page.getByLabel('Quantidade').fill('2')
+  await page.getByLabel('Valor no mercado').fill('25')
+  await page.getByRole('button', { name: 'Salvar item' }).click()
+  await expect(page.getByRole('button', { name: 'Confirmar Arroz fictício' })).toBeVisible()
 })

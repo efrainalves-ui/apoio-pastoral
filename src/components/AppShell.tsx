@@ -12,6 +12,7 @@ import {
   Flag,
   ClipboardList,
   Library,
+  Boxes,
   WalletCards,
   CalendarRange,
   Megaphone,
@@ -35,9 +36,10 @@ const primaryNav = [
   { to: '/app/planejamento', label: 'Planejamento Anual', icon: CalendarRange },
   { to: '/app/evangelismo', label: 'Evangelismo', icon: Megaphone },
   { to: '/app/comissoes', label: 'Comissões', icon: ClipboardList },
+  { to: '/app/materiais', label: 'Materiais', icon: Boxes },
   { to: '/app/fidelidade', label: 'Fidelidade', icon: ShieldCheck },
   { to: '/app/leitura', label: 'Leitura', icon: Library, personal: true },
-  { to: '/app/orcamento', label: 'Orçamento Familiar', icon: WalletCards, personal: true },
+  { to: '/app/orcamento', label: 'Orçamento', icon: WalletCards, personal: true },
 ]
 
 // Quatro entradas, nesta ordem, com rótulos curtos para caber no celular.

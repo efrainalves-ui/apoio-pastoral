@@ -201,6 +201,29 @@ que não se conseguiu ler seria apagar sem saber o quê. Se a versão dele mudar
 uma sincronização trouxe outra, um backup foi restaurado — ele sai da quarentena
 sozinho na leitura seguinte.
 
+## Importação de planilha ACMS
+
+A planilha `.xlsx` é aberta **dentro do aparelho**, com leitor próprio: um
+`.xlsx` é um ZIP com XML, e o navegador já traz `DecompressionStream` e
+`DOMParser`. Não é preciosismo evitar a dependência — uma biblioteca de
+planilha é código grande, com histórico de problemas de segurança, para rodar
+em cima de um arquivo que chegou por e-mail.
+
+O arquivo bruto **não é gravado em lugar nenhum**: nem no banco local, nem no
+serviço, nem no backup. Ele é lido na memória, mostrado em prévia por igreja e
+descartado. O que fica guardado, depois de o pastor confirmar, são os
+indicadores numéricos e o nome da igreja — nenhum nome de membro é extraído,
+porque nenhum é lido.
+
+Formato não reconhecido não vira importação parcial: a leitura recusa com uma
+explicação do que faltou e não grava nada. Importar meia dúzia de números de
+origem duvidosa é pior do que não importar, porque o erro só apareceria depois,
+no painel, quando os totais não fechassem.
+
+As fixtures de teste são inteiramente inventadas, incluindo um `.xlsx` montado
+dentro do próprio teste. Nenhuma planilha real entra em teste, no repositório
+ou na documentação.
+
 ## Limites honestos
 
 - E2EE não oculta todos os metadados (volume, timestamps e identificadores).
@@ -213,6 +236,11 @@ sozinho na leitura seguinte.
 - E-mail e senha abrem o cofre também em uma nova instalação. O serviço guarda somente o envelope da chave mestra já cifrado pela senha; nunca recebe a senha ou o conteúdo pastoral em texto aberto.
 - Uma nova instalação é registrada como outro dispositivo após a entrada. Safari e o aplicativo instalado no iPhone são instalações independentes para esse controle.
 - A chave de recuperação é contingência para perda de acesso aos dispositivos; ela não é enviada por e-mail e não é o caminho normal de entrada em um aparelho novo.
+- O orçamento do trabalho, os materiais, as necessidades e os relatórios ACMS
+  importados são dados do distrito e saem no encerramento. O orçamento
+  familiar, a lista de compras, a leitura e a agenda pessoal ficam.
+- A quilometragem é digitada. Não há GPS, rastreamento nem localização
+  automática em nenhum ponto do aplicativo.
 - Encerrar o distrito é durável e retomável por etapas: a intenção é gravada
   **antes** da primeira exclusão local, e o fluxo só termina depois de publicar
   as lápides, confirmar que elas subiram, expurgar o histórico distrital no
