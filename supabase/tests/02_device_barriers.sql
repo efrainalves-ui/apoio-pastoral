@@ -198,12 +198,17 @@ select homologacao_testes.exigir_recusa(
 select homologacao_testes.exigir_recusa(
   format($cmd$select public.revoke_device(%L)$cmd$, :disp_c2),
   'D não revoga o aparelho de C');
-select homologacao_testes.exigir(
-  (select count(*) from public.device_sessions) = 1,
-  'D só enxerga o vínculo de sessão dele');
-select homologacao_testes.exigir(
-  (select count(*) from public.revoked_sessions) = 0,
-  'D não enxerga sessão revogada de C');
+-- As duas tabelas de sessão saíram do alcance direto do cliente na migration
+-- 0009. Antes, a política deixava o dono ler as próprias linhas, e este teste
+-- conferia a contagem: o problema é que um aparelho revogado, com o token
+-- ainda vivo, lia por HTTP quantos aparelhos a conta tinha, quais foram
+-- derrubados e quando. Agora nem o dono lê — só as funções `security definer`.
+select homologacao_testes.exigir_recusa(
+  $cmd$select count(*) from public.device_sessions$cmd$,
+  'D não alcança a tabela de sessões de aparelho');
+select homologacao_testes.exigir_recusa(
+  $cmd$select count(*) from public.revoked_sessions$cmd$,
+  'D não alcança a tabela de sessões revogadas');
 
 -- ---------------------------------------------------------------------------
 -- 10. Limites do lote e da página.

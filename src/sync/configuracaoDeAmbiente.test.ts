@@ -11,11 +11,14 @@ import { environmentConfigurationProblem } from './config'
  * descobriria no dia em que trocasse de aparelho. Esquecer uma variável não
  * pode ser o mesmo que escolher trabalhar offline.
  */
+// Referências curtas de propósito: a revisão de segurança do repositório
+// reprova qualquer subdomínio Supabase com quinze caracteres ou mais, que é o
+// formato de um projeto de verdade. Nenhum endereço real entra aqui.
 const HOMOLOGACAO = {
   declared: 'homologacao',
-  url: 'https://projeto-ficticio.supabase.co',
+  url: 'https://ficticio-a.supabase.co',
   anonKey: 'chave-ficticia-sem-formato-jwt',
-  declaredRef: 'projeto-ficticio',
+  declaredRef: 'ficticio-a',
   disableSync: undefined,
 }
 
@@ -44,13 +47,13 @@ describe('configuração de ambiente', () => {
   })
 
   it('recusa quando o projeto declarado e o endereço discordam', () => {
-    expect(environmentConfigurationProblem({ ...HOMOLOGACAO, declaredRef: 'outro-projeto' })).toMatch(/serviço diferente do declarado/u)
+    expect(environmentConfigurationProblem({ ...HOMOLOGACAO, declaredRef: 'ficticio-b' })).toMatch(/serviço diferente do declarado/u)
   })
 
   it('recusa quando a chave pública veio de outro projeto', () => {
     // Chave JWT fictícia com `ref` de outro projeto, montada aqui: nenhuma
     // chave real entra em teste.
-    const corpo = btoa(JSON.stringify({ ref: 'projeto-de-outro-lugar' })).replace(/=+$/u, '').replace(/\+/gu, '-').replace(/\//gu, '_')
+    const corpo = btoa(JSON.stringify({ ref: 'ficticio-c' })).replace(/=+$/u, '').replace(/\+/gu, '-').replace(/\//gu, '_')
     expect(environmentConfigurationProblem({ ...HOMOLOGACAO, anonKey: `cabecalho.${corpo}.assinatura` }))
       .toMatch(/chave pública desta instalação pertence a outro serviço/u)
   })
