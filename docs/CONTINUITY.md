@@ -96,6 +96,47 @@ para uso real. Cada achado foi reproduzido no código antes de qualquer correç�
 - **Documentação**: `docs/GOVERNANCA.md` novo; `SECURITY_MODEL.md` e
   `PUBLICACAO.md` atualizados.
 
+## Etapa estável: terceira revisão independente
+
+Onze achados. Cada um foi reproduzido antes de qualquer correção, e três
+trouxeram junto um efeito que a revisão não citava.
+
+- **Reset por e-mail**: a senha do serviço era trocada antes de a chave de
+  recuperação conferir. Chave digitada errada deixava o titular sem a senha
+  antiga e sem cofre. Agora a sessão do link precisa ser da conta daquele
+  e-mail, a chave precisa abrir o envelope, e só então a senha muda.
+- **Troca de senha**: o envelope novo passou a ser gravado antes de o serviço
+  saber dele. A entrada seguinte reconhece as três situações possíveis e
+  conclui ou desfaz, sem bloquear a conta.
+- **Primeira sincronização grande**: o recebimento parava em dez mil operações
+  dizendo "Dados atualizados" e carimbava a marca que autoriza acreditar em
+  uma conta vazia — o pastor era mandado criar um segundo distrito. Agora vai
+  até o fim; rodada incompleta não carimba, não anuncia e não libera.
+- **Conflito exclusão × alteração**: a direção "apaguei aqui, alteraram lá"
+  não publicava nada e os dois lados discordavam para sempre. As duas direções
+  publicam por cima da versão remota e têm teste de convergência.
+- **Exclusão de pessoa**: faltavam a meta do planejamento e o acompanhamento da
+  campanha, que guardam o nome escrito ao lado do identificador, o nome do
+  responsável pela tarefa e a pessoa dentro do voto de outro candidato. E
+  faltava o principal: o passado continuava inteiro na fila, nas revisões, na
+  quarentena e no serviço. Existe expurgo, local e remoto, e o que ele não
+  alcança está dito.
+- **Exportação**: os registros compartilhados saem em versão redigida.
+- **Documentos**: a mesma caixa "Incluir nomes", com o mesmo texto, em pauta,
+  ata, relatório de nomeações, campanha, itinerário e pregações. A antiga
+  Central de Relatórios, fora de rota e gerando nomes sem confirmação, saiu.
+- **Ambiente antes da senha**: as funções que identificam o serviço respondem a
+  quem ainda não entrou, e a conferência acontece antes de a credencial sair.
+- **Encerrar distrito**: o trabalho começado fica gravado e uma tela conclui.
+- **Privilégios de função**: o padrão do PostgreSQL concede EXECUTE a PUBLIC e
+  o `alter default privileges` não alcançou isso — está declarado assim. Quem
+  garante é a conferência de isolamento, agora capaz de enxergar PUBLIC.
+- **Assinatura**: cobre a versão declarada do MAC. `deviceId` fica de fora com
+  a limitação escrita por extenso em `operationMac.ts`.
+
+Migrations novas: `0005_ambiente_antes_da_senha` e `0006_expurgo_de_historico`.
+Versão de esquema 6. Banco local na versão 12, com `pendingActions`.
+
 ## Etapa estável: segunda revisão independente
 
 Dez achados de uma segunda revisão. Cada um foi reproduzido no código antes de

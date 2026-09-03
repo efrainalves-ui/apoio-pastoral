@@ -179,6 +179,52 @@ select homologacao_testes.exigir_recusa(
   'não existe um segundo ambiente escondido em outra linha');
 
 -- ---------------------------------------------------------------------------
+-- 5b. Expurgo do histórico de um registro apagado.
+--
+-- Trocar o envelope por uma lápide resolve o presente. Sem apagar o passado,
+-- cada versão anterior continuava guardada, cifrada com a mesma chave que o
+-- titular usa todo dia — e o pastor tinha acabado de dizer à pessoa que os
+-- dados dela foram apagados.
+-- ---------------------------------------------------------------------------
+
+set role authenticated;
+set request.jwt.claims = '{"sub":"eeeeeeee-0000-4000-8000-000000000005","session_id":"e1a00000-0000-4000-8000-00000000000e"}';
+
+select public.upload_operations(jsonb_build_array(
+  jsonb_build_object('id', 'f1000000-0000-4000-8000-00000000000f', 'record_id', 'fa000000-0000-4000-8000-00000000000f',
+    'operation', 'upsert', 'base_version', 0, 'record_version', 1, 'schema_version', 1,
+    'ciphertext', 'versao-antiga-ficticia', 'iv', 'iv', 'aad', 'aad', 'mac', 'mac', 'mac_version', 3),
+  jsonb_build_object('id', 'f2000000-0000-4000-8000-00000000000f', 'record_id', 'fa000000-0000-4000-8000-00000000000f',
+    'operation', 'upsert', 'base_version', 1, 'record_version', 2, 'schema_version', 1,
+    'ciphertext', 'versao-intermediaria-ficticia', 'iv', 'iv', 'aad', 'aad', 'mac', 'mac', 'mac_version', 3),
+  jsonb_build_object('id', 'f3000000-0000-4000-8000-00000000000f', 'record_id', 'fa000000-0000-4000-8000-00000000000f',
+    'operation', 'delete', 'base_version', 2, 'record_version', 3, 'schema_version', 1,
+    'ciphertext', 'lapide-ficticia', 'iv', 'iv', 'aad', 'aad', 'mac', 'mac', 'mac_version', 3)
+));
+
+select homologacao_testes.exigir(
+  (select count(*) from public.download_operations(0, 500)) = 3,
+  'as três versões do registro chegaram ao serviço');
+
+select homologacao_testes.exigir(
+  public.purge_record_history(array['fa000000-0000-4000-8000-00000000000f']::uuid[]) = 2,
+  'o expurgo apaga as versões anteriores do registro');
+
+select homologacao_testes.exigir(
+  (select count(*) from public.download_operations(0, 500)) = 1,
+  'sobra apenas uma operação daquele registro');
+select homologacao_testes.exigir(
+  (select o.operation from public.download_operations(0, 500) o) = 'delete',
+  'a que sobra é a lápide, que os outros aparelhos ainda precisam receber');
+select homologacao_testes.exigir(
+  not exists (select 1 from public.download_operations(0, 500) o where o.ciphertext like 'versao-%'),
+  'nenhuma versão anterior continua recuperável no serviço');
+
+select homologacao_testes.exigir(
+  public.purge_record_history(array[]::uuid[]) = 0,
+  'expurgo sem registro nenhum não faz nada');
+
+-- ---------------------------------------------------------------------------
 -- 6. Privilégios de toda tabela futura de public.
 -- ---------------------------------------------------------------------------
 

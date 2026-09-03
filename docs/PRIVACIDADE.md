@@ -26,14 +26,17 @@ certificação de nenhuma lei.
 - **Exportar**: no perfil da pessoa, *Exportar dados* gera um documento legível
   com o cadastro e com o **conteúdo** dos registros que falam somente dela —
   visitas, pedidos de oração, acompanhamentos, tarefas e estudos. Dos registros
-  em que ela aparece junto de outras pessoas sai apenas a indicação de que
-  existem: aquele conteúdo também é dos outros.
+  em que ela aparece junto de outras pessoas sai uma versão redigida: o que o
+  registro é e o que há sobre ela, nunca o que é das outras.
 - **Apagar**: no mesmo perfil, *Apagar dados* remove o cadastro e o que era só
   daquela pessoa, e retira a citação dela em todo o resto — família, dupla
   missionária, classe, Pequeno Grupo, compromisso de cerimônia, respostas de
   entrevista dentro de visita de família, comissões, processo de nomeações,
-  campanha de evangelismo e a cópia que a importação de listas guarda para
-  poder desfazer.
+  campanha de evangelismo, meta do planejamento anual e a cópia que a
+  importação de listas guarda para poder desfazer. Junto disso, o histórico
+  cifrado daqueles registros é apagado aqui e no serviço: sem isso, cada versão
+  anterior continuaria recuperável com a chave que o titular usa todo dia. O que
+  outro aparelho já baixou e os backups já salvos continuam fora do alcance.
 - **Canal**: o e-mail cadastrado na própria conta.
 
 ## Governança, retenção e incidentes
@@ -58,9 +61,13 @@ esses arquivos.
 
 ## Relatórios
 
-- O padrão é sem nomes: datas, tipos, locais, números e totais.
-- Um relatório com nomes só é gerado quando o pastor marca *Incluir nomes neste
-  relatório*, com aviso de que o arquivo pode conter dados pessoais.
+- O padrão é sem nomes: datas, tipos, locais, cargos, assuntos, decisões,
+  números e totais.
+- Um documento com nomes só é gerado quando o pastor marca *Incluir nomes*, com
+  aviso de que o arquivo passa a conter dados pessoais.
+- É a mesma caixa, com o mesmo texto, em todos: itinerário, histórico de
+  pregações, pauta e ata de comissão, relatório da Comissão de Nomeações e
+  relatório de encerramento de campanha.
 - Pedidos de oração, observações privadas e anotações não entram no padrão.
 - O itinerário da agenda e o histórico de pregações seguem a mesma regra: sem
   marcar, saem data, tipo, igreja e local; o título fica de fora porque é ali

@@ -37,7 +37,7 @@ contrário.
 
 | Ação | O que acontece | Como conferir |
 |---|---|---|
-| Apagar uma pessoa | Registro e o que era só dela viram exclusão; a citação dela sai de todo o resto, inclusive das respostas de entrevista dentro de visita de família, do processo de nomeações e da cópia guardada pela importação de listas | O perfil deixa de existir e a contagem da igreja cai |
+| Apagar uma pessoa | Registro e o que era só dela viram exclusão; a citação dela sai de todo o resto — respostas de entrevista dentro de visita de família, comissões, processo de nomeações, campanha, meta do planejamento e a cópia guardada pela importação de listas — e o histórico cifrado daqueles registros é expurgado aqui e no serviço | O perfil deixa de existir, a contagem da igreja cai e a fila de expurgo fica vazia depois da sincronização seguinte |
 | Encerrar distrito | Todos os registros do distrito são apagados no aparelho e a mesma exclusão cifrada é enfileirada para o serviço; o serviço revoga todos os aparelhos da conta, inclusive os que este aparelho nunca conheceu | A tela mostra a contagem antes e depois; a lista de aparelhos fica só com a autorização nova |
 | Sair da conta | A sessão **deste** aparelho é encerrada; os outros continuam abertos e os dados cifrados continuam no aparelho | Entrar de novo exige e-mail e senha; o outro aparelho segue como estava |
 | Revogar um aparelho | Aquele aparelho para de enviar, receber, perde o envelope de chave e deixa de alcançar qualquer envelope da conta — o token que ele já tinha na mão para de valer na hora | A tela de Segurança mostra "Revogado"; aquele aparelho recebe aviso e para |
@@ -46,9 +46,19 @@ Exclusão é registrada como operação de exclusão cifrada e propagada para os
 outros aparelhos na próxima sincronização. O histórico de operações do serviço
 guarda que houve uma exclusão — não o que foi excluído.
 
+**Expurgo.** Trocar o envelope por uma lápide resolve o presente e não toca no
+passado: cada versão anterior seguia guardada na fila de envio, nas revisões de
+conflito, na quarentena e no histórico do serviço, cifrada com a mesma chave que
+o titular usa todo dia. O expurgo local acontece na hora da exclusão; o do
+serviço entra em fila e roda logo depois de a lápide subir, porque apagá-lo
+antes deixaria os outros aparelhos sem saber da remoção. Sobra, de propósito, a
+lápide.
+
 **Limite honesto**: o que já foi baixado em um aparelho continua nele. Nenhuma
-revogação, exclusão ou encerramento alcança um aparelho fora do seu controle,
-nem um backup que já foi salvo em outro lugar.
+revogação, exclusão, encerramento ou expurgo alcança um aparelho fora do seu
+controle, nem um backup que já foi salvo em outro lugar. O serviço também
+continua sabendo que houve operações e quando — quantidade e carimbos nunca
+foram segredo.
 
 ## Pedidos do titular dos dados
 
@@ -57,8 +67,10 @@ o próprio pastor, pelo e-mail da conta dele.
 
 1. **Acesso**: perfil da pessoa → *Exportar dados* gera um documento legível com
    o cadastro e o conteúdo dos registros que falam somente dela. Dos registros
-   compartilhados com outras pessoas sai só a indicação de que existem: entregar
-   o conteúdo deles seria entregar dado de terceiro junto.
+   compartilhados sai uma versão redigida: o que o registro é e o que há sobre
+   quem pediu — nunca o que é de terceiro. O que sai ali é uma lista fechada de
+   campos de contexto, e não uma tentativa de remover o que é dos outros: a
+   regra inversa erra sempre que aparece um campo novo, e erra entregando.
 2. **Exclusão**: perfil da pessoa → *Apagar dados*, com prévia do que sai e
    confirmação dupla.
 3. **Correção**: edição direta no cadastro.

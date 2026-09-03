@@ -20,6 +20,15 @@ O conteúdo nasce no cliente, é cifrado antes de persistir e só é aberto em m
 9. A redefinição de senha pelo e-mail troca a senha do serviço; o cofre é
    reaberto com a chave de recuperação, porque o envelope antigo estava
    protegido pela senha perdida. Não há outro caminho — nem para o serviço.
+   A ordem importa: a sessão do link precisa ser da conta daquele e-mail e a
+   chave precisa abrir o envelope **antes** de a senha do serviço mudar. Com a
+   ordem invertida, uma chave digitada errada deixava o titular sem a senha
+   antiga e sem cofre.
+10. A troca de senha grava o envelope novo antes de o serviço saber dele.
+   Fechar o navegador entre a troca remota e a gravação deixava a conta com a
+   senha nova no serviço e o envelope antigo em todo lugar; a entrada seguinte
+   agora reconhece as três situações — não valeu, valeu pela metade, valeu
+   inteira — e conclui ou desfaz.
 
 ## Dados remotos permitidos
 
@@ -80,12 +89,25 @@ O cliente deixou de decidir se um aparelho está autorizado.
   nem descartada.
 - Conflito é decidido pela linhagem: só entra por cima o que foi editado sobre a
   versão que o aparelho tem. As duas versões ficam guardadas cifradas.
-- A escolha do pastor é publicada por cima da versão do outro aparelho, e a
-  exclusão feita lá pode ser aceita aqui. Sem isso, "ficar com a deste
+- A escolha do pastor é publicada por cima da versão do outro aparelho, nas
+  duas direções: a exclusão feita lá pode ser aceita aqui, e a exclusão feita
+  aqui sobe como lápide nova quando o outro aparelho mandou uma alteração. Sem isso, "ficar com a deste
   aparelho" só marcava a revisão como resolvida e os dois lados discordavam
   para sempre, em silêncio.
-- Uma rodada que para no teto de páginas devolve `incomplete` e a tela avisa. O
-  cursor fica guardado: sincronizar de novo continua de onde parou.
+- O recebimento percorre quantas páginas existirem. O teto antigo eram
+  cinquenta — dez mil operações — e a rodada parava ali dizendo "Dados
+  atualizados"; pior, carimbava a marca da primeira sincronização, que é o que
+  autoriza acreditar em uma lista vazia, e o pastor era mandado criar um
+  segundo distrito por cima do primeiro. A trava que restou vale só para o
+  serviço que diz ter mais página e não move o cursor.
+- Rodada incompleta devolve `incomplete`, não carimba a primeira
+  sincronização, não anuncia "Dados atualizados" e não libera a criação de
+  distrito.
+- **Limitação declarada**: `deviceId` não entra na assinatura. Quem o atribui é
+  o servidor, pela sessão — o valor enviado no corpo é ignorado de propósito —,
+  ele muda quando o aparelho é reautorizado, e não decide nada ao aplicar. A
+  limitação real é que quem controlasse o serviço poderia atribuir uma operação
+  ao aparelho errado; isso não muda o que é aplicado nem abre o conteúdo.
 - Falha de sincronização nunca é interpretada como conta vazia: um aparelho que
   ainda não recebeu os dados espera em uma tela própria.
 - Um registro local que não abre é pulado e contado, em vez de derrubar a
@@ -121,6 +143,25 @@ Pessoas, famílias, WhatsApp, nascimento, histórico, divergências de importaç
 - erros de aplicação não deixam pessoas parcialmente gravadas;
 - logs continuam limitados a códigos técnicos allowlisted e não recebem nomes, telefones, arquivos ou divergências.
 
+## Exclusão e expurgo
+
+Apagar um registro troca o envelope por uma lápide, e isso resolve o presente.
+O passado é outra coisa: cada versão anterior fica guardada na fila de envio,
+nas revisões de conflito, na quarentena e no histórico do serviço — cifrada com
+a mesma chave que o titular usa todo dia. Dizer a uma pessoa que os dados dela
+foram apagados enquanto isso permanece recuperável não seria verdade.
+
+- o expurgo local acontece na hora da exclusão;
+- o do serviço entra em fila e roda na sincronização seguinte, logo depois do
+  envio: apagar o histórico antes de a lápide subir deixaria os outros
+  aparelhos sem saber da remoção;
+- `purge_record_history` guarda apenas a operação mais recente de cada
+  registro, que é a lápide;
+- **o que o expurgo não alcança**: o que outro aparelho já baixou continua
+  nele, backups já salvos continuam com quem os salvou, e o serviço continua
+  sabendo que houve operações e quando. Nenhum aplicativo alcança isso, e
+  prometer o contrário seria mentira.
+
 ## Limites honestos
 
 - E2EE não oculta todos os metadados (volume, timestamps e identificadores).
@@ -128,6 +169,10 @@ Pessoas, famílias, WhatsApp, nascimento, histórico, divergências de importaç
 - E-mail e senha abrem o cofre também em uma nova instalação. O serviço guarda somente o envelope da chave mestra já cifrado pela senha; nunca recebe a senha ou o conteúdo pastoral em texto aberto.
 - Uma nova instalação é registrada como outro dispositivo após a entrada. Safari e o aplicativo instalado no iPhone são instalações independentes para esse controle.
 - A chave de recuperação é contingência para perda de acesso aos dispositivos; ela não é enviada por e-mail e não é o caminho normal de entrada em um aparelho novo.
+- Encerrar o distrito passa por um instante em que este aparelho não tem
+  autorização nenhuma. Esse trabalho começado fica gravado e uma tela própria o
+  conclui; antes, fechar o navegador ali deixava a conta abrindo no aparelho e
+  sem entrar mais no serviço, sem nada explicando.
 - Revogar um aparelho impede acesso futuro ao serviço, aos envelopes e à
   sincronização, inclusive com o token que ele já tinha emitido.
   **Não apaga o que já foi baixado naquele aparelho** — nenhum
@@ -158,6 +203,11 @@ Redefinir a senha usa o e-mail oficial do serviço. A chave de recuperação nun
 os aparelhos foram perdidos.
 
 ## Separação entre ambientes
+
+A conferência acontece **antes** de e-mail e senha saírem daqui: as duas
+funções que identificam o serviço respondem também a quem ainda não entrou.
+Antes ela vinha depois de autenticar, e nesse desenho uma build apontada para o
+projeto errado já tinha entregado a credencial do titular.
 
 Endereço do serviço, chave pública e projeto declarado precisam falar do mesmo
 projeto; qualquer divergência impede abrir a conexão. Declarar o projeto passou

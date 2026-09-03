@@ -4,7 +4,7 @@ Este roteiro é exclusivo para um projeto Supabase novo, vazio, privado e separa
 
 ## Preparação já feita localmente
 
-As migrations de `0001_marco_zero_up.sql` a `0004_sessao_revogada_e_ambiente_up.sql` mantêm somente metadados técnicos e conteúdo cifrado. Elas foram reforçadas para:
+As migrations de `0001_marco_zero_up.sql` a `0006_expurgo_de_historico_up.sql` mantêm somente metadados técnicos e conteúdo cifrado. Elas foram reforçadas para:
 
 - impedir que um envelope de uma conta aponte para dispositivo de outra conta;
 - aceitar novo envelope apenas para dispositivo ativo da mesma conta;
@@ -16,7 +16,9 @@ As migrations de `0001_marco_zero_up.sql` a `0004_sessao_revogada_e_ambiente_up.
 - barrar a sessão de um aparelho revogado nos envelopes de senha, de recuperação e de chave, e na lista de aparelhos — o token que ele já tinha na mão para de valer na hora, e não só quando expira;
 - revogar todos os aparelhos da conta em um único comando, que é o que o encerramento de distrito precisa;
 - exigir que o próprio banco declare se é homologação ou produção;
-- deixar toda tabela futura de `public` fora do alcance do navegador até alguém conceder explicitamente, e exigir que cada função traga o próprio `revoke`, conferido pela prova de isolamento.
+- deixar toda tabela futura de `public` fora do alcance do navegador até alguém conceder explicitamente, e exigir que cada função traga o próprio `revoke`, conferido pela prova de isolamento;
+- responder a versão do esquema e o ambiente declarado também a quem ainda não entrou, para a build conferir com quem está falando antes de mandar e-mail e senha;
+- apagar, por `purge_record_history`, as versões anteriores de um registro excluído, preservando apenas a lápide.
 
 Essas garantias têm testes estáticos e unitários locais. Ainda precisam ser comprovadas no Supabase de homologação; nenhuma migration foi aplicada remotamente nesta preparação.
 
@@ -35,7 +37,7 @@ Inserir os valores somente no computador privado do avaliador. Não versionar `.
 1. Confirmar que o CI Linux da branch passou integralmente, inclusive Playwright desktop e celular.
 2. Criar um projeto Supabase vazio e identificado claramente como homologação; conferir que não é produção.
 3. Em Auth, permitir somente as contas fictícias da rodada. Se necessário, desabilitar confirmação de e-mail apenas nesse projeto temporário.
-4. Aplicar, nesta ordem, `0001_marco_zero_up.sql`, `0002_password_key_envelopes_up.sql`, `0003_device_sessions_up.sql` e `0004_sessao_revogada_e_ambiente_up.sql`. Não aplicar os arquivos `*_down.sql` na validação normal.
+4. Aplicar, nesta ordem, `0001_marco_zero_up.sql`, `0002_password_key_envelopes_up.sql`, `0003_device_sessions_up.sql`, `0004_sessao_revogada_e_ambiente_up.sql`, `0005_ambiente_antes_da_senha_up.sql` e `0006_expurgo_de_historico_up.sql`. Não aplicar os arquivos `*_down.sql` na validação normal.
 5. Declarar o ambiente no próprio banco, uma única vez, pelo editor SQL do projeto:
 
    ```sql
@@ -67,6 +69,11 @@ Inserir os valores somente no computador privado do avaliador. Não versionar `.
 | Ambiente declarado | Apontar a build de homologação para um projeto sem a linha de ambiente, ou com `producao` | O aplicativo recusa sincronizar e diz por quê | A sincronização acontece |
 | Tabela futura | Criar uma tabela qualquer em `public` pelo editor SQL e consultá-la como conta fictícia | Acesso negado antes mesmo da RLS | A tabela responde ao navegador |
 | Função futura | Criar uma função qualquer em `public` e rodar `supabase/tests/01_rls_isolation.sql` | A prova reprova enquanto faltar o `revoke` da função | A prova passa com a função aberta a PUBLIC |
+| Ambiente antes da senha | Apontar a build para o projeto errado e tentar entrar | O aplicativo recusa antes de enviar e-mail e senha | A credencial chega ao serviço errado |
+| Expurgo | Apagar uma pessoa fictícia com histórico, sincronizar e inspecionar `encrypted_operations` | Sobra apenas a lápide daquele registro | Alguma versão anterior continua no serviço |
+| Encerramento interrompido | Fechar a aba entre revogar e reautorizar; abrir de novo | A tela oferece concluir e o aparelho volta a ter autorização | A conta abre e não entra mais no serviço |
+| Primeira sincronização grande | Conta com mais de 10.000 operações em um aparelho novo | Recebe tudo antes de dizer que está em dia; nunca oferece criar distrito | Diz "Dados atualizados" com dados faltando |
+| Documentos | Gerar pauta, ata, relatório de nomeações, itinerário, pregações e encerramento de campanha sem marcar nada | Nenhum identifica pessoas | Algum traz nome sem confirmação |
 | Conteúdo remoto | Sincronizar registro pastoral fictício e inspecionar tabelas | Somente IDs, versões, ciphertext, IV, AAD e timestamps; envelope de senha não contém senha nem chave legível | Qualquer conteúdo legível aparece |
 | Envio e recebimento | Alterar registro fictício no computador A e receber no celular A | Uma cópia lógica, sem duplicidade e com conteúdo correto após desbloqueio | Perda, duplicidade ou texto legível no transporte |
 | Isolamento do pull | Sincronizar A e executar pull como B | B não recebe operação de A | B recebe ID, envelope ou contagem de A |
