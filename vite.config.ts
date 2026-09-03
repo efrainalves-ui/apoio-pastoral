@@ -46,6 +46,20 @@ export default defineConfig({
     // um ambiente específico o declaram com vi.stubEnv.
     env: { VITE_SUPABASE_URL: '', VITE_SUPABASE_ANON_KEY: '', VITE_APP_ENV: '' },
     setupFiles: ['./src/test/setup.ts'],
+    // Folga real, e não margem de sorte.
+    //
+    // Uma execução isolada reprovou sem que ninguém soubesse qual teste tinha
+    // sido. A investigação achou o mecanismo: quatro testes rodam entre 1,5 e
+    // 3,9 segundos contra um teto padrão de 5 — e reduzir o teto para 2
+    // segundos reprova exatamente esses quatro. A margem existia, mas era fina
+    // o bastante para a carga da máquina consumir.
+    //
+    // O tempo limite é uma trava contra travamento, não uma medida de
+    // desempenho: apertá-lo não deixa a suíte mais rigorosa, só a deixa
+    // instável — e uma reprovação que ninguém reproduz é pior do que nenhuma,
+    // porque ensina a equipe a ignorar reprovação.
+    testTimeout: 20_000,
+    hookTimeout: 20_000,
     css: true,
     coverage: { provider: 'v8', reporter: ['text', 'html'] },
   },
