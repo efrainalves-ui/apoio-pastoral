@@ -347,8 +347,22 @@ select homologacao_testes.exigir(
     join pg_namespace n on n.oid = p.pronamespace
     cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) as a
     left join pg_roles r on r.oid = a.grantee
-    where n.nspname = 'public' and (a.grantee = 0 or r.rolname = 'anon')),
-  'nem anon nem PUBLIC executam qualquer função de public');
+    where n.nspname = 'public' and a.grantee = 0),
+  'PUBLIC não executa nenhuma função de public');
+
+-- Duas funções respondem a quem ainda não entrou, e só elas: são o que permite
+-- à build conferir com qual serviço está falando antes de mandar e-mail e
+-- senha. Uma devolve um número de versão, a outra a palavra `homologacao` ou
+-- `producao`. Qualquer terceira função aberta a anon reprova aqui.
+select homologacao_testes.exigir(
+  (select coalesce(array_agg(distinct p.proname order by p.proname), '{}')
+   from pg_proc p
+   join pg_namespace n on n.oid = p.pronamespace
+   cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) as a
+   join pg_roles r on r.oid = a.grantee
+   where n.nspname = 'public' and r.rolname = 'anon')
+  = array['app_environment', 'app_schema_version']::name[],
+  'anon executa apenas as duas funções que identificam o serviço');
 
 -- Por nome, e não por contagem: uma função definidora nova precisa ser uma
 -- decisão consciente, escrita aqui. Contar só avisaria que o número mudou.

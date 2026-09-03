@@ -37,6 +37,7 @@ psql_run -f "$migrations/0001_marco_zero_up.sql"
 psql_run -f "$migrations/0002_password_key_envelopes_up.sql"
 psql_run -f "$migrations/0003_device_sessions_up.sql"
 psql_run -f "$migrations/0004_sessao_revogada_e_ambiente_up.sql"
+psql_run -f "$migrations/0005_ambiente_antes_da_senha_up.sql"
 
 tabelas="$(contar_tabelas)"
 if [ "$tabelas" -ne 8 ]; then
@@ -51,6 +52,7 @@ psql_run -f "$testes/02_device_barriers.sql"
 psql_run -f "$testes/03_sessao_revogada.sql"
 
 echo "==> 4/6 Revertendo as migrations"
+psql_run -f "$migrations/0005_ambiente_antes_da_senha_down.sql"
 psql_run -f "$migrations/0004_sessao_revogada_e_ambiente_down.sql"
 psql_run -f "$migrations/0003_device_sessions_down.sql"
 psql_run -f "$migrations/0002_password_key_envelopes_down.sql"
@@ -83,6 +85,7 @@ psql_run -f "$migrations/0001_marco_zero_up.sql"
 psql_run -f "$migrations/0002_password_key_envelopes_up.sql"
 psql_run -f "$migrations/0003_device_sessions_up.sql"
 psql_run -f "$migrations/0004_sessao_revogada_e_ambiente_up.sql"
+psql_run -f "$migrations/0005_ambiente_antes_da_senha_up.sql"
 
 tabelas="$(contar_tabelas)"
 if [ "$tabelas" -ne 8 ]; then

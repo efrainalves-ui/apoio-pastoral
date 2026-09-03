@@ -58,6 +58,7 @@ export interface RemoteRegistration {
  * seguir gravando envelopes pela metade.
  */
 export async function registerRemoteAccount(email: string, password: string): Promise<RemoteRegistration> {
+  await assertServiceIdentity()
   const { data, error } = await getSupabaseClient().auth.signUp({ email, password })
   if (error) {
     if (/already registered|already exists|User already/iu.test(error.message)) {
@@ -105,6 +106,11 @@ export async function currentRemoteAccountId(): Promise<string | null> {
 }
 
 export async function signInRemoteAccount(email: string, password: string): Promise<string> {
+  // Antes de mandar e-mail e senha, conferir para quem se está mandando. Esta
+  // conferência ficava depois da autenticação, e nesse desenho uma build
+  // apontada para o projeto errado entregava a credencial do titular a um
+  // serviço que não era o dele e só depois reclamava.
+  await assertServiceIdentity()
   const { data, error } = await getSupabaseClient().auth.signInWithPassword({ email, password })
   if (error) {
     if (/email not confirmed|not confirmed/iu.test(error.message)) {
@@ -117,7 +123,6 @@ export async function signInRemoteAccount(email: string, password: string): Prom
   // errado já teria buscado e gravado envelopes lá. Só dá para perguntar
   // depois de autenticar, porque as funções do serviço não respondem a quem
   // ainda não entrou.
-  await assertServiceSchema()
   return data.user.id
 }
 
@@ -180,6 +185,17 @@ let servicoConferido = false
  * precisam bater. Um banco que não declara nada não recebe sincronização.
  */
 export async function assertServiceSchema(): Promise<void> {
+  await assertServiceIdentity()
+}
+
+/**
+ * A mesma conferência, com o nome que diz quando ela precisa acontecer: antes
+ * de qualquer credencial sair daqui. As duas funções que ela consulta são as
+ * únicas que o serviço responde a quem ainda não entrou, e nenhuma delas
+ * revela nada — uma devolve um número de versão, a outra a palavra
+ * `homologacao` ou `producao`.
+ */
+export async function assertServiceIdentity(): Promise<void> {
   if (!hasSupabaseConfiguration || servicoConferido) return
   const versao = await remoteSchemaVersion()
   if (versao === null) return

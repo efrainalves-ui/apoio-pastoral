@@ -217,3 +217,122 @@ describe('senha trocada em outro aparelho', () => {
     await expect(session.unlockAccount(EMAIL, 'senha-ficticia-que-nao-e-2029', database)).rejects.toThrow()
   })
 })
+
+describe('a redefinição confere antes de mexer na conta', () => {
+  it('não troca a senha do serviço quando a chave de recuperação está errada', async () => {
+    // Antes a senha do serviço era trocada primeiro. Com a chave errada, o
+    // titular ficava com a senha antiga já inválida e um cofre que nenhuma
+    // senha abria — a conta inteira perdida por um erro de digitação.
+    const { servico, chamadas, database, session } = await carregar()
+    await contaInstalada(database, 'senha-ficticia-antiga-2026')
+
+    await expect(session.completePasswordReset(EMAIL, 'CHAVE-FICTICIA-ERRADA', 'senha-ficticia-nova-2027', database)).rejects.toThrow()
+
+    expect(servico.senhaDoServico).toBe('senha-ficticia-antiga-2026')
+    expect(chamadas.atualizacoesDeSenha).toHaveLength(0)
+  })
+
+  it('não troca a senha quando o link é de outra conta do serviço', async () => {
+    const { servico, chamadas, database, session } = await carregar()
+    const { recoveryCode } = await contaInstalada(database, 'senha-ficticia-antiga-2026')
+    // A conta local deste e-mail existe, mas a sessão aberta pelo link é de
+    // outra conta: trocar a senha aqui trocaria a senha da conta errada.
+    await database.accounts.put({ id: 'outra-conta-ficticia', email: 'outro.ficticio@example.invalid', createdAt: new Date().toISOString(), authMode: 'supabase' })
+
+    await expect(session.completePasswordReset('outro.ficticio@example.invalid', recoveryCode, 'senha-ficticia-nova-2027', database))
+      .rejects.toThrow('de outra conta')
+
+    expect(servico.senhaDoServico).toBe('senha-ficticia-antiga-2026')
+    expect(chamadas.atualizacoesDeSenha).toHaveLength(0)
+  })
+
+  it('com a chave certa, troca a senha e reabre o cofre', async () => {
+    const { servico, database, session } = await carregar()
+    const { recoveryCode } = await contaInstalada(database, 'senha-ficticia-antiga-2026')
+
+    const resultado = await session.completePasswordReset(EMAIL, recoveryCode, 'senha-ficticia-nova-2027', database)
+
+    expect(servico.senhaDoServico).toBe('senha-ficticia-nova-2027')
+    expect(resultado.account.id).toBe(CONTA)
+    const guardado = await database.keyEnvelopes.get(keyEnvelopeId(CONTA, 'password'))
+    await expect(openPasswordEnvelope(guardado!.envelope as never, 'senha-ficticia-nova-2027')).resolves.toBeDefined()
+  })
+})
+
+describe('troca de senha interrompida entre o serviço e o envelope', () => {
+  /** O aparelho desliga logo depois de o serviço aceitar a senha nova. */
+  async function trocaInterrompida() {
+    const carga = await carregar()
+    await contaInstalada(carga.database, 'senha-ficticia-antiga-2026')
+    const conta = (await carga.database.accounts.get(CONTA))!
+    // Falha ao guardar o envelope e falha ao desfazer: é exatamente o instante
+    // em que o navegador fechado deixaria a conta partida.
+    carga.servico.falharAoGuardarEnvelope = true
+    carga.servico.falharAoVoltarSenha = true
+    await carga.session.changeVaultPassword(conta, 'senha-ficticia-antiga-2026', 'senha-ficticia-nova-2027', carga.database).catch(() => undefined)
+    return carga
+  }
+
+  it('o envelope da senha nova fica guardado antes de o serviço saber dela', async () => {
+    const { database, session, servico } = await carregar()
+    await contaInstalada(database, 'senha-ficticia-antiga-2026')
+    const conta = (await database.accounts.get(CONTA))!
+    servico.falharAoGuardarEnvelope = true
+    servico.falharAoVoltarSenha = true
+
+    await session.changeVaultPassword(conta, 'senha-ficticia-antiga-2026', 'senha-ficticia-nova-2027', database).catch(() => undefined)
+
+    // Guardado com a senha nova, e o serviço também já está com ela.
+    expect(servico.senhaDoServico).toBe('senha-ficticia-nova-2027')
+    const guardado = await database.keyEnvelopes.get(keyEnvelopeId(CONTA, 'password'))
+    await expect(openPasswordEnvelope(guardado!.envelope as never, 'senha-ficticia-nova-2027')).resolves.toBeDefined()
+  })
+
+  it('a entrada seguinte com a senha nova conclui o que faltava, sem rede no meio', async () => {
+    const { database, session, servico } = await trocaInterrompida()
+    // O serviço volta a responder: a pendência sobe sozinha.
+    servico.falharAoGuardarEnvelope = false
+
+    const resultado = await session.unlockAccount(EMAIL, 'senha-ficticia-nova-2027', database)
+
+    expect(resultado.account.id).toBe(CONTA)
+    expect(servico.envelopeGuardado).toBeTruthy()
+    expect((await database.keyEnvelopes.get(keyEnvelopeId(CONTA, 'password')))?.pendingRemote).toBe(false)
+  })
+
+  it('mesmo com o aparelho reiniciado no meio, a conta abre com a senha nova', async () => {
+    // O aparelho desliga entre a senha remota e a gravação do envelope: só o
+    // registro pendente sobrevive, e é ele que devolve o acesso.
+    const { database, session, servico } = await carregar()
+    const { passwordEnvelope } = await contaInstalada(database, 'senha-ficticia-antiga-2026')
+    const conta = (await database.accounts.get(CONTA))!
+    servico.falharAoGuardarEnvelope = true
+    servico.falharAoVoltarSenha = true
+    await session.changeVaultPassword(conta, 'senha-ficticia-antiga-2026', 'senha-ficticia-nova-2027', database).catch(() => undefined)
+    // Reinício bruto: o envelope corrente volta a ser o antigo, como estaria se
+    // a gravação final nunca tivesse acontecido. Sobra a pendência.
+    await database.keyEnvelopes.put({ id: keyEnvelopeId(CONTA, 'password'), kind: 'password', accountId: CONTA, envelope: passwordEnvelope, updatedAt: new Date().toISOString() })
+    await database.keyEnvelopes.put({ id: `${CONTA}:password-pendente`, kind: 'password', accountId: CONTA, envelope: (await createPasswordEnvelope(generateMasterSecret(), 'irrelevante-ficticia-2026')), updatedAt: new Date().toISOString(), pendingRemote: true })
+
+    // Com a pendência de outro segredo, ela não abre e o serviço é consultado.
+    servico.falharAoGuardarEnvelope = false
+    servico.envelopeGuardado = await createPasswordEnvelope(generateMasterSecret(), 'senha-ficticia-nova-2027')
+    servico.senhaDoServico = 'senha-ficticia-nova-2027'
+
+    await expect(session.unlockAccount(EMAIL, 'senha-ficticia-nova-2027', database)).resolves.toBeDefined()
+    expect(await database.keyEnvelopes.get(`${CONTA}:password-pendente`)).toBeUndefined()
+  })
+
+  it('quando a troca não chegou ao serviço, a senha antiga continua valendo e a pendência sai', async () => {
+    const { database, session, servico } = await carregar({ falharAoGuardarEnvelope: true })
+    await contaInstalada(database, 'senha-ficticia-antiga-2026')
+    const conta = (await database.accounts.get(CONTA))!
+
+    // Aqui a volta atrás dá certo: o serviço fica com a senha antiga.
+    await session.changeVaultPassword(conta, 'senha-ficticia-antiga-2026', 'senha-ficticia-nova-2027', database).catch(() => undefined)
+    expect(servico.senhaDoServico).toBe('senha-ficticia-antiga-2026')
+
+    await expect(session.unlockAccount(EMAIL, 'senha-ficticia-antiga-2026', database)).resolves.toBeDefined()
+    expect(await database.keyEnvelopes.get(`${CONTA}:password-pendente`)).toBeUndefined()
+  })
+})

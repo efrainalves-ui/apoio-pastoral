@@ -105,7 +105,7 @@ describe('o serviço precisa declarar o próprio ambiente', () => {
     vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'chave-publica-ficticia')
     vi.stubEnv('VITE_SUPABASE_PROJECT_REF', 'homolog-fake')
     const rpc = vi.fn((nome: string) => Promise.resolve({
-      data: nome === 'app_schema_version' ? 4 : ambienteDoBanco,
+      data: nome === 'app_schema_version' ? 5 : ambienteDoBanco,
       error: null,
     }))
     vi.doMock('@supabase/supabase-js', () => ({ createClient: () => ({ rpc, auth: {} }) }))
@@ -130,5 +130,35 @@ describe('o serviço precisa declarar o próprio ambiente', () => {
     const { supabase } = await carregarServico('homologacao', null)
 
     await expect(supabase.assertServiceSchema()).rejects.toThrow(/não declara/u)
+  })
+
+  it('confere a identidade do serviço antes de mandar e-mail e senha', async () => {
+    // O buraco: a conferência acontecia depois de autenticar. Uma build
+    // apontada para o projeto errado entregava a credencial do titular a um
+    // serviço que não era o dele e só então reclamava.
+    const ordem: string[] = []
+    vi.resetModules()
+    vi.stubEnv('VITE_APP_ENV', 'producao')
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://homolog-fake.supabase.co')
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'chave-publica-ficticia')
+    vi.stubEnv('VITE_SUPABASE_PROJECT_REF', 'homolog-fake')
+    vi.doMock('@supabase/supabase-js', () => ({
+      createClient: () => ({
+        rpc: (nome: string) => { ordem.push(`rpc:${nome}`); return Promise.resolve({ data: nome === 'app_schema_version' ? 5 : 'homologacao', error: null }) },
+        auth: {
+          signInWithPassword: () => { ordem.push('senha-enviada'); return Promise.resolve({ data: { user: { id: 'x' } }, error: null }) },
+          signUp: () => { ordem.push('senha-enviada'); return Promise.resolve({ data: { user: { id: 'x' }, session: {} }, error: null }) },
+        },
+      }),
+    }))
+    const supabase = await import('./supabase')
+
+    await expect(supabase.signInRemoteAccount('conta.ficticia@example.invalid', 'senha-ficticia-2026'))
+      .rejects.toThrow(/ambientes diferentes/u)
+    await expect(supabase.registerRemoteAccount('conta.ficticia@example.invalid', 'senha-ficticia-2026'))
+      .rejects.toThrow(/ambientes diferentes/u)
+
+    expect(ordem).not.toContain('senha-enviada')
+    expect(ordem[0]).toBe('rpc:app_schema_version')
   })
 })

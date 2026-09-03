@@ -167,7 +167,7 @@ select homologacao_testes.exigir(
   public.app_environment() = 'homologacao',
   'com a linha escrita pelo responsável, o banco declara o ambiente');
 select homologacao_testes.exigir(
-  public.app_schema_version() = 4,
+  public.app_schema_version() = 5,
   'a versão do esquema acompanha esta migration');
 
 reset role;
@@ -194,10 +194,31 @@ select homologacao_testes.exigir(
 drop table public.tabela_futura_ficticia;
 
 -- Para funções a promessa é outra, e é preciso ser exato: o PostgreSQL concede
--- EXECUTE a PUBLIC em toda função nova, e o `alter default privileges` não
--- alcançou esse caso — foi o CI que mostrou. Então o que se prova aqui não é
--- que a função nasce fechada, e sim que a conferência de 01 pega uma função
--- deixada aberta. É ela que obriga cada função a trazer o próprio `revoke`.
+-- EXECUTE a PUBLIC em toda função nova. O que se prova aqui é que a conferência
+-- de 01 pega uma função deixada aberta — é ela que obriga cada função a trazer
+-- o próprio `revoke`. O aviso abaixo mostra o estado real dos privilégios
+-- padrão, para a afirmação na documentação continuar batendo com o banco.
+do $$
+declare
+  padrao text;
+  concedido text;
+begin
+  select coalesce(string_agg(format('%s:%s', d.defaclobjtype, d.defaclacl::text), ' | '), 'nenhum')
+    into padrao
+  from pg_default_acl d
+  join pg_namespace n on n.oid = d.defaclnamespace
+  where n.nspname = 'public';
+  raise notice 'diagnóstico: privilégios padrão em public = %', padrao;
+
+  execute 'create function public.funcao_diagnostico_ficticia() returns integer language sql immutable as $f$ select 1 $f$';
+  select coalesce(p.proacl::text, 'nulo (padrão embutido: EXECUTE para PUBLIC)') into concedido
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname = 'funcao_diagnostico_ficticia';
+  raise notice 'diagnóstico: função nova nasce com acl = %', concedido;
+  execute 'drop function public.funcao_diagnostico_ficticia()';
+end;
+$$;
+
 create function public.funcao_futura_ficticia() returns integer language sql immutable as $$ select 1 $$;
 select homologacao_testes.exigir(
   exists (

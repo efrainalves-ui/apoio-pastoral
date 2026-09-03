@@ -7,7 +7,7 @@ import { FamilyBudgetDatabase } from '../family-budget/database'
 import { VaultRepository } from '../db/repository'
 import { ReadingDatabase } from '../reading/database'
 import { ReadingService } from '../reading/service'
-import { CloseDistrictService, isPersonalRecord, type CloseDistrictRemote } from './closeDistrict'
+import { CloseDistrictService, isPersonalRecord, pendingDistrictClosure, resumeDistrictClosure, type CloseDistrictRemote } from './closeDistrict'
 
 vi.mock('../auth/supabase', async (importarOriginal) => ({
   ...await importarOriginal<Record<string, unknown>>(),
@@ -194,5 +194,56 @@ describe('encerrar distrito', () => {
 
     expect(resultado.revokedDevices).toBe(1)
     expect((await banco.devices.get(antigo))?.status).toBe('revoked')
+  })
+
+  it('deixa marca do encerramento e a retira quando a autorização nova está de pé', async () => {
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    await distritoFicticio(banco, chave)
+    await banco.devices.put({ id: currentDeviceId(CONTA), accountId: CONTA, label: 'Computador', status: 'active', createdAt: '', lastSeenAt: '' })
+    const servico: CloseDistrictRemote = { listDevices: () => Promise.resolve(null), revokeAll: () => Promise.resolve(2) }
+
+    await new CloseDistrictService(banco, servico).close(CONTA, chave)
+
+    expect(await pendingDistrictClosure(CONTA, banco)).toBe(false)
+  })
+
+  it('retoma o encerramento interrompido e devolve autorização a este aparelho', async () => {
+    // O instante perigoso: os aparelhos já foram revogados e este ainda não
+    // recebeu autorização nova. Fechar o navegador aí deixava a conta abrindo
+    // no aparelho e sem entrar mais no serviço, sem nada na tela.
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    await distritoFicticio(banco, chave)
+    const antigo = currentDeviceId(CONTA)
+    await banco.devices.put({ id: antigo, accountId: CONTA, label: 'Computador', status: 'revoked', createdAt: '', lastSeenAt: '', revokedAt: new Date().toISOString() })
+    await banco.pendingActions.put({ id: `${CONTA}:close_district`, accountId: CONTA, kind: 'close_district', createdAt: new Date().toISOString(), stage: 'reauthorizing' })
+
+    expect(await pendingDistrictClosure(CONTA, banco)).toBe(true)
+    const { newDeviceId } = await resumeDistrictClosure(CONTA, banco, () => Promise.resolve(0))
+
+    expect(newDeviceId).not.toBe(antigo)
+    expect((await banco.devices.get(newDeviceId))?.status).toBe('active')
+    expect(currentDeviceId(CONTA)).toBe(newDeviceId)
+    expect(await pendingDistrictClosure(CONTA, banco)).toBe(false)
+  })
+
+  it('retoma também quando parou antes de revogar, e não trava se o serviço recusar', async () => {
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    await distritoFicticio(banco, chave)
+    const antigo = currentDeviceId(CONTA)
+    await banco.devices.put({ id: antigo, accountId: CONTA, label: 'Computador', status: 'active', createdAt: '', lastSeenAt: '' })
+    await banco.pendingActions.put({ id: `${CONTA}:close_district`, accountId: CONTA, kind: 'close_district', createdAt: new Date().toISOString(), stage: 'revoking' })
+
+    // O serviço recusa porque este aparelho já estava revogado lá: a retomada
+    // segue para a autorização nova em vez de travar.
+    const { newDeviceId } = await resumeDistrictClosure(CONTA, banco, () => Promise.reject(new Error('aparelho sem autorizacao ativa')))
+
+    expect((await banco.devices.get(antigo))?.status).toBe('revoked')
+    expect((await banco.devices.get(newDeviceId))?.status).toBe('active')
+    expect(await pendingDistrictClosure(CONTA, banco)).toBe(false)
+  })
+
+  it('não retoma o que não começou', async () => {
+    const banco = novoBanco()
+    await expect(resumeDistrictClosure(CONTA, banco, () => Promise.resolve(0))).rejects.toThrow('não há encerramento pendente'.replace('não h', 'Não h'))
   })
 })

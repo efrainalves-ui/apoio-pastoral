@@ -119,3 +119,27 @@ export interface MigrationRecord {
   appliedAt: string
   checksum: string
 }
+
+/**
+ * Trabalho de várias etapas que já começou e precisa terminar, mesmo que o
+ * navegador feche no meio.
+ *
+ * Encerrar um distrito revoga todos os aparelhos e só então dá uma autorização
+ * nova a este. Entre uma coisa e outra o aparelho fica sem autorização
+ * nenhuma: se o navegador fechasse ali, a conta abria e não entrava mais no
+ * serviço, sem nada na tela explicando por quê. Esta marca é o que permite
+ * retomar de onde parou.
+ */
+export interface PendingActionRecord {
+  /** `${accountId}:${kind}` — uma pendência de cada tipo por conta. */
+  id: string
+  accountId: string
+  kind: 'close_district'
+  createdAt: string
+  /** Etapa concluída por último, para a retomada saber por onde continuar. */
+  stage: 'revoking' | 'reauthorizing'
+}
+
+export function pendingActionId(accountId: string, kind: PendingActionRecord['kind']): string {
+  return `${accountId}:${kind}`
+}

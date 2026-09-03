@@ -4,6 +4,7 @@ import { currentDeviceId } from '../auth/device'
 import { DeviceApprovalPage } from '../pages/DeviceApprovalPage'
 import { db } from '../db/database'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { pendingDistrictClosure } from '../district/closeDistrict'
 import { SyncService, firstSyncPending } from '../sync/service'
 import { createSyncTransport } from '../sync/transport'
 import { AppShell } from '../components/AppShell'
@@ -15,6 +16,7 @@ import { ChurchDetailPage } from '../pages/ChurchDetailPage'
 import { ChurchFormPage } from '../pages/ChurchFormPage'
 import { DistrictPage } from '../pages/DistrictPage'
 import { InitialSetupPage } from '../pages/InitialSetupPage'
+import { ResumeClosurePage } from '../pages/ResumeClosurePage'
 import { FamiliesPage } from '../pages/FamiliesPage'
 import { FamilyDetailPage } from '../pages/FamilyDetailPage'
 import { FamilyFormPage } from '../pages/FamilyFormPage'
@@ -118,6 +120,25 @@ export function useDistrictPresence(): DistrictPresence {
 }
 
 /**
+ * Encerramento de distrito interrompido no instante em que este aparelho ficou
+ * sem autorização nenhuma. Vem antes de tudo: nenhuma outra verificação faz
+ * sentido enquanto o aparelho não voltar a ter autorização.
+ */
+function usePendingClosure(): { pending: boolean | null; done: () => void } {
+  const { account, masterKey, recoveryCode } = useAuthVault()
+  const [pending, setPending] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    if (!account || !masterKey || recoveryCode) return
+    let cancelled = false
+    void pendingDistrictClosure(account.id).then((existe) => { if (!cancelled) setPending(existe) })
+    return () => { cancelled = true }
+  }, [account, masterKey, recoveryCode])
+
+  return { pending, done: () => setPending(false) }
+}
+
+/**
  * Uma instalação nova abre o cofre com a senha, mas fica aguardando a
  * confirmação de um aparelho já ativo antes de sincronizar. Esta checagem vem
  * antes da do distrito: sem ela, o aparelho pendente tentaria sincronizar, não
@@ -155,9 +176,12 @@ function SyncPending() {
 
 function SetupAccess({ children }: { children: ReactNode }) {
   const { masterKey, recoveryCode } = useAuthVault()
+  const encerramento = usePendingClosure()
   const { pending, approve } = useCurrentDeviceApproval()
   const hasDistrict = useDistrictPresence()
   if (!masterKey || recoveryCode) return <Navigate to="/acesso" replace />
+  if (encerramento.pending === null) return <div className="app-loading" role="status">Preparando seu distrito…</div>
+  if (encerramento.pending) return <ResumeClosurePage onDone={encerramento.done} />
   if (pending === null) return <div className="app-loading" role="status">Preparando seu distrito…</div>
   if (pending) return <DeviceApprovalPage onApproved={approve} />
   if (hasDistrict === null) return <div className="app-loading" role="status">Preparando seu distrito…</div>
@@ -167,9 +191,12 @@ function SetupAccess({ children }: { children: ReactNode }) {
 
 function ProtectedApp() {
   const { masterKey, recoveryCode } = useAuthVault()
+  const encerramento = usePendingClosure()
   const { pending, approve } = useCurrentDeviceApproval()
   const hasDistrict = useDistrictPresence()
   if (!masterKey || recoveryCode) return <Navigate to="/acesso" replace />
+  if (encerramento.pending === null) return <div className="app-loading" role="status">Preparando sua área…</div>
+  if (encerramento.pending) return <ResumeClosurePage onDone={encerramento.done} />
   if (pending === null) return <div className="app-loading" role="status">Preparando sua área…</div>
   if (pending) return <DeviceApprovalPage onApproved={approve} />
   if (hasDistrict === null) return <div className="app-loading" role="status">Preparando sua área…</div>

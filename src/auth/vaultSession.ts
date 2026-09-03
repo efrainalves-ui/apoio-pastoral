@@ -10,6 +10,19 @@ import {
 } from '../crypto/vault'
 import { db, type ApoioDatabase } from '../db/database'
 import { keyEnvelopeId, type AccountRecord, type KeyEnvelopeRecord } from '../db/types'
+
+/**
+ * Envelope da senha nova, guardado antes de o serviço saber dela.
+ *
+ * Existe para o intervalo entre trocar a senha no serviço e gravar o envelope
+ * que a acompanha. Se o navegador fecha ou o aparelho reinicia bem aí, sem
+ * este registro a conta ficava com a senha nova no serviço e o envelope antigo
+ * em todo lugar — e nenhuma senha abria o cofre. Com ele, a entrada seguinte
+ * reconhece a situação e conclui ou desfaz.
+ */
+function pendingPasswordId(accountId: string): string {
+  return `${accountId}:password-pendente`
+}
 import { authorizeCurrentDevice } from './device'
 import {
   hasSupabaseConfiguration,
@@ -199,9 +212,26 @@ async function abrirEnvelopeDeSenha(
   database: ApoioDatabase,
 ): Promise<VaultKeys> {
   if (envelopeRecord.envelope.kind !== 'password') throw new Error('Envelope de senha indisponível.')
+  const pendente = await database.keyEnvelopes.get(pendingPasswordId(account.id))
+
   try {
-    return await openPasswordEnvelope(envelopeRecord.envelope, password)
+    const keys = await openPasswordEnvelope(envelopeRecord.envelope, password)
+    // A senha que o serviço acabou de aceitar é a antiga: a troca não chegou a
+    // valer lá. O envelope guardado antes dela não serve mais para nada.
+    if (pendente) await database.keyEnvelopes.delete(pendingPasswordId(account.id))
+    return keys
   } catch (falha) {
+    // Troca de senha interrompida no meio: o serviço aceitou esta senha e o
+    // envelope que a acompanha é o que ficou guardado antes da troca. Concluir
+    // agora é o que devolve a conta ao estado inteiro.
+    if (pendente?.envelope.kind === 'password') {
+      try {
+        const keys = await openPasswordEnvelope(pendente.envelope, password)
+        await database.keyEnvelopes.put({ ...envelopeRecord, envelope: pendente.envelope, updatedAt: new Date().toISOString(), pendingRemote: true })
+        await database.keyEnvelopes.delete(pendingPasswordId(account.id))
+        return keys
+      } catch { /* não era esta; segue para o envelope do serviço */ }
+    }
     if (account.authMode !== 'supabase' || !hasSupabaseConfiguration) throw falha
     let remoto
     try {
@@ -209,8 +239,74 @@ async function abrirEnvelopeDeSenha(
     } catch { throw falha }
     const keys = await openPasswordEnvelope(remoto, password)
     await database.keyEnvelopes.put({ ...envelopeRecord, envelope: remoto, updatedAt: new Date().toISOString(), pendingRemote: false })
+    await database.keyEnvelopes.delete(pendingPasswordId(account.id))
     return keys
   }
+}
+
+/**
+ * Como a senha do serviço será acertada nesta recuperação.
+ *
+ * A ordem importa e é a razão de existir esta estrutura: a chave de
+ * recuperação precisa conferir **antes** de qualquer alteração remota. Antes,
+ * a conclusão pelo link do e-mail trocava a senha do serviço primeiro e só
+ * depois pedia a chave; com a chave errada, o pastor ficava com a senha antiga
+ * já inválida e um cofre que nenhuma senha abria.
+ */
+interface PlanoDeRecuperacao {
+  /** Senha que o serviço aceita agora, quando ela é conhecida. */
+  currentPassword?: string
+  /** Trocar a senha do serviço, sempre depois de a chave conferir. */
+  setRemotePassword: boolean
+}
+
+async function recuperarComChave(
+  email: string,
+  recoveryCode: string,
+  newPassword: string,
+  database: ApoioDatabase,
+  plano: PlanoDeRecuperacao,
+): Promise<{ account: AccountRecord; keys: VaultKeys }> {
+  const problema = passwordProblem(newPassword)
+  if (problema) throw new Error(problema)
+  const normalizedEmail = email.trim().toLowerCase()
+  let account = await database.accounts.where('email').equals(normalizedEmail).first()
+  let recoveryEnvelope
+  if (!account && hasSupabaseConfiguration) {
+    // Aparelho que não conhece a conta. A sessão já aberta pelo link do e-mail
+    // serve de prova; sem ela, entra com a senha que o serviço aceita hoje.
+    const daSessao = await currentRemoteAccountId()
+    const accountId = daSessao ?? await signInRemoteAccount(normalizedEmail, plano.currentPassword ?? newPassword)
+    recoveryEnvelope = await fetchRemoteRecoveryEnvelope()
+    account = { id: accountId, email: normalizedEmail, createdAt: new Date().toISOString(), authMode: 'supabase' }
+    await database.accounts.put(account)
+    await database.keyEnvelopes.put({ id: keyEnvelopeId(accountId, 'recovery'), kind: 'recovery', accountId, envelope: recoveryEnvelope, updatedAt: new Date().toISOString() })
+    await database.syncState.put({ accountId, cursor: null, lastSyncedAt: null, firstSyncAt: null })
+  } else {
+    const recoveryRecord = await database.keyEnvelopes.get(keyEnvelopeId(account?.id ?? '', 'recovery'))
+    if (!recoveryRecord || recoveryRecord.accountId !== account?.id || recoveryRecord.envelope.kind !== 'recovery') throw new Error('Envelope de recuperação indisponível.')
+    recoveryEnvelope = recoveryRecord.envelope
+  }
+  if (!account) throw new Error('Conta não encontrada neste dispositivo.')
+
+  // A prova vem primeiro. Uma chave errada para aqui, com a conta exatamente
+  // como estava: nem a senha do serviço nem o envelope foram tocados.
+  const { keys, secret } = await openRecoveryVault(recoveryEnvelope, recoveryCode)
+  const passwordEnvelope = await createPasswordEnvelope(secret, newPassword)
+  secret.fill(0)
+
+  if (account.authMode === 'supabase' && hasSupabaseConfiguration) {
+    await assertRemoteSessionMatches(account)
+    // Ordem que aguenta interrupção: primeiro a senha do serviço, depois o
+    // envelope que abre o cofre com ela. Se parar no meio, a próxima tentativa
+    // repete os dois passos com o mesmo resultado.
+    if (plano.setRemotePassword) await updateRemotePassword(newPassword)
+    await storeRemotePasswordEnvelope(passwordEnvelope)
+  }
+  await database.keyEnvelopes.put({ id: keyEnvelopeId(account.id, 'password'), kind: 'password', accountId: account.id, envelope: passwordEnvelope, updatedAt: new Date().toISOString() })
+  await database.keyEnvelopes.delete(pendingPasswordId(account.id))
+  await authorizeCurrentDevice(account.id, database)
+  return { account, keys }
 }
 
 /**
@@ -227,43 +323,10 @@ export async function recoverAccount(
   database: ApoioDatabase = db,
   currentPassword: string = newPassword,
 ): Promise<{ account: AccountRecord; keys: VaultKeys }> {
-  const problema = passwordProblem(newPassword)
-  if (problema) throw new Error(problema)
-  const normalizedEmail = email.trim().toLowerCase()
-  let account = await database.accounts.where('email').equals(normalizedEmail).first()
-  let recoveryEnvelope
-  if (!account && hasSupabaseConfiguration) {
-    // Aparelho que não conhece a conta: entra no serviço com a senha atual
-    // (a que o pastor acabou de definir pelo e-mail de redefinição) e busca o
-    // envelope de recuperação. Antes tentava entrar com a senha nova, que o
-    // serviço ainda não conhecia, e a recuperação nunca completava.
-    const accountId = await signInRemoteAccount(normalizedEmail, currentPassword)
-    recoveryEnvelope = await fetchRemoteRecoveryEnvelope()
-    account = { id: accountId, email: normalizedEmail, createdAt: new Date().toISOString(), authMode: 'supabase' }
-    await database.accounts.put(account)
-    await database.keyEnvelopes.put({ id: keyEnvelopeId(accountId, 'recovery'), kind: 'recovery', accountId, envelope: recoveryEnvelope, updatedAt: new Date().toISOString() })
-    await database.syncState.put({ accountId, cursor: null, lastSyncedAt: null, firstSyncAt: null })
-  } else {
-    const recoveryRecord = await database.keyEnvelopes.get(keyEnvelopeId(account?.id ?? '', 'recovery'))
-    if (!recoveryRecord || recoveryRecord.accountId !== account?.id || recoveryRecord.envelope.kind !== 'recovery') throw new Error('Envelope de recuperação indisponível.')
-    recoveryEnvelope = recoveryRecord.envelope
-  }
-  if (!account) throw new Error('Conta não encontrada neste dispositivo.')
-  const { keys, secret } = await openRecoveryVault(recoveryEnvelope, recoveryCode)
-  const passwordEnvelope = await createPasswordEnvelope(secret, newPassword)
-  secret.fill(0)
-  if (account.authMode === 'supabase' && hasSupabaseConfiguration) {
-    await assertRemoteSessionMatches(account)
-    // Ordem que aguenta interrupção: primeiro a senha do serviço, depois o
-    // envelope que abre o cofre com ela. Se parar no meio, a próxima tentativa
-    // repete os dois passos com o mesmo resultado. Quando a senha do serviço já
-    // é a mesma, não se mexe nela: repetir a troca é recusado pelo serviço.
-    if (newPassword !== currentPassword) await updateRemotePassword(newPassword)
-    await storeRemotePasswordEnvelope(passwordEnvelope)
-  }
-  await database.keyEnvelopes.put({ id: keyEnvelopeId(account.id, 'password'), kind: 'password', accountId: account.id, envelope: passwordEnvelope, updatedAt: new Date().toISOString() })
-  await authorizeCurrentDevice(account.id, database)
-  return { account, keys }
+  return recuperarComChave(email, recoveryCode, newPassword, database, {
+    currentPassword,
+    setRemotePassword: newPassword !== currentPassword,
+  })
 }
 
 /** Tenta devolver a senha do serviço ao valor anterior. */
@@ -306,6 +369,7 @@ export async function changeVaultPassword(
   secret.fill(0)
   const guardar = async (pendingRemote: boolean) => {
     await database.keyEnvelopes.put({ ...passwordRecord, envelope: replacement, updatedAt: new Date().toISOString(), pendingRemote })
+    await database.keyEnvelopes.delete(pendingPasswordId(account.id))
   }
 
   if (account.authMode !== 'supabase' || !hasSupabaseConfiguration) {
@@ -314,11 +378,27 @@ export async function changeVaultPassword(
   }
 
   await assertRemoteSessionMatches(account)
+
+  // O envelope da senha nova é gravado ANTES de o serviço saber dela. Se o
+  // navegador fechar entre a troca remota e a gravação do envelope, é este
+  // registro que permite à entrada seguinte reconhecer o que aconteceu:
+  // sem ele, a senha nova valeria no serviço e o envelope antigo em todo
+  // lugar, e nenhuma senha abriria o cofre.
+  await database.keyEnvelopes.put({
+    id: pendingPasswordId(account.id),
+    kind: 'password',
+    accountId: account.id,
+    envelope: replacement,
+    updatedAt: new Date().toISOString(),
+    pendingRemote: true,
+  })
+
   await updateRemotePassword(newPassword)
   try {
     await storeRemotePasswordEnvelope(replacement)
   } catch (falha) {
     if (await desfazerSenhaDoServico(currentPassword)) {
+      await database.keyEnvelopes.delete(pendingPasswordId(account.id))
       throw new Error('Não foi possível concluir a troca de senha. Nada mudou; tente de novo.', { cause: falha })
     }
     await guardar(true)
@@ -349,13 +429,26 @@ export async function completePasswordReset(
   const problema = passwordProblem(newPassword)
   if (problema) throw new Error(problema)
   if (!hasSupabaseConfiguration) throw new Error('A redefinição por e-mail só existe com o serviço configurado.')
-  if (!await currentRemoteAccountId()) {
+
+  // 1. A sessão do link precisa existir e ser desta conta. Um link aberto com
+  //    outra conta do serviço já autenticada aqui trocaria a senha da conta
+  //    errada — e o titular descobriria pelo bloqueio.
+  const daSessao = await currentRemoteAccountId()
+  if (!daSessao) {
     throw new Error('Este link de redefinição não está mais valendo. Peça outro e abra-o neste mesmo aparelho.')
   }
-  await updateRemotePassword(newPassword)
-  // A senha do serviço já é a nova: `recoverAccount` recebe as duas iguais e,
-  // por isso, não tenta trocá-la de novo — só recria o envelope do cofre.
-  return recoverAccount(email, recoveryCode, newPassword, database, newPassword)
+  const normalizedEmail = email.trim().toLowerCase()
+  const local = await database.accounts.where('email').equals(normalizedEmail).first()
+  if (local && local.id !== daSessao) {
+    throw new Error('Este link é de outra conta. Confira o e-mail que você digitou e abra o link mais recente.')
+  }
+
+  // 2. A senha do serviço só é trocada lá dentro, depois de a chave de
+  //    recuperação conferir. Antes ela era trocada aqui, antes de qualquer
+  //    conferência: com a chave errada, a senha antiga já não valia mais e o
+  //    cofre não abria com nenhuma — a conta ficava inacessível por um engano
+  //    de digitação.
+  return recuperarComChave(email, recoveryCode, newPassword, database, { setRemotePassword: true })
 }
 
 export async function findLocalAccount(database: ApoioDatabase = db): Promise<AccountRecord | undefined> {
