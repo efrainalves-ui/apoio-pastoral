@@ -103,10 +103,16 @@ describe('migration de homologação', () => {
   // As provas acima olham a primeira migration. Estas valem para todas, hoje e
   // para a próxima: um objeto novo entrar sem barreira é justamente o tipo de
   // regressão que ninguém percebe até haver dado real do outro lado.
-  it('toda tabela criada por qualquer migration nasce com RLS ligada e privilégios zerados', () => {
+  it('toda tabela criada por qualquer migration nasce com RLS ligada, política e privilégios zerados', () => {
     for (const { nome, subida } of paresDeMigration()) {
       for (const tabela of tabelasCriadas(subida)) {
         expect(subida, `${nome}: ${tabela} sem RLS`).toContain(`alter table public.${tabela} enable row level security`)
+        // RLS ligada e nenhuma política parece esquecimento, não decisão: uma
+        // tabela alcançável só por função definidora precisa dizer isso em uma
+        // política que nega, para o dia em que alguém conceder acesso por engano.
+        expect(subida, `${nome}: ${tabela} sem política`).toMatch(
+          new RegExp(`create policy \\w+ on public\\.${tabela}`, 'u'),
+        )
         for (const papel of ['anon', 'authenticated']) {
           expect(subida, `${nome}: ${tabela} sem revoke de ${papel}`).toMatch(
             new RegExp(`revoke all on[^;]*public\\.${tabela}[^;]*from[^;]*\\b${papel}\\b`, 'isu'),

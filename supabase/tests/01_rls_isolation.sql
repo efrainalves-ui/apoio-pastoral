@@ -347,10 +347,18 @@ select homologacao_testes.exigir(
     where n.nspname = 'public' and r.rolname in ('anon', 'public')),
   'anon não executa nenhuma função de public');
 
+-- Por nome, e não por contagem: uma função definidora nova precisa ser uma
+-- decisão consciente, escrita aqui. Contar só avisaria que o número mudou.
 select homologacao_testes.exigir(
-  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-   where n.nspname = 'public' and p.prosecdef) = 7,
-  'só as sete funções previstas rodam com os privilégios do dono');
+  (select coalesce(array_agg(p.proname order by p.proname), '{}')
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prosecdef)
+  = array[
+      'active_device_id', 'app_environment', 'approve_device', 'claim_device',
+      'current_device_id', 'download_operations', 'revoke_all_devices', 'revoke_device',
+      'session_is_authorized', 'session_is_not_revoked', 'upload_operations'
+    ]::name[],
+  'só as funções previstas rodam com os privilégios do dono');
 
 -- O aplicativo não usa armazenamento de arquivos: todo anexo continuaria fora
 -- do cofre cifrado, então nenhum bucket pode existir.

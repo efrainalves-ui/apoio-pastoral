@@ -197,6 +197,14 @@ create table public.service_environment (
 
 alter table public.service_environment enable row level security;
 
+-- O ambiente declarado sai apenas por `app_environment()`, que roda como dono.
+-- A tabela em si não é alcançável pelo navegador: além de não ter privilégio
+-- nenhum, esta política nega tudo de forma explícita. Se um dia alguém
+-- conceder SELECT por engano, a RLS ainda barra — e uma tabela com RLS ligada
+-- e nenhuma política parece esquecimento, não decisão.
+create policy service_environment_sem_acesso_direto on public.service_environment
+  for all using (false) with check (false);
+
 create function public.app_environment()
 returns text
 language sql
