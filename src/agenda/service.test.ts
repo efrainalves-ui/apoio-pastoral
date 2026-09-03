@@ -52,8 +52,21 @@ describe('agenda cifrada', () => {
     const events = [{ id: 'public-fixture', ...input(), ...timestamps }, { id: 'private-fixture', ...input({ title: 'Pessoal fictício', category: 'personal', includeInItinerary: false }), ...timestamps }]
     const items = itineraryItems(events, new Date('2026-08-17'), new Date('2026-08-23T23:59:59'), new Set(events.map(({ id }) => id)), () => 'Igreja fictícia')
     expect(items.some(({ id }) => id === 'public-fixture')).toBe(true); expect(items.some(({ id }) => id === 'private-fixture')).toBe(false)
-    const pdf = new TextDecoder('latin1').decode(buildItineraryPdf(items, 'Semana fictícia'))
-    expect(pdf).toContain('%PDF-1.4'); expect(pdf).toContain('Local fictício')
+    // Sem a confirmação de nomes, o itinerário sai com data, tipo e igreja. O
+    // título, o local e o endereço são escritos pelo pastor — "casa da irmã
+    // Fulana", a rua de uma família — e saíam sempre, mesmo com a caixa
+    // desmarcada.
+    const semNomes = new TextDecoder('latin1').decode(buildItineraryPdf(items, 'Semana fictícia'))
+    expect(semNomes).toContain('%PDF-1.4')
+    expect(semNomes).toContain('Igreja fictícia')
+    expect(semNomes).not.toContain('Local fictício')
+    expect(semNomes).not.toContain('Endereço fictício')
+    expect(semNomes).not.toContain('Visita à família fictícia')
+
+    const comNomes = new TextDecoder('latin1').decode(buildItineraryPdf(items, 'Semana fictícia', true))
+    expect(comNomes).toContain('Local fictício')
+    expect(comNomes).toContain('Endereço fictício')
+    expect(comNomes).toContain('Visita à família fictícia')
   })
 
   it('cria os quatro tipos de cerimônia e preserva seus checklists', async () => {

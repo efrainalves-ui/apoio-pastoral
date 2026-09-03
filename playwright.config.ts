@@ -15,7 +15,10 @@ export default defineConfig({
   },
   webServer: {
     command: 'pnpm build && pnpm preview --host 127.0.0.1 --port 4173',
-    env: { VITE_E2E: 'true', VITE_DISABLE_SYNC: 'true' },
+    // A suíte roda em modo local declarado. Modo local deixou de ser o que
+    // sobra: sem esta declaração a build não abre, que é justamente a proteção
+    // que se quer provar.
+    env: { VITE_E2E: 'true', VITE_DISABLE_SYNC: 'true', VITE_APP_ENV: 'desenvolvimento' },
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

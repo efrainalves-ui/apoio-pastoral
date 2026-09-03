@@ -5,7 +5,8 @@ import { ApoioDatabase } from '../db/database'
 import { keyEnvelopeId } from '../db/types'
 import { isPasswordRecoveryUrl } from './passwordReset'
 import { currentDeviceId } from './device'
-import { pendingDistrictClosure, resumeDistrictClosure } from '../district/closeDistrict'
+import { CloseDistrictService, pendingDistrictClosure } from '../district/closeDistrict'
+import { generateMasterKey } from '../crypto/vault'
 
 const databases: ApoioDatabase[] = []
 
@@ -411,7 +412,12 @@ describe('encerramento pendente atravessa o login', () => {
     expect(currentDeviceId(CONTA)).toBe(aparelho)
     expect(await pendingDistrictClosure(CONTA, database)).toBe(true)
 
-    const { newDeviceId } = await resumeDistrictClosure(CONTA, database, () => Promise.resolve(0))
+    const encerramento = new CloseDistrictService(database, {
+      listDevices: () => Promise.resolve(null),
+      revokeAll: () => Promise.resolve(0),
+      synchronize: () => Promise.resolve(null),
+    })
+    const { newDeviceId } = await encerramento.resume(CONTA, await generateMasterKey())
 
     expect(newDeviceId).toBe('aparelho-ficticio-novo')
     const ativos = (await database.devices.where('accountId').equals(CONTA).toArray()).filter(({ status }) => status === 'active')
@@ -426,5 +432,88 @@ describe('encerramento pendente atravessa o login', () => {
     await database.devices.put({ id: aparelho, accountId: CONTA, label: 'Computador', status: 'revoked', createdAt: '', lastSeenAt: '', revokedAt: new Date().toISOString() })
 
     await expect(session.unlockAccount(EMAIL, 'senha-ficticia-antiga-2026', database)).rejects.toThrow('removido da conta')
+  })
+})
+
+/**
+ * Retomada segura pelo envelope pendente.
+ *
+ * A troca de senha e a recuperação gravam o envelope novo como **pendente**
+ * antes de o serviço saber dele, e só o promovem a definitivo no fim. Fechar o
+ * navegador entre uma coisa e outra deixava a conta com o pendente gravado e
+ * nenhum definitivo — e a entrada seguinte nem tentava: dizia "este dispositivo
+ * precisa ser autorizado com a chave de recuperação", com a senha nova certa na
+ * mão e o envelope que ela abre ali ao lado, no mesmo banco.
+ */
+describe('recuperação em navegador novo, com o envelope definitivo ainda ausente', () => {
+  /** Conta que existe no serviço mas nunca abriu neste navegador. */
+  async function armazenamentoVazio(database: ApoioDatabase) {
+    expect(await database.accounts.count()).toBe(0)
+    expect(await database.keyEnvelopes.count()).toBe(0)
+  }
+
+  it('em armazenamento local vazio, o navegador novo entra pelo envelope do serviço', async () => {
+    const { servico, database, session } = await carregar()
+    // O serviço já tem o envelope da senha que vale; este navegador, nada.
+    const secret = generateMasterSecret()
+    servico.envelopeGuardado = await createPasswordEnvelope(secret, 'senha-ficticia-antiga-2026')
+    secret.fill(0)
+    await armazenamentoVazio(database)
+
+    const resultado = await session.unlockAccount(EMAIL, 'senha-ficticia-antiga-2026', database)
+
+    expect(resultado.account.id).toBe(CONTA)
+    expect((await database.keyEnvelopes.get(keyEnvelopeId(CONTA, 'password')))).toBeTruthy()
+  })
+
+  it('interrompida depois do pendente e antes do definitivo, a entrada seguinte conclui', async () => {
+    // A senha do serviço já é a nova: foi ela que a troca alcançou antes de
+    // o navegador fechar, e é ela que o pastor tem na mão.
+    const { database, session } = await carregar({ senhaDoServico: 'senha-ficticia-nova-2027' })
+    const secret = generateMasterSecret()
+    const envelopeNovo = await createPasswordEnvelope(secret, 'senha-ficticia-nova-2027')
+    const recovery = await createRecoveryEnvelope(secret)
+    secret.fill(0)
+    const agora = new Date().toISOString()
+    // Exatamente o que a interrupção deixa: conta gravada, envelope de
+    // recuperação gravado, envelope pendente gravado, definitivo ausente.
+    await database.accounts.put({ id: CONTA, email: EMAIL, createdAt: agora, authMode: 'supabase' })
+    await database.keyEnvelopes.bulkPut([
+      { id: keyEnvelopeId(CONTA, 'recovery'), kind: 'recovery', accountId: CONTA, envelope: recovery.envelope, updatedAt: agora },
+      { id: `${CONTA}:password-pendente`, kind: 'password', accountId: CONTA, envelope: envelopeNovo, updatedAt: agora, pendingRemote: true },
+    ])
+    await database.syncState.put({ accountId: CONTA, cursor: null, lastSyncedAt: null })
+
+    const resultado = await session.unlockAccount(EMAIL, 'senha-ficticia-nova-2027', database)
+
+    expect(resultado.account.id).toBe(CONTA)
+    // O pendente virou o definitivo, marcado para subir na primeira rede.
+    const definitivo = await database.keyEnvelopes.get(keyEnvelopeId(CONTA, 'password'))
+    expect(definitivo?.envelope).toEqual(envelopeNovo)
+    expect(await database.keyEnvelopes.get(`${CONTA}:password-pendente`)).toBeUndefined()
+  })
+
+  it('o envelope pendente não abre com a senha errada: quem prova é a senha', async () => {
+    const { database, session } = await carregar()
+    const secret = generateMasterSecret()
+    const envelopeNovo = await createPasswordEnvelope(secret, 'senha-ficticia-nova-2027')
+    secret.fill(0)
+    const agora = new Date().toISOString()
+    await database.accounts.put({ id: CONTA, email: EMAIL, createdAt: agora, authMode: 'supabase' })
+    await database.keyEnvelopes.put({ id: `${CONTA}:password-pendente`, kind: 'password', accountId: CONTA, envelope: envelopeNovo, updatedAt: agora, pendingRemote: true })
+    await database.syncState.put({ accountId: CONTA, cursor: null, lastSyncedAt: null })
+
+    await expect(session.unlockAccount(EMAIL, 'senha-ficticia-antiga-2026', database)).rejects.toThrow()
+    // Nada foi promovido: o definitivo continua ausente.
+    expect(await database.keyEnvelopes.get(keyEnvelopeId(CONTA, 'password'))).toBeUndefined()
+  })
+
+  it('sem pendente e sem definitivo, continua pedindo a chave de recuperação', async () => {
+    const { database, session } = await carregar()
+    const agora = new Date().toISOString()
+    await database.accounts.put({ id: CONTA, email: EMAIL, createdAt: agora, authMode: 'supabase' })
+    await database.syncState.put({ accountId: CONTA, cursor: null, lastSyncedAt: null })
+
+    await expect(session.unlockAccount(EMAIL, 'senha-ficticia-antiga-2026', database)).rejects.toThrow('chave de recuperação')
   })
 })

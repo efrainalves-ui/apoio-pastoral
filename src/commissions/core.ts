@@ -1,3 +1,4 @@
+import { personLabel } from '../reports/redaction'
 import type { ChurchType } from '../district/types'
 import type { CommissionAgendaItem, CommissionConfigData, CommissionMeetingData, DecisionResult, PresidentMode, PresidentTieBreak } from './types'
 
@@ -18,9 +19,20 @@ export function commissionPresident(config: Pick<CommissionConfigData, 'presiden
   return { mode: 'pastor', personId: '', label: pastorLabel(config?.pastorName) }
 }
 
-/** Nome que vai para os documentos, seja o pastor ou o ancião que presidiu. */
-export function meetingPresidentName(meeting: Pick<CommissionMeetingData, 'presidentId' | 'presidentLabel'>, personName: (id: string) => string): string {
-  return meeting.presidentLabel?.trim() || personName(meeting.presidentId)
+/**
+ * Nome que vai para os documentos, seja o pastor ou o ancião que presidiu.
+ *
+ * `presidentLabel` é o nome do pastor digitado por ele e guardado ao lado do
+ * identificador. Ele passava direto: a assinatura de uma ata gerada sem nomes
+ * trazia o nome do pastor por extenso, duas vezes, no fim da página. Agora ele
+ * segue a mesma confirmação de todo mundo.
+ */
+export function meetingPresidentName(
+  meeting: Pick<CommissionMeetingData, 'presidentId' | 'presidentLabel'>,
+  personName: (id: string) => string,
+  includeNames = true,
+): string {
+  return personLabel(includeNames, meeting.presidentLabel, personName(meeting.presidentId))
 }
 
 export function requiredMajority(favorable: number, against: number): number { const valid = favorable + against; return valid ? Math.floor(valid / 2) + 1 : 0 }

@@ -1,5 +1,6 @@
 import { KeyRound, Laptop, LockKeyhole, ShieldCheck, Smartphone } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { remoteAccountGuard } from '../auth/accountGuard'
 import { approveDevice, currentDeviceId, deviceConfirmationCode, revokeDevice } from '../auth/device'
 import { fetchRemoteDevices } from '../auth/supabase'
 import { useAuthVault } from '../auth/AuthVaultContext'
@@ -21,6 +22,17 @@ export function SecurityPage() {
   const loadDevices = useCallback(async () => {
     if (!account) return
     const locais = await db.devices.where('accountId').equals(account.id).toArray()
+    // Antes de perguntar ao serviço: a sessão aberta ainda é a desta conta?
+    // Sem esta linha, com duas contas no mesmo navegador, esta tela mostrava
+    // os aparelhos da conta que entrou por último enquanto dizia o nome da
+    // conta desta aba — e o botão Revogar revogava os dela.
+    try {
+      await remoteAccountGuard(account.id)
+    } catch (motivo) {
+      setDevices(locais)
+      setError(motivo instanceof Error ? motivo.message : 'Não foi possível confirmar a sessão desta conta.')
+      return
+    }
     // Cada aparelho só guarda a si mesmo. A lista da conta inteira vem do
     // serviço; sem ela, os outros aparelhos ficariam invisíveis e não haveria
     // como revogar nenhum deles.
@@ -59,12 +71,29 @@ export function SecurityPage() {
   }
 
   async function approve(id: string) {
-    await approveDevice(id)
+    if (!account) return
+    setError('')
+    try {
+      await remoteAccountGuard(account.id)
+      await approveDevice(id)
+    } catch (motivo) {
+      setError(motivo instanceof Error ? motivo.message : 'Não foi possível confirmar o aparelho.')
+    }
     await loadDevices()
   }
 
   async function revoke(id: string) {
-    await revokeDevice(id)
+    if (!account) return
+    setError('')
+    try {
+      // Revogar é irreversível para o aparelho alvo. Conferir a conta da sessão
+      // antes é o que impede esta aba de revogar um aparelho da conta que
+      // entrou depois, em outra aba do mesmo navegador.
+      await remoteAccountGuard(account.id)
+      await revokeDevice(id)
+    } catch (motivo) {
+      setError(motivo instanceof Error ? motivo.message : 'Não foi possível revogar o aparelho.')
+    }
     await loadDevices()
   }
 
@@ -72,6 +101,7 @@ export function SecurityPage() {
     <div className="page-stack page-narrow">
       <header className="page-hero"><div><p className="eyebrow">Proteção da conta</p><h1>Segurança</h1></div><StatusPill>Aplicativo aberto</StatusPill></header>
       <Card title="Dispositivos" eyebrow="Controle de acesso" action={<Laptop />}>
+        {error && <div className="alert alert--error" role="alert">{error}</div>}
         <div className="device-list">
           {devices.map((device) => {
             const isCurrent = device.id === currentDeviceId(account?.id ?? '')

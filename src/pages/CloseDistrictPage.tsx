@@ -1,19 +1,24 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { ArrowLeft, TriangleAlert } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Field } from '../components/ui/Field'
+import { db } from '../db/database'
 import { CloseDistrictService, type CloseDistrictPreview } from '../district/closeDistrict'
+import { closeDistrictRemote } from '../district/closeDistrictRemote'
 
-const service = new CloseDistrictService()
 const CONFIRMACAO = 'ENCERRAR'
 
 export function CloseDistrictPage() {
-  const { account, masterKey } = useAuthVault()
+  const { account, masterKey, syncKey } = useAuthVault()
   const navigate = useNavigate()
+  const service = useMemo(
+    () => new CloseDistrictService(db, account && syncKey ? closeDistrictRemote(account.id, syncKey) : undefined),
+    [account, syncKey],
+  )
   const [previa, setPrevia] = useState<CloseDistrictPreview | null>(null)
   const [texto, setTexto] = useState('')
   const [ciente, setCiente] = useState(false)
@@ -23,7 +28,7 @@ export function CloseDistrictPage() {
   const load = useCallback(async () => {
     if (!account || !masterKey) return
     try { setPrevia(await service.preview(account.id, masterKey)) } catch { setError('Não foi possível abrir os dados do distrito.') }
-  }, [account, masterKey])
+  }, [account, masterKey, service])
   useEffect(() => { void load() }, [load])
 
   async function encerrar() {
@@ -31,7 +36,14 @@ export function CloseDistrictPage() {
     if (!window.confirm('Encerrar o distrito? Os dados do distrito serão apagados e o aplicativo não poderá recuperá-los depois desta confirmação.')) return
     setBusy(true); setError('')
     try {
-      await service.close(account.id, masterKey)
+      const resultado = await service.close(account.id, masterKey)
+      // Encerramento que parou em uma etapa não vira "pronto": a tela diz o
+      // que falta e o pastor conclui pela retomada, com rede.
+      if (!resultado.completed) {
+        setError(resultado.pending ?? 'O encerramento não terminou. Conecte-se e conclua.')
+        setBusy(false)
+        return
+      }
       await navigate('/app', { replace: true })
     } catch (motivo) {
       setError(motivo instanceof Error ? motivo.message : 'Não foi possível encerrar o distrito.')
@@ -53,6 +65,7 @@ export function CloseDistrictPage() {
         <div><small>Registros pessoais preservados</small><strong>{previa.personalRecords}</strong></div>
       </div>
       <ul className="plain-list">{previa.removedLabels.map((label) => <li key={label}>{label}</li>)}</ul>
+      {previa.unreadableRecords > 0 && <div className="alert alert--warning" role="status">{previa.unreadableRecords} registro(s) não abriram neste aparelho e ficaram em quarentena. Eles não serão apagados por este encerramento, porque não é possível saber o que são.</div>}
     </Card>
 
     <Card title="O que permanece">

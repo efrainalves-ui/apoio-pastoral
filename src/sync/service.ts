@@ -1,7 +1,9 @@
+import { remoteAccountGuard, type AccountSessionGuard } from '../auth/accountGuard'
 import { assertDeviceCanSync, assertRemoteDeviceStillActive, type RemoteDeviceStatusReader } from '../auth/device'
 import { fetchRemoteDeviceStatus, purgeRemoteRecordHistory, PURGE_BATCH_SIZE, type PurgeTarget } from '../auth/supabase'
 import { db, type ApoioDatabase } from '../db/database'
 import { clearRemotePurge, pendingRemotePurge } from '../db/purge'
+import { pendingActionId } from '../db/types'
 import type { OutboxRecord, QuarantinedOperationRecord, SyncConflictRecord, VaultRecord } from '../db/types'
 import { operationMacIsValid, withOperationMac } from './operationMac'
 import type { EncryptedOperation, SyncSummary, SyncTransport } from './types'
@@ -58,6 +60,15 @@ export class SyncService {
     private readonly online: () => boolean = () => navigator.onLine,
     private readonly readRemoteDeviceStatus: RemoteDeviceStatusReader = fetchRemoteDeviceStatus,
     private readonly purgeRemoteHistory: (targets: PurgeTarget[]) => Promise<string[] | null> = purgeRemoteRecordHistory,
+    /**
+     * Conferência de que a sessão aberta no serviço ainda é a desta conta.
+     *
+     * Com duas contas no mesmo navegador, a sessão é compartilhada entre as
+     * abas: entrar como B em uma aba faz a aba que mostra A sincronizar contra
+     * a conta B. As lápides, o expurgo e a fila de envio de A iam para B, e o
+     * que voltava era o conteúdo de B guardado como se fosse de A.
+     */
+    private readonly guard: AccountSessionGuard = remoteAccountGuard,
   ) {}
 
   /**
@@ -67,7 +78,23 @@ export class SyncService {
    */
   async synchronize(accountId: string, deviceId: string, syncKey: CryptoKey): Promise<SyncSummary> {
     await assertDeviceCanSync(accountId, deviceId, this.database)
-    if (!this.online()) return { status: 'offline', pushed: 0, pulled: 0, conflicts: 0, quarantined: 0, incomplete: false }
+    if (!this.online()) {
+      return {
+        status: 'offline', pushed: 0, pulled: 0, conflicts: 0, quarantined: 0, incomplete: false,
+        purgePending: (await pendingRemotePurge(accountId, this.database)).length > 0,
+        pushPending: await this.database.outbox.where('accountId').equals(accountId).filter(({ status }) => status === 'pending').count() > 0,
+      }
+    }
+    // Antes de tudo: a sessão aberta no serviço é mesmo a desta conta? Se outra
+    // conta entrou em outra aba, esta aba não fala com o serviço nunca mais até
+    // um novo acesso.
+    await this.guard(accountId)
+    // Restauração pela metade não sobe. Metade de um backup publicada para os
+    // outros aparelhos é pior do que backup nenhum: eles receberiam um estado
+    // que nunca existiu, e a lápide que faltasse chegaria depois, ou nunca.
+    if (await this.database.pendingActions.get(pendingActionId(accountId, 'restore_backup'))) {
+      throw new Error('Há uma restauração de backup pela metade neste aparelho. Conclua a restauração antes de sincronizar.')
+    }
     // Antes de enviar e antes de receber: só o serviço sabe se outro aparelho
     // revogou este aqui.
     await assertRemoteDeviceStillActive(accountId, deviceId, this.database, this.readRemoteDeviceStatus)
@@ -159,6 +186,12 @@ export class SyncService {
       firstSyncAt: estado?.firstSyncAt ?? (incompleto ? null : new Date().toISOString()),
     })
 
+    // O que sobrou na fila de envio e o que sobrou na fila de expurgo dizem, os
+    // dois, a mesma coisa: esta rodada não terminou o trabalho. Nenhum dos dois
+    // pode virar "Dados atualizados" na tela.
+    const aindaPorEnviar = await this.database.outbox.where('accountId').equals(accountId).filter(({ status }) => status === 'pending').count()
+    const aindaPorExpurgar = (await pendingRemotePurge(accountId, this.database)).length
+
     return {
       status: !incompleto && pending.length === 0 && recebidas === 0 && conflitos === 0 ? 'empty' : 'synced',
       pushed: pushResult.acceptedIds.length,
@@ -166,6 +199,8 @@ export class SyncService {
       conflicts: pushResult.conflicts.length + conflitos,
       quarantined: quarentena,
       incomplete: incompleto,
+      purgePending: aindaPorExpurgar > 0,
+      pushPending: aindaPorEnviar > 0,
     }
   }
 
@@ -240,7 +275,19 @@ export class SyncService {
  * como se tivesse recebido tudo.
  */
 export function syncConfirmed(summary: SyncSummary): boolean {
-  return summary.status !== 'offline' && !summary.incomplete
+  return summary.status !== 'offline'
+    && !summary.incomplete
+    && !summary.pushPending
+    && !summary.purgePending
+}
+
+/** O que impede esta rodada de contar como concluída, em uma frase. */
+export function syncPendingReason(summary: SyncSummary): string | null {
+  if (summary.status === 'offline') return 'Sem conexão: nada foi enviado nem recebido nesta tentativa.'
+  if (summary.incomplete) return 'Ainda há alterações para receber: esta rodada não chegou ao fim. Sincronize de novo até este aviso sumir.'
+  if (summary.pushPending) return 'Ainda há alterações deste aparelho esperando para subir. Sincronize de novo.'
+  if (summary.purgePending) return 'Ainda há histórico apagado esperando para sair do serviço. Sincronize de novo até este aviso sumir.'
+  return null
 }
 
 /**

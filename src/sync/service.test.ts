@@ -4,11 +4,11 @@ import { PeopleService } from '../people/service'
 import { ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { OutboxRecord } from '../db/types'
-import { SyncService, firstSyncPending } from './service'
+import { SyncService, firstSyncPending, syncConfirmed, syncPendingReason } from './service'
 import { MAC_VERSION, signOperation, withOperationMac } from './operationMac'
 import { PURGE_BATCH_SIZE, type PurgeTarget } from '../auth/supabase'
 import { LocalDevelopmentTransport, PAGE_SIZE, resetLocalDevelopmentTransport } from './transport'
-import type { EncryptedOperation, PullResult, PushResult, SyncTransport } from './types'
+import type { EncryptedOperation, PullResult, PushResult, SyncSummary, SyncTransport } from './types'
 
 class CaptureTransport implements SyncTransport {
   readonly name = 'local-development' as const
@@ -588,3 +588,87 @@ describe('sincronização sob ataque e sob condições ruins', () => {
     await new SyncService(new CaptureTransport(), database, () => true).synchronize(accountId, deviceId, keys.sync)
     expect(await firstSyncPending(accountId, database)).toBe(false)
 })})
+
+/**
+ * Sucesso só existe quando a rodada foi confirmada.
+ *
+ * A tela desenhava a mesma faixa verde para qualquer desfecho: offline, com
+ * páginas faltando, com a fila de envio cheia ou com o expurgo pendente. O
+ * pastor lia "Dados atualizados" com o distrito pela metade e com o histórico
+ * do que ele mandou apagar ainda guardado no serviço.
+ */
+describe('sucesso na sincronização é só a rodada confirmada', () => {
+  const bancos: ApoioDatabase[] = []
+  afterEach(async () => {
+    resetLocalDevelopmentTransport()
+    await Promise.all(bancos.splice(0).map((banco) => banco.delete()))
+  })
+
+  const rodada = (extra: Partial<SyncSummary> = {}): SyncSummary => ({
+    status: 'synced', pushed: 1, pulled: 1, conflicts: 0, quarantined: 0,
+    incomplete: false, purgePending: false, pushPending: false, ...extra,
+  })
+
+  it('confirma quando não sobrou nada', () => {
+    expect(syncConfirmed(rodada())).toBe(true)
+    expect(syncPendingReason(rodada())).toBeNull()
+  })
+
+  it('não confirma offline', () => {
+    expect(syncConfirmed(rodada({ status: 'offline' }))).toBe(false)
+    expect(syncPendingReason(rodada({ status: 'offline' }))).toMatch(/Sem conexão/u)
+  })
+
+  it('não confirma com paginação pendente', () => {
+    expect(syncConfirmed(rodada({ incomplete: true }))).toBe(false)
+    expect(syncPendingReason(rodada({ incomplete: true }))).toMatch(/não chegou ao fim/u)
+  })
+
+  it('não confirma com alterações ainda por enviar', () => {
+    expect(syncConfirmed(rodada({ pushPending: true }))).toBe(false)
+    expect(syncPendingReason(rodada({ pushPending: true }))).toMatch(/esperando para subir/u)
+  })
+
+  it('não confirma com expurgo pendente no serviço', () => {
+    // Uma exclusão de pessoa só está concluída quando o passado dela sai
+    // também do serviço.
+    expect(syncConfirmed(rodada({ purgePending: true }))).toBe(false)
+    expect(syncPendingReason(rodada({ purgePending: true }))).toMatch(/histórico apagado esperando/u)
+  })
+
+  it('a rodada real informa expurgo pendente quando o serviço não apagou', async () => {
+    const database = new ApoioDatabase(`sync-expurgo-${crypto.randomUUID()}`); bancos.push(database)
+    const accountId = 'conta-ficticia-expurgo'
+    await database.devices.put({ id: 'aparelho-ficticio', accountId, label: 'Computador', status: 'active', createdAt: '', lastSeenAt: '' })
+    await database.pendingActions.put({
+      id: `${accountId}:purge_history`, accountId, kind: 'purge_history',
+      createdAt: new Date().toISOString(),
+      purgeTargets: [{ recordId: 'registro-ficticio', operationId: 'operacao-ficticia' }],
+    })
+    const chaves = await generateVaultKeys()
+    // O serviço recusa apagar: houve alteração concorrente. A fila permanece.
+    const service = new SyncService(new LocalDevelopmentTransport(), database, () => true, () => Promise.resolve(null), () => Promise.resolve([]))
+
+    const resumo = await service.synchronize(accountId, 'aparelho-ficticio', chaves.sync)
+
+    expect(resumo.purgePending).toBe(true)
+    expect(syncConfirmed(resumo)).toBe(false)
+  })
+
+  it('recusa sincronizar com uma restauração de backup pela metade', async () => {
+    // Metade de um backup publicada para os outros aparelhos é pior do que
+    // backup nenhum: eles receberiam um estado que nunca existiu.
+    const database = new ApoioDatabase(`sync-restauracao-${crypto.randomUUID()}`); bancos.push(database)
+    const accountId = 'conta-ficticia-restauro'
+    await database.devices.put({ id: 'aparelho-ficticio', accountId, label: 'Computador', status: 'active', createdAt: '', lastSeenAt: '' })
+    await database.pendingActions.put({
+      id: `${accountId}:restore_backup`, accountId, kind: 'restore_backup',
+      createdAt: new Date().toISOString(), stage: 'restoring_pastoral',
+      restore: { file: {}, appliedRecordIds: [], appliedPersonalIds: [], totalRecords: 2, totalPersonal: 0 },
+    })
+    const chaves = await generateVaultKeys()
+    const service = new SyncService(new LocalDevelopmentTransport(), database, () => true, () => Promise.resolve(null))
+
+    await expect(service.synchronize(accountId, 'aparelho-ficticio', chaves.sync)).rejects.toThrow('restauração de backup pela metade')
+  })
+})

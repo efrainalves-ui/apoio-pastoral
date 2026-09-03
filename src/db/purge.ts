@@ -40,11 +40,34 @@ export async function purgeRecordHistory(
   database: ApoioDatabase = db,
 ): Promise<PurgeResult> {
   if (targets.length === 0) return { local: 0, queued: 0 }
+  let resultado: PurgeResult = { local: 0, queued: 0 }
+  await database.transaction('rw', database.outbox, database.syncConflicts, database.quarantine, database.pendingActions, async () => {
+    resultado = await registerPurgeTargets(accountId, targets, database)
+  })
+  return resultado
+}
+
+/**
+ * O mesmo trabalho, sem abrir transação própria.
+ *
+ * Existe para a gravação e o pedido de expurgo caberem na mesma transação: a
+ * exclusão de uma pessoa publica as lápides e registra o expurgo de uma vez
+ * só, e uma interrupção no meio não deixa mais o passado inteiro para trás sem
+ * nada pendente que faça alguém voltar. Chame apenas de dentro de uma
+ * transação que já inclua `outbox`, `syncConflicts`, `quarantine` e
+ * `pendingActions`.
+ */
+export async function registerPurgeTargets(
+  accountId: string,
+  targets: PurgeTarget[],
+  database: ApoioDatabase = db,
+): Promise<PurgeResult> {
+  if (targets.length === 0) return { local: 0, queued: 0 }
   const alvos = new Set(targets.map(({ recordId }) => recordId))
   const keepOperationIds = new Set(targets.map(({ operationId }) => operationId))
   let local = 0
 
-  await database.transaction('rw', database.outbox, database.syncConflicts, database.quarantine, database.pendingActions, async () => {
+  {
     const fila = await database.outbox.where('accountId').equals(accountId).toArray()
     const antigas = fila.filter((item) => alvos.has(item.recordId) && !keepOperationIds.has(item.id))
     await database.outbox.bulkDelete(antigas.map(({ id }) => id))
@@ -76,7 +99,7 @@ export async function purgeRecordHistory(
       createdAt: pendente?.createdAt ?? new Date().toISOString(),
       purgeTargets: [...porRegistro.values()],
     })
-  })
+  }
 
   return { local, queued: targets.length }
 }

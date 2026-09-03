@@ -179,11 +179,8 @@ export async function unlockAccount(
     const remoteId = remoteAccountId ?? await signInRemoteAccount(normalizedEmail, password)
     if (remoteId !== account.id) throw new Error('Esta conta não corresponde à conta deste dispositivo.')
   }
-  const envelopeRecord = await database.keyEnvelopes.get(keyEnvelopeId(account.id, 'password'))
-  if (!envelopeRecord || envelopeRecord.accountId !== account.id || envelopeRecord.envelope.kind !== 'password') {
-    throw new Error('Este dispositivo precisa ser autorizado com a chave de recuperação.')
-  }
-  const keys = await abrirEnvelopeDeSenha(account, envelopeRecord, password, database)
+  const { record: envelopeRecord, precisaGravar } = await envelopeDeSenhaParaAbrir(account, database)
+  const keys = await abrirEnvelopeDeSenha(account, envelopeRecord, password, database, precisaGravar)
   // Conta criada antes do envelope de senha remoto, ou criada com confirmação
   // de e-mail pendente: este aparelho acabou de provar a senha, então completa
   // o que falta. Sem isso, entrar em um navegador novo exigiria a chave de
@@ -204,6 +201,50 @@ export async function unlockAccount(
 }
 
 /**
+ * Qual envelope de senha usar para abrir o cofre neste aparelho.
+ *
+ * O caminho normal é o envelope definitivo. Falta um segundo caminho, e é o
+ * que faltava depois de uma interrupção: a troca de senha e a recuperação
+ * gravam o envelope novo como **pendente** antes de o serviço saber dele, e só
+ * promovem o pendente a definitivo no fim. Fechar o navegador entre uma coisa e
+ * outra — em um navegador que ainda não conhecia esta conta, o pior caso —
+ * deixava a conta com o pendente gravado e nenhum definitivo. A entrada
+ * seguinte nem tentava: dizia "este dispositivo precisa ser autorizado com a
+ * chave de recuperação", com a senha nova certa na mão e o envelope que ela
+ * abre ali ao lado, no mesmo banco.
+ *
+ * Agora o pendente é aceito. Ele só vale se abrir com a senha que o serviço
+ * aceitou — quem prova é a senha, não a existência do registro — e, ao abrir,
+ * vira o definitivo, marcado para subir ao serviço na primeira rede.
+ */
+async function envelopeDeSenhaParaAbrir(
+  account: AccountRecord,
+  database: ApoioDatabase,
+): Promise<{ record: KeyEnvelopeRecord; precisaGravar: boolean }> {
+  const definitivo = await database.keyEnvelopes.get(keyEnvelopeId(account.id, 'password'))
+  if (definitivo && definitivo.accountId === account.id && definitivo.envelope.kind === 'password') {
+    return { record: definitivo, precisaGravar: false }
+  }
+
+  const pendente = await database.keyEnvelopes.get(pendingPasswordId(account.id))
+  if (pendente && pendente.accountId === account.id && pendente.envelope.kind === 'password') {
+    return {
+      record: {
+        id: keyEnvelopeId(account.id, 'password'),
+        kind: 'password',
+        accountId: account.id,
+        envelope: pendente.envelope,
+        updatedAt: pendente.updatedAt,
+        pendingRemote: true,
+      },
+      precisaGravar: true,
+    }
+  }
+
+  throw new Error('Este dispositivo precisa ser autorizado com a chave de recuperação.')
+}
+
+/**
  * Abre o cofre com o envelope deste aparelho e, se ele não abrir, com o do
  * serviço.
  *
@@ -218,12 +259,17 @@ async function abrirEnvelopeDeSenha(
   envelopeRecord: KeyEnvelopeRecord,
   password: string,
   database: ApoioDatabase,
+  precisaGravar = false,
 ): Promise<VaultKeys> {
   if (envelopeRecord.envelope.kind !== 'password') throw new Error('Envelope de senha indisponível.')
   const pendente = await database.keyEnvelopes.get(pendingPasswordId(account.id))
 
   try {
     const keys = await openPasswordEnvelope(envelopeRecord.envelope, password)
+    // Retomada pelo pendente: ele abriu com a senha que vale, então vira o
+    // definitivo agora. A marca `pendingRemote` faz a próxima entrada com rede
+    // concluir o que a interrupção deixou pela metade.
+    if (precisaGravar) await database.keyEnvelopes.put(envelopeRecord)
     // A senha que o serviço acabou de aceitar é a antiga: a troca não chegou a
     // valer lá. O envelope guardado antes dela não serve mais para nada.
     if (pendente) await database.keyEnvelopes.delete(pendingPasswordId(account.id))

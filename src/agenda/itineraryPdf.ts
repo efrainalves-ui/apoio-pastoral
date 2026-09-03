@@ -1,3 +1,4 @@
+import { freeText } from '../reports/redaction'
 import { AGENDA_CATEGORY_LABELS, type AgendaEventEntity, type ItineraryItem } from './types'
 import { mondayRestItems } from './service'
 
@@ -16,14 +17,19 @@ export function itineraryItems(events: AgendaEventEntity[], from: Date, to: Date
 }
 
 /**
- * O padrão é sair sem nomes: data, tipo e local bastam para o itinerário. O
- * título é escrito pelo pastor e pode conter o nome de quem será visitado, por
- * isso só entra quando ele pede na hora de gerar.
+ * O padrão é sair sem nomes: data, tipo e a igreja bastam para o itinerário.
+ *
+ * O título é escrito pelo pastor e pode conter o nome de quem será visitado.
+ * O local e o endereço também são escritos por ele — "casa da irmã Fulana",
+ * a rua e o número de uma família — e saíam sempre, mesmo com a caixa
+ * desmarcada. Agora os três seguem a mesma regra; o nome da igreja fica,
+ * porque igreja não é pessoa.
  */
 export function buildItineraryPdf(items: ItineraryItem[], heading: string, includeNames = false): Uint8Array {
   const rows = [heading, 'Apoio Pastoral · itinerário selecionado', '', ...items.flatMap((item) => {
     const category = item.category === 'rest' ? 'Folga' : AGENDA_CATEGORY_LABELS[item.category]
-    return [`${pdfDate(item.startAt, item.allDay)} · ${category}`, ...(includeNames ? [item.title] : []), [item.churchName, item.location, item.address].filter(Boolean).join(' · '), '']
+    const lugar = [item.churchName, freeText(includeNames, item.location), freeText(includeNames, item.address)].filter(Boolean).join(' · ')
+    return [`${pdfDate(item.startAt, item.allDay)} · ${category}`, ...(includeNames ? [item.title] : []), lugar, '']
   })]
   const pages: string[][] = []
   for (let index = 0; index < rows.length; index += 42) pages.push(rows.slice(index, index + 42))

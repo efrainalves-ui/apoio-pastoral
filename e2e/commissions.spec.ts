@@ -94,10 +94,18 @@ test('separa preparar a pauta, realizar a comissão e gerar a ata', async ({ pag
   await expect(page.getByLabel('Favoráveis')).toHaveCount(0)
   await page.getByRole('checkbox', { name: 'Ana Fictícia' }).check()
   await page.getByRole('checkbox', { name: 'Bruno Fictício' }).check()
-  await page.getByLabel('Assunto').fill('Compra fictícia de cadeiras')
-  await page.getByLabel('Proposta').fill('comprar cadeiras fictícias para o salão')
+  // Por papel, e não por rótulo solto: o texto da caixa "Incluir nomes"
+  // menciona os assuntos e as propostas, e um `getByLabel` frouxo passa a
+  // casar com ela.
+  await page.getByRole('textbox', { name: 'Assunto' }).fill('Compra fictícia de cadeiras')
+  await page.getByRole('textbox', { name: 'Proposta' }).fill('comprar cadeiras fictícias para o salão')
   await page.getByRole('button', { name: 'Adicionar à pauta' }).click()
+  // A pauta para imprimir sai sem nada identificável enquanto "Incluir nomes"
+  // não estiver marcado — e o assunto é texto livre, escrito pelo pastor.
+  await expect(page.getByText('1. texto não incluído').first()).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Incluir nomes' }).first().check()
   await expect(page.getByText('1. Compra fictícia de cadeiras').first()).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Incluir nomes' }).first().uncheck()
 
   // A ata ainda não pode ser gerada: nada foi votado.
   await page.getByRole('button', { name: '3. Gerar ata' }).click()
@@ -114,6 +122,10 @@ test('separa preparar a pauta, realizar a comissão e gerar a ata', async ({ pag
   // Etapa 3: revisão final e ata.
   await page.getByRole('button', { name: '3. Gerar ata' }).click()
   await expect(page.getByRole('heading', { name: 'Revisão final dos textos' })).toBeVisible()
+  // A ata segue a mesma regra: o texto do que foi votado só sai com a
+  // confirmação. A decisão em si — número, contagem e resultado — continua.
+  await expect(page.getByText('VOTADO texto não incluído.').first()).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Incluir nomes' }).first().check()
   await expect(page.getByText('VOTADO comprar cadeiras fictícias para o salão.').first()).toBeVisible()
   await page.getByRole('button', { name: 'Finalizar ata' }).click()
   await expect(page.getByText('Ata finalizada. O histórico desta reunião está protegido.')).toBeVisible()

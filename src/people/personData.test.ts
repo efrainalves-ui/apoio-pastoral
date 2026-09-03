@@ -26,11 +26,20 @@ async function gravar(banco: ApoioDatabase, chave: CryptoKey, tipo: string, dado
 
 describe('classificação dos registros ligados a uma pessoa', () => {
   it('reconhece o que é só daquela pessoa', () => {
-    expect(isOnlyAboutPerson({ schemaVersion: 1, type: 'visit', data: { targetType: 'person', targetId: 'p1' } }, 'p1')).toBe(true)
-    expect(isOnlyAboutPerson({ schemaVersion: 1, type: 'visit', data: { targetType: 'family', targetId: 'f1' } }, 'p1')).toBe(false)
-    expect(isOnlyAboutPerson({ schemaVersion: 1, type: 'prayer_request', data: { subjectType: 'person', subjectId: 'p1' } }, 'p1')).toBe(true)
-    expect(isOnlyAboutPerson({ schemaVersion: 1, type: 'prayer_request', data: { subjectType: 'anonymous', subjectId: null } }, 'p1')).toBe(false)
-    expect(isOnlyAboutPerson({ schemaVersion: 1, type: 'family', data: { memberIds: ['p1'] } }, 'p1')).toBe(false)
+    expect(isOnlyAboutPerson({ schemaVersion: 1, type: 'visit', data: { targetType: 'person', targetId: 'p1' } }, 'p1', 'v1')).toBe(true)
+    expect(isOnlyAboutPerson({ schemaVersion: 1, type: 'visit', data: { targetType: 'family', targetId: 'f1' } }, 'p1', 'v1')).toBe(false)
+    expect(isOnlyAboutPerson({ schemaVersion: 1, type: 'prayer_request', data: { subjectType: 'person', subjectId: 'p1' } }, 'p1', 'o1')).toBe(true)
+    expect(isOnlyAboutPerson({ schemaVersion: 1, type: 'prayer_request', data: { subjectType: 'anonymous', subjectId: null } }, 'p1', 'o1')).toBe(false)
+    expect(isOnlyAboutPerson({ schemaVersion: 1, type: 'family', data: { memberIds: ['p1'] } }, 'p1', 'f1')).toBe(false)
+  })
+
+  it('o cadastro de uma pessoa só fala dela quando o registro é o dela', () => {
+    // O achado: `person` respondia `true` para qualquer cadastro, de qualquer
+    // pessoa. Era isso que fazia a exportação de uma pessoa sair com o cadastro
+    // completo de todas as outras dentro.
+    const cadastro = { schemaVersion: 1, type: 'person', data: { name: 'Pessoa Fictícia' } } as const
+    expect(isOnlyAboutPerson(cadastro, 'p1', 'p1')).toBe(true)
+    expect(isOnlyAboutPerson(cadastro, 'p1', 'p2')).toBe(false)
   })
 
   it('tira a citação da pessoa sem apagar o registro dos outros', () => {
@@ -135,6 +144,7 @@ describe('exportação e exclusão de uma pessoa', () => {
     expect(texto).toContain('Registros em que esta pessoa aparece junto de outras')
     expect(texto).toContain('Família')
     expect(texto).toContain('Sobre as outras pessoas')
+    expect(texto).not.toContain('Família Fictícia')
     expect(texto).not.toContain('outra-pessoa')
   })
 
@@ -239,22 +249,92 @@ describe('exportação e exclusão de uma pessoa', () => {
     expect(texto).toContain('routine')
   })
 
-  it('a exportação traz a versão redigida dos registros compartilhados', async () => {
+  it('a exportação traz a versão projetada dos registros compartilhados', async () => {
     const banco = novoBanco(); const chave = await generateMasterKey()
     const pessoa = await gravar(banco, chave, 'person', { name: 'Pessoa Fictícia Delta' })
-    await gravar(banco, chave, 'small_group', { name: 'PG Fictício', leaderId: pessoa, participantIds: [pessoa, 'outra-pessoa'], host: 'Casa fictícia' }, 'person')
+    await gravar(banco, chave, 'small_group', { name: 'PG Fictício da Irmã Sentinela', day: 'wednesday', leaderId: pessoa, participantIds: [pessoa, 'outra-pessoa'], host: 'Rua Fictícia, 123' }, 'person')
 
     const texto = (await new PersonDataService(banco).exportLines(CONTA, chave, pessoa)).join('\n')
 
     expect(texto).toContain('Pequeno Grupo')
-    expect(texto).toContain('PG Fictício')
     // O papel dela é o que interessa a quem pede os próprios dados: dizer
     // apenas "aparece neste registro" não responde nada.
     expect(texto).toContain('Como esta pessoa aparece')
     expect(texto).toContain('líder')
     expect(texto).toContain('participante')
     expect(texto).toContain('Sobre as outras pessoas')
+    // Campo estrutural sai; campo livre e endereço, não. O nome de um registro
+    // compartilhado é escrito pelo pastor e pode citar quem quer que seja.
+    expect(texto).toContain('wednesday')
+    expect(texto).not.toContain('PG Fictício da Irmã Sentinela')
+    expect(texto).not.toContain('Rua Fictícia')
     expect(texto).not.toContain('outra-pessoa')
+  })
+
+  it('exportar uma pessoa não entrega o cadastro de outra', async () => {
+    // O achado central: a exportação de uma pessoa saía com o cadastro
+    // completo de todas as outras pessoas da conta.
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    const alfa = await gravar(banco, chave, 'person', { name: 'Pessoa Sentinela Alfa', whatsapp: '(61) 90000-0001', notes: 'Observação sentinela de Alfa' })
+    const beta = await gravar(banco, chave, 'person', { name: 'Pessoa Sentinela Beta', whatsapp: '(61) 90000-0002', notes: 'Observação sentinela de Beta', address: 'Rua Sentinela de Beta, 45' })
+    await gravar(banco, chave, 'prayer_request', { subjectType: 'person', subjectId: beta, text: 'Pedido sentinela só de Beta', privateNotes: 'Reservado sentinela de Beta' }, 'prayer_request')
+    await gravar(banco, chave, 'visit', { targetType: 'person', targetId: beta, versions: [] }, 'visit')
+    await gravar(banco, chave, 'family', { name: 'Família Sentinela', memberIds: [alfa, beta] }, 'family')
+    await gravar(banco, chave, 'commission_meeting', {
+      date: '2026-05-01', location: 'Sala Sentinela', notes: 'Observação sentinela da comissão',
+      participantIds: [alfa, beta], guestNames: ['Convidado Sentinela'],
+      agenda: [{ id: 'a1', title: 'Assunto Sentinela', responsibleId: beta, dueDate: '2026-06-01' }],
+    }, 'commission_meeting')
+
+    const texto = (await new PersonDataService(banco).exportLines(CONTA, chave, alfa)).join('\n')
+
+    expect(texto).toContain('Pessoa Sentinela Alfa')
+    expect(texto).toContain('Observação sentinela de Alfa')
+    for (const sentinela of [
+      'Pessoa Sentinela Beta', 'Observação sentinela de Beta', 'Rua Sentinela de Beta',
+      '(61) 90000-0002', 'Pedido sentinela só de Beta', 'Reservado sentinela de Beta',
+      'Convidado Sentinela', 'Sala Sentinela', 'Observação sentinela da comissão',
+      'Assunto Sentinela', 'Família Sentinela', beta,
+    ]) {
+      expect(texto, `a exportação de Alfa não pode conter "${sentinela}"`).not.toContain(sentinela)
+    }
+  })
+
+  it('e a exportação da outra pessoa também não entrega a primeira', async () => {
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    const alfa = await gravar(banco, chave, 'person', { name: 'Pessoa Sentinela Alfa', notes: 'Observação sentinela de Alfa' })
+    const beta = await gravar(banco, chave, 'person', { name: 'Pessoa Sentinela Beta', notes: 'Observação sentinela de Beta' })
+    await gravar(banco, chave, 'visit', {
+      targetType: 'family', targetId: 'f1', notes: 'Anotação sentinela da visita inteira',
+      versions: [{
+        version: 1,
+        participants: [{ id: 'x', personId: alfa, present: true }, { id: 'y', personId: beta, present: true }],
+        answers: [
+          { id: 'r1', subjectId: alfa, value: 'Resposta sentinela de Alfa', question: { code: 'Q1', text: 'Pergunta do catálogo', category: 'espiritual' } },
+          { id: 'r2', subjectId: beta, value: 'Resposta sentinela de Beta', question: { code: 'Q1', text: 'Pergunta do catálogo', category: 'espiritual' } },
+        ],
+      }],
+    }, 'visit')
+
+    const texto = (await new PersonDataService(banco).exportLines(CONTA, chave, beta)).join('\n')
+
+    expect(texto).toContain('Resposta sentinela de Beta')
+    expect(texto).toContain('Pergunta do catálogo')
+    for (const sentinela of ['Pessoa Sentinela Alfa', 'Observação sentinela de Alfa', 'Resposta sentinela de Alfa', 'Anotação sentinela da visita inteira', alfa]) {
+      expect(texto, `a exportação de Beta não pode conter "${sentinela}"`).not.toContain(sentinela)
+    }
+  })
+
+  it('um registro ilegível não derruba a exportação', async () => {
+    const banco = novoBanco(); const chave = await generateMasterKey(); const outraChave = await generateMasterKey()
+    const pessoa = await gravar(banco, chave, 'person', { name: 'Pessoa Fictícia Ômega' })
+    await gravar(banco, outraChave, 'person', { name: 'Registro Ilegível Fictício' })
+
+    const texto = (await new PersonDataService(banco).exportLines(CONTA, chave, pessoa)).join('\n')
+
+    expect(texto).toContain('Pessoa Fictícia Ômega')
+    expect(texto).toContain('Registros que não abriram neste aparelho')
+    expect(await banco.corruptedRecords.where('accountId').equals(CONTA).count()).toBe(1)
   })
 
   it('descreve o papel em comissão, nomeação e campanha sem citar terceiro', () => {
@@ -263,9 +343,12 @@ describe('exportação e exclusão de uma pessoa', () => {
       data: { date: '2026-05-01', presidentId: 'p1', secretaryId: 'p2', participantIds: ['p1', 'p2'], agenda: [{ id: 'a1', title: 'Assunto Fictício', responsibleId: 'p1' }] },
     }, 'p1')
     const textoComissao = JSON.stringify(comissao)
-    expect(textoComissao).toContain('presidente')
-    expect(textoComissao).toContain('participante')
+    expect(textoComissao).toContain('presidiu a reunião')
+    expect(textoComissao).toContain('participante da reunião')
+    expect(textoComissao).toContain('responsável por um assunto')
     expect(textoComissao).not.toContain('p2')
+    // O assunto é texto livre da igreja e pode citar quem for.
+    expect(textoComissao).not.toContain('Assunto Fictício')
 
     const nomeacoes = redactForPerson({
       schemaVersion: 1, type: 'nomination_process',
@@ -279,11 +362,29 @@ describe('exportação e exclusão de uma pessoa', () => {
 
     const campanha = redactForPerson({
       schemaVersion: 1, type: 'evangelism_campaign',
-      data: { name: 'Campanha Fictícia', team: [{ id: 'e1', personId: 'p1', role: 'music' }, { id: 'e2', personId: 'p2', role: 'sound' }], points: [], tasks: [], followUps: [] },
+      data: { name: 'Campanha Fictícia', learnings: 'Aprendizado fictício sobre terceiro', team: [{ id: 'e1', personId: 'p1', role: 'music' }, { id: 'e2', personId: 'p2', role: 'sound' }], points: [], tasks: [], followUps: [] },
     }, 'p1')
     expect(JSON.stringify(campanha)).toContain('na equipe da campanha')
     expect(JSON.stringify(campanha)).toContain('music')
     expect(JSON.stringify(campanha)).not.toContain('sound')
+    // Nome e aprendizados da campanha são texto livre do pastor: não saem na
+    // exportação de uma pessoa.
+    expect(JSON.stringify(campanha)).not.toContain('Campanha Fictícia')
+    expect(JSON.stringify(campanha)).not.toContain('Aprendizado fictício')
+  })
+
+  it('um campo novo em registro compartilhado não sai sozinho', () => {
+    // A regra inversa — "copie tudo e depois tire o que é de terceiro" — erra
+    // sempre que aparece um campo novo, e erra entregando. Aqui a projeção é
+    // aditiva: o campo que ninguém autorizou simplesmente não aparece.
+    const grupo = redactForPerson({
+      schemaVersion: 1, type: 'small_group',
+      data: { day: 'monday', participantIds: ['p1', 'p2'], campoNovoInventado: 'Segredo fictício de terceiro' },
+    }, 'p1')
+
+    expect(JSON.stringify(grupo)).toContain('participante do Pequeno Grupo')
+    expect(JSON.stringify(grupo)).not.toContain('Segredo fictício de terceiro')
+    expect(JSON.stringify(grupo)).not.toContain('campoNovoInventado')
   })
 
   it('apaga o rastro que a exclusão deixaria para trás', async () => {
@@ -318,5 +419,65 @@ describe('exportação e exclusão de uma pessoa', () => {
     expect(aExpurgar.map(({ recordId }) => recordId).sort()).toEqual([oracao, pessoa].sort())
     const publicadas = new Set((await banco.outbox.toArray()).map(({ id }) => id))
     expect(aExpurgar.every(({ operationId }) => publicadas.has(operationId))).toBe(true)
+  })
+
+  it('não pede o expurgo da operação de outro registro, mesmo com gravação concorrente', async () => {
+    // O achado: a exclusão tirava um retrato da fila antes e outro depois, e
+    // chamava de "minhas" todas as operações que apareceram na diferença.
+    // Qualquer coisa enfileirada no meio — outra aba, outra tela — entrava
+    // junto, e o expurgo pedia ao serviço que apagasse o histórico de um
+    // registro que nada tinha a ver com a pessoa.
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    const pessoa = await gravar(banco, chave, 'person', { name: 'Pessoa Fictícia Zeta' })
+    const alheio = await gravar(banco, chave, 'sermon', { title: 'Sermão Fictício Alheio' }, 'sermon')
+
+    // Uma gravação concorrente entra na fila enquanto a exclusão acontece.
+    const repositorio = new VaultRepository(banco)
+    const concorrente = repositorio.saveEncrypted(
+      CONTA, APARELHO, alheio,
+      await encryptPayload(chave, { schemaVersion: 1, type: 'sermon', data: { title: 'Sermão Fictício Alterado' } }, alheio),
+      'sermon',
+    )
+    const exclusao = new PersonDataService(banco).remove(CONTA, chave, APARELHO, pessoa)
+    await Promise.all([concorrente, exclusao])
+
+    const aExpurgar = await pendingRemotePurge(CONTA, banco)
+    expect(aExpurgar.map(({ recordId }) => recordId)).toEqual([pessoa])
+    expect(aExpurgar.some(({ recordId }) => recordId === alheio)).toBe(false)
+    // E o registro alheio continua inteiro, com a alteração concorrente.
+    expect((await banco.vaultRecords.get(alheio))?.deletedAt).toBeUndefined()
+  })
+
+  it('a lápide e o pedido de expurgo entram juntos, ou nenhum dos dois', async () => {
+    // Entre publicar a lápide e registrar o expurgo havia uma janela: fechar o
+    // navegador ali deixava a pessoa apagada da tela e o passado dela inteiro,
+    // sem nada pendente que fizesse alguém voltar.
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    const pessoa = await gravar(banco, chave, 'person', { name: 'Pessoa Fictícia Ípsilon' })
+    const oracao = await gravar(banco, chave, 'prayer_request', { subjectType: 'person', subjectId: pessoa, text: 'Pedido fictício' }, 'prayer_request')
+
+    await new PersonDataService(banco).remove(CONTA, chave, APARELHO, pessoa)
+
+    const apagados = (await banco.vaultRecords.bulkGet([pessoa, oracao])).filter((registro) => registro?.deletedAt)
+    const aExpurgar = await pendingRemotePurge(CONTA, banco)
+    // Dois apagados, dois pedidos de expurgo: nunca um número sem o outro.
+    expect(apagados).toHaveLength(2)
+    expect(aExpurgar).toHaveLength(2)
+    expect(aExpurgar.map(({ recordId }) => recordId).sort()).toEqual([oracao, pessoa].sort())
+  })
+
+  it('apagar a mesma pessoa de novo não deixa alvo de expurgo apontando para o passado', async () => {
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    const pessoa = await gravar(banco, chave, 'person', { name: 'Pessoa Fictícia Ômega' })
+    const dados = new PersonDataService(banco)
+
+    await dados.remove(CONTA, chave, APARELHO, pessoa)
+    const primeiroAlvo = (await pendingRemotePurge(CONTA, banco))[0]
+    // A pessoa já está apagada: a segunda chamada não tem o que fazer e não
+    // pode trocar o alvo por uma operação que nunca existiu.
+    const segunda = await dados.remove(CONTA, chave, APARELHO, pessoa)
+
+    expect(segunda.removed).toBe(0)
+    expect((await pendingRemotePurge(CONTA, banco))[0]).toEqual(primeiroAlvo)
   })
 })

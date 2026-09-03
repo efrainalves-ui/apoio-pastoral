@@ -153,7 +153,7 @@ exigir(autorizacaoNova.status === 200, 'a sessão que encerrou registra a autori
 
 // 7. Versão do esquema e ambiente declarado, para o aplicativo conferir.
 const versao = await rpc(a, 'app_schema_version')
-exigir(versao.corpo.trim() === '8', 'o serviço responde a versão de esquema esperada')
+exigir(versao.corpo.trim() === '9', 'o serviço responde a versão de esquema esperada')
 const ambiente = await rpc(a, 'app_environment')
 exigir(ambiente.corpo.includes('homologacao'), 'o serviço declara ser o ambiente de homologação')
 const escritaAmbiente = await tabela(a, 'service_environment', {
@@ -162,9 +162,24 @@ const escritaAmbiente = await tabela(a, 'service_environment', {
 exigir(escritaAmbiente.status >= 400, 'o navegador não reescreve o ambiente declarado')
 
 // 8. A proteção de função nova é lida do catálogo, não afirmada por ninguém.
+//
+// Esta é a verificação obrigatória da migration 0007: o Supabase gerenciado
+// pode recusar `create event trigger` ao papel que aplica migrations. Se ela
+// falhar, a homologação PARA — não se segue em frente com uma proteção
+// automática que não existe, nem se enfraquece a migration para ela passar.
 const protecao = await rpc(a, 'protecao_de_funcao_nova')
 exigir(protecao.corpo.trim() === 'true',
-  'o gatilho que fecha função e procedimento novos está ativo neste projeto')
+  'o gatilho que fecha função e procedimento novos está ativo neste projeto (0007; se falhar, PARE a homologação)')
+
+// 8b. As tabelas de sessão não são alcançáveis pelo navegador.
+//
+// Antes da 0009 elas tinham `grant select` para `authenticated`: um aparelho
+// revogado, com o token ainda vivo, lia quantos aparelhos a conta tinha, quais
+// foram derrubados e quando.
+const sessoes = await tabela(a, 'device_sessions?select=session_id')
+exigir(sessoes.status >= 400, 'a tabela de sessões de aparelho não responde ao navegador')
+const revogadas = await tabela(a, 'revoked_sessions?select=session_id')
+exigir(revogadas.status >= 400, 'a tabela de sessões revogadas não responde ao navegador')
 
 // 9. Expurgo: sem a operação esperada, o serviço não apaga nada.
 const expurgoInvalido = await rpc(a, 'purge_record_history', { p_expected: [{ record_id: crypto.randomUUID() }] })

@@ -1,4 +1,5 @@
 import { requiredMajority, voteResult } from '../commissions/core'
+import { freeList, freeText } from '../reports/redaction'
 import type { PersonEntity } from '../people/types'
 import type { NominationCandidate, NominationMeeting, NominationOffice, NominationProcessData, NominationReportVersion } from './types'
 
@@ -56,7 +57,7 @@ export function publicReport(process: NominationProcessData, people: PersonEntit
  * foi indicado para cada cargo —, e é justamente por isso que nomear virou uma
  * decisão explícita: sem marcar, sai a estrutura dos cargos e não as pessoas.
  */
-export function publicReportText(churchName: string, process: NominationProcessData, report: NominationReportVersion, includeNames = false): string { return [churchName, 'Relatório da Comissão de Nomeações', `Período: ${process.period}`, report.presentationDate ? `Data de apresentação: ${report.presentationDate}` : 'Data de apresentação: a definir', ...report.lines.map((line) => `${line.officeTitle}: ${includeNames ? line.personName : 'nome não incluído'}`), ...(report.openOffices.length ? ['Vagas ainda abertas:', ...report.openOffices.map((office) => `- ${office}`)] : []), report.publicNote].filter(Boolean).join('\n\n') }
+export function publicReportText(churchName: string, process: NominationProcessData, report: NominationReportVersion, includeNames = false): string { return [churchName, 'Relatório da Comissão de Nomeações', `Período: ${process.period}`, report.presentationDate ? `Data de apresentação: ${report.presentationDate}` : 'Data de apresentação: a definir', ...report.lines.map((line) => `${line.officeTitle}: ${includeNames ? line.personName : 'nome não incluído'}`), ...(report.openOffices.length ? ['Vagas ainda abertas:', ...report.openOffices.map((office) => `- ${office}`)] : []), freeText(includeNames, report.publicNote)].filter(Boolean).join('\n\n') }
 export function officeDefault(area: string, title: string, vacancies = 1, allowsAssociates = officeAllowsAssociates(title)): NominationOffice { return { id: crypto.randomUUID(), area, title, vacancies, multiplePeople: vacancies > 1, allowsAssociates: allowsAssociates && officeAllowsAssociates(title), description: '', status: 'open', indicatedByOtherCommittee: false, officialStatus: 'pending' } }
 
 /**
@@ -70,11 +71,19 @@ export function officeDefault(area: string, title: string, vacancies = 1, allows
  * Todo o texto é apenas um ponto de partida: o pastor edita livremente e o que
  * ele salvar passa a valer no lugar deste modelo.
  */
-export function defaultMeetingAgenda(churchName: string, process: NominationProcessData, meeting: NominationMeeting, personName: (id: string) => string): string {
+/**
+ * Pauta padrão da Comissão de Nomeações.
+ *
+ * `includeNames` vale para os nomes e para tudo que é escrito à mão: o local
+ * e os itens de pauta acrescentados pelo pastor. Os passos numerados são texto
+ * fixo deste aplicativo, não do pastor, e continuam saindo — é o que faz a
+ * pauta sem nomes ainda ser uma pauta.
+ */
+export function defaultMeetingAgenda(churchName: string, process: NominationProcessData, meeting: NominationMeeting, personName: (id: string) => string, includeNames = false): string {
   return [
     `${churchName} · Comissão de Nomeações`,
     `Pauta da reunião · Período ${process.period}`,
-    `Data: ${meeting.date || 'a definir'} · Horário: ${meeting.time || 'a definir'} · Local: ${meeting.location || 'a definir'}`,
+    `Data: ${meeting.date || 'a definir'} · Horário: ${meeting.time || 'a definir'} · Local: ${freeText(includeNames, meeting.location) || 'a definir'}`,
     `Presidente: ${personName(meeting.presidentId)} · Secretário(a): ${personName(meeting.secretaryId)}`,
     `Quórum: ${meeting.participantIds.length} presentes; mínimo ${meeting.quorum}.`,
     '1. Oração inicial e leitura devocional.',
@@ -87,23 +96,31 @@ export function defaultMeetingAgenda(churchName: string, process: NominationProc
     '8. Consentimento dos indicados: quem fala com cada pessoa e até quando.',
     '9. Definição da lista que será apresentada à igreja.',
     '10. Data da primeira leitura do relatório e prazo para objeções.',
-    ...meeting.agenda.map((item, index) => `${index + 11}. ${item}`),
+    ...freeList(includeNames, meeting.agenda).map((item, index) => `${index + 11}. ${item}`),
     meeting.nextMeetingDate ? `Próxima reunião: ${meeting.nextMeetingDate}` : '',
     'Oração final.',
   ].filter(Boolean).join('\n\n')
 }
 
-export function defaultMeetingMinutes(churchName: string, process: NominationProcessData, meeting: NominationMeeting, personName: (id: string) => string): string {
+/**
+ * Ata padrão da Comissão de Nomeações.
+ *
+ * Os convidados, a oração inicial e a reflexão são exatamente o que a auditoria
+ * apontou: saíam por inteiro em uma ata pedida sem nomes. "Convidados: Fulano e
+ * Beltrana" identifica tão bem quanto uma lista de presença.
+ */
+export function defaultMeetingMinutes(churchName: string, process: NominationProcessData, meeting: NominationMeeting, personName: (id: string) => string, includeNames = false): string {
+  const convidados = freeList(includeNames, meeting.guestNames)
   return [
     `${churchName} · Comissão de Nomeações`,
     `Ata da reunião · Período ${process.period}`,
-    `Data: ${meeting.date || 'a definir'} · Horário: ${meeting.time || 'a definir'} · Local: ${meeting.location || 'a definir'}`,
+    `Data: ${meeting.date || 'a definir'} · Horário: ${meeting.time || 'a definir'} · Local: ${freeText(includeNames, meeting.location) || 'a definir'}`,
     `Presidente: ${personName(meeting.presidentId)} · Secretário(a): ${personName(meeting.secretaryId)}`,
     `Presentes: ${meeting.participantIds.map(personName).join(', ') || 'a registrar'}`,
-    meeting.guestNames.length ? `Convidados: ${meeting.guestNames.join(', ')}` : '',
+    convidados.length ? `Convidados: ${convidados.join(', ')}` : '',
     `Quórum: ${meeting.participantIds.length} presentes; mínimo ${meeting.quorum}. ${meeting.participantIds.length >= meeting.quorum ? 'Quórum confirmado.' : 'Sem quórum.'}`,
-    meeting.openingPrayer ? `Oração inicial: ${meeting.openingPrayer}` : 'Oração inicial: a registrar.',
-    meeting.reflection ? `Reflexão: ${meeting.reflection}` : '',
+    meeting.openingPrayer ? `Oração inicial: ${freeText(includeNames, meeting.openingPrayer)}` : 'Oração inicial: a registrar.',
+    meeting.reflection ? `Reflexão: ${freeText(includeNames, meeting.reflection)}` : '',
     'Decisões por cargo:',
     ...process.candidates.filter(candidateReady).map((candidate) => `- ${process.offices.find((office) => office.id === candidate.officeId)?.title ?? 'Cargo'}: ${personName(candidate.personId)} — recomendado.`),
     'Encaminhamentos: quem procura cada indicado para obter o consentimento e até quando.',
@@ -124,6 +141,6 @@ export function defaultFinalReport(churchName: string, process: NominationProces
     ...(report.openOffices.length ? ['Cargos ainda em aberto:', ...report.openOffices.map((office) => `- ${office}`)] : []),
     'Objeções: quem quiser apresentar observações deve procurar o presidente da comissão ou o pastor antes da segunda leitura. A comissão ouvirá cada pessoa e decidirá se muda a recomendação.',
     'A aprovação de cada nome se dá por maioria dos membros presentes que votarem.',
-    report.publicNote,
+    freeText(includeNames, report.publicNote),
   ].filter(Boolean).join('\n\n')
 }

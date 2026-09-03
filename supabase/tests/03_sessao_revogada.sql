@@ -330,6 +330,32 @@ select homologacao_testes.exigir(
   public.protecao_de_funcao_nova(),
   'o gatilho que fecha função e procedimento novos está ativo e verificável');
 
+-- ---------------------------------------------------------------------------
+-- As tabelas de sessão não são alcançáveis pelo cliente.
+--
+-- Antes da 0009, `device_sessions` e `revoked_sessions` tinham `grant select`
+-- para `authenticated` e política que só perguntava pelo dono: um aparelho
+-- revogado, com o token ainda vivo, lia por HTTP quantos aparelhos a conta
+-- tinha, quais foram derrubados e quando. Aqui o grant é conferido pelo
+-- catálogo, que é o que a API REST realmente usa.
+-- ---------------------------------------------------------------------------
+select homologacao_testes.exigir(
+  not has_table_privilege('authenticated', 'public.device_sessions', 'select')
+  and not has_table_privilege('anon', 'public.device_sessions', 'select'),
+  'a tabela de sessões de aparelho não é legível pelo cliente');
+select homologacao_testes.exigir(
+  not has_table_privilege('authenticated', 'public.revoked_sessions', 'select')
+  and not has_table_privilege('anon', 'public.revoked_sessions', 'select'),
+  'a tabela de sessões revogadas não é legível pelo cliente');
+
+-- Segunda camada: mesmo que alguém devolva o grant um dia, a política precisa
+-- exigir que a sessão de quem lê não esteja revogada.
+select homologacao_testes.exigir(
+  (select count(*) from pg_policies
+   where schemaname = 'public' and tablename in ('device_sessions', 'revoked_sessions')
+     and qual like '%session_is_not_revoked%') = 2,
+  'as políticas das duas tabelas de sessão exigem sessão não revogada');
+
 delete from public.service_environment;
 set request.jwt.claims = '{}';
 

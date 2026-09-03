@@ -19,8 +19,8 @@ Por isso o caminho é publicar em um endereço `https` **privado**.
 |---|---|
 | Aplicativo estático, sem servidor próprio | Pronto — a pasta `dist` é o site inteiro |
 | Manifesto, ícones e service worker | Prontos e conferidos por `pnpm verify:pwa` |
-| Rotas internas funcionando em link direto | `public/_redirects` e `vercel.json` |
-| Cabeçalhos de segurança | `vercel.json` |
+| Rotas internas funcionando em link direto | `public/_redirects` |
+| Cabeçalhos de segurança | `public/_headers`, conferido por `pnpm verify:headers` |
 | Nenhuma chave no repositório | Conferido por `pnpm verify:repo` |
 
 Gerar a versão para enviar:
@@ -31,23 +31,41 @@ pnpm install --frozen-lockfile && pnpm build
 
 ## O que só você pode fazer
 
-Escolha **um** serviço de hospedagem estática que ofereça proteção por senha, e
-entre com a sua conta. Qualquer um dos três serve:
+**Cloudflare Pages é a única hospedagem suportada nesta fase**, com Cloudflare
+Access ligado.
 
-- **Cloudflare Pages** com Cloudflare Access
-- **Netlify** com proteção por senha do site
-- **Vercel** com proteção por senha (Deployment Protection)
+Não é preferência: `public/_headers` está no formato do Cloudflare Pages e é o
+único lugar onde os cabeçalhos de segurança deste aplicativo existem — CSP,
+HSTS, Permissions-Policy, as políticas de origem cruzada e a regra que impede o
+service worker de ficar preso em cache. Havia aqui um `vercel.json` versionado
+com três cabeçalhos e nenhum dos demais: publicar por ali era publicar o mesmo
+aplicativo com bem menos proteção, e nada avisava. Ele foi retirado, e
+`pnpm verify:headers` reprova se um arquivo de configuração de outra hospedagem
+voltar ao repositório.
 
-Em todos, o procedimento é o mesmo:
+Para apoiar outra hospedagem, o caminho é este, nesta ordem: reproduzir **todos**
+os cabeçalhos de `public/_headers` no formato dela, conferir cada um na resposta
+HTTP real do ambiente publicado, e só então versionar a configuração e ampliar
+`scripts/verify-headers.mjs`. Enquanto isso não for feito e registrado, a
+alternativa não é documentada — documentar uma opção com proteção inferior é
+oferecer a opção errada.
 
-1. Criar um projeto novo e **privado**, apontando para a pasta `dist`.
-2. **Ligar a proteção por senha antes do primeiro envio.** Sem isso o endereço
+Procedimento:
+
+1. Criar um projeto novo e **privado** no Cloudflare Pages, apontando para a
+   pasta `dist`.
+2. **Ligar o Cloudflare Access antes do primeiro envio.** Sem isso o endereço
    fica aberto na internet.
 3. Definir as variáveis de ambiente do projeto, com os mesmos valores do seu
    `.env.local`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
-   `VITE_APP_ENV=homologacao` e `VITE_DISABLE_SYNC=false`. Aponte **somente**
-   para o projeto Supabase de homologação.
-4. Enviar a pasta `dist` e conferir que o endereço pede senha.
+   `VITE_SUPABASE_PROJECT_REF`, `VITE_APP_ENV=homologacao` e
+   `VITE_DISABLE_SYNC=false`. Aponte **somente** para o projeto Supabase de
+   homologação. As quatro primeiras precisam ser do mesmo projeto: a build
+   confere e se recusa a abrir se discordarem.
+4. Rodar `pnpm verify:env` com essas variáveis antes de enviar. Ele reprova a
+   build que declara homologação e esquece endereço, chave ou projeto — a falha
+   que antes virava, em silêncio, um aplicativo funcionando só no aparelho.
+5. Enviar a pasta `dist` e conferir que o endereço pede autenticação.
 
 ## No aparelho
 

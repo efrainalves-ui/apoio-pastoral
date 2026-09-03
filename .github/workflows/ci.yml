@@ -14,6 +14,9 @@ jobs:
     timeout-minutes: 15
     env:
       CI: 'true'
+      # Modo local deixou de ser o que sobra: a build precisa declarar o
+      # ambiente, e o CI declara desenvolvimento com dados fictícios.
+      VITE_APP_ENV: 'desenvolvimento'
       VITE_DISABLE_SYNC: 'true'
     steps:
       - uses: actions/checkout@v7
@@ -29,10 +32,15 @@ jobs:
       - run: pnpm exec vitest run --maxWorkers=1
       - run: pnpm build
       - run: pnpm verify:pwa
+      - name: Conferir a configuração de ambiente desta build
+        run: pnpm verify:env
       - name: Conferir os cabeçalhos de segurança versionados
         run: pnpm verify:headers
       - name: Revisão de segurança do repositório
         run: pnpm verify:repo
+
+      - name: Auditoria de dependências
+        run: pnpm audit --audit-level=low
 
   banco:
     name: Migrations, reversão e RLS
@@ -74,6 +82,9 @@ jobs:
     timeout-minutes: 20
     env:
       CI: 'true'
+      # Modo local deixou de ser o que sobra: a build precisa declarar o
+      # ambiente, e o CI declara desenvolvimento com dados fictícios.
+      VITE_APP_ENV: 'desenvolvimento'
       VITE_DISABLE_SYNC: 'true'
     steps:
       - uses: actions/checkout@v7

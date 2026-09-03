@@ -47,4 +47,16 @@ export interface SyncSummary {
    * de onde parou. Sem este aviso, o aparelho dizia "em dia" com dados faltando.
    */
   incomplete: boolean
+  /**
+   * Verdadeiro quando ainda há registros esperando o expurgo do histórico no
+   * serviço.
+   *
+   * Uma exclusão de pessoa só está concluída quando o passado dela sai também
+   * do serviço. Enquanto isso não acontece, a rodada não pode ser anunciada
+   * como sucesso: o pastor leria "tudo sincronizado" com o histórico do que ele
+   * mandou apagar ainda guardado do outro lado.
+   */
+  purgePending: boolean
+  /** Verdadeiro quando a fila de envio não coube inteira nesta rodada. */
+  pushPending: boolean
 }

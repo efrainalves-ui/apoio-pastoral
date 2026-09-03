@@ -104,9 +104,18 @@ A build declara em qual ambiente está, e só dois valores abrem conexão remota
 
 | `VITE_APP_ENV` | O que acontece |
 |---|---|
-| vazio ou qualquer outro valor | tudo local, nenhuma conexão remota |
+| `desenvolvimento` | tudo local, nenhuma conexão remota |
 | `homologacao` | fala com o projeto Supabase de teste, só dados fictícios |
 | `producao` | fala com o projeto Supabase real do distrito |
+| vazio ou qualquer outro valor | **o aplicativo não abre** |
+
+Modo local deixou de ser o que sobra quando alguém esquece a variável. Antes,
+uma build que declarava homologação e esquecia o endereço do serviço não parava:
+caía no transporte local e abria normalmente, e o pastor cadastraria o distrito
+inteiro achando que estava sincronizando. Agora `homologacao` e `producao`
+falham fechado — sem endereço, sem chave pública, sem projeto declarado, com os
+três discordando, ou com `VITE_DISABLE_SYNC=true`, a build mostra o motivo e não
+abre. E uma build sem ambiente declarado também não abre.
 
 Cada ambiente tem o seu próprio projeto Supabase, com URL e chave pública
 próprias, guardadas apenas no painel do provedor e no `.env.local` de quem
@@ -119,8 +128,38 @@ endereço, o projeto declarado e o projeto gravado dentro da chave pública. Se
 os três não forem o mesmo, nenhuma conexão é aberta — é o que impede uma build
 de produção falar com o banco de teste, e o contrário.
 
+Antes de publicar, rode a mesma conferência fora do navegador:
+
+```bash
+pnpm verify:env
+```
+
+Ele lê `VITE_APP_ENV`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
+`VITE_SUPABASE_PROJECT_REF` e `VITE_DISABLE_SYNC` do ambiente de quem executa,
+reprova o que estiver faltando ou discordando, e não imprime valor nenhum — só
+o nome da variável. Os dois workflows já o executam.
+
 O ambiente de homologação mostra uma marca discreta "Homologação" no cabeçalho.
 Se ela aparecer em produção, a build foi gerada com a variável errada.
+
+## 5.1 Hospedagem: Cloudflare Pages, e só
+
+Nesta fase, **Cloudflare Pages é a única hospedagem oficialmente suportada**.
+
+`public/_headers` está no formato do Cloudflare Pages e é o único lugar onde os
+cabeçalhos de segurança deste aplicativo existem: CSP, HSTS, Permissions-Policy,
+as políticas de origem cruzada e a regra que impede o service worker de ficar
+preso em cache. Havia um `vercel.json` versionado com três desses cabeçalhos e
+nenhum dos outros — publicar por ali era publicar o mesmo aplicativo com bem
+menos proteção, e nada na documentação dizia isso. Ele foi retirado.
+
+`pnpm verify:headers` confere `public/_headers` e reprova se um arquivo de
+configuração de outra hospedagem voltar ao repositório. Para apoiar outra:
+reproduzir **todos** os cabeçalhos no formato dela, conferir cada um na resposta
+HTTP real do ambiente publicado, e só então versionar a configuração e ampliar o
+script. Enquanto isso não for feito e registrado, a alternativa não é
+documentada — documentar uma opção com proteção inferior é oferecer a opção
+errada.
 
 ## 6. Migrations, na ordem de aplicação
 
@@ -131,20 +170,37 @@ No projeto de produção recém-criado, aplique nesta ordem:
 | 1 | `supabase/migrations/0001_marco_zero_up.sql` | `devices`, `device_key_envelopes`, `recovery_key_envelopes`, `encrypted_operations`; índice do cursor de sincronização; gatilho que impede reativar aparelho revogado; RLS por dono e privilégios mínimos |
 | 2 | `supabase/migrations/0002_password_key_envelopes_up.sql` | `password_key_envelopes`, com RLS por dono e mínimo de 600 mil iterações |
 | 3 | `supabase/migrations/0003_device_sessions_up.sql` | ordem de chegada (`seq`) e assinatura das operações; `device_sessions` e `revoked_sessions`; funções `claim_device`, `approve_device`, `revoke_device`, `upload_operations`, `download_operations` e `app_schema_version`; retirada da escrita direta em `devices` e `encrypted_operations`; privilégios padrão do schema revogados |
+| 4 | `supabase/migrations/0004_sessao_revogada_e_ambiente_up.sql` | `session_is_not_revoked` e `session_is_authorized`; políticas dos envelopes exigindo sessão não revogada; `service_environment` e `app_environment`; `revoke_all_devices` |
+| 5 | `supabase/migrations/0005_ambiente_antes_da_senha_up.sql` | `app_schema_version` e `app_environment` respondem antes da autenticação, para a conferência acontecer antes de a credencial sair |
+| 6 | `supabase/migrations/0006_expurgo_de_historico_up.sql` | `purge_record_history`, que apaga o histórico de um registro somente quando a operação esperada ainda é a última dele |
+| 7 | `supabase/migrations/0007_funcao_nova_fechada_up.sql` | gatilho de evento que tira o EXECUTE de PUBLIC de toda função e procedimento criados em `public`, e `protecao_de_funcao_nova()` para conferir isso pelo catálogo |
+| 8 | `supabase/migrations/0008_revogacao_idempotente_up.sql` | `revoke_all_devices` idempotente: repetir devolve zero em vez de erro, e é assim que a retomada distingue trabalho já feito de falha |
+| 9 | `supabase/migrations/0009_sessoes_fora_de_alcance_up.sql` | `device_sessions` e `revoked_sessions` saem do alcance direto do cliente, e suas políticas passam a exigir sessão não revogada |
 
-O aplicativo espera a versão de esquema **3** (`app_schema_version()`) e recusa
-sincronizar com um serviço em versão diferente. Aplicar as três migrations é
+O aplicativo espera a versão de esquema **9** (`app_schema_version()`) e recusa
+sincronizar com um serviço em versão diferente. Aplicar as nove migrations é
 obrigatório antes da primeira entrada.
+
+**A migration 7 pode não ser aplicável em todo projeto Supabase gerenciado**:
+ela depende de `create event trigger`, e essa permissão ainda não foi comprovada.
+Se o Supabase recusar, a transação aborta e a migration falha — que é o
+comportamento certo. A conferência obrigatória e o que fazer nesse caso estão em
+[SUPABASE_HOMOLOGATION.md](SUPABASE_HOMOLOGATION.md), na seção "Parada
+obrigatória". Enquanto ela não passar, a homologação fechada não começa.
 
 Operações que já existirem no banco sem assinatura de metadados — só é o caso
 de bancos de teste anteriores a esta versão — entram em quarentena no aparelho
 que as receber, sem serem aplicadas. Em um projeto de produção recém-criado
 isso não acontece.
 
-Para desfazer, na ordem inversa: `0003_device_sessions_down.sql`,
-`0002_password_key_envelopes_down.sql` e
-`0001_marco_zero_down.sql`. Desfazer apaga as tabelas e o que estiver nelas —
-faça backup antes e só em ambiente de teste.
+Para desfazer, na ordem inversa: `0009_sessoes_fora_de_alcance_down.sql`,
+`0008_revogacao_idempotente_down.sql`, `0007_funcao_nova_fechada_down.sql`,
+`0006_expurgo_de_historico_down.sql`, `0005_ambiente_antes_da_senha_down.sql`,
+`0004_sessao_revogada_e_ambiente_down.sql`, `0003_device_sessions_down.sql`,
+`0002_password_key_envelopes_down.sql` e `0001_marco_zero_down.sql`. Desfazer
+apaga as tabelas e o que estiver nelas — faça backup antes e só em ambiente de
+teste. A reversão da `0009` devolve a leitura direta das tabelas de sessão ao
+cliente: só faz sentido para desfazer uma aplicação errada.
 
 Os dois workflows do GitHub aplicam, provam e revertem essas migrations em um
 Postgres descartável a cada envio, incluindo a prova de isolamento entre duas

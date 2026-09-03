@@ -17,7 +17,10 @@ describe('trava de ambiente da conexão remota', () => {
     const { assertRemoteEnvironment, currentEnvironment } = await carregarComAmbiente(undefined)
 
     expect(() => { assertRemoteEnvironment() }).toThrowError(/ambiente declarado/u)
-    expect(currentEnvironment()).toBe('local')
+    // Sem declaração, o ambiente é `indefinido`: nem local, nem remoto. Modo
+    // local passou a exigir `VITE_APP_ENV=desenvolvimento`, escrito de
+    // propósito, em vez de ser o que sobra quando alguém esquece a variável.
+    expect(currentEnvironment()).toBe('indefinido')
   })
 
   // Um valor parecido não vale: só os dois nomes exatos abrem conexão.
@@ -105,7 +108,7 @@ describe('o serviço precisa declarar o próprio ambiente', () => {
     vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'chave-publica-ficticia')
     vi.stubEnv('VITE_SUPABASE_PROJECT_REF', 'homolog-fake')
     const rpc = vi.fn((nome: string) => Promise.resolve({
-      data: nome === 'app_schema_version' ? 8 : ambienteDoBanco,
+      data: nome === 'app_schema_version' ? 9 : ambienteDoBanco,
       error: null,
     }))
     vi.doMock('@supabase/supabase-js', () => ({ createClient: () => ({ rpc, auth: {} }) }))
@@ -144,7 +147,7 @@ describe('o serviço precisa declarar o próprio ambiente', () => {
     vi.stubEnv('VITE_SUPABASE_PROJECT_REF', 'homolog-fake')
     vi.doMock('@supabase/supabase-js', () => ({
       createClient: () => ({
-        rpc: (nome: string) => { ordem.push(`rpc:${nome}`); return Promise.resolve({ data: nome === 'app_schema_version' ? 8 : 'homologacao', error: null }) },
+        rpc: (nome: string) => { ordem.push(`rpc:${nome}`); return Promise.resolve({ data: nome === 'app_schema_version' ? 9 : 'homologacao', error: null }) },
         auth: {
           signInWithPassword: () => { ordem.push('senha-enviada'); return Promise.resolve({ data: { user: { id: 'x' } }, error: null }) },
           signUp: () => { ordem.push('senha-enviada'); return Promise.resolve({ data: { user: { id: 'x' }, session: {} }, error: null }) },
@@ -190,7 +193,7 @@ describe('o serviço precisa declarar o próprio ambiente', () => {
     vi.stubEnv('VITE_SUPABASE_PROJECT_REF', 'homolog-fake')
     vi.doMock('@supabase/supabase-js', () => ({
       createClient: () => ({
-        rpc: (nome: string) => { ordem.push(`rpc:${nome}`); return Promise.resolve({ data: nome === 'app_schema_version' ? 8 : 'homologacao', error: null }) },
+        rpc: (nome: string) => { ordem.push(`rpc:${nome}`); return Promise.resolve({ data: nome === 'app_schema_version' ? 9 : 'homologacao', error: null }) },
         auth: {
           resetPasswordForEmail: () => { ordem.push('e-mail-enviado'); return Promise.resolve({ error: null }) },
           resend: () => { ordem.push('e-mail-enviado'); return Promise.resolve({ error: null }) },

@@ -141,6 +141,97 @@ Migrations novas: `0005_ambiente_antes_da_senha`, `0006_expurgo_de_historico` e
 `0007_funcao_nova_fechada`. Versão de esquema 7. Banco local na versão 12, com
 `pendingActions`.
 
+## Etapa estável: quarta revisão independente
+
+Treze achados de uma auditoria independente do commit `8421f8e`. Cada um foi
+reproduzido no código antes de qualquer correção. Cinco eram bloqueadores.
+
+**1. Duas contas em abas do mesmo navegador.** A sessão do serviço é uma só para
+toda a origem: entrar como B em uma aba fazia a aba que mostrava A agir como B.
+Listar aparelhos mostrava os de B, revogar revogava os de B, encerrar distrito
+encerrava o de B, e a lápide de uma pessoa apagada em A ia para a conta B. Agora
+toda operação remota confere `user.id === accountId` antes de acontecer; quando
+não confere, a aba é bloqueada, o cofre fecha e só um acesso novo com e-mail e
+senha a devolve. Falha fechada: erro ao conferir também bloqueia.
+
+**2. Exportação de dados de uma pessoa.** `isOnlyAboutPerson` respondia `true`
+para qualquer registro do tipo `person` — a exportação de uma pessoa saía com o
+cadastro completo de todas as outras. E os registros compartilhados eram
+copiados como objetos inteiros: bastava um item citar a pessoa para sair tudo
+que houvesse dentro dele. As duas coisas foram corrigidas na raiz: o tipo
+`person` só fala desta pessoa quando o registro é o dela, e a redação virou
+projeção explícita por tipo — nada sai a não ser o que está escrito, campo por
+campo. Campo novo não sai sozinho.
+
+**3. Encerrar distrito.** A intenção passou a ser gravada antes da primeira
+exclusão local, e o encerramento só termina depois de publicar as lápides,
+confirmar que subiram, expurgar o histórico distrital no serviço, revogar os
+aparelhos e reautorizar este. Cada etapa é idempotente; retomar três vezes deixa
+um aparelho ativo e sete lápides, não vinte e uma.
+
+**4. Exclusão completa de pessoa.** A identificação das operações a expurgar
+vinha de um retrato da fila antes e outro depois: qualquer gravação concorrente
+entrava na diferença, e o expurgo pedia para apagar o histórico de um registro
+alheio. Agora os identificadores saem de dentro da própria gravação, e a lápide
+e o pedido de expurgo entram na mesma transação. `PeopleService.deletePerson`,
+o caminho antigo que publicava a lápide e ia embora, foi retirado.
+
+**5. Documentos sem nomes.** "Sem nomes" escondia o campo Nome e deixava passar
+todo o resto. A ata da comissão saía com a oração inicial, a reflexão, os
+convidados, os assuntos, as propostas e as observações; a assinatura trazia o
+nome do pastor digitado à mão; o itinerário trazia o local e o endereço; o
+relatório da campanha trazia o texto dos aprendizados. Todo campo livre passou a
+seguir a mesma confirmação, e um teste com sentinelas percorre todos os tipos de
+documento.
+
+**6. Recuperação em navegador novo.** A troca de senha grava o envelope novo
+como pendente antes de o serviço saber dele. Interrompida ali, a entrada
+seguinte dizia "este dispositivo precisa ser autorizado com a chave de
+recuperação" — com a senha certa na mão e o envelope que ela abre no mesmo
+banco. O pendente passou a ser aceito, e só vale se abrir com a senha.
+
+**7. Configuração remota obrigatória.** Homologação e produção falham fechado:
+sem endereço, chave pública ou projeto declarado, com os três discordando, ou
+com a sincronização desligada, a build não abre. Modo local deixou de ser o que
+sobra e virou `VITE_APP_ENV=desenvolvimento`. `pnpm verify:env` faz a mesma
+conferência no processo de publicação.
+
+**8. Sessões técnicas após revogação.** `device_sessions` e `revoked_sessions`
+tinham `grant select` para `authenticated`: um aparelho revogado lia o mapa da
+conta. A migration `0009` retira o grant e exige, na política, sessão não
+revogada.
+
+**9. Dados cifrados corrompidos.** A quarentena saiu da memória para o banco.
+Um registro que não abre não derruba mais backup, exportação, encerramento nem
+listagens, e sai da quarentena sozinho quando volta a abrir.
+
+**10. Restauração de backup.** Conferida por inteiro antes da primeira
+gravação, aplicada em lotes atômicos, retomável, e a sincronização se recusa a
+subir um estado parcialmente restaurado. O que fica guardado para a retomada é
+o arquivo cifrado, nunca o conteúdo aberto.
+
+**11. Tela de sincronização.** Sucesso só quando `syncConfirmed` é verdadeiro.
+Offline, paginação faltando, fila de envio cheia e expurgo pendente passaram a
+ser estados próprios, com o motivo escrito.
+
+**12. Migration 0007.** A permissão de `create event trigger` no Supabase
+gerenciado continua não comprovada. A migration não foi enfraquecida: ela aborta
+se o gatilho não ficar ativo. `SUPABASE_HOMOLOGATION.md` ganhou a seção "Parada
+obrigatória", com as três conferências e a instrução explícita de parar a
+homologação se qualquer uma reprovar.
+
+**13. Hospedagem.** `vercel.json` foi retirado: ele tinha três cabeçalhos e
+nenhum dos demais. Cloudflare Pages é a única hospedagem suportada nesta fase, e
+`pnpm verify:headers` reprova se a configuração de outra voltar ao repositório.
+
+Migration nova: `0009_sessoes_fora_de_alcance`. Versão de esquema 9. Banco local
+na versão 13, com `corruptedRecords`.
+
+**Pendente**: as migrations e as provas SQL não rodaram nesta máquina (sem
+Postgres nem Docker) — elas rodam no CI Linux. O Playwright continua bloqueado
+pelo sandbox do macOS. Nada foi aplicado em Supabase, e o projeto de produção
+permanece vazio e intocado.
+
 ## Etapa estável: segunda revisão independente
 
 Dez achados de uma segunda revisão. Cada um foi reproduzido no código antes de

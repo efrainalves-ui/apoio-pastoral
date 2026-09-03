@@ -6,6 +6,7 @@ import { VaultRepository } from '../db/repository'
 import type { EncryptedMutation } from '../db/repository'
 import type { VaultRecord } from '../db/types'
 import { DistrictService } from '../district/service'
+import { freeList, freeText } from '../reports/redaction'
 import { agendaText, canDeliberate, elderPresidencyAllowed, meetingPresidentName, minutesText, presidentMayBreakTie, tieBreakNote, voteNumber, voteResult } from './core'
 import type { CommissionAgendaItem, CommissionConfigData, CommissionEntity, CommissionMeetingData, CommissionTaskData, TaskStatus, PresidentTieBreak } from './types'
 
@@ -198,12 +199,51 @@ export class CommissionService {
     return { id: task.id, ...data }
   }
 
-  agendaDocument(meeting: CommissionEntity<CommissionMeetingData>, churchName: string, personName: (id: string) => string = (id) => id): string {
-    return [churchName, meeting.kind === 'board' ? 'Agenda da Comissão Diretiva' : 'Agenda da Reunião Administrativa', `Data: ${meeting.date} · Horário: ${meeting.time || 'a confirmar'} · Local: ${meeting.location || 'a confirmar'}`, `Presidente: ${meetingPresidentName(meeting, personName)} · Secretário(a): ${personName(meeting.secretaryId)}`, `Participantes: ${meeting.participantIds.map(personName).join(', ') || 'A confirmar'}`, meeting.openingPrayer ? `Oração: ${meeting.openingPrayer}` : '', meeting.reflection ? `Reflexão: ${meeting.reflection}` : '', ...[...meeting.agenda].sort((a, b) => a.order - b.order).map((item) => `${item.order}. ${item.title}${item.sourceVoteNumber ? ` (Origem: voto ${item.sourceVoteNumber})` : ''}\n${agendaText(item)}`)].filter(Boolean).join('\n\n')
+  /**
+   * Pauta para imprimir.
+   *
+   * `includeNames` deixou de valer só para os nomes. O local da reunião, a
+   * oração inicial, a reflexão, o título de cada assunto e a proposta são todos
+   * texto escrito pelo pastor e pelo secretário, e é ali que aparecem as
+   * pessoas: "conversar com a irmã Fulana sobre o afastamento". Antes esses
+   * campos saíam sempre, e a pauta dizia "sem nomes" trazendo todos eles. Sem a
+   * confirmação, restam a igreja, a data, os cargos e a ordem dos assuntos, e
+   * cada texto omitido aparece marcado como tal.
+   */
+  agendaDocument(meeting: CommissionEntity<CommissionMeetingData>, churchName: string, personName: (id: string) => string = (id) => id, includeNames = false): string {
+    const convidados = freeList(includeNames, meeting.guestNames)
+    return [
+      churchName,
+      meeting.kind === 'board' ? 'Agenda da Comissão Diretiva' : 'Agenda da Reunião Administrativa',
+      `Data: ${meeting.date} · Horário: ${meeting.time || 'a confirmar'} · Local: ${freeText(includeNames, meeting.location) || 'a confirmar'}`,
+      `Presidente: ${meetingPresidentName(meeting, personName, includeNames)} · Secretário(a): ${personName(meeting.secretaryId)}`,
+      `Participantes: ${meeting.participantIds.map(personName).join(', ') || 'A confirmar'}`,
+      convidados.length ? `Convidados: ${convidados.join(', ')}` : '',
+      meeting.openingPrayer ? `Oração: ${freeText(includeNames, meeting.openingPrayer)}` : '',
+      meeting.reflection ? `Reflexão: ${freeText(includeNames, meeting.reflection)}` : '',
+      ...[...meeting.agenda].sort((a, b) => a.order - b.order).map((item) => `${item.order}. ${freeText(includeNames, item.title)}${item.sourceVoteNumber ? ` (Origem: voto ${item.sourceVoteNumber})` : ''}\n${includeNames ? agendaText(item) : 'PROPÕE-SE texto não incluído.'}`),
+    ].filter(Boolean).join('\n\n')
   }
 
-  minutesDocument(meeting: CommissionEntity<CommissionMeetingData>, churchName: string, quorum: number, personName: (id: string) => string = (id) => id): string {
+  /** Ata da reunião, com a mesma regra da pauta. */
+  minutesDocument(meeting: CommissionEntity<CommissionMeetingData>, churchName: string, quorum: number, personName: (id: string) => string = (id) => id, includeNames = false): string {
     const present = meeting.participantIds.length + meeting.votingGuestNames.length
-    return [churchName, meeting.kind === 'board' ? 'Ata da Comissão Diretiva' : 'Ata da Reunião Administrativa', `Data: ${meeting.date} · Horário: ${meeting.time || 'a confirmar'} · Local: ${meeting.location || 'a confirmar'}`, `Presidente: ${meetingPresidentName(meeting, personName)} · Secretário(a): ${personName(meeting.secretaryId)}`, `Participantes: ${meeting.participantIds.map(personName).join(', ') || 'Nenhum informado'}`, `Quórum: ${present} presentes com voto; mínimo ${quorum}. ${canDeliberate(present, quorum) ? 'Quórum confirmado.' : 'Sem quórum.'}`, ...meeting.agenda.filter((item) => item.vote).map((item) => `${item.vote?.voteNumber ?? 'Decisão sem número'} · ${minutesText(item)}\nFavoráveis: ${item.vote?.favorable}; contrários: ${item.vote?.against}; abstenções: ${item.vote?.abstentions}. Resultado: ${item.vote?.result}.${item.vote?.presidentTieBreak ? `\n${tieBreakNote(item.vote.presidentTieBreak)}` : ''}`), meeting.notes ? `Observações: ${meeting.notes}` : '', `Assinaturas:\n${meetingPresidentName(meeting, personName)} — Presidente\n${personName(meeting.secretaryId)} — Secretário(a)`].filter(Boolean).join('\n\n')
+    const convidados = freeList(includeNames, [...meeting.guestNames, ...meeting.votingGuestNames])
+    return [
+      churchName,
+      meeting.kind === 'board' ? 'Ata da Comissão Diretiva' : 'Ata da Reunião Administrativa',
+      `Data: ${meeting.date} · Horário: ${meeting.time || 'a confirmar'} · Local: ${freeText(includeNames, meeting.location) || 'a confirmar'}`,
+      `Presidente: ${meetingPresidentName(meeting, personName, includeNames)} · Secretário(a): ${personName(meeting.secretaryId)}`,
+      `Participantes: ${meeting.participantIds.map(personName).join(', ') || 'Nenhum informado'}`,
+      convidados.length ? `Convidados: ${convidados.join(', ')}` : '',
+      `Quórum: ${present} presentes com voto; mínimo ${quorum}. ${canDeliberate(present, quorum) ? 'Quórum confirmado.' : 'Sem quórum.'}`,
+      meeting.openingPrayer ? `Oração: ${freeText(includeNames, meeting.openingPrayer)}` : '',
+      meeting.reflection ? `Reflexão: ${freeText(includeNames, meeting.reflection)}` : '',
+      // A decisão continua legível sem nomes: número do voto, contagem e
+      // resultado. O que sai é o texto do que foi votado, que é livre.
+      ...meeting.agenda.filter((item) => item.vote).map((item) => `${item.vote?.voteNumber ?? 'Decisão sem número'} · ${includeNames ? minutesText(item) : 'VOTADO texto não incluído.'}\nFavoráveis: ${item.vote?.favorable}; contrários: ${item.vote?.against}; abstenções: ${item.vote?.abstentions}. Resultado: ${item.vote?.result}.${item.vote?.presidentTieBreak ? `\n${tieBreakNote(item.vote.presidentTieBreak)}` : ''}`),
+      meeting.notes ? `Observações: ${freeText(includeNames, meeting.notes)}` : '',
+      `Assinaturas:\n${meetingPresidentName(meeting, personName, includeNames)} — Presidente\n${personName(meeting.secretaryId)} — Secretário(a)`,
+    ].filter(Boolean).join('\n\n')
   }
 }

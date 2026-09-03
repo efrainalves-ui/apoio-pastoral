@@ -130,14 +130,31 @@ export interface MigrationRecord {
  * serviço, sem nada na tela explicando por quê. Esta marca é o que permite
  * retomar de onde parou.
  */
+export type PendingActionKind = 'close_district' | 'purge_history' | 'restore_backup'
+
+/**
+ * Etapas do encerramento de distrito e da restauração de backup, na ordem em
+ * que acontecem. A marca é gravada **antes** da primeira alteração local, e é
+ * ela que diz por onde a retomada continua.
+ */
+export type PendingActionStage =
+  | 'intent'
+  | 'tombstones'
+  | 'syncing'
+  | 'purging'
+  | 'revoking'
+  | 'reauthorizing'
+  | 'restoring_pastoral'
+  | 'restoring_personal'
+
 export interface PendingActionRecord {
   /** `${accountId}:${kind}` — uma pendência de cada tipo por conta. */
   id: string
   accountId: string
-  kind: 'close_district' | 'purge_history'
+  kind: PendingActionKind
   createdAt: string
   /** Etapa concluída por último, para a retomada saber por onde continuar. */
-  stage?: 'revoking' | 'reauthorizing'
+  stage?: PendingActionStage
   /**
    * Registros cujo histórico cifrado ainda precisa ser apagado no serviço.
    * A lista vive aqui, e não em memória, porque o expurgo só pode acontecer
@@ -159,8 +176,64 @@ export interface PendingActionRecord {
    * conta, um por interrupção.
    */
   newDeviceId?: string
+  /**
+   * Registros que o encerramento marcou para apagar, escolhidos antes da
+   * primeira exclusão local.
+   *
+   * A intenção é gravada primeiro justamente para o caso de o navegador
+   * fechar no meio: a retomada refaz as lápides que faltam em vez de deixar
+   * metade do distrito apagada aqui e inteira no serviço.
+   */
+  districtRecordIds?: string[]
+  /** Compromissos pessoais, de leitura e de orçamento que ficam de fora. */
+  preservedRecordCount?: number
+  /**
+   * Restauração de backup começada e não concluída.
+   *
+   * O que fica guardado é o **arquivo como veio** — cifrado com o código que só
+   * o pastor tem —, nunca o conteúdo aberto: gravar o backup decifrado no banco
+   * local para poder retomar seria desfazer, por conveniência, a única coisa
+   * que protege esses dados em repouso. A retomada pede o código de novo, o que
+   * é honesto: quem retoma precisa provar que é quem restaurou.
+   *
+   * As listas de já aplicados são o que torna a retomada idempotente: um
+   * registro gravado antes da interrupção não é gravado de novo, e não gera uma
+   * segunda operação na fila de envio.
+   */
+  restore?: {
+    file: unknown
+    appliedRecordIds: string[]
+    appliedPersonalIds: string[]
+    totalRecords: number
+    totalPersonal: number
+  }
 }
 
-export function pendingActionId(accountId: string, kind: PendingActionRecord['kind']): string {
+export function pendingActionId(accountId: string, kind: PendingActionKind): string {
   return `${accountId}:${kind}`
+}
+
+/**
+ * Registro cifrado que não abriu neste aparelho.
+ *
+ * Antes isto vivia em um conjunto na memória: bastava recarregar a página para
+ * a contagem sumir, e cada tela que decifrava em lote parava no primeiro
+ * registro ruim — backup, exportação, encerramento e listagens caíam junto. A
+ * quarentena passou a ser gravada: o registro ruim fica de lado, identificado,
+ * e todo o resto continua acessível.
+ */
+export interface CorruptedRecordRecord {
+  /** `${accountId}:${recordId}` — a mesma linha por conta e registro. */
+  id: string
+  accountId: string
+  recordId: string
+  recordType: string
+  /** Versão do registro que não abriu, para reconhecer quando ela mudar. */
+  version: number
+  detectedAt: string
+  reason: 'nao-abriu' | 'vinculo' | 'conteudo'
+}
+
+export function corruptedRecordId(accountId: string, recordId: string): string {
+  return `${accountId}:${recordId}`
 }

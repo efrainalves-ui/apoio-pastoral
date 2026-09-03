@@ -9,7 +9,7 @@ import { Field } from '../components/ui/Field'
 type Mode = 'register' | 'unlock' | 'recover' | 'reset'
 
 export function AuthPage() {
-  const { account, accounts, register, unlock, recover, completeReset, recoveryCode, clearRecoveryCode, awaitingConfirmation, resendConfirmation, sendPasswordReset } = useAuthVault()
+  const { account, accounts, register, unlock, recover, completeReset, recoveryCode, clearRecoveryCode, awaitingConfirmation, resendConfirmation, sendPasswordReset, sessionLostMessage } = useAuthVault()
   const [mode, setMode] = useState<Mode>(openedFromPasswordReset ? 'reset' : account ? 'unlock' : 'register')
   const [email, setEmail] = useState(account?.email ?? '')
   const [password, setPassword] = useState('')
@@ -148,6 +148,7 @@ export function AuthPage() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
+              {sessionLostMessage && <div className="alert alert--error" role="alert">{sessionLostMessage}</div>}
               {error && <div className="alert alert--error" role="alert">{error}</div>}
               {aviso && <div className="alert alert--success" role="status">{aviso}</div>}
               <Button type="submit" full disabled={busy}>{busy ? 'Processando…' : mode === 'register' ? 'Criar conta' : mode === 'recover' ? 'Recuperar acesso' : mode === 'reset' ? 'Definir senha nova' : 'Entrar'}</Button>

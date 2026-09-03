@@ -3,6 +3,7 @@ import type { VisitEntity, VisitRoundEntity } from '../care/types'
 import type { GoalArea } from '../goals/areas'
 import { GOAL_AREA_LABELS } from '../goals/areas'
 import { formatGoalValue } from '../goals/format'
+import { freeText } from './redaction'
 
 const dataCurta = (valor: string) => new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date(valor))
 
@@ -22,10 +23,11 @@ export function visitReportLines(visits: VisitEntity[], rounds: VisitRoundEntity
 }
 
 /**
- * Relatório de agenda. `includeNames` libera o título e as observações, que são
- * onde os nomes aparecem — "Visita a Fulana", "Batismo de Beltrano". Sem marcar,
- * saem data, tipo e local: o relatório continua servindo para prestar contas do
- * trabalho sem entregar quem foi visitado.
+ * Relatório de agenda. `includeNames` libera o título, o local, o endereço e as
+ * observações — todos escritos à mão pelo pastor, e todos lugares onde um nome
+ * aparece: "Visita a Fulana", "casa da irmã Beltrana", a rua de uma família.
+ * Sem marcar, saem data, tipo e igreja: o relatório continua servindo para
+ * prestar contas do trabalho sem entregar quem foi visitado nem onde ele mora.
  */
 export function agendaReportLines(events: AgendaEventEntity[], churchName: (id: string | null) => string, includeNames = false): string[] {
   return [
@@ -33,7 +35,7 @@ export function agendaReportLines(events: AgendaEventEntity[], churchName: (id: 
     ...events.flatMap((event) => [
       `${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', ...(event.allDay ? {} : { timeStyle: 'short' as const }) }).format(new Date(event.startAt))} · ${AGENDA_CATEGORY_LABELS[event.category]}`,
       ...(includeNames ? [event.title] : []),
-      [churchName(event.churchId), event.location, event.address].filter(Boolean).join(' · '),
+      [churchName(event.churchId), freeText(includeNames, event.location), freeText(includeNames, event.address)].filter(Boolean).join(' · '),
       ...(includeNames && event.notes ? [event.notes] : []),
       '',
     ]),

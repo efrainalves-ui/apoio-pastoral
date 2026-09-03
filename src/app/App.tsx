@@ -5,6 +5,7 @@ import { DeviceApprovalPage } from '../pages/DeviceApprovalPage'
 import { db } from '../db/database'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { pendingDistrictClosure } from '../district/closeDistrict'
+import { currentEnvironmentProblem } from '../sync/config'
 import { SyncService, firstSyncPending, syncConfirmed } from '../sync/service'
 import { createSyncTransport } from '../sync/transport'
 import { AppShell } from '../components/AppShell'
@@ -201,8 +202,29 @@ function ProtectedApp() {
   return hasDistrict ? <AppShell /> : <Navigate to="/configuracao-inicial" replace />
 }
 
+/**
+ * Build mal configurada não abre.
+ *
+ * Uma build que declara homologação ou produção e não tem endereço, chave
+ * pública ou projeto declarado — ou tem os três discordando — não pode cair no
+ * modo local em silêncio: o pastor cadastraria o distrito inteiro achando que
+ * está sincronizando. E uma build que não declara ambiente nenhum também não
+ * abre: modo local passou a ser uma escolha escrita, não o que sobra.
+ */
+function EnvironmentBlocked({ problema }: { problema: string }) {
+  return (
+    <div className="page-stack page-narrow">
+      <header className="page-hero"><div><h1>Esta instalação não está configurada</h1></div></header>
+      <div className="alert alert--error" role="alert">{problema}</div>
+      <p className="card-copy">Nenhum dado foi aberto e nenhuma conexão foi feita. Corrija a configuração desta instalação e recarregue a página.</p>
+    </div>
+  )
+}
+
 export function App() {
   const { masterKey, initialized, recoveryCode } = useAuthVault()
+  const problemaDeAmbiente = currentEnvironmentProblem()
+  if (problemaDeAmbiente) return <EnvironmentBlocked problema={problemaDeAmbiente} />
   if (!initialized) return <div className="app-loading" role="status">Preparando o acesso…</div>
   return <Suspense fallback={<div className="app-loading" role="status">Abrindo sua área…</div>}>
     <Routes>

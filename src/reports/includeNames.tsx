@@ -12,17 +12,7 @@
  * o arquivo passa a conter dados pessoais e o aviso diz isso.
  */
 
-/** Como uma pessoa aparece quando o documento sai sem nomes. */
-export const NOME_OMITIDO = 'nome não incluído'
-
-/**
- * Resolve o nome de uma pessoa respeitando a escolha do pastor. Passar isto
- * aos geradores de documento é o que mantém a regra em um lugar só, em vez de
- * cada tela lembrar (ou esquecer) de esconder o nome.
- */
-export function personNameResolver(includeNames: boolean, nome: (id: string) => string): (id: string) => string {
-  return (id: string) => (includeNames ? nome(id) : id ? NOME_OMITIDO : 'a confirmar')
-}
+export { NOME_OMITIDO, TEXTO_OMITIDO, personNameResolver, freeText, freeList, personLabel } from './redaction'
 
 export interface IncludeNamesProps {
   checked: boolean
@@ -45,3 +35,4 @@ export function IncludeNames({ checked, onChange, detalhe }: IncludeNamesProps) 
     </label>
   )
 }
+

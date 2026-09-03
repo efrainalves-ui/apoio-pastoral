@@ -9,8 +9,23 @@ export const isSyncDisabled = import.meta.env.MODE !== 'test' && import.meta.env
 const ambienteDeclarado = import.meta.env.VITE_APP_ENV as string | undefined
 export const isHomologationEnvironment = ambienteDeclarado === 'homologacao'
 export const isProductionEnvironment = ambienteDeclarado === 'producao'
+/**
+ * O único valor que autoriza o modo local.
+ *
+ * Antes, modo local era o que sobrava: qualquer declaração ausente, vazia ou
+ * escrita errado caía nele em silêncio. Uma build de homologação com a variável
+ * do endereço esquecida subia, abria, deixava cadastrar e guardava tudo só no
+ * aparelho, sem nada na tela dizendo que não havia serviço nenhum do outro
+ * lado. Esquecer uma variável não pode ser o mesmo que escolher trabalhar
+ * offline: agora essa escolha é escrita.
+ */
+export const isDevelopmentEnvironment = ambienteDeclarado === 'desenvolvimento'
 export const isRemoteEnvironmentAllowed = isHomologationEnvironment || isProductionEnvironment
-export const declaredEnvironment = isHomologationEnvironment ? 'homologacao' : isProductionEnvironment ? 'producao' : 'local'
+export const declaredEnvironment = isHomologationEnvironment
+  ? 'homologacao'
+  : isProductionEnvironment
+    ? 'producao'
+    : isDevelopmentEnvironment ? 'desenvolvimento' : 'indefinido'
 
 /**
  * Só os testes automatizados internos veem atalhos de dados fictícios. Nem o
@@ -77,4 +92,65 @@ export function remoteProjectProblem({ url, anonKey, declaredRef }: RemoteProjec
 export const declaredProjectRef = import.meta.env.VITE_SUPABASE_PROJECT_REF as string | undefined
 
 /** Versão do esquema do serviço que esta versão do aplicativo espera. */
-export const EXPECTED_SCHEMA_VERSION = 8
+export const EXPECTED_SCHEMA_VERSION = 9
+
+export interface EnvironmentConfigurationCheck {
+  /** Valor de `VITE_APP_ENV`. */
+  declared: string | undefined
+  url: string | undefined
+  anonKey: string | undefined
+  declaredRef: string | undefined
+  /** Valor de `VITE_DISABLE_SYNC`. */
+  disableSync: string | undefined
+}
+
+/**
+ * A configuração desta build está coerente? Devolve a explicação do problema,
+ * ou `null` quando não há nenhum.
+ *
+ * Homologação e produção falham fechado: sem endereço, sem chave pública, sem
+ * projeto declarado, com os três discordando, ou com a sincronização desligada,
+ * a build não abre. Nenhuma dessas situações pode virar "funciona local", que
+ * é a falha silenciosa que este aplicativo não pode ter — o pastor cadastraria
+ * o distrito inteiro achando que está sincronizando.
+ *
+ * Fora desses dois ambientes, só `desenvolvimento` abre, e abre local. Qualquer
+ * outro valor, ou nenhum, é uma build sem ambiente declarado, e ela também não
+ * abre.
+ */
+export function environmentConfigurationProblem(check: EnvironmentConfigurationCheck): string | null {
+  const declarado = check.declared?.trim().toLowerCase()
+
+  if (declarado === 'homologacao' || declarado === 'producao') {
+    if (check.disableSync === 'true') {
+      return `Esta build declara o ambiente ${declarado} e ao mesmo tempo desliga a sincronização. Escolha um dos dois: remova VITE_DISABLE_SYNC ou declare VITE_APP_ENV=desenvolvimento.`
+    }
+    if (!check.url?.trim()) {
+      return `Esta build declara o ambiente ${declarado} e não informa o endereço do serviço. Defina VITE_SUPABASE_URL.`
+    }
+    if (!check.anonKey?.trim()) {
+      return `Esta build declara o ambiente ${declarado} e não informa a chave pública do serviço. Defina VITE_SUPABASE_ANON_KEY.`
+    }
+    return remoteProjectProblem({ url: check.url, anonKey: check.anonKey, declaredRef: check.declaredRef })
+  }
+
+  if (declarado === 'desenvolvimento') return null
+
+  return 'Esta build não declara em que ambiente ela roda. Defina VITE_APP_ENV como homologacao, producao ou desenvolvimento; modo local só existe quando declarado como desenvolvimento.'
+}
+
+/**
+ * A conferência aplicada a esta build. Os testes automatizados internos ficam
+ * de fora: eles rodam sem ambiente declarado de propósito, com transporte de
+ * memória e dados fictícios.
+ */
+export function currentEnvironmentProblem(): string | null {
+  if (import.meta.env.MODE === 'test') return null
+  return environmentConfigurationProblem({
+    declared: ambienteDeclarado,
+    url: import.meta.env.VITE_SUPABASE_URL as string | undefined,
+    anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined,
+    declaredRef: declaredProjectRef,
+    disableSync: import.meta.env.VITE_DISABLE_SYNC as string | undefined,
+  })
+}

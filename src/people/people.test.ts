@@ -42,6 +42,9 @@ describe('pessoas, vínculos, famílias e aniversários', () => {
     const family = await families.createFamily(accountId, masterKey, { ...emptyFamilyInput(), name: 'Família Modelo Fictícia', primaryChurchId: 'church-a', memberIds: [first.id, second.id] })
     expect(family.memberIds).toEqual([first.id, second.id])
     await expect(families.createFamily(accountId, masterKey, { ...emptyFamilyInput(), name: 'Outra Família Fictícia', primaryChurchId: 'church-b', memberIds: [first.id] })).rejects.toThrow('já pertence')
-    await expect(people.deletePerson(accountId, masterKey, first.id)).rejects.toThrow('Remova a pessoa da família')
+    // A exclusão de pessoa não vive mais aqui: existe um caminho só, em
+    // `PersonDataService.remove`, que desvincula e pede o expurgo. O antigo
+    // `deletePerson` publicava a lápide e ia embora.
+    expect('deletePerson' in people).toBe(false)
   })
 })

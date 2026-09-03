@@ -120,13 +120,26 @@ describe('presidência da comissão', () => {
     await expect(service.saveConfig(accountId, key, { ...base(churchId), presidentMode: 'elder', boardPresidentId: 'person-3', elderIds: ['person-1'] })).rejects.toThrow('ancião registrado')
   })
 
-  it('assina a ata com o nome do pastor quando é ele quem preside', async () => {
+  it('assina a ata com o nome do pastor quando é ele quem preside e os nomes foram confirmados', async () => {
+    const { service, key, accountId, churchId } = await comIgreja('organized_church')
+    await service.saveConfig(accountId, key, base(churchId))
+    const meeting = await service.saveMeeting(accountId, key, { ...meetingData(churchId, 'board', [agendaItem('item-1', 'aprovar ação fictícia')]), presidentId: '', presidentLabel: 'Pastor Fictício' })
+    const ata = service.minutesDocument(meeting, 'Igreja Fictícia', 2, (id) => `Pessoa ${id}`, true)
+
+    expect(ata).toContain('Presidente: Pastor Fictício')
+    expect(ata).toContain('Pastor Fictício — Presidente')
+  })
+
+  it('sem a confirmação de nomes, nem o rótulo digitado do pastor sai na ata', async () => {
+    // `presidentLabel` é o nome do pastor escrito por ele, guardado ao lado do
+    // identificador. Ele passava direto pelo resolvedor de nomes: a assinatura
+    // de uma ata gerada sem nomes trazia o nome dele por extenso, duas vezes.
     const { service, key, accountId, churchId } = await comIgreja('organized_church')
     await service.saveConfig(accountId, key, base(churchId))
     const meeting = await service.saveMeeting(accountId, key, { ...meetingData(churchId, 'board', [agendaItem('item-1', 'aprovar ação fictícia')]), presidentId: '', presidentLabel: 'Pastor Fictício' })
     const ata = service.minutesDocument(meeting, 'Igreja Fictícia', 2, (id) => `Pessoa ${id}`)
 
-    expect(ata).toContain('Presidente: Pastor Fictício')
-    expect(ata).toContain('Pastor Fictício — Presidente')
+    expect(ata).not.toContain('Pastor Fictício')
+    expect(ata).toContain('nome não incluído — Presidente')
   })
 })

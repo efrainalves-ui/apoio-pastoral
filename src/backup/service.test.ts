@@ -4,7 +4,7 @@ import { decryptPayload, encryptPayload, generateMasterKey } from '../crypto/vau
 import { ApoioDatabase } from '../db/database'
 import { ReadingDatabase } from '../reading/database'
 import { FamilyBudgetDatabase } from '../family-budget/database'
-import { BackupService } from './service'
+import { BackupService, pendingBackupRestore } from './service'
 
 const databases: ApoioDatabase[] = []
 afterEach(async () => { localStorage.clear(); await Promise.all(databases.splice(0).map((database) => database.delete())) })
@@ -124,5 +124,108 @@ describe('backup diante de arquivo ruim', () => {
     expect(await destino.leitura.records.get('leitura-1')).toMatchObject({ accountId: 'conta-ficticia-a' })
     expect(await destino.orcamento.records.get('orcamento-1')).toMatchObject({ accountId: 'conta-ficticia-a' })
     expect(JSON.stringify(await destino.leitura.records.toArray())).not.toContain('Livro Fictício')
+  })
+})
+
+/**
+ * Restauração validada antes de começar, atômica por etapas e retomável.
+ *
+ * A auditoria apontou três coisas: a conferência do conteúdo acontecia com a
+ * restauração já em andamento, uma interrupção deixava metade de um backup
+ * dentro do cofre sem nada pendente que fizesse alguém voltar, e a
+ * sincronização subia esse estado pela metade para os outros aparelhos.
+ */
+describe('restauração validada, atômica e retomável', () => {
+  const CONTA = 'conta-ficticia-restauracao'
+  const CODIGO = 'codigo-ficticio-de-backup'
+
+  async function arquivoFicticio(quantos: number) {
+    const origem = new ApoioDatabase(`restauro-origem-${crypto.randomUUID()}`); databases.push(origem)
+    const chave = await generateMasterKey()
+    for (let indice = 0; indice < quantos; indice += 1) {
+      await seed(origem, CONTA, chave, `registro-ficticio-${indice}`, `Distrito Fictício ${indice}`)
+    }
+    return { file: (await new BackupService(origem).create(CONTA, chave, CODIGO)).file, chave }
+  }
+
+  it('confere o arquivo inteiro antes de gravar o primeiro registro', async () => {
+    const destino = new ApoioDatabase(`restauro-destino-${crypto.randomUUID()}`); databases.push(destino)
+    const { file } = await arquivoFicticio(3)
+    const adulterado = { ...file, ciphertext: `${file.ciphertext.slice(0, -4)}AAAA` }
+
+    await expect(new BackupService(destino).restore(CONTA, await generateMasterKey(), CODIGO, adulterado)).rejects.toThrow()
+
+    expect(await destino.vaultRecords.count()).toBe(0)
+    // Nem a marca de pendência foi gravada: a conferência vem antes de tudo.
+    expect(await destino.pendingActions.count()).toBe(0)
+  })
+
+  it('não deixa marca pendente quando a restauração termina', async () => {
+    const destino = new ApoioDatabase(`restauro-completo-${crypto.randomUUID()}`); databases.push(destino)
+    const { file } = await arquivoFicticio(3)
+
+    const resultado = await new BackupService(destino).restore(CONTA, await generateMasterKey(), CODIGO, file)
+
+    expect(resultado.completed).toBe(true)
+    expect(resultado.recordCount).toBe(3)
+    expect(await pendingBackupRestore(CONTA, destino)).toBeNull()
+  })
+
+  it('interrompida no meio, deixa a pendência e retoma sem repetir o que já entrou', async () => {
+    const destino = new ApoioDatabase(`restauro-interrompido-${crypto.randomUUID()}`); databases.push(destino)
+    const { file } = await arquivoFicticio(3)
+    const chave = await generateMasterKey()
+
+    // Simula a interrupção: a marca fica com um registro já aplicado e os
+    // outros não, exatamente como o navegador fechado no meio deixaria.
+    await destino.pendingActions.put({
+      id: `${CONTA}:restore_backup`, accountId: CONTA, kind: 'restore_backup',
+      createdAt: new Date().toISOString(), stage: 'restoring_pastoral',
+      restore: { file, appliedRecordIds: ['registro-ficticio-0'], appliedPersonalIds: [], totalRecords: 3, totalPersonal: 0 },
+    })
+    await seed(destino, CONTA, chave, 'registro-ficticio-0', 'Distrito Fictício 0')
+
+    const pendente = await pendingBackupRestore(CONTA, destino)
+    expect(pendente).toMatchObject({ applied: 1, total: 3 })
+
+    const resultado = await new BackupService(destino).resume(CONTA, chave, CODIGO)
+
+    expect(resultado.completed).toBe(true)
+    expect(await destino.vaultRecords.count()).toBe(3)
+    expect(await pendingBackupRestore(CONTA, destino)).toBeNull()
+    // O registro que já estava lá não foi gravado de novo: uma segunda
+    // gravação criaria uma operação a mais na fila de envio, sem necessidade.
+    const fila = await destino.outbox.where('recordId').equals('registro-ficticio-0').toArray()
+    expect(fila).toHaveLength(0)
+  })
+
+  it('a retomada exige o mesmo código: o arquivo guardado continua cifrado', async () => {
+    const destino = new ApoioDatabase(`restauro-codigo-${crypto.randomUUID()}`); databases.push(destino)
+    const { file } = await arquivoFicticio(2)
+    await destino.pendingActions.put({
+      id: `${CONTA}:restore_backup`, accountId: CONTA, kind: 'restore_backup',
+      createdAt: new Date().toISOString(), stage: 'restoring_pastoral',
+      restore: { file, appliedRecordIds: [], appliedPersonalIds: [], totalRecords: 2, totalPersonal: 0 },
+    })
+
+    await expect(new BackupService(destino).resume(CONTA, await generateMasterKey(), 'codigo-ficticio-errado')).rejects.toThrow()
+    expect(await pendingBackupRestore(CONTA, destino)).not.toBeNull()
+    // O conteúdo aberto nunca é gravado no banco local: só o arquivo cifrado.
+    expect(JSON.stringify(await destino.pendingActions.toArray())).not.toContain('Distrito Fictício')
+  })
+
+  it('recusa retomar o que não começou', async () => {
+    const destino = new ApoioDatabase(`restauro-sem-pendencia-${crypto.randomUUID()}`); databases.push(destino)
+    await expect(new BackupService(destino).resume(CONTA, await generateMasterKey(), CODIGO)).rejects.toThrow('Não há restauração pendente')
+  })
+
+  it('recusa um backup de outra conta antes de gravar e sem deixar pendência', async () => {
+    const destino = new ApoioDatabase(`restauro-outra-conta-${crypto.randomUUID()}`); databases.push(destino)
+    const { file } = await arquivoFicticio(2)
+
+    await expect(new BackupService(destino).restore('conta-ficticia-vizinha', await generateMasterKey(), CODIGO, file)).rejects.toThrow('outra conta')
+
+    expect(await destino.vaultRecords.count()).toBe(0)
+    expect(await destino.pendingActions.count()).toBe(0)
   })
 })

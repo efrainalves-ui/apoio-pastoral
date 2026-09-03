@@ -1,4 +1,5 @@
 import { AgendaService } from '../agenda/service'
+import { freeText } from '../reports/redaction'
 import { currentDeviceId } from '../auth/device'
 import { CommissionService } from '../commissions/service'
 import type { CommissionAgendaItem, CommissionMeetingData } from '../commissions/types'
@@ -75,12 +76,12 @@ export class NominationService {
    * dizer "sem nomes" e entregar os nomes que o pastor digitou.
    */
   meetingAgendaTemplate(churchName: string, process: NominationProcessEntity, meeting: NominationMeeting, personName: (id: string) => string, includeNames = false): string {
-    return includeNames && meeting.agendaTemplate?.trim() ? meeting.agendaTemplate : defaultMeetingAgenda(churchName, process, meeting, personName)
+    return includeNames && meeting.agendaTemplate?.trim() ? meeting.agendaTemplate : defaultMeetingAgenda(churchName, process, meeting, personName, includeNames)
   }
 
   /** Modelo de ata, com a mesma regra do modelo de pauta. */
   meetingMinutesTemplate(churchName: string, process: NominationProcessEntity, meeting: NominationMeeting, personName: (id: string) => string, includeNames = false): string {
-    return includeNames && meeting.minutesTemplate?.trim() ? meeting.minutesTemplate : defaultMeetingMinutes(churchName, process, meeting, personName)
+    return includeNames && meeting.minutesTemplate?.trim() ? meeting.minutesTemplate : defaultMeetingMinutes(churchName, process, meeting, personName, includeNames)
   }
 
   /** Modelo do relatório final, com a mesma regra dos demais. */
@@ -99,8 +100,14 @@ export class NominationService {
   }
 
   internalAgenda(process: NominationProcessEntity, meeting: NominationMeeting, personName: (id: string) => string): string { return [`Comissão de Nomeações - ${process.period}`, `Data: ${meeting.date} · ${meeting.time || 'horário a definir'} · ${meeting.location || 'local a definir'}`, `Presidente: ${personName(meeting.presidentId)} · Secretário(a): ${personName(meeting.secretaryId)}`, `Quórum: ${meeting.participantIds.length} presentes; mínimo ${meeting.quorum}`, ...meeting.agenda.map((item, index) => `${index + 1}. ${item}`)].join('\n\n') }
-  internalRecord(process: NominationProcessEntity, meeting: NominationMeeting, personName: (id: string) => string): string { return [`Registro confidencial - Comissão de Nomeações - ${process.period}`, `Data: ${meeting.date} · ${meeting.time || 'horário a definir'} · ${meeting.location || 'local a definir'}`, `Participantes: ${meeting.participantIds.map(personName).join(', ')}`, `Quórum: ${meeting.participantIds.length} presentes; mínimo ${meeting.quorum}`, meeting.confidentialNotes ? `Observações confidenciais: ${meeting.confidentialNotes}` : '', ...process.candidates.filter((candidate) => candidate.vote).map((candidate) => `${personName(candidate.personId)}: ${candidate.vote?.favorable} favoráveis, ${candidate.vote?.against} contrários, ${candidate.vote?.abstentions} abstenções; resultado ${decisionText(candidate.vote?.result ?? 'deferred')}.`), `Assinaturas: ${personName(meeting.presidentId)} e ${personName(meeting.secretaryId)}`].filter(Boolean).join('\n\n') }
-  officialAgenda(process: NominationProcessEntity, vote: NominationOfficialVote): string { return [`Votação oficial - Comissão de Nomeações`, `Período: ${process.period}`, `Data: ${vote.date} · ${vote.time || 'horário a definir'} · ${vote.location || 'local a definir'}`, `PROPÕE-SE aprovar e registrar o relatório da Comissão de Nomeações para o período ${process.period}.`].join('\n\n') }
+  /**
+   * Registro confidencial da comissão. É o documento mais sensível daqui: a
+   * observação confidencial e o local são texto livre, e a contagem por
+   * candidato diz o que a comissão pensou de cada pessoa. Segue a mesma
+   * confirmação de nomes de todos os outros.
+   */
+  internalRecord(process: NominationProcessEntity, meeting: NominationMeeting, personName: (id: string) => string, includeNames = false): string { return [`Registro confidencial - Comissão de Nomeações - ${process.period}`, `Data: ${meeting.date} · ${meeting.time || 'horário a definir'} · ${freeText(includeNames, meeting.location) || 'local a definir'}`, `Participantes: ${meeting.participantIds.map(personName).join(', ')}`, `Quórum: ${meeting.participantIds.length} presentes; mínimo ${meeting.quorum}`, meeting.confidentialNotes ? `Observações confidenciais: ${freeText(includeNames, meeting.confidentialNotes)}` : '', ...process.candidates.filter((candidate) => candidate.vote).map((candidate) => `${personName(candidate.personId)}: ${candidate.vote?.favorable} favoráveis, ${candidate.vote?.against} contrários, ${candidate.vote?.abstentions} abstenções; resultado ${decisionText(candidate.vote?.result ?? 'deferred')}.`), `Assinaturas: ${personName(meeting.presidentId)} e ${personName(meeting.secretaryId)}`].filter(Boolean).join('\n\n') }
+  officialAgenda(process: NominationProcessEntity, vote: NominationOfficialVote, includeNames = false): string { return [`Votação oficial - Comissão de Nomeações`, `Período: ${process.period}`, `Data: ${vote.date} · ${vote.time || 'horário a definir'} · ${freeText(includeNames, vote.location) || 'local a definir'}`, `PROPÕE-SE aprovar e registrar o relatório da Comissão de Nomeações para o período ${process.period}.`].join('\n\n') }
   officialMinutes(process: NominationProcessEntity, vote: NominationOfficialVote, personName: (id: string) => string): string { return [`Ata da votação oficial - Comissão de Nomeações`, `Período: ${process.period}`, `VOTADO aprovar e registrar o relatório da Comissão de Nomeações para o período ${process.period}.`, `Favoráveis: ${vote.favorable}; contrários: ${vote.against}; abstenções: ${vote.abstentions}; resultado: ${decisionText(vote.result)}.`, `Assinaturas: ${personName(vote.presidentId)} e ${personName(vote.secretaryId)}`].join('\n\n') }
 
   private async required(accountId: string, masterKey: CryptoKey, id: string): Promise<NominationProcessEntity> { const process = await this.get(accountId, masterKey, id); if (!process) throw new Error('Processo de nomeações não encontrado.'); return process }

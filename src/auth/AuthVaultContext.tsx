@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { AccountRecord } from '../db/types'
 import { technicalEvent } from '../logging/safeLogger'
+import { clearAccountSessionLock, lockedAccountId, onAccountSessionLost } from './accountGuard'
 import { useAutoLock } from './autoLock'
 import { resendConfirmationEmail, requestPasswordReset, signOutRemoteAccount } from './supabase'
 import {
@@ -24,6 +25,11 @@ interface AuthVaultContextValue {
   recoveryCode: string | null
   /** Verdadeiro enquanto o serviço espera a confirmação do e-mail da conta nova. */
   awaitingConfirmation: boolean
+  /**
+   * Aviso de que outra conta entrou neste navegador e esta aba foi bloqueada.
+   * Vazio quando não há bloqueio. Só um novo acesso o desfaz.
+   */
+  sessionLostMessage: string
   register: (email: string, password: string) => Promise<void>
   resendConfirmation: (email: string) => Promise<void>
   sendPasswordReset: (email: string) => Promise<void>
@@ -49,10 +55,29 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null)
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false)
   const [initialized, setInitialized] = useState(false)
+  const [sessionLostMessage, setSessionLostMessage] = useState('')
 
   const refreshAccounts = useCallback(async () => { setAccounts(await listLocalAccounts()) }, [])
 
+  /**
+   * Outra conta entrou em outra aba deste navegador.
+   *
+   * A sessão do serviço é uma só para toda a origem: a partir daqui, tudo que
+   * esta aba pedisse ao serviço sairia autenticado como a outra conta. Fechar o
+   * cofre e voltar ao acesso é a única resposta honesta — a tela não pode
+   * continuar mostrando os dados de uma conta enquanto age em nome de outra.
+   */
+  useEffect(() => onAccountSessionLost(() => {
+    setMasterKey(null)
+    setSyncKey(null)
+    setSessionLostMessage('Outra conta entrou neste navegador e esta aba foi bloqueada. Entre de novo com e-mail e senha para continuar nesta conta.')
+    technicalEvent('vault.locked')
+  }), [])
+
   useEffect(() => {
+    if (lockedAccountId()) {
+      setSessionLostMessage('Outra conta entrou neste navegador e esta aba foi bloqueada. Entre de novo com e-mail e senha para continuar nesta conta.')
+    }
     void (async () => {
       const found = await findLocalAccount()
       setAccount(found ?? null)
@@ -62,6 +87,8 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
   }, [refreshAccounts])
 
   const register = useCallback(async (email: string, password: string) => {
+    clearAccountSessionLock()
+    setSessionLostMessage('')
     const result = await registerAccount(email, password)
     setAccount(result.account)
     setRecoveryCode(result.recoveryCode)
@@ -90,6 +117,10 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const unlock = useCallback(async (email: string, password: string) => {
+    // O acesso novo é o único que desfaz o bloqueio da aba: era ele que
+    // faltava, e é ele que prova de quem é a sessão que vai valer agora.
+    clearAccountSessionLock()
+    setSessionLostMessage('')
     const result = await unlockAccount(email, password)
     setAccount(result.account)
     setMasterKey(result.keys.master)
@@ -136,6 +167,8 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
    * abrir com a senha dela.
    */
   const switchAccount = useCallback(async () => {
+    clearAccountSessionLock()
+    setSessionLostMessage('')
     setMasterKey(null)
     setSyncKey(null)
     setAccount(null)
@@ -145,6 +178,8 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
   }, [refreshAccounts])
 
   const signOut = useCallback(async () => {
+    clearAccountSessionLock()
+    setSessionLostMessage('')
     setMasterKey(null)
     setSyncKey(null)
     await signOutRemoteAccount()
@@ -161,6 +196,7 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
     initialized,
     recoveryCode,
     awaitingConfirmation,
+    sessionLostMessage,
     register,
     resendConfirmation,
     sendPasswordReset,
@@ -172,7 +208,7 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
     switchAccount,
     signOut,
     clearRecoveryCode: () => setRecoveryCode(null),
-  }), [account, accounts, masterKey, syncKey, initialized, recoveryCode, awaitingConfirmation, register, resendConfirmation, sendPasswordReset, unlock, recover, completeReset, changePassword, lock, switchAccount, signOut])
+  }), [account, accounts, masterKey, syncKey, initialized, recoveryCode, awaitingConfirmation, sessionLostMessage, register, resendConfirmation, sendPasswordReset, unlock, recover, completeReset, changePassword, lock, switchAccount, signOut])
 
   return <AuthVaultContext.Provider value={value}>{children}</AuthVaultContext.Provider>
 }

@@ -166,17 +166,72 @@ foram apagados enquanto isso permanece recuperável não seria verdade.
   sabendo que houve operações e quando. Nenhum aplicativo alcança isso, e
   prometer o contrário seria mentira.
 
+## Duas contas no mesmo navegador
+
+A sessão do serviço vive no armazenamento da origem, e esse armazenamento é um
+só para todas as abas. Entrar com a conta B em uma aba troca a sessão de todas:
+a aba que mostra a conta A continua desenhando o nome, os aparelhos e os
+registros de A, mas cada chamada remota que ela faz sai autenticada como B.
+Listar aparelhos mostrava os de B; revogar revogava os de B; encerrar distrito
+encerrava o de B; apagar uma pessoa mandava a lápide e o pedido de expurgo para
+a conta errada.
+
+Antes de **toda** operação remota, o aplicativo confere que o `user.id` da
+sessão é o `accountId` desta aba. Quando não é, a aba fica bloqueada: o cofre
+fecha, a tela pede um acesso novo com e-mail e senha, e nenhuma operação remota
+acontece até isso. O bloqueio é local à aba e não volta sozinho — nem se a
+sessão voltar a ser a de A por coincidência, porque quem prova de quem é a
+sessão é o acesso, não a coincidência.
+
+A conferência falha fechada: erro técnico ao consultar a sessão bloqueia
+também. Uma operação remota feita com a conta errada não tem volta; uma tela
+bloqueada por engano custa um novo acesso.
+
+## Registros cifrados que não abrem
+
+Um registro que não decifra neste aparelho vai para uma quarentena gravada, com
+conta, tipo e versão, e a leitura devolve nada em vez de levantar exceção. Antes
+essa lista vivia na memória: a contagem sumia a cada recarregamento e, pior, um
+único registro corrompido derrubava a criação do backup, a exportação dos dados
+de uma pessoa, o encerramento do distrito e as listagens inteiras — o que, para
+quem usa, é indistinguível de ter perdido tudo.
+
+O registro em quarentena continua guardado e não é apagado às cegas: apagar o
+que não se conseguiu ler seria apagar sem saber o quê. Se a versão dele mudar —
+uma sincronização trouxe outra, um backup foi restaurado — ele sai da quarentena
+sozinho na leitura seguinte.
+
 ## Limites honestos
 
 - E2EE não oculta todos os metadados (volume, timestamps e identificadores).
-- O modo local é para desenvolvimento, não substitui autenticação remota de produção.
+- O modo local é para desenvolvimento, não substitui autenticação remota de
+  produção, e só existe quando declarado: `VITE_APP_ENV=desenvolvimento`. Uma
+  build que declara `homologacao` ou `producao` e não tem endereço, chave
+  pública ou projeto declarado — ou tem os três discordando — não abre. Antes
+  ela caía no transporte local em silêncio, e quem usasse cadastraria o distrito
+  inteiro achando que estava sincronizando.
 - E-mail e senha abrem o cofre também em uma nova instalação. O serviço guarda somente o envelope da chave mestra já cifrado pela senha; nunca recebe a senha ou o conteúdo pastoral em texto aberto.
 - Uma nova instalação é registrada como outro dispositivo após a entrada. Safari e o aplicativo instalado no iPhone são instalações independentes para esse controle.
 - A chave de recuperação é contingência para perda de acesso aos dispositivos; ela não é enviada por e-mail e não é o caminho normal de entrada em um aparelho novo.
-- Encerrar o distrito passa por um instante em que este aparelho não tem
-  autorização nenhuma. Esse trabalho começado fica gravado e uma tela própria o
-  conclui; antes, fechar o navegador ali deixava a conta abrindo no aparelho e
-  sem entrar mais no serviço, sem nada explicando.
+- Encerrar o distrito é durável e retomável por etapas: a intenção é gravada
+  **antes** da primeira exclusão local, e o fluxo só termina depois de publicar
+  as lápides, confirmar que elas subiram, expurgar o histórico distrital no
+  serviço, revogar os aparelhos e devolver a este uma autorização nova. Cada
+  etapa é idempotente e uma tela própria conclui o que ficou pela metade. Antes,
+  a exclusão vinha primeiro e fechar o navegador ali deixava metade do distrito
+  apagada aqui, inteira no serviço, e nada explicando.
+- Restaurar um backup também é durável: o arquivo é conferido por inteiro antes
+  da primeira gravação, os registros entram em lotes atômicos e a marca de
+  pendência registra o que já entrou. Enquanto uma restauração estiver pela
+  metade, a sincronização se recusa a subir esse estado — metade de um backup
+  publicada para os outros aparelhos é pior do que backup nenhum. O que fica
+  guardado para a retomada é o arquivo **como veio**, cifrado; a retomada pede o
+  código de novo, e é por isso que ela pede.
+- As tabelas de sessão (`device_sessions`, `revoked_sessions`) saíram do alcance
+  direto do cliente. Elas não têm conteúdo pastoral, mas descrevem o mapa da
+  conta — quantos aparelhos existem, quais foram derrubados e quando —, e era
+  justamente o que um aparelho revogado, com o token ainda vivo, continuava
+  lendo.
 - Revogar um aparelho impede acesso futuro ao serviço, aos envelopes e à
   sincronização, inclusive com o token que ele já tinha emitido.
   **Não apaga o que já foi baixado naquele aparelho** — nenhum

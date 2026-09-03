@@ -1,7 +1,9 @@
-import { decryptPayload, encryptPayload } from '../crypto/vault'
+import { encryptPayload } from '../crypto/vault'
 import type { VaultPayload } from '../crypto/types'
+import { remoteAccountGuard, type AccountSessionGuard } from '../auth/accountGuard'
+import { readPayloads } from '../db/corrupted'
 import { db, type ApoioDatabase } from '../db/database'
-import { purgeRecordHistory, type PurgeResult } from '../db/purge'
+import type { PurgeResult } from '../db/purge'
 import { VaultRepository, type EncryptedMutation } from '../db/repository'
 import type { VaultRecord } from '../db/types'
 
@@ -16,11 +18,18 @@ const objetos = (valor: unknown): Dados[] => Array.isArray(valor) ? valor.filter
 /** Apaga a citação da pessoa em um campo de identificação única. */
 const semCitacao = (valor: unknown, personId: string, vazio: string | null = ''): unknown => valor === personId ? vazio : valor
 
-/** O registro fala só desta pessoa: apagá-lo não tira nada de mais ninguém. */
-export function isOnlyAboutPerson(payload: VaultPayload, personId: string): boolean {
+/**
+ * O registro fala só desta pessoa: apagá-lo não tira nada de mais ninguém.
+ *
+ * `recordId` não é enfeite. Sem ele, `person` respondia `true` para qualquer
+ * cadastro de pessoa, de qualquer pessoa — e a exportação de uma pessoa saía
+ * com o cadastro completo de todas as outras dentro. O tipo `person` só fala
+ * desta pessoa quando o registro **é** o dela.
+ */
+export function isOnlyAboutPerson(payload: VaultPayload, personId: string, recordId: string): boolean {
   const dados = payload.data as Dados
   switch (payload.type) {
-    case 'person': return true
+    case 'person': return recordId === personId
     case 'visit': return dados.targetType === 'person' && dados.targetId === personId
     case 'prayer_request': return dados.subjectType === 'person' && dados.subjectId === personId
     case 'follow_up': return dados.subjectType === 'person' && dados.subjectId === personId
@@ -319,119 +328,273 @@ function linhasDoConteudo(conteudo: unknown, prefixo = ''): string[] {
 }
 
 /**
- * Campos de identificação de pessoa dentro de um item de lista. Se algum deles
- * aponta para a pessoa, o item fala dela.
+ * Projeções explícitas para registros compartilhados.
+ *
+ * A versão anterior copiava objetos inteiros: bastava um item de lista citar a
+ * pessoa para o item sair como estava, com tudo que houvesse dentro — o nome de
+ * quem mais participou, a observação confidencial da comissão, o endereço do
+ * ponto de evangelismo, a nota escrita ao lado do acompanhamento. Copiar e
+ * depois tentar limpar é a ordem errada: cada campo novo que alguém acrescenta
+ * ao registro passa a sair sozinho, e sai entregando.
+ *
+ * Aqui é o contrário. Nada sai a não ser o que está escrito abaixo, campo por
+ * campo, tipo por tipo. Um campo novo simplesmente não aparece na exportação
+ * até alguém decidir que ele pode.
+ *
+ * Duas regras valem para todos:
+ *
+ * 1. Campo livre escrito pelo pastor — nome, título, descrição, observação,
+ *    nota, endereço, local, motivo — nunca sai de um registro compartilhado.
+ *    Ele fala do trabalho da igreja e pode citar qualquer pessoa. O que
+ *    identifica o registro para quem pediu os dados é o tipo e a data.
+ * 2. Só saem itens de lista cujo vínculo aponta para esta pessoa, e deles só
+ *    os campos listados.
  */
-const CAMPOS_DE_PESSOA = ['personId', 'subjectId', 'responsibleId', 'presidentId', 'secretaryId', 'teacherId', 'assistantId', 'leaderId', 'associateId', 'recordId', 'id']
+interface ProjecaoDeItem {
+  /** Papel que a pessoa exerce quando aparece nesta lista. */
+  papel: string
+  /** Campos do item que podem sair, já sabendo que o item fala dela. */
+  campos: readonly string[]
+  /** Campos internos de um objeto do item, por exemplo `question.text`. */
+  internos?: Readonly<Record<string, readonly string[]>>
+}
+
+interface ProjecaoCompartilhada {
+  /** Campos estruturais do registro: datas, situações, anos. Nunca texto livre. */
+  contexto: readonly string[]
+  /** Campos do próprio registro que só rendem um papel, nunca conteúdo. */
+  papeis: Readonly<Record<string, string>>
+  /** Listas do registro e o que sai do item que fala dela. */
+  listas: Readonly<Record<string, ProjecaoDeItem>>
+  /** Listas dentro de cada item de outra lista: `versions[].answers[]`. */
+  aninhadas?: Readonly<Record<string, Readonly<Record<string, ProjecaoDeItem>>>>
+  /** Lista guardada dentro de um objeto do registro: `undo.previousPeople`. */
+  internas?: Readonly<Record<string, Readonly<Record<string, ProjecaoDeItem>>>>
+}
+
+const SEM_CONTEUDO: readonly string[] = []
+
+const PROJECOES: Readonly<Record<string, ProjecaoCompartilhada>> = {
+  family: {
+    contexto: ['createdAt', 'updatedAt'],
+    papeis: { memberIds: 'integrante da família' },
+    listas: {},
+  },
+  missionary_pair: {
+    contexto: ['active', 'createdAt', 'updatedAt'],
+    papeis: { memberIds: 'integrante da dupla missionária' },
+    listas: {},
+  },
+  sabbath_class: {
+    contexto: ['ageGroup', 'active', 'createdAt', 'updatedAt'],
+    papeis: {
+      participantIds: 'participante da classe', teacherId: 'professora ou professor da classe',
+      assistantId: 'auxiliar da classe',
+    },
+    listas: {},
+  },
+  small_group: {
+    contexto: ['day', 'time', 'active', 'createdAt', 'updatedAt'],
+    papeis: {
+      participantIds: 'participante do Pequeno Grupo', leaderId: 'líder do Pequeno Grupo',
+      associateId: 'associada ou associado do Pequeno Grupo',
+    },
+    listas: {},
+  },
+  visit: {
+    // A visita de família é o registro em que a pessoa tem mais a receber: as
+    // respostas que ela própria deu na entrevista. Sai a pergunta do catálogo e
+    // a resposta dela; as respostas dos outros presentes não são alcançadas
+    // porque o filtro é `subjectId`.
+    contexto: ['mode', 'status', 'reason', 'createdAt', 'updatedAt'],
+    papeis: {},
+    listas: {
+      incomeAnswers: { papel: 'informou a própria fidelidade', campos: ['status'] },
+    },
+    aninhadas: {
+      versions: {
+        answers: {
+          papel: 'respondeu na entrevista',
+          campos: ['value', 'skipped'],
+          internos: { question: ['text', 'category', 'code'] },
+        },
+        participants: { papel: 'presente na visita', campos: ['present'] },
+      },
+    },
+  },
+  commission_config: {
+    contexto: ['year', 'updatedAt'],
+    papeis: {
+      boardMemberIds: 'na comissão da igreja', elderIds: 'registrada ou registrado como ancião',
+      boardPresidentId: 'preside a comissão', secretaryId: 'secretária ou secretário da comissão',
+    },
+    listas: {},
+  },
+  commission_meeting: {
+    contexto: ['kind', 'date', 'createdAt', 'updatedAt'],
+    papeis: {
+      participantIds: 'participante da reunião', presidentId: 'presidiu a reunião',
+      secretaryId: 'secretariou a reunião',
+    },
+    // O assunto e a proposta são texto livre da igreja; sai o prazo, que é o
+    // que diz respeito a quem ficou responsável.
+    listas: { agenda: { papel: 'responsável por um assunto', campos: ['dueDate'] } },
+  },
+  commission_task: {
+    contexto: ['kind', 'dueDate', 'status', 'createdAt', 'updatedAt'],
+    papeis: { responsibleId: 'responsável pela pendência' },
+    listas: {},
+  },
+  nomination_process: {
+    contexto: ['period', 'status', 'createdAt', 'updatedAt'],
+    papeis: {},
+    listas: {
+      // A nota confidencial, o motivo da recusa e a data da conversa ficam com
+      // a comissão. Sai o que a pessoa viveu: se consentiu, se foi considerada
+      // apta e qual foi o resultado.
+      candidates: { papel: 'indicada para um cargo', campos: ['status', 'consent', 'eligibility', 'associate', 'electedAt'], internos: { vote: ['result'] } },
+      meetings: { papel: 'presente em reunião da comissão', campos: ['date'] },
+      officialVotes: { papel: 'presente na votação oficial', campos: ['date', 'result'] },
+      tasks: { papel: 'responsável por tarefa da comissão', campos: ['dueDate', 'status'] },
+      reports: { papel: 'citada no relatório', campos: SEM_CONTEUDO },
+    },
+    aninhadas: {
+      reports: { lines: { papel: 'indicada no relatório', campos: ['officeTitle'] } },
+    },
+  },
+  evangelism_campaign: {
+    contexto: ['objective', 'status', 'startDate', 'endDate', 'createdAt', 'updatedAt'],
+    papeis: {},
+    listas: {
+      // `role` é uma escolha de uma lista fechada e é o papel da própria
+      // pessoa: sai. Os pontos guardam só identificadores; deles sai o papel.
+      team: { papel: 'na equipe da campanha', campos: ['role'] },
+      points: { papel: 'na equipe de um ponto', campos: SEM_CONTEUDO },
+      tasks: { papel: 'responsável por tarefa da campanha', campos: ['dueDate', 'status'] },
+      followUps: { papel: 'em acompanhamento na campanha', campos: ['status'] },
+    },
+  },
+  annual_goal: {
+    contexto: ['area', 'year', 'startDate', 'endDate', 'createdAt', 'updatedAt'],
+    papeis: {},
+    listas: { references: { papel: 'referência da meta', campos: SEM_CONTEUDO } },
+  },
+  import_batch: {
+    // O lote guarda uma cópia do cadastro anterior para poder desfazer. Esse
+    // conteúdo é o mesmo que já sai em "Dados pessoais": aqui basta o papel.
+    contexto: ['createdAt'],
+    papeis: {},
+    listas: {},
+    internas: {
+      undo: {
+        previousPeople: { papel: 'consta na lista importada', campos: SEM_CONTEUDO },
+      },
+    },
+  },
+  agenda_event: {
+    contexto: ['category', 'startAt', 'endAt', 'allDay'],
+    papeis: {},
+    listas: {},
+    internas: {
+      ceremonyDetails: {},
+    },
+  },
+}
+
+/** Campos de vínculo aceitos dentro de um item de lista. */
+const VINCULOS_DE_PESSOA = ['personId', 'subjectId', 'responsibleId', 'presidentId', 'secretaryId', 'recordId'] as const
+const VINCULOS_DE_LISTA = ['participantIds', 'memberIds', 'teamPersonIds'] as const
 
 function itemFalaDaPessoa(item: Dados, personId: string): boolean {
-  return CAMPOS_DE_PESSOA.some((campo) => item[campo] === personId)
-    || lista(item.participantIds).includes(personId)
-    || lista(item.memberIds).includes(personId)
-    || lista(item.teamPersonIds).includes(personId)
+  if (VINCULOS_DE_PESSOA.some((campo) => item[campo] === personId)) return true
+  if (VINCULOS_DE_LISTA.some((campo) => lista(item[campo]).includes(personId))) return true
+  // A referência da meta e o acompanhamento da campanha usam `id`/`recordId`
+  // com um `type` ao lado: só vale quando o tipo é pessoa.
+  return item.type === 'person' && (item.id === personId || item.recordId === personId)
 }
 
-/**
- * Contexto de um registro compartilhado que pode sair sem revelar terceiro:
- * o que o registro é, como se chama e quando aconteceu.
- *
- * É uma lista fechada de propósito. A regra inversa — "tire o que é de
- * terceiro" — erra sempre que aparece um campo novo, e erra para o lado de
- * entregar dado alheio junto. Aqui um campo novo simplesmente não sai.
- */
-const CONTEXTO_COMPARTILHADO = new Set([
-  'name', 'title', 'objective', 'area', 'year', 'kind', 'category', 'status',
-  'date', 'time', 'startAt', 'endAt', 'dueAt', 'dueDate', 'startDate', 'endDate',
-  'createdAt', 'updatedAt', 'requestedAt', 'reason', 'ageGroup', 'day', 'active',
-])
-
-/**
- * Como esta pessoa aparece dentro de um registro compartilhado.
- *
- * Um item de lista sozinho não diz nada a quem lê: `{"personId": "..."}` é
- * técnico e vazio. O que a pessoa tem direito de saber é o papel — que ela era
- * a professora daquela classe, que estava entre os participantes daquela
- * reunião, que foi indicada para aquele cargo. Estes rótulos são exatamente
- * isso, e nenhum deles precisa citar terceiro para ser dito.
- */
-const PAPEIS: Record<string, string> = {
-  memberIds: 'integrante', participantIds: 'participante', teamPersonIds: 'na equipe',
-  teacherId: 'professora ou professor', assistantId: 'auxiliar', leaderId: 'líder',
-  associateId: 'associada ou associado', presidentId: 'presidente', secretaryId: 'secretária ou secretário',
-  responsibleId: 'responsável', personId: 'citada', subjectId: 'citada', recordId: 'em acompanhamento',
-  organizingCommitteeIds: 'na comissão organizadora', committeeMemberIds: 'na comissão',
-  districtLeaderId: 'líder distrital',
-}
-
-const PAPEIS_POR_LISTA: Record<string, string> = {
-  candidates: 'indicada para um cargo', team: 'na equipe da campanha',
-  followUps: 'em acompanhamento', meetings: 'em reunião', officialVotes: 'em votação',
-  reports: 'no relatório', tasks: 'responsável por tarefa', agenda: 'responsável por assunto',
-  points: 'na equipe de um ponto', previousPeople: 'na lista importada',
-  answers: 'respondeu na entrevista', participants: 'presente na visita',
-  incomeAnswers: 'informou fidelidade', references: 'referência da meta', lines: 'indicada no relatório',
-}
-
-/** Em que papéis a pessoa aparece dentro de um item, sem citar mais ninguém. */
-function papeisNoItem(item: Dados, personId: string): string[] {
-  const papeis: string[] = []
-  for (const [campo, rotulo] of Object.entries(PAPEIS)) {
+/** Copia de um item apenas os campos autorizados, e nada mais. */
+function projetarItem(item: Dados, projecao: ProjecaoDeItem): Dados | null {
+  const saida: Dados = {}
+  for (const campo of projecao.campos) {
+    if (item[campo] === undefined) continue
     const valor = item[campo]
-    if (valor === personId || (Array.isArray(valor) && lista(valor).includes(personId))) papeis.push(rotulo)
+    // Um campo autorizado que virou objeto deixou de ser o que foi autorizado.
+    if (valor !== null && typeof valor === 'object') continue
+    saida[campo] = valor
   }
-  return papeis
+  for (const [objeto, campos] of Object.entries(projecao.internos ?? {})) {
+    const interno = item[objeto]
+    if (!interno || typeof interno !== 'object' || Array.isArray(interno)) continue
+    for (const campo of campos) {
+      const valor = (interno as Dados)[campo]
+      if (valor === undefined || (valor !== null && typeof valor === 'object')) continue
+      saida[`${objeto}.${campo}`] = valor
+    }
+  }
+  return Object.keys(saida).length ? saida : null
 }
 
 /**
- * Versão redigida de um registro que fala desta pessoa junto de outras.
+ * Versão projetada de um registro que fala desta pessoa junto de outras.
  *
- * Quem pede os próprios dados tem direito a saber o que existe sobre si em um
- * registro compartilhado — em que classe estava e como, o que respondeu numa
- * visita de família, para qual cargo foi indicada. Não tem direito ao que ali
- * é de terceiro, e entregar o registro inteiro entregaria os dois.
- *
- * O que sai é o contexto do registro, o papel dela em cada parte e o conteúdo
- * das entradas que falam só dela. Os campos de contexto são uma lista fechada
- * de propósito: a regra inversa — "tire o que é de terceiro" — erra sempre que
- * aparece um campo novo, e erra entregando.
+ * Quem pede os próprios dados tem direito a saber que aquele registro existe,
+ * que papel teve nele e o que há ali de conteúdo dela. Não tem direito ao que
+ * é de terceiro — e o registro compartilhado é, quase inteiro, de terceiros.
+ * Por isso a montagem é aditiva: começa vazia e recebe apenas o que
+ * `PROJECOES` autoriza.
  */
 export function redactForPerson(payload: VaultPayload, personId: string): VaultPayload | null {
+  const projecao = PROJECOES[payload.type]
+  if (!projecao) return null
   if (withoutPerson(payload, personId) === null) return null
   const dados = payload.data as Dados
+
   const contexto: Dados = {}
+  for (const campo of projecao.contexto) {
+    const valor = dados[campo]
+    if (valor === undefined || (valor !== null && typeof valor === 'object')) continue
+    contexto[campo] = valor
+  }
+
   const papeis: string[] = []
   const conteudo: Dados[] = []
 
-  for (const [chave, valor] of Object.entries(dados)) {
-    if (CONTEXTO_COMPARTILHADO.has(chave) && (typeof valor !== 'object' || valor === null)) {
-      contexto[chave] = valor
-      continue
-    }
-    // Lista de identificadores no próprio registro: só o papel dela sai.
-    if (Array.isArray(valor) && lista(valor).includes(personId) && PAPEIS[chave]) {
-      papeis.push(PAPEIS[chave])
-      continue
-    }
-    if (typeof valor === 'string' && valor === personId && PAPEIS[chave]) {
-      papeis.push(PAPEIS[chave])
-      continue
-    }
-    if (!Array.isArray(valor)) continue
+  for (const [campo, papel] of Object.entries(projecao.papeis)) {
+    const valor = dados[campo]
+    if (valor === personId || (Array.isArray(valor) && lista(valor).includes(personId))) papeis.push(papel)
+  }
 
-    for (const item of objetos(valor)) {
-      // Uma volta a mais: a visita guarda as respostas dentro de cada versão.
-      for (const [subChave, subValor] of Object.entries(item)) {
-        for (const interno of objetos(subValor)) {
-          if (!itemFalaDaPessoa(interno, personId)) continue
-          papeis.push(PAPEIS_POR_LISTA[subChave] ?? `citada em ${subChave}`)
-          conteudo.push(interno)
-        }
-      }
-      if (!itemFalaDaPessoa(item, personId)) continue
-      const noItem = papeisNoItem(item, personId)
-      papeis.push(noItem.length ? `${PAPEIS_POR_LISTA[chave] ?? `citada em ${chave}`} (${noItem.join(', ')})` : PAPEIS_POR_LISTA[chave] ?? `citada em ${chave}`)
-      conteudo.push(item)
+  const percorrer = (itens: Dados[], nome: string, item: ProjecaoDeItem) => {
+    for (const entrada of itens) {
+      if (!itemFalaDaPessoa(entrada, personId)) continue
+      papeis.push(item.papel)
+      const projetado = projetarItem(entrada, item)
+      if (projetado) conteudo.push({ origem: nome, ...projetado })
     }
+  }
+
+  for (const [nome, item] of Object.entries(projecao.listas)) percorrer(objetos(dados[nome]), nome, item)
+
+  for (const [externo, internas] of Object.entries(projecao.aninhadas ?? {})) {
+    for (const bloco of objetos(dados[externo])) {
+      for (const [nome, item] of Object.entries(internas)) percorrer(objetos(bloco[nome]), nome, item)
+    }
+  }
+
+  for (const [objeto, internas] of Object.entries(projecao.internas ?? {})) {
+    const bloco = dados[objeto]
+    if (!bloco || typeof bloco !== 'object' || Array.isArray(bloco)) continue
+    for (const [nome, item] of Object.entries(internas)) percorrer(objetos((bloco as Dados)[nome]), nome, item)
+  }
+
+  // A cerimônia da agenda cita a pessoa em campos do próprio objeto, não em
+  // uma lista de objetos. Sai o papel, nunca o conteúdo do compromisso.
+  if (payload.type === 'agenda_event') {
+    const cerimonia = (typeof dados.ceremonyDetails === 'object' && dados.ceremonyDetails !== null ? dados.ceremonyDetails : {}) as Dados
+    if (lista(cerimonia.involvedPersonIds).includes(personId)) papeis.push('pessoa da cerimônia')
+    if (lista(cerimonia.parentPersonIds).includes(personId)) papeis.push('responsável na cerimônia')
+    if (cerimonia.childPersonId === personId) papeis.push('criança da cerimônia')
   }
 
   return {
@@ -449,17 +612,27 @@ export interface PersonRemovalPlan { removed: Carregado[]; edited: Array<{ recor
 
 export class PersonDataService {
   private readonly repository: VaultRepository
-  constructor(private readonly database: ApoioDatabase = db) { this.repository = new VaultRepository(database) }
+  constructor(
+    private readonly database: ApoioDatabase = db,
+    /** Conferência de que a sessão remota ainda é a desta conta. */
+    private readonly guard: AccountSessionGuard = remoteAccountGuard,
+  ) { this.repository = new VaultRepository(database) }
 
-  private async carregar(accountId: string, key: CryptoKey): Promise<Carregado[]> {
+  /**
+   * Um registro que não abre não pode derrubar a exportação nem a exclusão: ele
+   * vai para a quarentena e os íntegros seguem. Quem chama recebe também a
+   * lista do que ficou de fora, para dizer isso em vez de omitir em silêncio.
+   */
+  private async carregar(accountId: string, key: CryptoKey): Promise<{ todos: Carregado[]; ilegiveis: VaultRecord[] }> {
     const records = await this.database.vaultRecords.where('accountId').equals(accountId).filter((record) => !record.deletedAt).toArray()
-    return Promise.all(records.map(async (record) => ({ record, payload: await decryptPayload(key, record) })))
+    const { opened, skipped } = await readPayloads(key, records, this.database)
+    return { todos: opened, ilegiveis: skipped }
   }
 
   /** O que será apagado e o que será apenas desvinculado, antes de confirmar. */
   async plan(accountId: string, key: CryptoKey, personId: string): Promise<PersonRemovalPlan> {
-    const todos = await this.carregar(accountId, key)
-    const removed = todos.filter(({ record, payload }) => record.id === personId ? true : payload.type !== 'person' && isOnlyAboutPerson(payload, personId))
+    const { todos } = await this.carregar(accountId, key)
+    const removed = todos.filter(({ record, payload }) => isOnlyAboutPerson(payload, personId, record.id))
     const edited: PersonRemovalPlan['edited'] = []
     for (const { record, payload } of todos) {
       if (removed.some((item) => item.record.id === record.id)) continue
@@ -480,7 +653,7 @@ export class PersonDataService {
    * outros; deles fica a indicação de que existem.
    */
   async exportLines(accountId: string, key: CryptoKey, personId: string): Promise<string[]> {
-    const todos = await this.carregar(accountId, key)
+    const { todos, ilegiveis } = await this.carregar(accountId, key)
     const pessoa = todos.find(({ record }) => record.id === personId)
     if (!pessoa) throw new Error('Pessoa não encontrada.')
 
@@ -489,7 +662,7 @@ export class PersonDataService {
       ...linhasDoConteudo(pessoa.payload.data),
     ]
 
-    const somenteDela = todos.filter(({ record, payload }) => record.id !== personId && isOnlyAboutPerson(payload, personId))
+    const somenteDela = todos.filter(({ record, payload }) => record.id !== personId && isOnlyAboutPerson(payload, personId, record.id))
     linhas.push('', 'Registros que falam somente desta pessoa')
     if (!somenteDela.length) linhas.push('- nenhum')
     for (const { payload } of somenteDela) {
@@ -497,7 +670,7 @@ export class PersonDataService {
     }
 
     const compartilhados = todos.filter(({ record, payload }) => record.id !== personId
-      && !isOnlyAboutPerson(payload, personId) && withoutPerson(payload, personId) !== null)
+      && !isOnlyAboutPerson(payload, personId, record.id) && redactForPerson(payload, personId) !== null)
     linhas.push('', 'Registros em que esta pessoa aparece junto de outras')
     linhas.push('De cada um sai o que o registro é e o que há sobre esta pessoa. O restante é de terceiros e não sai nesta exportação.')
     if (!compartilhados.length) linhas.push('- nenhum')
@@ -505,6 +678,11 @@ export class PersonDataService {
       const redigido = redactForPerson(payload, personId)
       if (!redigido) continue
       linhas.push('', rotuloDeTipo(payload.type), ...linhasDoConteudo(redigido.data))
+    }
+
+    if (ilegiveis.length) {
+      linhas.push('', 'Registros que não abriram neste aparelho')
+      linhas.push(`${ilegiveis.length} registro(s) cifrado(s) não puderam ser abertos aqui e ficaram em quarentena. Eles não entram nesta exportação; restaurar um backup costuma resolver.`)
     }
 
     return linhas
@@ -521,6 +699,10 @@ export class PersonDataService {
    * dela foram apagados enquanto isso permanece recuperável não seria verdade.
    */
   async remove(accountId: string, key: CryptoKey, deviceId: string, personId: string): Promise<{ removed: number; edited: number; purge: PurgeResult }> {
+    // Antes de apagar qualquer coisa: a sessão aberta no serviço ainda é a
+    // desta conta? Com duas contas no mesmo navegador, a aba antiga mandaria a
+    // lápide e o pedido de expurgo para a conta que entrou depois.
+    await this.guard(accountId)
     const { removed, edited } = await this.plan(accountId, key, personId)
     const agora = new Date().toISOString()
     const mutations: EncryptedMutation[] = []
@@ -535,17 +717,19 @@ export class PersonDataService {
     }
     if (!mutations.length) return { removed: 0, edited: 0, purge: { local: 0, queued: 0 } }
 
-    // O que já estava na fila antes desta exclusão é o que precisa sair; o que
-    // ela acabou de criar é o que leva a remoção aos outros aparelhos — e é
-    // também a versão que o serviço vai exigir que ainda seja a última antes
-    // de apagar o histórico daquele registro.
-    const filaAnterior = new Set((await this.database.outbox.where('accountId').equals(accountId).toArray()).map(({ id }) => id))
-    await this.repository.applyEncryptedMutations(accountId, deviceId, mutations)
-    const criadas = (await this.database.outbox.where('accountId').equals(accountId).toArray())
-      .filter(({ id }) => !filaAnterior.has(id))
-    const alvos = criadas.map(({ id, recordId }) => ({ recordId, operationId: id }))
-
-    const purge = await purgeRecordHistory(accountId, alvos, this.database)
+    // Publicar a lápide e pedir o expurgo do passado é uma coisa só.
+    //
+    // Antes eram duas, e as duas eram frágeis. A identificação das operações
+    // vinha de um retrato da fila tirado antes e outro depois: qualquer coisa
+    // enfileirada no meio — outra aba, outra tela, o próprio aplicativo —
+    // entrava na diferença, e o expurgo pedia ao serviço que apagasse o
+    // histórico de um registro que nada tinha a ver com a pessoa. E entre a
+    // gravação e o pedido havia uma janela: fechar o navegador ali deixava a
+    // pessoa apagada da tela e o passado dela inteiro, sem nada pendente.
+    //
+    // `applyMutationsAndQueuePurge` grava as operações e registra os alvos na
+    // mesma transação, com os identificadores vindos de dentro da gravação.
+    const { purge } = await this.repository.applyMutationsAndQueuePurge(accountId, deviceId, mutations)
     return { removed: removed.length, edited: edited.length, purge }
   }
 }

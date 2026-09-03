@@ -1,7 +1,9 @@
 import type { CipherEnvelope } from '../crypto/types'
 import { isSyncDisabled } from '../sync/config'
 import { db, type ApoioDatabase } from './database'
+import { registerPurgeTargets, type PurgeResult } from './purge'
 import type { OutboxRecord, VaultRecord } from './types'
+import type { PurgeTarget } from '../auth/supabase'
 
 type VaultRecordType = VaultRecord['recordType']
 
@@ -35,6 +37,14 @@ export class VaultRepository {
     return (await this.applyEncryptedMutations(accountId, deviceId, [{ recordId, envelope, recordType }]))[0]!
   }
 
+  /**
+   * Exclusão simples de um registro que fala só de si.
+   *
+   * Não serve para pessoa: apagar uma pessoa exige desvincular onde ela
+   * aparece junto de outras e pedir o expurgo do passado. Quem faz isso é
+   * `PersonDataService.remove`, e o caminho antigo foi retirado justamente
+   * para não haver dois.
+   */
   async deleteEncrypted(
     accountId: string,
     deviceId: string,
@@ -47,7 +57,53 @@ export class VaultRepository {
   }
 
   async applyEncryptedMutations(accountId: string, deviceId: string, mutations: EncryptedMutation[]): Promise<VaultRecord[]> {
-    if (mutations.length === 0) return []
+    return (await this.applyEncryptedMutationsWithOperations(accountId, deviceId, mutations)).records
+  }
+
+  /**
+   * O mesmo lote, devolvendo também qual operação foi criada para cada
+   * registro.
+   *
+   * A exclusão de pessoa precisa saber exatamente disso. Antes ela tirava um
+   * retrato da fila de envio, gravava, e chamava de "as minhas" todas as
+   * operações que apareceram na diferença: bastava outra aba, outra tela ou o
+   * próprio aplicativo enfileirar qualquer coisa no meio para o expurgo pedir
+   * ao serviço que apagasse o histórico de um registro que nada tinha a ver
+   * com a pessoa apagada. Aqui os identificadores saem de dentro da própria
+   * gravação, e nenhuma corrida os alcança.
+   */
+  async applyEncryptedMutationsWithOperations(
+    accountId: string,
+    deviceId: string,
+    mutations: EncryptedMutation[],
+  ): Promise<{ records: VaultRecord[]; targets: PurgeTarget[] }> {
+    return this.aplicar(accountId, deviceId, mutations, false)
+  }
+
+  /**
+   * Gravação e pedido de expurgo em uma transação só.
+   *
+   * Entre publicar a lápide e registrar o pedido de expurgo havia uma janela:
+   * fechar o navegador ali deixava a pessoa apagada da tela e o passado dela
+   * inteiro na fila, nas revisões, na quarentena e no histórico do serviço,
+   * sem nada pendente que fizesse alguém voltar. Agora ou as duas coisas
+   * acontecem, ou nenhuma.
+   */
+  async applyMutationsAndQueuePurge(
+    accountId: string,
+    deviceId: string,
+    mutations: EncryptedMutation[],
+  ): Promise<{ records: VaultRecord[]; targets: PurgeTarget[]; purge: PurgeResult }> {
+    return this.aplicar(accountId, deviceId, mutations, true)
+  }
+
+  private async aplicar(
+    accountId: string,
+    deviceId: string,
+    mutations: EncryptedMutation[],
+    comExpurgo: boolean,
+  ): Promise<{ records: VaultRecord[]; targets: PurgeTarget[]; purge: PurgeResult }> {
+    if (mutations.length === 0) return { records: [], targets: [], purge: { local: 0, queued: 0 } }
     if (new Set(mutations.map(({ recordId }) => recordId)).size !== mutations.length) throw new Error('Uma operação em lote não pode repetir o mesmo registro.')
     const existingRecords = await this.database.vaultRecords.bulkGet(mutations.map(({ recordId }) => recordId))
     const now = new Date().toISOString()
@@ -95,14 +151,25 @@ export class VaultRepository {
       })
     })
 
-    if (isSyncDisabled) await this.database.vaultRecords.bulkPut(records)
-    else {
-      await this.database.transaction('rw', this.database.vaultRecords, this.database.outbox, async () => {
+    const targets: PurgeTarget[] = operations.map(({ recordId, id }) => ({ recordId, operationId: id }))
+    let purge: PurgeResult = { local: 0, queued: 0 }
+
+    if (isSyncDisabled) {
+      // Sem sincronização não existe fila nem histórico remoto; o expurgo local
+      // continua acontecendo, pelo mesmo caminho.
+      await this.database.transaction('rw', this.database.vaultRecords, this.database.outbox, this.database.syncConflicts, this.database.quarantine, this.database.pendingActions, async () => {
         await this.database.vaultRecords.bulkPut(records)
-        await this.database.outbox.bulkPut(operations)
+        if (comExpurgo) purge = await registerPurgeTargets(accountId, targets, this.database)
       })
+      return { records, targets, purge }
     }
-    return records
+
+    await this.database.transaction('rw', this.database.vaultRecords, this.database.outbox, this.database.syncConflicts, this.database.quarantine, this.database.pendingActions, async () => {
+      await this.database.vaultRecords.bulkPut(records)
+      await this.database.outbox.bulkPut(operations)
+      if (comExpurgo) purge = await registerPurgeTargets(accountId, targets, this.database)
+    })
+    return { records, targets, purge }
   }
 
   async list(accountId: string, recordType?: VaultRecordType): Promise<VaultRecord[]> {

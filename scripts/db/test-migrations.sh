@@ -41,6 +41,7 @@ psql_run -f "$migrations/0005_ambiente_antes_da_senha_up.sql"
 psql_run -f "$migrations/0006_expurgo_de_historico_up.sql"
 psql_run -f "$migrations/0007_funcao_nova_fechada_up.sql"
 psql_run -f "$migrations/0008_revogacao_idempotente_up.sql"
+psql_run -f "$migrations/0009_sessoes_fora_de_alcance_up.sql"
 
 tabelas="$(contar_tabelas)"
 if [ "$tabelas" -ne 8 ]; then
@@ -55,6 +56,7 @@ psql_run -f "$testes/02_device_barriers.sql"
 psql_run -f "$testes/03_sessao_revogada.sql"
 
 echo "==> 4/6 Revertendo as migrations"
+psql_run -f "$migrations/0009_sessoes_fora_de_alcance_down.sql"
 psql_run -f "$migrations/0008_revogacao_idempotente_down.sql"
 psql_run -f "$migrations/0007_funcao_nova_fechada_down.sql"
 psql_run -f "$migrations/0006_expurgo_de_historico_down.sql"
@@ -97,6 +99,7 @@ psql_run -f "$migrations/0005_ambiente_antes_da_senha_up.sql"
 psql_run -f "$migrations/0006_expurgo_de_historico_up.sql"
 psql_run -f "$migrations/0007_funcao_nova_fechada_up.sql"
 psql_run -f "$migrations/0008_revogacao_idempotente_up.sql"
+psql_run -f "$migrations/0009_sessoes_fora_de_alcance_up.sql"
 
 tabelas="$(contar_tabelas)"
 if [ "$tabelas" -ne 8 ]; then

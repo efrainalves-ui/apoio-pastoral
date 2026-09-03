@@ -100,15 +100,15 @@ export class PeopleService {
     return { id: personId, ...data }
   }
 
-  async deletePerson(accountId: string, masterKey: CryptoKey, personId: string): Promise<void> {
-    const person = await this.getPerson(accountId, masterKey, personId)
-    if (!person) throw new Error('Pessoa não encontrada.')
-    for (const record of await this.repository.list(accountId, 'family')) {
-      const payload = await decryptRecord(masterKey, record)
-      if (payload?.type === 'family' && (payload.data as { memberIds: string[] }).memberIds.includes(personId)) throw new Error('Remova a pessoa da família antes de excluir o cadastro.')
-    }
-    const deletedAt = new Date().toISOString()
-    const tombstone = await encryptPayload(masterKey, { schemaVersion: 1, type: 'person_tombstone', data: { deletedAt } }, personId)
-    await this.repository.deleteEncrypted(accountId, currentDeviceId(accountId), personId, tombstone)
-  }
+  /**
+   * A exclusão de pessoa vive só em `PersonDataService.remove`.
+   *
+   * Existia aqui um segundo caminho, mais antigo: publicava a lápide do
+   * cadastro e ia embora. Ele não desvinculava a pessoa das visitas, das
+   * comissões, do processo de nomeações, da campanha nem do lote de
+   * importação, e não pedia expurgo nenhum — o passado dela continuava
+   * inteiro na fila de envio, nas revisões, na quarentena e no histórico do
+   * serviço. Dois caminhos para a mesma ação, um deles incompleto, é só
+   * questão de tempo até alguém chamar o errado. Ficou um só.
+   */
 }

@@ -37,7 +37,7 @@ Inserir os valores somente no computador privado do avaliador. Não versionar `.
 1. Confirmar que o CI Linux da branch passou integralmente, inclusive Playwright desktop e celular.
 2. Criar um projeto Supabase vazio e identificado claramente como homologação; conferir que não é produção.
 3. Em Auth, permitir somente as contas fictícias da rodada. Se necessário, desabilitar confirmação de e-mail apenas nesse projeto temporário.
-4. Aplicar, nesta ordem, `0001_marco_zero_up.sql`, `0002_password_key_envelopes_up.sql`, `0003_device_sessions_up.sql`, `0004_sessao_revogada_e_ambiente_up.sql`, `0005_ambiente_antes_da_senha_up.sql`, `0006_expurgo_de_historico_up.sql`, `0007_funcao_nova_fechada_up.sql` e `0008_revogacao_idempotente_up.sql`. Não aplicar os arquivos `*_down.sql` na validação normal.
+4. Aplicar, nesta ordem, `0001_marco_zero_up.sql`, `0002_password_key_envelopes_up.sql`, `0003_device_sessions_up.sql`, `0004_sessao_revogada_e_ambiente_up.sql`, `0005_ambiente_antes_da_senha_up.sql`, `0006_expurgo_de_historico_up.sql`, `0007_funcao_nova_fechada_up.sql`, `0008_revogacao_idempotente_up.sql` e `0009_sessoes_fora_de_alcance_up.sql`. Não aplicar os arquivos `*_down.sql` na validação normal. Depois de aplicar todas, `select public.app_schema_version();` precisa responder **9**.
 5. Declarar o ambiente no próprio banco, uma única vez, pelo editor SQL do projeto:
 
    ```sql
@@ -70,6 +70,7 @@ Inserir os valores somente no computador privado do avaliador. Não versionar `.
 | Tabela futura | Criar uma tabela qualquer em `public` pelo editor SQL e consultá-la como conta fictícia | Acesso negado antes mesmo da RLS | A tabela responde ao navegador |
 | Função futura | Criar uma função e um procedimento em `public` pelo editor SQL, sem `revoke`, e consultar os privilégios | PUBLIC não aparece em nenhum dos dois | PUBLIC continua com EXECUTE |
 | Proteção verificável | `select public.protecao_de_funcao_nova();` | Responde `true` | Responde `false`: o gatilho foi apagado ou desabilitado depois da migration |
+| Sessões fora de alcance | Como conta fictícia autenticada, `GET /rest/v1/device_sessions` e `GET /rest/v1/revoked_sessions` | As duas respondem erro; nenhuma linha sai | Qualquer uma responde 200 com linhas |
 | Expurgo concorrente | Apagar uma pessoa fictícia, alterar o mesmo registro por outro aparelho antes de sincronizar, e sincronizar | O histórico daquele registro não é apagado e a pendência permanece | O histórico some por baixo da alteração |
 | Encerramento retomado | Fechar a aba entre revogar e reautorizar, abrir, concluir; repetir o teste três vezes | A conta termina com exatamente um aparelho ativo | Sobra mais de um aparelho ativo |
 | Ambiente antes da senha | Apontar a build para o projeto errado e tentar entrar | O aplicativo recusa antes de enviar e-mail e senha | A credencial chega ao serviço errado |
@@ -84,6 +85,61 @@ Inserir os valores somente no computador privado do avaliador. Não versionar `.
 | Conflito | Alterar o mesmo registro fictício em dois dispositivos antes de sincronizar | Conflito fica preservado e sinalizado; nenhuma versão é apagada silenciosamente | Uma versão desaparece sem aviso |
 | Backup | Criar por ação explícita, tentar conta B e restaurar na conta A | B é recusada; A exige confirmação e restaura integralmente | Mistura de contas ou restauração parcial |
 | Orçamento Familiar | Criar lançamento fictício e sincronizar dados pastorais | Orçamento permanece no banco pessoal separado e não aparece nas tabelas remotas | Lançamento financeiro aparece na sincronização pastoral |
+
+## Parada obrigatória: a migration 0007 e o gatilho de evento
+
+A `0007` depende de `create event trigger`. É esse gatilho que tira o EXECUTE de
+PUBLIC de **toda** função criada em `public`, inclusive de uma escrita à mão no
+editor SQL do painel — que é justamente o caso em que ninguém lembra de escrever
+o `revoke`. O diagnóstico do CI mostrou que `alter default privileges` não
+resolve isso para funções: para tabelas resolve, para funções não.
+
+**A permissão de criar gatilho de evento no Supabase gerenciado ainda não foi
+comprovada.** Ela depende de o papel que aplica migrations ser superusuário ou
+ter o privilégio equivalente, e isso varia por projeto e por plano. Não há como
+afirmar daqui que vai funcionar; é preciso executar e olhar.
+
+Três conferências, nesta ordem, no projeto de homologação, logo depois de
+aplicar a `0007`:
+
+1. **A migration concluiu.** Ela termina com um `do $$ ... $$` que levanta
+   exceção se o gatilho não ficou ativo. Se o Supabase recusar o
+   `create event trigger`, a transação inteira aborta e a migration falha com a
+   mensagem do próprio PostgreSQL. Isso é o comportamento certo.
+
+2. **O gatilho existe e está ativo.**
+
+   ```sql
+   select evtname, evtenabled, evtevent, evttags
+   from pg_event_trigger
+   where evtname = 'fechar_funcao_nova';
+   ```
+
+   Precisa devolver exatamente uma linha, com `evtenabled` diferente de `D`.
+
+3. **A função de verificação confirma.**
+
+   ```sql
+   select public.protecao_de_funcao_nova();
+   ```
+
+   Precisa responder `true`. Ela lê o catálogo — não afirma nada por conta
+   própria —, então continua respondendo a verdade se alguém apagar ou
+   desabilitar o gatilho depois. `pnpm test:api` faz a mesma pergunta por HTTP.
+
+**Se qualquer uma das três reprovar, a homologação para aqui.** Não há caminho
+alternativo autorizado nesta etapa:
+
+- **Não** remover o `create event trigger` da migration.
+- **Não** transformar a falha em aviso, nem deixar a migration seguir em frente.
+- **Não** substituir o gatilho por "lembrar de escrever `revoke` em cada
+  função": foi exatamente essa dependência da memória de quem escreve que a
+  auditoria apontou.
+
+O que fazer, em vez disso: registrar a mensagem exata do PostgreSQL, o plano do
+projeto Supabase e o papel usado, e levar a decisão ao responsável. Enquanto a
+proteção não estiver ativa e verificável, o ambiente não está pronto para a
+homologação fechada.
 
 ## Evidências permitidas
 
