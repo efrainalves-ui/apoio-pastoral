@@ -4,7 +4,8 @@ import { decryptPayload, encryptPayload, generateMasterKey } from '../crypto/vau
 import { ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { VaultRecord } from '../db/types'
-import { PersonDataService, isOnlyAboutPerson, withoutPerson } from './personData'
+import { pendingRemotePurge } from '../db/purge'
+import { PersonDataService, isOnlyAboutPerson, redactForPerson, withoutPerson } from './personData'
 
 const CONTA = 'conta-ficticia-pessoa'
 const APARELHO = 'aparelho-ficticio'
@@ -129,10 +130,12 @@ describe('exportação e exclusão de uma pessoa', () => {
     // conteúdo, não uma contagem.
     expect(texto).toContain('Registros que falam somente desta pessoa')
     expect(texto).toContain('Visita')
-    // A família é de outras pessoas também: dela fica só a indicação.
+    // A família é de outras pessoas também: dela sai só o contexto e o que há
+    // sobre quem pediu — nunca os outros integrantes.
     expect(texto).toContain('Registros em que esta pessoa aparece junto de outras')
-    expect(texto).toContain('- Família: 1')
-    expect(texto).not.toContain('Família Fictícia')
+    expect(texto).toContain('Família')
+    expect(texto).toContain('Sobre as outras pessoas')
+    expect(texto).not.toContain('outra-pessoa')
   })
 
   it('a exportação traz o conteúdo dos registros que falam só dela', async () => {
@@ -184,5 +187,97 @@ describe('exportação e exclusão de uma pessoa', () => {
     expect(fila.filter(({ operation }) => operation === 'delete')).toHaveLength(2)
     expect(JSON.stringify(fila)).not.toContain('Pedido fictício reservado')
     expect(JSON.stringify(await banco.vaultRecords.toArray())).not.toContain('Pessoa Fictícia Gama')
+  })
+
+  it('tira o nome escrito na meta anual e no acompanhamento da campanha', () => {
+    // Os dois guardam o nome ao lado do identificador. Apagar só o vínculo
+    // deixava escrito de quem se tratava.
+    const meta = withoutPerson({
+      schemaVersion: 1, type: 'annual_goal',
+      data: { title: 'Meta Fictícia', references: [{ type: 'person', id: 'p1', label: 'Pessoa Fictícia Apagada' }, { type: 'person', id: 'p2', label: 'Outra Pessoa' }] },
+    }, 'p1')
+    expect(JSON.stringify(meta)).not.toContain('Pessoa Fictícia Apagada')
+    expect(JSON.stringify(meta)).toContain('Outra Pessoa')
+
+    const campanha = withoutPerson({
+      schemaVersion: 1, type: 'evangelism_campaign',
+      data: {
+        team: [], points: [],
+        tasks: [{ id: 't1', responsibleId: 'p1', responsibleName: 'Pessoa Fictícia Apagada' }],
+        followUps: [{ id: 'f1', type: 'person', recordId: 'p1', displayName: 'Pessoa Fictícia Apagada' }, { id: 'f2', type: 'person', recordId: 'p2', displayName: 'Outra Pessoa' }],
+      },
+    }, 'p1')
+    expect(JSON.stringify(campanha)).not.toContain('Pessoa Fictícia Apagada')
+    expect(JSON.stringify(campanha)).toContain('Outra Pessoa')
+
+    const nomeacoes = withoutPerson({
+      schemaVersion: 1, type: 'nomination_process',
+      data: {
+        formation: {}, meetings: [], officialVotes: [], reports: [], tasks: [],
+        candidates: [{ id: 'c1', personId: 'p2', vote: { participantIds: ['p1', 'p2'], favorable: 2 } }],
+      },
+    }, 'p1')
+    expect((nomeacoes?.data as { candidates: Array<{ vote: { participantIds: string[] } }> }).candidates[0]!.vote.participantIds).toEqual(['p2'])
+  })
+
+  it('a versão redigida guarda o que é da pessoa e não entrega terceiro', () => {
+    const visita = redactForPerson({
+      schemaVersion: 1, type: 'visit',
+      data: {
+        targetType: 'family', targetId: 'f1', reason: 'routine', createdAt: '2026-05-01T10:00:00.000Z',
+        notes: 'Anotação da visita inteira, que fala de todos',
+        versions: [{ version: 1, answers: [{ id: 'r1', subjectId: 'p1', value: 'resposta fictícia dela' }, { id: 'r2', subjectId: 'p2', value: 'resposta fictícia de outro' }] }],
+      },
+    }, 'p1')
+    const texto = JSON.stringify(visita)
+
+    expect(texto).toContain('resposta fictícia dela')
+    expect(texto).not.toContain('resposta fictícia de outro')
+    // Texto livre da visita inteira fala de todos: não sai numa exportação de
+    // uma pessoa só.
+    expect(texto).not.toContain('Anotação da visita inteira')
+    expect(texto).toContain('routine')
+  })
+
+  it('a exportação traz a versão redigida dos registros compartilhados', async () => {
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    const pessoa = await gravar(banco, chave, 'person', { name: 'Pessoa Fictícia Delta' })
+    await gravar(banco, chave, 'small_group', { name: 'PG Fictício', leaderId: pessoa, participantIds: [pessoa, 'outra-pessoa'], host: 'Casa fictícia' }, 'person')
+
+    const texto = (await new PersonDataService(banco).exportLines(CONTA, chave, pessoa)).join('\n')
+
+    expect(texto).toContain('Pequeno Grupo')
+    expect(texto).toContain('PG Fictício')
+    expect(texto).toContain('terceiros')
+    expect(texto).not.toContain('outra-pessoa')
+  })
+
+  it('apaga o rastro que a exclusão deixaria para trás', async () => {
+    // O envelope atual vira lápide, e sem expurgo o passado ficava inteiro:
+    // cada versão anterior na fila de envio, nas revisões e na quarentena,
+    // cifrada com a mesma chave que o titular usa todo dia.
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    const pessoa = await gravar(banco, chave, 'person', { name: 'Pessoa Fictícia Épsilon', whatsapp: '(61) 90000-0000' })
+    const oracao = await gravar(banco, chave, 'prayer_request', { subjectType: 'person', subjectId: pessoa, text: 'Pedido fictício reservado' }, 'prayer_request')
+    await banco.syncConflicts.put({
+      id: crypto.randomUUID(), accountId: CONTA, recordId: pessoa, localVersion: 1, remoteVersion: 2,
+      remoteOperation: 'upsert', remotePayload: (await banco.vaultRecords.get(pessoa))!, createdAt: new Date().toISOString(), status: 'pending',
+    })
+    await banco.quarantine.put({
+      id: crypto.randomUUID(), accountId: CONTA, recordId: oracao, reason: 'assinatura', operation: 'upsert',
+      recordVersion: 1, baseVersion: 0, payload: (await banco.vaultRecords.get(oracao))!, createdAt: new Date().toISOString(),
+    })
+
+    const resultado = await new PersonDataService(banco).remove(CONTA, chave, APARELHO, pessoa)
+
+    expect(resultado.purge.local).toBeGreaterThan(0)
+    expect(await banco.syncConflicts.count()).toBe(0)
+    expect(await banco.quarantine.count()).toBe(0)
+    // Na fila sobra apenas o que leva a remoção aos outros aparelhos.
+    const fila = await banco.outbox.toArray()
+    expect(fila.every(({ operation }) => operation === 'delete')).toBe(true)
+    // E o histórico do serviço fica na fila de expurgo, para depois de a
+    // lápide subir: apagá-lo antes deixaria os outros sem saber da exclusão.
+    expect((await pendingRemotePurge(CONTA, banco)).sort()).toEqual([oracao, pessoa].sort())
   })
 })

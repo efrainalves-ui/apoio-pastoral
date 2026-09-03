@@ -134,10 +134,16 @@ export interface PendingActionRecord {
   /** `${accountId}:${kind}` — uma pendência de cada tipo por conta. */
   id: string
   accountId: string
-  kind: 'close_district'
+  kind: 'close_district' | 'purge_history'
   createdAt: string
   /** Etapa concluída por último, para a retomada saber por onde continuar. */
-  stage: 'revoking' | 'reauthorizing'
+  stage?: 'revoking' | 'reauthorizing'
+  /**
+   * Registros cujo histórico cifrado ainda precisa ser apagado no serviço.
+   * A lista vive aqui, e não em memória, porque o expurgo só pode acontecer
+   * depois que a lápide subir — o que pode ser em outro dia, com outra rede.
+   */
+  recordIds?: string[]
 }
 
 export function pendingActionId(accountId: string, kind: PendingActionRecord['kind']): string {

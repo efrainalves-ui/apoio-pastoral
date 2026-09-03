@@ -300,6 +300,38 @@ describe('sincronização cifrada', () => {
 
     expect(summary.incomplete).toBe(false)
   })
+
+  it('apaga o histórico enfileirado no serviço logo depois de enviar a lápide', async () => {
+    // A ordem importa: apagar o histórico antes de a lápide subir deixaria os
+    // outros aparelhos sem nunca saber da exclusão.
+    const { database, accountId, deviceId, keys } = await fixture()
+    await database.pendingActions.put({
+      id: `${accountId}:purge_history`, accountId, kind: 'purge_history',
+      createdAt: new Date().toISOString(), recordIds: ['registro-ficticio-1', 'registro-ficticio-2'],
+    })
+    const transport = new CaptureTransport()
+    const expurgados: string[][] = []
+
+    await new SyncService(transport, database, () => true, () => Promise.resolve(null), (ids) => { expurgados.push(ids); return Promise.resolve(ids.length) })
+      .synchronize(accountId, deviceId, keys.sync)
+
+    expect(transport.pushed).toHaveLength(1)
+    expect(expurgados).toEqual([['registro-ficticio-1', 'registro-ficticio-2']])
+    expect(await database.pendingActions.count()).toBe(0)
+  })
+
+  it('sem rede, a fila de expurgo permanece para a próxima vez', async () => {
+    const { database, accountId, deviceId, keys } = await fixture()
+    await database.pendingActions.put({
+      id: `${accountId}:purge_history`, accountId, kind: 'purge_history',
+      createdAt: new Date().toISOString(), recordIds: ['registro-ficticio-1'],
+    })
+
+    await new SyncService(new CaptureTransport(), database, () => true, () => Promise.resolve(null), () => Promise.reject(new Error('sem rede')))
+      .synchronize(accountId, deviceId, keys.sync)
+
+    expect((await database.pendingActions.get(`${accountId}:purge_history`))?.recordIds).toEqual(['registro-ficticio-1'])
+  })
 })
 
 /**
@@ -479,5 +511,4 @@ describe('sincronização sob ataque e sob condições ruins', () => {
 
     await new SyncService(new CaptureTransport(), database, () => true).synchronize(accountId, deviceId, keys.sync)
     expect(await firstSyncPending(accountId, database)).toBe(false)
-  })
-})
+})})

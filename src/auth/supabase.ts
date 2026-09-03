@@ -401,6 +401,21 @@ export async function revokeRemoteDevice(deviceId: string): Promise<void> {
 }
 
 /**
+ * Apaga no serviço as versões anteriores dos registros indicados, deixando só
+ * a última — a lápide que os outros aparelhos ainda precisam receber.
+ *
+ * Sem isto, apagar uma pessoa trocava o envelope atual por uma lápide e
+ * deixava todo o passado dela guardado, cifrado com a mesma chave que o
+ * titular usa todo dia. Devolve `null` quando não há serviço remoto.
+ */
+export async function purgeRemoteRecordHistory(recordIds: string[]): Promise<number | null> {
+  if (!hasSupabaseConfiguration || recordIds.length === 0) return null
+  const resposta = await getSupabaseClient().rpc('purge_record_history', { p_record_ids: recordIds })
+  if (resposta.error) throw falhaRemota(resposta.error, 'Não foi possível apagar o histórico no serviço.')
+  return typeof resposta.data === 'number' ? resposta.data : null
+}
+
+/**
  * Revoga todos os aparelhos da conta em uma única transação do serviço.
  *
  * Encerrar o distrito não pode depender da lista local: cada instalação só

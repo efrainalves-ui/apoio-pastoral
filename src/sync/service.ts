@@ -1,6 +1,7 @@
 import { assertDeviceCanSync, assertRemoteDeviceStillActive, type RemoteDeviceStatusReader } from '../auth/device'
-import { fetchRemoteDeviceStatus } from '../auth/supabase'
+import { fetchRemoteDeviceStatus, purgeRemoteRecordHistory } from '../auth/supabase'
 import { db, type ApoioDatabase } from '../db/database'
+import { clearRemotePurge, pendingRemotePurge } from '../db/purge'
 import type { OutboxRecord, QuarantinedOperationRecord, SyncConflictRecord, VaultRecord } from '../db/types'
 import { operationMacIsValid, withOperationMac } from './operationMac'
 import type { EncryptedOperation, SyncSummary, SyncTransport } from './types'
@@ -56,6 +57,7 @@ export class SyncService {
     private readonly database: ApoioDatabase = db,
     private readonly online: () => boolean = () => navigator.onLine,
     private readonly readRemoteDeviceStatus: RemoteDeviceStatusReader = fetchRemoteDeviceStatus,
+    private readonly purgeRemoteHistory: (recordIds: string[]) => Promise<number | null> = purgeRemoteRecordHistory,
   ) {}
 
   /**
@@ -81,6 +83,20 @@ export class SyncService {
         await this.database.syncConflicts.put(conflictRecord(accountId, operation, existing?.version ?? 0))
       }
     })
+
+    // Depois do envio e antes do recebimento: a lápide da exclusão já subiu, e
+    // é só a partir daí que dá para apagar o histórico daquele registro sem
+    // deixar os outros aparelhos sem saber da remoção.
+    const aExpurgar = await pendingRemotePurge(accountId, this.database)
+    if (aExpurgar.length > 0) {
+      try {
+        await this.purgeRemoteHistory(aExpurgar)
+        await clearRemotePurge(accountId, aExpurgar, this.database)
+      } catch {
+        // Sem rede ou serviço recusando: a fila permanece e a próxima
+        // sincronização tenta de novo. Nunca é descartada em silêncio.
+      }
+    }
 
     let recebidas = 0
     let conflitos = 0
