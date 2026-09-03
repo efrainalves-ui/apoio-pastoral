@@ -16,10 +16,14 @@ begin;
 -- Trocamos prevenção automática impossível por três coisas que existem de
 -- verdade:
 --
---   1. **Privilégio padrão**, onde a plataforma permite. Declarado na 0005
---      para cada papel sobre o qual esta migration tem poder — e no Supabase
---      gerenciado esse papel é o mesmo do editor SQL do painel. É melhor
---      esforço, e está dito como tal.
+--   1. **Privilégio padrão**, que resolve tabela e **não** resolve função. A
+--      prova do CI é explícita: uma tabela criada depois das migrations nasce
+--      fora do alcance do navegador; uma função criada sem `revoke` nasce
+--      ABERTA para PUBLIC, mesmo com o `alter default privileges` declarado
+--      para o papel que a cria. O `revoke` de função continua sendo escrito à
+--      mão em cada migration, e é a porta do CI que garante que ninguém
+--      esqueça. A declaração da 0005 fica de pé porque para tabela ela é
+--      justamente o que funciona.
 --
 --   2. **Auditoria do catálogo**, aqui. `protecao_de_funcao_nova()` não afirma
 --      que existe um mecanismo: ela olha o estado real e responde se hoje

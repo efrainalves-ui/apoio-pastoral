@@ -298,10 +298,14 @@ ao recriar o projeto.
 
 No lugar da prevenção automática impossível ficaram três coisas que existem:
 
-1. **Privilégio padrão**, onde a plataforma permite. A `0005` declara para cada
-   papel sobre o qual ela tem poder, conferido por `pg_has_role` — e avisa quais
-   ficaram de fora, em vez de supor que alcançou todos. É melhor esforço, e está
-   dito como tal.
+1. **Privilégio padrão**, que resolve **tabela** e não resolve **função**. A
+   prova do CI é explícita nos dois sentidos: uma tabela criada depois das
+   migrations nasce fora do alcance do navegador; uma função criada sem
+   `revoke` nasce aberta para `PUBLIC`, mesmo com o `alter default privileges`
+   declarado para o papel que a cria. A `0005` declara para cada papel sobre o
+   qual tem poder, conferido por `pg_has_role`, e avisa quais ficaram de fora —
+   mas o `revoke` de cada função continua escrito à mão, e é a porta do CI que
+   garante que ninguém esqueça.
 2. **Auditoria do catálogo**. `public.protecao_de_funcao_nova()` não afirma que
    existe um mecanismo: olha o estado real e responde se hoje alguma função de
    `public` está ao alcance de `PUBLIC` ou de `anon`.

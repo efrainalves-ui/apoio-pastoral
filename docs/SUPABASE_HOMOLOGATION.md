@@ -106,12 +106,17 @@ As duas migrations foram redesenhadas para isso, sem afrouxar barreira nenhuma:
   realmente tem poder, conferido por `pg_has_role`. Existir não é poder. Ela
   avisa, por `notice`, quais papéis ficaram de fora, e falha se não alcançar
   nenhum.
-- **`0007`** não cria mais gatilho de evento. No lugar entram três coisas que
-  existem de verdade: o privilégio padrão da `0005` (melhor esforço, e dito como
-  tal), a **auditoria do catálogo** (`protecao_de_funcao_nova()` e
-  `funcoes_publicas_abertas()`) e a **porta do CI**
-  (`src/sync/migrationSecurity.test.ts`), que recusa uma migration que crie
-  função ou procedimento em `public` sem o `revoke` ao lado.
+- **`0007`** não cria mais gatilho de evento. No lugar entram a **auditoria do
+  catálogo** (`protecao_de_funcao_nova()` e `funcoes_publicas_abertas()`) e a
+  **porta do CI** (`src/sync/migrationSecurity.test.ts`), que recusa uma
+  migration que crie função ou procedimento em `public` sem o `revoke` ao lado.
+
+O privilégio padrão da `0005` entra nessa conta só onde ele funciona, e a prova
+do CI é explícita: **tabela** criada depois das migrations nasce fora do alcance
+do navegador; **função** criada sem `revoke` nasce aberta para `PUBLIC`, mesmo
+com o `alter default privileges` declarado para o papel que a cria. Para função,
+portanto, não existe fechamento automático nenhum neste ambiente — existe
+`revoke` escrito à mão, porta no CI e auditoria que reprova.
 
 ### O limite, dito por extenso
 
