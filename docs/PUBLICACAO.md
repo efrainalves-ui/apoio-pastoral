@@ -161,6 +161,57 @@ script. Enquanto isso não for feito e registrado, a alternativa não é
 documentada — documentar uma opção com proteção inferior é oferecer a opção
 errada.
 
+## 5.2 Homologação privada no Cloudflare Pages
+
+A homologação vai para um **projeto Pages próprio**, separado de qualquer
+publicação anterior e de produção. Nome usado: `apoio-pastoral-homologacao`.
+
+| Campo | Valor |
+|---|---|
+| Build command | `pnpm build` |
+| Build output directory | `dist` |
+| Variável de build | `NODE_VERSION` = `22` (o projeto exige Node ≥ 22) |
+
+O repositório já traz o que o Pages precisa: `public/_redirects` devolve
+`index.html` nas rotas internas e `public/_headers` leva os cabeçalhos de
+segurança. Os dois são copiados para `dist` na build.
+
+Variáveis da build, **somente os nomes** — os valores são digitados direto no
+painel, nunca em documento, mensagem ou log:
+
+- `VITE_APP_ENV` = `homologacao`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_SUPABASE_PROJECT_REF`
+- `VITE_DISABLE_SYNC` = `false`
+- `NODE_VERSION` = `22`
+
+Nenhuma variável de E2E e nenhuma variável de produção.
+
+**As variáveis precisam existir antes da build que vai ser usada.** O Vite grava
+o valor delas dentro do arquivo compilado; publicar antes de configurá-las gera
+um aplicativo que abre na tela "Esta instalação não está configurada" e não
+passa dali. Isso é a trava funcionando, e está provado: uma build sem variável
+nenhuma carrega essa tela e não carrega endereço de projeto nenhum.
+
+### O endereço privado, sem domínio próprio
+
+O Cloudflare Access protege endereços de um domínio **seu**. `pages.dev` é
+domínio da Cloudflare, então **o endereço de produção do projeto Pages não pode
+receber Access sem domínio próprio** — ele fica público para quem souber a URL.
+
+A alternativa gratuita e segura, e a que esta fase usa: **a homologação não sai
+pelo endereço de produção do projeto**. A branch de produção do projeto Pages é
+apontada para uma branch que não existe no repositório, e a `main` sai como
+**preview**, em endereço estável de branch. Previews aceitam Access no plano
+gratuito. O resultado é um endereço fixo atrás de autenticação, sem domínio
+próprio e sem custo.
+
+Se o painel não oferecer Access para previews, a homologação **não** é tratada
+como privada: nesse caso, ou se registra um domínio próprio, ou a rodada física
+acontece apenas com dados fictícios e com a consciência de que o endereço é
+alcançável por quem o tiver. Não se chama de protegido um endereço que não está.
+
 ## 6. Migrations, na ordem de aplicação
 
 No projeto de produção recém-criado, aplique nesta ordem:
