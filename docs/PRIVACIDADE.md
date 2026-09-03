@@ -24,10 +24,16 @@ certificação de nenhuma lei.
 ## Direitos do titular
 
 - **Exportar**: no perfil da pessoa, *Exportar dados* gera um documento legível
-  com o cadastro e a contagem dos registros ligados.
+  com o cadastro e com o **conteúdo** dos registros que falam somente dela —
+  visitas, pedidos de oração, acompanhamentos, tarefas e estudos. Dos registros
+  em que ela aparece junto de outras pessoas sai apenas a indicação de que
+  existem: aquele conteúdo também é dos outros.
 - **Apagar**: no mesmo perfil, *Apagar dados* remove o cadastro e o que era só
-  daquela pessoa — visitas, pedidos, acompanhamentos, tarefas e estudos — e
-  retira o vínculo dela onde aparecia junto de outras.
+  daquela pessoa, e retira a citação dela em todo o resto — família, dupla
+  missionária, classe, Pequeno Grupo, compromisso de cerimônia, respostas de
+  entrevista dentro de visita de família, comissões, processo de nomeações,
+  campanha de evangelismo e a cópia que a importação de listas guarda para
+  poder desfazer.
 - **Canal**: o e-mail cadastrado na própria conta.
 
 ## Governança, retenção e incidentes
@@ -42,7 +48,8 @@ Em Configurações, *Encerrar distrito*:
 
 1. apaga os registros do distrito no aparelho e enfileira a mesma remoção
    cifrada para o serviço de sincronização;
-2. revoga todos os aparelhos autorizados e dá uma autorização nova a este;
+2. revoga, no próprio serviço, todos os aparelhos da conta — inclusive os que
+   este aparelho nunca conheceu — e dá uma autorização nova a ele;
 3. preserva a conta, leitura, orçamento familiar e a agenda pessoal;
 4. deixa a conta pronta para começar um distrito vazio.
 
@@ -55,6 +62,9 @@ esses arquivos.
 - Um relatório com nomes só é gerado quando o pastor marca *Incluir nomes neste
   relatório*, com aviso de que o arquivo pode conter dados pessoais.
 - Pedidos de oração, observações privadas e anotações não entram no padrão.
+- O itinerário da agenda e o histórico de pregações seguem a mesma regra: sem
+  marcar, saem data, tipo, igreja e local; o título fica de fora porque é ali
+  que o nome costuma aparecer.
 
 ## Menores e informações sensíveis
 

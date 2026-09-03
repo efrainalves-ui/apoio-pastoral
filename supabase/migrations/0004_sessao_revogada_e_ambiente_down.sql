@@ -82,5 +82,6 @@ end;
 $$;
 
 drop function if exists public.session_is_authorized();
+drop function if exists public.session_is_not_revoked();
 
 commit;

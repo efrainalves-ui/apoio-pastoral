@@ -19,7 +19,10 @@ begin;
 -- apenas a sessão revogada e a sessão presa a um aparelho sem autorização.
 -- ---------------------------------------------------------------------------
 
-create function public.session_is_authorized()
+-- Sessão que não foi revogada e não pertence a um aparelho revogado. É o
+-- mínimo para a tela de Segurança: um aparelho ainda aguardando confirmação
+-- precisa enxergar a própria linha para descobrir que foi liberado.
+create function public.session_is_not_revoked()
 returns boolean
 language sql
 stable
@@ -38,16 +41,34 @@ as $$
        join public.devices d on d.id = s.device_id
        where s.session_id = public.current_session_id()
          and s.owner_id = auth.uid()
+         and d.status = 'revoked'
+     );
+$$;
+
+-- Chave só chega a aparelho com autorização ativa. Uma sessão que ainda não
+-- reivindicou aparelho nenhum passa: é a entrada com e-mail e senha em um
+-- aparelho novo, em que o envelope é buscado antes de o aparelho existir.
+create function public.session_is_authorized()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.session_is_not_revoked()
+     and not exists (
+       select 1
+       from public.device_sessions s
+       join public.devices d on d.id = s.device_id
+       where s.session_id = public.current_session_id()
+         and s.owner_id = auth.uid()
          and d.status is distinct from 'active'
      );
 $$;
 
-comment on function public.session_is_authorized() is
-  'Falso para sessão revogada ou presa a aparelho sem autorização ativa. Uma sessão que ainda não reivindicou aparelho é verdadeira: é a entrada com e-mail e senha em um aparelho novo.';
-
 drop policy devices_owner_select on public.devices;
 create policy devices_owner_select on public.devices
-  for select using (auth.uid() = owner_id and public.session_is_authorized());
+  for select using (auth.uid() = owner_id and public.session_is_not_revoked());
 
 drop policy device_envelopes_owner_all on public.device_key_envelopes;
 create policy device_envelopes_owner_all on public.device_key_envelopes
@@ -204,13 +225,13 @@ as $$ select 4 $$;
 
 revoke all on public.service_environment from public, anon, authenticated;
 
-revoke all on function public.session_is_authorized(), public.revoke_all_devices(),
-  public.app_environment() from public, anon;
+revoke all on function public.session_is_not_revoked(), public.session_is_authorized(),
+  public.revoke_all_devices(), public.app_environment() from public, anon;
 -- `session_is_authorized` aparece dentro das políticas, e a expressão de uma
 -- política roda com os privilégios de quem consulta: sem este EXECUTE, toda
 -- leitura de envelope falharia por permissão em vez de por autorização.
-grant execute on function public.session_is_authorized(), public.revoke_all_devices(),
-  public.app_environment() to authenticated;
+grant execute on function public.session_is_not_revoked(), public.session_is_authorized(),
+  public.revoke_all_devices(), public.app_environment() to authenticated;
 
 alter default privileges in schema public
   revoke all on tables from anon, authenticated;

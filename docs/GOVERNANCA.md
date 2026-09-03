@@ -37,10 +37,10 @@ contrário.
 
 | Ação | O que acontece | Como conferir |
 |---|---|---|
-| Apagar uma pessoa | Registro e o que era só dela viram exclusão; o vínculo dela sai de onde aparecia junto de outras | O perfil deixa de existir e a contagem da igreja cai |
-| Encerrar distrito | Todos os registros do distrito são apagados no aparelho e a mesma exclusão cifrada é enfileirada para o serviço; todos os aparelhos são revogados | A tela mostra a contagem antes e depois; a lista de aparelhos fica só com este |
-| Sair da conta | A sessão do serviço é encerrada; os dados cifrados continuam no aparelho | Entrar de novo exige e-mail e senha |
-| Revogar um aparelho | Aquele aparelho para de enviar, receber e perde o envelope de chave | A tela de Segurança mostra "Revogado"; aquele aparelho recebe aviso e para |
+| Apagar uma pessoa | Registro e o que era só dela viram exclusão; a citação dela sai de todo o resto, inclusive das respostas de entrevista dentro de visita de família, do processo de nomeações e da cópia guardada pela importação de listas | O perfil deixa de existir e a contagem da igreja cai |
+| Encerrar distrito | Todos os registros do distrito são apagados no aparelho e a mesma exclusão cifrada é enfileirada para o serviço; o serviço revoga todos os aparelhos da conta, inclusive os que este aparelho nunca conheceu | A tela mostra a contagem antes e depois; a lista de aparelhos fica só com a autorização nova |
+| Sair da conta | A sessão **deste** aparelho é encerrada; os outros continuam abertos e os dados cifrados continuam no aparelho | Entrar de novo exige e-mail e senha; o outro aparelho segue como estava |
+| Revogar um aparelho | Aquele aparelho para de enviar, receber, perde o envelope de chave e deixa de alcançar qualquer envelope da conta — o token que ele já tinha na mão para de valer na hora | A tela de Segurança mostra "Revogado"; aquele aparelho recebe aviso e para |
 
 Exclusão é registrada como operação de exclusão cifrada e propagada para os
 outros aparelhos na próxima sincronização. O histórico de operações do serviço
@@ -56,7 +56,9 @@ O titular aqui é a pessoa cadastrada (membro, interessado, visitado). O canal �
 o próprio pastor, pelo e-mail da conta dele.
 
 1. **Acesso**: perfil da pessoa → *Exportar dados* gera um documento legível com
-   o cadastro e a contagem dos registros ligados.
+   o cadastro e o conteúdo dos registros que falam somente dela. Dos registros
+   compartilhados com outras pessoas sai só a indicação de que existem: entregar
+   o conteúdo deles seria entregar dado de terceiro junto.
 2. **Exclusão**: perfil da pessoa → *Apagar dados*, com prévia do que sai e
    confirmação dupla.
 3. **Correção**: edição direta no cadastro.

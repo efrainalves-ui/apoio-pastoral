@@ -17,6 +17,9 @@ O conteúdo nasce no cliente, é cifrado antes de persistir e só é aberto em m
    seguida. Uma falha de script na página não consegue extrair a chave.
 8. Do mesmo segredo deriva-se, por HKDF-SHA-256, uma chave HMAC que autentica os
    metadados de cada operação de sincronização.
+9. A redefinição de senha pelo e-mail troca a senha do serviço; o cofre é
+   reaberto com a chave de recuperação, porque o envelope antigo estava
+   protegido pela senha perdida. Não há outro caminho — nem para o serviço.
 
 ## Dados remotos permitidos
 
@@ -45,8 +48,21 @@ O cliente deixou de decidir se um aparelho está autorizado.
   `revoked_sessions`. Uma sessão revogada não reivindica nem o mesmo
   identificador nem um novo — voltar exige provar a senha outra vez.
 - Aparelho pendente não confirma a si mesmo, nem trocando de sessão.
-- `supabase/tests/02_device_barriers.sql` prova cada uma dessas barreiras em um
-  Postgres descartável, incluindo as tentativas de contorno.
+- A revogação vale para o token que já foi emitido. As políticas dos envelopes
+  de senha, de recuperação e de chave, e a lista de aparelhos, exigem uma
+  sessão que não foi revogada. Antes, o aparelho revogado seguia até uma hora
+  podendo ler esses envelopes, apagar os dos outros aparelhos e sobrescrever o
+  de senha — o que trancaria o titular para fora de qualquer aparelho novo.
+- A sessão que ainda não reivindicou aparelho nenhum é liberada de propósito:
+  é a entrada com e-mail e senha em um aparelho novo, em que o envelope é
+  buscado antes de o aparelho existir. A senha continua sendo a prova.
+- `revoke_all_devices` revoga a conta inteira em uma transação. É o que o
+  encerramento de distrito usa: cada instalação guarda só a si mesma, então
+  percorrer a lista local revogava apenas o aparelho em que o pastor estava.
+- `supabase/tests/02_device_barriers.sql` e `03_sessao_revogada.sql` provam cada
+  uma dessas barreiras em um Postgres descartável, incluindo as tentativas de
+  contorno. `scripts/api-barreiras.mjs` repete as mesmas provas falando direto
+  com a API de homologação, que é como um atacante falaria.
 
 ## Ordem, paginação e autenticação da sincronização
 
@@ -54,12 +70,22 @@ O cliente deixou de decidir se um aparelho está autorizado.
   tempo do aparelho é informativo. Antes ele era o cursor, e um relógio
   adiantado ou um envio atrasado faziam operações nunca serem baixadas.
 - O recebimento percorre todas as páginas até o serviço não ter mais nada.
-- Cada operação leva um HMAC-SHA-256 sobre conta, registro, tipo de operação,
-  versão, versão-base, formato, versão de chave e o próprio texto cifrado.
+- Cada operação leva um HMAC-SHA-256 (versão 3) sobre o identificador da
+  operação, a conta, o registro, o tipo de operação, a versão, a versão-base, o
+  formato, a versão de chave, o carimbo de tempo e o próprio texto cifrado. O
+  carimbo entra porque ele vira a data do registro guardado aqui; o
+  identificador, porque é a chave de idempotência, de conflito e de quarentena.
+  O aparelho de origem fica de fora: quem o atribui é o servidor, pela sessão.
   Operação sem assinatura válida vai para quarentena local, sem ser aplicada
   nem descartada.
 - Conflito é decidido pela linhagem: só entra por cima o que foi editado sobre a
   versão que o aparelho tem. As duas versões ficam guardadas cifradas.
+- A escolha do pastor é publicada por cima da versão do outro aparelho, e a
+  exclusão feita lá pode ser aceita aqui. Sem isso, "ficar com a deste
+  aparelho" só marcava a revisão como resolvida e os dois lados discordavam
+  para sempre, em silêncio.
+- Uma rodada que para no teto de páginas devolve `incomplete` e a tela avisa. O
+  cursor fica guardado: sincronizar de novo continua de onde parou.
 - Falha de sincronização nunca é interpretada como conta vazia: um aparelho que
   ainda não recebeu os dados espera em uma tela própria.
 - Um registro local que não abre é pulado e contado, em vez de derrubar a
@@ -70,7 +96,10 @@ O cliente deixou de decidir se um aparelho está autorizado.
 - cada instalação do navegador mantém uma única conta local, evitando colisões dos envelopes locais de senha e recuperação;
 - o backup pastoral é cifrado, vinculado à conta de origem e restaurado em um único lote; outra conta é recusada e uma falha não deve deixar aplicação parcial;
 - criar e restaurar dependem de ações explícitas; o arquivo não é enviado automaticamente;
-- **Sair** encerra a sessão no serviço (`scope: 'global'`) e fecha o cofre;
+- **Sair** encerra a sessão **deste** aparelho (`scope: 'local'`) e fecha o
+  cofre. Sair no celular não derruba o computador: quem quer tirar outro
+  aparelho da conta usa **Revogar**, na tela de Segurança, que também apaga o
+  envelope de chave daquele aparelho.
   **Bloquear cofre** apenas fecha o cofre e mantém a sessão. O cofre também se
   fecha sozinho após 15 minutos sem uso ou 5 minutos em segundo plano;
 - o Orçamento Familiar e a Leitura usam bancos locais separados e não entram na
@@ -100,7 +129,8 @@ Pessoas, famílias, WhatsApp, nascimento, histórico, divergências de importaç
 - Uma nova instalação é registrada como outro dispositivo após a entrada. Safari e o aplicativo instalado no iPhone são instalações independentes para esse controle.
 - A chave de recuperação é contingência para perda de acesso aos dispositivos; ela não é enviada por e-mail e não é o caminho normal de entrada em um aparelho novo.
 - Revogar um aparelho impede acesso futuro ao serviço, aos envelopes e à
-  sincronização. **Não apaga o que já foi baixado naquele aparelho** — nenhum
+  sincronização, inclusive com o token que ele já tinha emitido.
+  **Não apaga o que já foi baixado naquele aparelho** — nenhum
   aplicativo faz isso à distância. Se a senha também pode ter vazado, trocar a
   senha é o passo que importa.
 - O token de acesso já emitido vale até expirar; por isso a revogação também
@@ -130,6 +160,18 @@ os aparelhos foram perdidos.
 ## Separação entre ambientes
 
 Endereço do serviço, chave pública e projeto declarado precisam falar do mesmo
-projeto; qualquer divergência impede abrir a conexão. O aplicativo também
-confere, uma vez por sessão, que o serviço está na versão de esquema esperada, e
-o ambiente de homologação mostra uma marca discreta no cabeçalho.
+projeto; qualquer divergência impede abrir a conexão. Declarar o projeto passou
+a ser obrigatório: esquecer a variável não pode virar permissão para falar com
+qualquer projeto.
+
+O banco também declara o que ele é, em `public.service_environment`, escrito uma
+única vez por quem provisiona o projeto. Logo depois de entrar, e antes de
+buscar ou gravar envelope nenhum, o aplicativo confere a versão do esquema e
+esse ambiente. Uma build de produção apontada para o banco de homologação — ou o
+contrário — não sincroniza, e um banco que não declara nada também não. O
+ambiente de homologação mostra uma marca discreta no cabeçalho.
+
+Toda tabela e função criada depois nasce fora do alcance de `anon` e
+`authenticated`: os privilégios padrão de `public` foram zerados, e cada objeto
+recebe na mão o que precisa. Antes, uma tabela nova nasceria legível e gravável
+pelo navegador, e sem RLS ligada não haveria barreira nenhuma.

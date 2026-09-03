@@ -105,23 +105,60 @@ exigir(aprovaCruzado.status >= 400, 'a conta B não confirma o aparelho da conta
 const operacao = crypto.randomUUID()
 const registro = crypto.randomUUID()
 await rpc(b, 'upload_operations', {
-  p_ops: [{ id: operacao, owner_id: 'declarado-mentindo', device_id: aparelhoA, record_id: registro, operation: 'upsert', base_version: 0, record_version: 1, schema_version: 1, ciphertext: 'cifra-ficticia', iv: 'iv', aad: 'aad', mac: 'mac-ficticio', mac_version: 2 }],
+  p_ops: [{ id: operacao, owner_id: 'declarado-mentindo', device_id: aparelhoA, record_id: registro, operation: 'upsert', base_version: 0, record_version: 1, schema_version: 1, ciphertext: 'cifra-ficticia', iv: 'iv', aad: 'aad', mac: 'mac-ficticio', mac_version: 3 }],
 })
 const recebidoPorA = await rpc(a, 'download_operations', { p_after: 0, p_limit: 500 })
 exigir(!recebidoPorA.corpo.includes(operacao), 'operação enviada por B não aparece para A mesmo declarando a conta de A')
 
-// 5. Revogação fecha o aparelho, inclusive para um identificador novo.
-const revogado = await rpc(b, 'revoke_device', { p_device_id: aparelhoB })
-exigir(revogado.status === 200, 'a conta B revoga o próprio aparelho')
-const depoisDeRevogar = await rpc(b, 'download_operations', { p_after: 0, p_limit: 500 })
-exigir(depoisDeRevogar.status >= 400, 'a sessão do aparelho revogado não recebe mais')
+// 5. Um aparelho revoga outro, e o token que o revogado já tinha na mão para
+//    de valer na hora — não só para sincronizar, mas para alcançar chave.
+const b2 = await entrar(contas.b)
+const aparelhoB2 = crypto.randomUUID()
+const claimB2 = await rpc(b2, 'claim_device', { p_device_id: aparelhoB2, p_label: 'Teste Fictício B2' })
+exigir(claimB2.status === 200, 'a conta B entra com a senha em um segundo aparelho')
 
-// 6. Versão do esquema visível para o aplicativo conferir.
+const envelopesAntes = await tabela(b2, 'password_key_envelopes?select=owner_id')
+exigir(envelopesAntes.status === 200, 'o segundo aparelho ativo alcança o envelope de senha da conta')
+
+const revogadoPeloOutro = await rpc(b, 'revoke_device', { p_device_id: aparelhoB2 })
+exigir(revogadoPeloOutro.status === 200, 'o primeiro aparelho revoga o segundo')
+
+const envelopeDepois = await tabela(b2, 'password_key_envelopes?select=owner_id')
+exigir(envelopeDepois.corpo.trim() === '[]', 'o aparelho revogado não lê mais o envelope de senha')
+const recuperacaoDepois = await tabela(b2, 'recovery_key_envelopes?select=owner_id')
+exigir(recuperacaoDepois.corpo.trim() === '[]', 'o aparelho revogado não lê mais o envelope de recuperação')
+const chavesDepois = await tabela(b2, 'device_key_envelopes?select=id')
+exigir(chavesDepois.corpo.trim() === '[]', 'o aparelho revogado não lê mais os envelopes de chave')
+const aparelhosDepois = await tabela(b2, 'devices?select=id')
+exigir(aparelhosDepois.corpo.trim() === '[]', 'o aparelho revogado não lista mais os aparelhos da conta')
+const apagarEnvelope = await tabela(b2, 'password_key_envelopes?owner_id=neq.00000000-0000-0000-0000-000000000000', { method: 'DELETE' })
+exigir(apagarEnvelope.status < 300, 'a exclusão pedida pelo revogado é aceita pela API e barrada pela política')
+const aindaExiste = await tabela(b, 'password_key_envelopes?select=owner_id')
+exigir(aindaExiste.corpo.trim() !== '[]', 'o envelope de senha continua no lugar depois da tentativa do revogado')
+const claimNovoPeloRevogado = await rpc(b2, 'claim_device', { p_device_id: crypto.randomUUID(), p_label: 'Volta do revogado' })
+exigir(claimNovoPeloRevogado.status >= 400, 'a sessão revogada não reivindica um identificador novo')
+
+// 6. Revogação em massa: é o que o encerramento de distrito precisa.
+const revogaTudo = await rpc(b, 'revoke_all_devices')
+exigir(revogaTudo.status === 200, 'a conta B revoga todos os próprios aparelhos de uma vez')
+const aparelhosB = await tabela(b, 'devices?select=id,status')
+exigir(!aparelhosB.corpo.includes('"active"'), 'nenhum aparelho da conta B continua ativo')
+const autorizacaoNova = await rpc(b, 'claim_device', { p_device_id: crypto.randomUUID(), p_label: 'Teste Fictício B novo' })
+exigir(autorizacaoNova.status === 200, 'a sessão que encerrou registra a autorização nova')
+
+// 7. Versão do esquema e ambiente declarado, para o aplicativo conferir.
 const versao = await rpc(a, 'app_schema_version')
-exigir(versao.corpo.trim() === '3', 'o serviço responde a versão de esquema esperada')
+exigir(versao.corpo.trim() === '4', 'o serviço responde a versão de esquema esperada')
+const ambiente = await rpc(a, 'app_environment')
+exigir(ambiente.corpo.includes('homologacao'), 'o serviço declara ser o ambiente de homologação')
+const escritaAmbiente = await tabela(a, 'service_environment', {
+  method: 'POST', body: JSON.stringify({ environment: 'producao' }),
+})
+exigir(escritaAmbiente.status >= 400, 'o navegador não reescreve o ambiente declarado')
 
 // Limpeza: os aparelhos fictícios criados aqui não ficam ativos.
 await rpc(a, 'revoke_device', { p_device_id: aparelhoA })
+await rpc(b, 'revoke_all_devices')
 
 console.log(falhas === 0 ? '\nBarreiras confirmadas direto na API.' : `\n${falhas} verificação(ões) falharam.`)
 process.exit(falhas === 0 ? 0 : 1)

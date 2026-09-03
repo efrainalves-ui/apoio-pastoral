@@ -32,7 +32,7 @@ Atualizado em: 27 de agosto de 2026.
 
 - revisar privacidade e segurança antes de reativar Transferência de Distrito;
 - revisar a limpeza sincronizada antes de reativar Novo Distrito; o backup atual não usa senha fixa e agora é vinculado à conta;
-- homologar sincronização remota, RLS e migrations em Supabase;
+- homologar sincronização remota, RLS e migrations em Supabase, agora incluindo a migration `0004` e a linha de ambiente declarado;
 - configurar o remoto Git autorizado, versionar e confirmar a primeira execução externa do CI Linux antes de aplicar migrations ou configurar Supabase de homologação;
 - validar migrations, RLS, login, isolamento, sincronização e revogação somente no projeto Supabase exclusivo de homologação, seguindo `SUPABASE_HOMOLOGATION.md`;
 - validar instalação/offline em iPhone e Android;
@@ -95,6 +95,63 @@ para uso real. Cada achado foi reproduzido no código antes de qualquer correç�
 - **Cabeçalhos**: `public/_headers` versionado e conferido nos dois workflows.
 - **Documentação**: `docs/GOVERNANCA.md` novo; `SECURITY_MODEL.md` e
   `PUBLICACAO.md` atualizados.
+
+## Etapa estável: segunda revisão independente
+
+Dez achados de uma segunda revisão. Cada um foi reproduzido no código antes de
+qualquer correção; dois vieram acompanhados de um efeito que a revisão não
+tinha citado e que também foi fechado.
+
+- **Aparelho revogado**: as barreiras de sincronização estavam de pé, mas as
+  políticas dos envelopes ainda eram só `auth.uid() = owner_id`. Com o token
+  ainda válido, o aparelho revogado lia o envelope de senha e o de
+  recuperação, apagava os envelopes de chave dos outros aparelhos e podia
+  sobrescrever o de senha, trancando o titular para fora de todo aparelho
+  novo. A migration `0004` exige sessão não revogada nessas tabelas.
+- **Redefinição por e-mail**: o link abria uma sessão e nada mais — a senha
+  jamais era trocada, e a tela mandava entrar com uma senha que não existia. A
+  tela de acesso reconhece o retorno do link, define a senha no serviço e
+  reabre o cofre com a chave de recuperação.
+- **Encerrar distrito**: percorria a lista local de aparelhos, e cada
+  instalação guarda só a si mesma; revogava apenas o aparelho em uso. Passou a
+  usar `revoke_all_devices`, que revoga a conta inteira no servidor.
+- **Troca de senha**: quando o envelope não subia e a volta atrás também
+  falhava, o aviso dizia "nada mudou" com a senha do serviço já trocada. Agora
+  este aparelho avança junto com o serviço, marca a pendência do envelope, diz
+  o que aconteceu, e a próxima entrada com rede conclui sozinha. Junto disso:
+  senha trocada em outro aparelho deixava este inutilizável — ele agora busca
+  o envelope do serviço em vez de recusar a senha certa.
+- **Sincronização**: o teto de 50 páginas (10.000 operações) era silencioso e o
+  aparelho dizia estar em dia. O resumo carrega `incomplete` e a tela avisa.
+- **Conflito exclusão × alteração**: não havia como aceitar a exclusão feita no
+  outro aparelho, e "ficar com a deste" só marcava a revisão como resolvida —
+  os dois lados discordavam para sempre, em silêncio. Toda escolha passou a
+  ser publicada por cima da versão remota.
+- **Assinatura da sincronização**: versão 3, cobrindo também o identificador da
+  operação e o carimbo de tempo, que virava a data do registro guardado aqui.
+- **Sair**: encerrava a sessão em todos os aparelhos (`global`) enquanto a tela
+  prometia "neste aparelho". Passou a `local`.
+- **Direitos do titular**: a desvinculação não alcançava as respostas de
+  entrevista dentro de visita de família, comissões, o processo de nomeações —
+  inclusive o nome escrito no relatório final — a campanha de evangelismo e a
+  cópia completa dos dados que a importação guarda para desfazer. A exportação
+  devolvia cinco campos e uma contagem; devolve o conteúdo do que fala só dela.
+  O histórico de pregações levava o título de todo compromisso e agora segue a
+  regra do itinerário.
+- **Ambientes e privilégios**: declarar o projeto virou obrigatório, o banco
+  declara em `public.service_environment` se é homologação ou produção, e a
+  conferência acontece logo depois de entrar, antes de qualquer envelope. Os
+  privilégios padrão de `public` foram zerados: tabela ou função criada depois
+  não nasce ao alcance do navegador.
+
+Novos arquivos: `supabase/migrations/0004_sessao_revogada_e_ambiente_{up,down}.sql`
+e `supabase/tests/03_sessao_revogada.sql`. `scripts/api-barreiras.mjs` e
+`docs/SUPABASE_HOMOLOGATION.md` cobrem as barreiras novas.
+
+**Pendente**: as migrations e as provas SQL não rodaram nesta máquina (sem
+Postgres nem Docker) — elas rodam no CI Linux. O ambiente de homologação
+precisa receber a `0004`, a linha de `service_environment` e a rodada de
+`pnpm test:api`. Nada foi aplicado em produção.
 
 ## Etapa estável: privacidade, direitos do titular e encerramento de distrito
 

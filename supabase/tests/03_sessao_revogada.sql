@@ -100,6 +100,32 @@ select homologacao_testes.exigir(
   'o aparelho ativo continua enxergando a lista de aparelhos');
 
 -- ---------------------------------------------------------------------------
+-- 3b. Aparelho aguardando confirmação: enxerga a própria linha, para descobrir
+--     que foi liberado, mas não alcança chave nenhuma enquanto espera.
+-- ---------------------------------------------------------------------------
+
+reset role;
+insert into public.devices (id, owner_id, label, status)
+  values ('e9000000-0000-4000-8000-00000000000e', :conta_e, 'Aparelho Fictício E aguardando', 'pending');
+insert into public.device_sessions (session_id, owner_id, device_id)
+  values ('e9a00000-0000-4000-8000-00000000000e', :conta_e, 'e9000000-0000-4000-8000-00000000000e');
+set role authenticated;
+set request.jwt.claims = '{"sub":"eeeeeeee-0000-4000-8000-000000000005","session_id":"e9a00000-0000-4000-8000-00000000000e"}';
+
+select homologacao_testes.exigir(
+  (select status from public.devices where id = 'e9000000-0000-4000-8000-00000000000e') = 'pending',
+  'o aparelho que aguarda enxerga a própria situação');
+select homologacao_testes.exigir(
+  (select count(*) from public.password_key_envelopes) = 0,
+  'o aparelho que aguarda não alcança o envelope de senha da conta');
+
+reset role;
+delete from public.device_sessions where session_id = 'e9a00000-0000-4000-8000-00000000000e';
+delete from public.devices where id = 'e9000000-0000-4000-8000-00000000000e';
+set role authenticated;
+set request.jwt.claims = '{"sub":"eeeeeeee-0000-4000-8000-000000000005","session_id":"e1a00000-0000-4000-8000-00000000000e"}';
+
+-- ---------------------------------------------------------------------------
 -- 4. Encerrar distrito: um comando revoga todos os aparelhos do servidor,
 --    inclusive os que este aparelho nunca conheceu.
 -- ---------------------------------------------------------------------------

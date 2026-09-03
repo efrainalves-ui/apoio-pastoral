@@ -112,6 +112,12 @@ export async function signInRemoteAccount(email: string, password: string): Prom
     }
     throw new Error('E-mail ou senha inválidos.')
   }
+  // A conferência do serviço acontece aqui, na primeira porta, e não só na
+  // sincronização: antes desta linha, uma build apontada para o ambiente
+  // errado já teria buscado e gravado envelopes lá. Só dá para perguntar
+  // depois de autenticar, porque as funções do serviço não respondem a quem
+  // ainda não entrou.
+  await assertServiceSchema()
   return data.user.id
 }
 
@@ -145,6 +151,7 @@ export async function signOutRemoteAccount(): Promise<void> {
  */
 export async function ensureRemoteDevice(deviceId: string, label: string): Promise<RemoteDeviceStatus | null> {
   if (!hasSupabaseConfiguration) return null
+  await assertServiceSchema()
   const client = getSupabaseClient()
   const { data: { user } } = await client.auth.getUser()
   if (!user) return null

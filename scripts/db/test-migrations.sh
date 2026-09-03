@@ -69,7 +69,8 @@ restos="$(psql_run --tuples-only --no-align -c \
      and p.proname in ('prevent_revoked_device_reactivation', 'claim_device', 'approve_device',
                        'revoke_device', 'upload_operations', 'download_operations',
                        'current_session_id', 'current_device_id', 'active_device_id',
-                       'app_schema_version', 'session_is_authorized', 'revoke_all_devices',
+                       'app_schema_version', 'session_is_authorized', 'session_is_not_revoked',
+                       'revoke_all_devices',
                        'app_environment');")"
 if [ "$restos" -ne 0 ]; then
   echo "FALHOU: a reversão deixou $restos função(ões) das migrations para trás" >&2
