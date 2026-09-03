@@ -179,7 +179,7 @@ select homologacao_testes.exigir(
   public.app_environment() = 'homologacao',
   'com a linha escrita pelo responsável, o banco declara o ambiente');
 select homologacao_testes.exigir(
-  public.app_schema_version() = 8,
+  public.app_schema_version() = 9,
   'a versão do esquema acompanha esta migration');
 
 reset role;
