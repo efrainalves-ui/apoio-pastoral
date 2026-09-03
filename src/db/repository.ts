@@ -57,7 +57,14 @@ export class VaultRepository {
     mutations.forEach((mutation, index) => {
       const existing = existingRecords[index]
       if (existing && existing.accountId !== accountId) throw new Error('Registro pertence a outra conta.')
-      if (mutation.operation === 'delete' && (!existing || existing.deletedAt)) throw new Error('Registro não encontrado.')
+      if (mutation.operation === 'delete' && !existing) throw new Error('Registro não encontrado.')
+      // Apagar duas vezes é engano, exceto em um caso: a revisão de alterações
+      // concorrentes, em que a exclusão daqui precisa ser republicada por cima
+      // da versão do outro aparelho para ele também apagar. `supersedes` é o
+      // que distingue os dois — só a resolução de conflito o informa.
+      if (mutation.operation === 'delete' && existing?.deletedAt && mutation.supersedes === undefined) {
+        throw new Error('Registro não encontrado.')
+      }
       const baseVersion = Math.max(existing?.version ?? 0, mutation.supersedes ?? 0)
       const version = baseVersion + 1
       const deletedAt = mutation.operation === 'delete' ? now : undefined

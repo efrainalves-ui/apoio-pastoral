@@ -39,6 +39,8 @@ export interface ConflictPreview {
   kind: string
   createdAt: string
   remoteIsDeletion: boolean
+  /** O registro foi apagado neste aparelho e o outro mandou uma alteração. */
+  localIsDeletion: boolean
   local: ConflictSide
   remote: ConflictSide
   differences: ConflictDifference[]
@@ -158,6 +160,7 @@ export class ConflictService {
     let localData: unknown = null
     let remoteData: unknown = null
 
+    if (localRecord?.deletedAt) localSummary = 'Você apagou este registro neste aparelho'
     if (localRecord && !localRecord.deletedAt) {
       try {
         const payload = await decryptPayload(masterKey, localRecord)
@@ -188,6 +191,7 @@ export class ConflictService {
       kind,
       createdAt: conflict.createdAt,
       remoteIsDeletion: conflict.remoteOperation === 'delete',
+      localIsDeletion: Boolean(localRecord?.deletedAt),
       local: { version: conflict.localVersion, summary: localSummary, available: localAvailable },
       remote: { version: conflict.remoteVersion, summary: remoteSummary, available: remoteAvailable },
       differences: mudancas.visible,
@@ -251,10 +255,10 @@ export class ConflictService {
         const envelope = await encryptPayload(masterKey, payload, novoId)
         await this.repository.saveEncrypted(accountId, deviceId, novoId, envelope, recordType)
         keptRecordId = novoId
-        await this.publicarVersaoLocal(accountId, deviceId, conflict.recordId, recordType, localPayload, localRecord?.deletedAt, conflict.remoteVersion)
+        await this.publicarVersaoLocal(accountId, masterKey, deviceId, conflict.recordId, recordType, localPayload, localRecord?.deletedAt, conflict.remoteVersion)
       }
     } else {
-      await this.publicarVersaoLocal(accountId, deviceId, conflict.recordId, recordType, localPayload, localRecord?.deletedAt, conflict.remoteVersion)
+      await this.publicarVersaoLocal(accountId, masterKey, deviceId, conflict.recordId, recordType, localPayload, localRecord?.deletedAt, conflict.remoteVersion)
     }
 
     await this.database.syncConflicts.put({
@@ -268,12 +272,18 @@ export class ConflictService {
   }
 
   /**
-   * Reenvia a versão deste aparelho por cima da versão do outro. Um registro
-   * que já foi apagado aqui não é reenviado: a exclusão local já está na fila
-   * e é justamente ela que o outro aparelho precisa receber.
+   * Reenvia a decisão deste aparelho por cima da versão do outro, nas duas
+   * direções.
+   *
+   * Quando o registro existe aqui, sobe o conteúdo daqui. Quando ele foi
+   * apagado aqui e o outro aparelho mandou uma alteração, sobe uma lápide nova
+   * baseada na versão remota — sem ela, a exclusão local já enfileirada nasceu
+   * de uma versão antiga, o outro aparelho a recusaria por linhagem, e o
+   * registro ficaria vivo lá e morto aqui para sempre.
    */
   private async publicarVersaoLocal(
     accountId: string,
+    masterKey: CryptoKey,
     deviceId: string,
     recordId: string,
     recordType: VaultRecord['recordType'],
@@ -281,7 +291,17 @@ export class ConflictService {
     deletedAt: string | undefined,
     remoteVersion: number,
   ): Promise<void> {
-    if (!localPayload || deletedAt) return
+    if (!localPayload) return
+    if (deletedAt) {
+      await this.repository.applyEncryptedMutations(accountId, deviceId, [{
+        recordId,
+        recordType,
+        operation: 'delete',
+        supersedes: remoteVersion,
+        envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: 'tombstone', data: { deletedAt: new Date().toISOString() } }, recordId),
+      }])
+      return
+    }
     await this.repository.applyEncryptedMutations(accountId, deviceId, [{ recordId, recordType, envelope: localPayload, supersedes: remoteVersion }])
   }
 }

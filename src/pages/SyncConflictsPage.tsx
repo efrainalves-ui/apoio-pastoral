@@ -19,6 +19,11 @@ const deletionLabels: Partial<Record<ConflictChoice, string>> = {
   keep_remote: 'A exclusão foi aceita e vale nos dois aparelhos',
 }
 
+const localDeletionLabels: Partial<Record<ConflictChoice, string>> = {
+  keep_local: 'A exclusão foi mantida e agora vale nos dois aparelhos',
+  keep_remote: 'O registro do outro aparelho voltou a valer aqui',
+}
+
 function shortDate(value: string): string {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
 }
@@ -51,7 +56,9 @@ export function SyncConflictsPage() {
       await service.resolve(account.id, masterKey, conflictId, choice)
       setNotice(alvo?.remoteIsDeletion
         ? `${deletionLabels[choice] ?? choiceLabels[choice]}.`
-        : `${choiceLabels[choice]}. A outra continua guardada no histórico.`)
+        : alvo?.localIsDeletion
+          ? `${localDeletionLabels[choice] ?? choiceLabels[choice]}.`
+          : `${choiceLabels[choice]}. A outra continua guardada no histórico.`)
       await load()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível concluir a revisão.')
@@ -119,12 +126,13 @@ export function SyncConflictsPage() {
             <p className="card-copy">A versão que não ficar ativa continua guardada e protegida, para você consultar depois.</p>
 
             <div className="form-actions">
-              <Button disabled={busy} onClick={() => void choose(preview.id, 'keep_local')} icon={<Laptop />}>{preview.remoteIsDeletion ? 'Manter o registro' : 'Ficar com a deste aparelho'}</Button>
-              <Button variant="secondary" disabled={busy || (!preview.remoteIsDeletion && !preview.remote.available)} onClick={() => void choose(preview.id, 'keep_remote')} icon={<Smartphone />}>{preview.remoteIsDeletion ? 'Aceitar a exclusão' : 'Ficar com a do outro aparelho'}</Button>
+              <Button disabled={busy} onClick={() => void choose(preview.id, 'keep_local')} icon={<Laptop />}>{preview.remoteIsDeletion ? 'Manter o registro' : preview.localIsDeletion ? 'Manter a exclusão' : 'Ficar com a deste aparelho'}</Button>
+              <Button variant="secondary" disabled={busy || (!preview.remoteIsDeletion && !preview.remote.available)} onClick={() => void choose(preview.id, 'keep_remote')} icon={<Smartphone />}>{preview.remoteIsDeletion ? 'Aceitar a exclusão' : preview.localIsDeletion ? 'Trazer o registro de volta' : 'Ficar com a do outro aparelho'}</Button>
               <Button variant="secondary" disabled={busy || preview.remoteIsDeletion || !preview.remote.available} onClick={() => void choose(preview.id, 'keep_both')} icon={<Copy />}>Manter as duas</Button>
             </div>
 
             {preview.remoteIsDeletion && <p className="card-copy">O outro aparelho apagou este registro. Manter faz o registro voltar a valer nos dois; aceitar a exclusão apaga também aqui.</p>}
+            {preview.localIsDeletion && <p className="card-copy">Você apagou este registro aqui e o outro aparelho o alterou. Manter a exclusão apaga nos dois; trazer de volta faz a versão do outro voltar a valer aqui.</p>}
           </Card>
         ))}
 

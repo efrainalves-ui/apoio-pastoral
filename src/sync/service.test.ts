@@ -41,15 +41,14 @@ class PaginatedTransport extends CaptureTransport {
 }
 
 /**
- * Serviço que sempre tem mais uma página. É assim que se prova o teto: uma
- * operação por página, e nunca um fim.
+ * Serviço que diz ter mais página e não move o cursor. É a única forma de o
+ * recebimento não terminar sozinho, e a trava precisa reconhecê-la.
  */
-class InfiniteTransport extends CaptureTransport {
-  constructor(private readonly paginas: EncryptedOperation[]) { super() }
+class TravadoTransport extends CaptureTransport {
+  constructor(private readonly pagina: EncryptedOperation) { super() }
   override pull(_ownerId: string, cursor: string | null): Promise<PullResult> {
-    const desde = cursor ? Number(cursor) : 0
     this.pulls += 1
-    return Promise.resolve({ operations: [this.paginas[desde % this.paginas.length]!], cursor: String(desde + 1), hasMore: true })
+    return Promise.resolve({ operations: [this.pagina], cursor, hasMore: true })
   }
 }
 
@@ -235,9 +234,11 @@ describe('sincronização cifrada', () => {
     expect(await database.vaultRecords.get(operation.recordId)).toBeUndefined()
   })
 
-  it('avisa quando parou no teto de páginas em vez de dizer que está em dia', async () => {
+  it('recebe todas as páginas, quantas forem, antes de se declarar em dia', async () => {
+    // O teto antigo eram cinquenta páginas — dez mil operações — e a rodada
+    // parava ali em silêncio. Um distrito grande virava "conta vazia".
     const { database, accountId, deviceId, keys } = await fixture()
-    const paginas = await Promise.all(Array.from({ length: 60 }, async () => {
+    const todas = await Promise.all(Array.from({ length: PAGE_SIZE * 3 + 7 }, async () => {
       const recordId = crypto.randomUUID()
       return withOperationMac(keys.sync, {
         id: crypto.randomUUID(), ownerId: accountId, deviceId: crypto.randomUUID(), recordId,
@@ -246,16 +247,50 @@ describe('sincronização cifrada', () => {
         createdAt: new Date().toISOString(),
       })
     }))
-    const transport = new InfiniteTransport(paginas)
+    const transport = new PaginatedTransport(todas)
 
     const summary = await new SyncService(transport, database, () => true).synchronize(accountId, deviceId, keys.sync)
 
-    // Antes o resumo voltava sem nenhuma marca e o aparelho seguia achando que
-    // tinha recebido tudo, com o serviço ainda cheio de operações.
+    expect(transport.paginas).toBe(4)
+    expect(summary.pulled).toBe(todas.length)
+    expect(summary.incomplete).toBe(false)
+    expect((await database.syncState.get(accountId))?.firstSyncAt).toBeTruthy()
+  })
+
+  it('para e avisa quando o serviço diz ter mais e não anda', async () => {
+    const { database, accountId, deviceId, keys } = await fixture()
+    const recordId = crypto.randomUUID()
+    const pagina = await withOperationMac(keys.sync, {
+      id: crypto.randomUUID(), ownerId: accountId, deviceId: crypto.randomUUID(), recordId,
+      operation: 'upsert' as const, baseVersion: 0, recordVersion: 1, schemaVersion: 1,
+      payload: await encryptPayload(keys.master, { schemaVersion: 1, type: 'foundation_fixture', data: 'ficticio' }, recordId),
+      createdAt: new Date().toISOString(),
+    })
+    const transport = new TravadoTransport(pagina)
+
+    const summary = await new SyncService(transport, database, () => true).synchronize(accountId, deviceId, keys.sync)
+
     expect(summary.incomplete).toBe(true)
-    expect(summary.status).toBe('synced')
-    // O cursor avançou: sincronizar de novo continua de onde parou.
-    expect((await database.syncState.get(accountId))?.cursor).toBe(String(transport.pulls))
+    expect(transport.pulls).toBe(1)
+  })
+
+  it('não carimba a primeira sincronização quando a rodada não terminou', async () => {
+    // `firstSyncAt` é o que autoriza acreditar em uma lista vazia. Carimbá-lo
+    // numa rodada incompleta mandava o pastor criar um segundo distrito.
+    const { database, accountId, deviceId, keys } = await fixture()
+    const recordId = crypto.randomUUID()
+    const pagina = await withOperationMac(keys.sync, {
+      id: crypto.randomUUID(), ownerId: accountId, deviceId: crypto.randomUUID(), recordId,
+      operation: 'upsert' as const, baseVersion: 0, recordVersion: 1, schemaVersion: 1,
+      payload: await encryptPayload(keys.master, { schemaVersion: 1, type: 'foundation_fixture', data: 'ficticio' }, recordId),
+      createdAt: new Date().toISOString(),
+    })
+
+    const summary = await new SyncService(new TravadoTransport(pagina), database, () => true).synchronize(accountId, deviceId, keys.sync)
+
+    expect(summary.incomplete).toBe(true)
+    expect((await database.syncState.get(accountId))?.firstSyncAt).toBeFalsy()
+    expect(await firstSyncPending(accountId, database)).toBe(true)
   })
 
   it('não marca sincronização incompleta quando o serviço entregou tudo', async () => {

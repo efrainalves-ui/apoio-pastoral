@@ -246,4 +246,80 @@ describe('revisão de alterações concorrentes', () => {
     expect(original).toMatchObject({ baseVersion: conflict.remoteVersion })
     expect(enviadas).toHaveLength(2)
   })
+
+  /** Este aparelho apagou o registro; o outro mandou uma alteração dele. */
+  async function cenarioDeExclusaoLocal() {
+    const base = await cenario()
+    await base.repository.applyEncryptedMutations(accountId, deviceId, [{
+      recordId: base.recordId,
+      recordType: 'person',
+      operation: 'delete',
+      envelope: await encryptPayload(base.key, { schemaVersion: 1, type: 'person_tombstone', data: { deletedAt: new Date().toISOString() } }, base.recordId),
+    }])
+    return base
+  }
+
+  it('manter a exclusão daqui publica uma lápide nova sobre a versão do outro', async () => {
+    // Sem isso a exclusão local ficava presa a uma versão antiga: o outro
+    // aparelho a recusaria por linhagem e o registro viveria lá e morreria
+    // aqui, para sempre, sem ninguém ver.
+    const { database, key, recordId, conflict, service } = await cenarioDeExclusaoLocal()
+    databases.push(database)
+    await database.outbox.clear()
+
+    await service.resolve(accountId, key, conflict.id, 'keep_local')
+
+    expect((await database.vaultRecords.get(recordId))?.deletedAt).toBeTruthy()
+    const [enviada] = await database.outbox.toArray()
+    expect(enviada).toMatchObject({ recordId, operation: 'delete', baseVersion: conflict.remoteVersion, recordVersion: conflict.remoteVersion + 1 })
+  })
+
+  it('trazer de volta o registro do outro aparelho ressuscita e publica por cima', async () => {
+    const { database, key, recordId, conflict, service } = await cenarioDeExclusaoLocal()
+    databases.push(database)
+    await database.outbox.clear()
+
+    await service.resolve(accountId, key, conflict.id, 'keep_remote')
+
+    const registro = await database.vaultRecords.get(recordId)
+    expect(registro?.deletedAt).toBeUndefined()
+    expect(await decryptPayload(key, registro!)).toMatchObject({ data: { name: 'Pessoa Fictícia do Celular' } })
+    const [enviada] = await database.outbox.toArray()
+    expect(enviada).toMatchObject({ recordId, operation: 'upsert', baseVersion: conflict.remoteVersion })
+  })
+
+  it('a revisão diz de qual lado veio a exclusão', async () => {
+    const local = await cenarioDeExclusaoLocal()
+    databases.push(local.database)
+    const previaLocal = await local.service.preview(local.conflict, local.key)
+    expect(previaLocal).toMatchObject({ localIsDeletion: true, remoteIsDeletion: false })
+    expect(previaLocal.local.summary).toContain('apagou este registro')
+
+    const remoto = await cenarioDeExclusao()
+    databases.push(remoto.database)
+    const previaRemota = await remoto.service.preview(remoto.conflict, remoto.key)
+    expect(previaRemota).toMatchObject({ localIsDeletion: false, remoteIsDeletion: true })
+  })
+
+  it('as duas direções convergem: o que sobe reescreve a versão do outro aparelho', async () => {
+    // Convergir é isto: a operação publicada nasce da versão que o outro tem,
+    // então a linhagem bate lá e a escolha do pastor entra sem novo conflito.
+    for (const [direcao, montar] of [
+      ['exclusão remota × alteração local', cenarioDeExclusao],
+      ['exclusão local × alteração remota', cenarioDeExclusaoLocal],
+    ] as const) {
+      for (const escolha of ['keep_local', 'keep_remote'] as const) {
+        const { database, key, conflict, service } = await montar()
+        databases.push(database)
+        await database.outbox.clear()
+
+        await service.resolve(accountId, key, conflict.id, escolha)
+
+        const [enviada] = await database.outbox.toArray()
+        expect(enviada, `${direcao} / ${escolha}`).toBeDefined()
+        expect(enviada!.baseVersion, `${direcao} / ${escolha}`).toBe(conflict.remoteVersion)
+        expect(enviada!.recordVersion, `${direcao} / ${escolha}`).toBe(conflict.remoteVersion + 1)
+      }
+    }
+  })
 })

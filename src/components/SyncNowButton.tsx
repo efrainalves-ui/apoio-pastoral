@@ -6,11 +6,14 @@ import { countPendingChanges, pendingLabel } from '../sync/pending'
 import { SyncService } from '../sync/service'
 import { createSyncTransport } from '../sync/transport'
 
-type Situacao = 'parado' | 'sincronizando' | 'pronto' | 'offline' | 'erro'
+type Situacao = 'parado' | 'sincronizando' | 'pronto' | 'incompleto' | 'offline' | 'erro'
 
 const MENSAGENS: Record<Exclude<Situacao, 'parado'>, string> = {
   sincronizando: 'Sincronizando…',
   pronto: 'Dados atualizados',
+  // Anunciar "Dados atualizados" com páginas faltando é a pior das saídas: o
+  // pastor para de sincronizar acreditando estar em dia.
+  incompleto: 'Ainda faltam dados para receber. Toque em Sincronizar de novo até este aviso sumir.',
   offline: 'Sem internet agora. Suas alterações ficam guardadas e sobem quando a conexão voltar.',
   erro: 'Não foi possível atualizar agora. Suas alterações continuam guardadas neste aparelho.',
 }
@@ -46,8 +49,8 @@ export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
     if (!navigator.onLine) { setSituacao('offline'); return }
     setSituacao('sincronizando')
     try {
-      await service.synchronize(account.id, currentDeviceId(account.id), syncKey)
-      setSituacao('pronto')
+      const resumo = await service.synchronize(account.id, currentDeviceId(account.id), syncKey)
+      setSituacao(resumo.incomplete ? 'incompleto' : 'pronto')
     } catch {
       setSituacao(navigator.onLine ? 'erro' : 'offline')
     } finally {
@@ -78,7 +81,7 @@ export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
       </button>
       {situacao === 'parado' && aviso && <p className="sync-now__notice" role="status">{aviso}</p>}
       {situacao !== 'parado' && (
-        <p className={`sync-now__notice${situacao === 'pronto' ? ' sync-now__notice--ok' : ''}`} role="status">{MENSAGENS[situacao]}</p>
+        <p className={`sync-now__notice${situacao === 'pronto' ? ' sync-now__notice--ok' : ''}`} role={situacao === 'incompleto' ? 'alert' : 'status'}>{MENSAGENS[situacao]}</p>
       )}
     </>
   )

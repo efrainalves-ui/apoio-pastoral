@@ -6,12 +6,12 @@ import { operationMacIsValid, withOperationMac } from './operationMac'
 import type { EncryptedOperation, SyncSummary, SyncTransport } from './types'
 
 /**
- * Teto de páginas por sincronização, para não prender a tela indefinidamente.
- * Bater no teto não é erro nem fim: o cursor fica guardado e a próxima
- * sincronização continua. O que não pode é o aparelho dizer que está em dia —
- * por isso o resumo carrega `incomplete`.
+ * Trava de segurança contra um serviço que diz ter mais página para sempre, e
+ * nada mais. O recebimento normal termina quando o serviço não tem mais nada,
+ * quantas páginas forem necessárias: parar antes disso deixava o aparelho
+ * achando que estava em dia com o distrito pela metade.
  */
-const MAX_PAGES = 50
+const MAX_PAGES = 10_000
 
 function toOperation(record: OutboxRecord): EncryptedOperation {
   return {
@@ -88,10 +88,11 @@ export class SyncService {
     let incompleto = false
     let cursor = (await this.database.syncState.get(accountId))?.cursor ?? null
 
-    // Página por página até o serviço não ter mais nada. Parar na primeira
-    // página deixaria para trás tudo que passasse do limite, e o aparelho
-    // seguiria achando que estava em dia.
+    // Página por página até o serviço não ter mais nada. Parar antes disso
+    // deixaria para trás tudo que passasse do limite, e o aparelho seguiria
+    // achando que estava em dia.
     for (let pagina = 0; pagina < MAX_PAGES; pagina += 1) {
+      const cursorAnterior = cursor
       const pullResult = await this.transport.pull(accountId, cursor)
       if (pullResult.operations.some((operation) => operation.ownerId !== accountId)) {
         throw new Error('A sincronização recebeu dados de outra conta e foi interrompida.')
@@ -115,17 +116,23 @@ export class SyncService {
       })
 
       if (!pullResult.hasMore || pullResult.operations.length === 0) break
-      // Última volta permitida e o serviço ainda tem página: a conta não está
-      // em dia, e quem chamou precisa saber disso.
+      // Serviço que diz ter mais página sem mover o cursor não vai terminar
+      // nunca. Parar aqui é a saída certa, e a conta não está em dia.
+      if (pullResult.cursor === cursorAnterior) { incompleto = true; break }
+      // Última volta permitida e o serviço ainda tem página.
       if (pagina === MAX_PAGES - 1) incompleto = true
     }
 
+    // `firstSyncAt` é o que autoriza o aplicativo a acreditar em uma lista
+    // vazia. Uma rodada que não chegou ao fim não pode carimbá-lo: era assim
+    // que um distrito grande virava "conta vazia" e o pastor era mandado criar
+    // um segundo distrito por cima do primeiro.
     const estado = await this.database.syncState.get(accountId)
     await this.database.syncState.put({
       accountId,
       cursor,
       lastSyncedAt: new Date().toISOString(),
-      firstSyncAt: estado?.firstSyncAt ?? new Date().toISOString(),
+      firstSyncAt: estado?.firstSyncAt ?? (incompleto ? null : new Date().toISOString()),
     })
 
     return {

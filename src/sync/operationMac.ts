@@ -23,13 +23,33 @@ export const MAC_VERSION = 3
  * nos dois lados; o texto cifrado entra junto para que assinatura e conteúdo
  * não possam ser recombinados de operações diferentes.
  *
- * `deviceId` fica de fora de propósito: ele é atribuído pelo servidor a partir
- * da sessão, não pelo aparelho que assina, então assiná-lo aqui só produziria
- * assinaturas que nunca conferem na volta.
+ * `macVersion` entra por completude: a versão já estava presa ao valor pela
+ * constante, e assinar o campo declarado impede que ele seja reescrito no
+ * caminho para forçar uma leitura diferente da mesma assinatura.
+ *
+ * `deviceId` fica de fora, e isto é uma limitação declarada, não um descuido:
+ *
+ * 1. Quem atribui o campo é o servidor, a partir da sessão autenticada — o
+ *    valor que o aparelho envia no corpo é ignorado de propósito, porque
+ *    acreditar nele foi um buraco que já se fechou. Assinar o valor enviado
+ *    produziria assinaturas que não conferem sempre que o servidor decidisse
+ *    diferente, e é justamente ele quem decide.
+ * 2. Depois de encerrar um distrito, o aparelho recebe um identificador novo
+ *    enquanto a fila ainda guarda operações assinadas com o antigo. Assinar o
+ *    campo mandaria toda essa fila para a quarentena.
+ * 3. O campo não decide nada em `aplicar`: a origem não altera conteúdo,
+ *    linhagem, versão nem exclusão. Ele é informativo.
+ *
+ * A limitação real, então, é esta: quem controlasse o serviço poderia atribuir
+ * uma operação ao aparelho errado. Isso não muda o que é aplicado nem abre o
+ * conteúdo — muda apenas de qual aparelho o registro parece ter vindo. A conta,
+ * o registro, a versão, a linhagem, o tipo de operação, o carimbo e o texto
+ * cifrado continuam todos assinados.
  */
 function corpo(operation: EncryptedOperation): Uint8Array<ArrayBuffer> {
   return utf8(JSON.stringify([
     MAC_VERSION,
+    operation.macVersion ?? MAC_VERSION,
     operation.id,
     operation.ownerId,
     operation.recordId,

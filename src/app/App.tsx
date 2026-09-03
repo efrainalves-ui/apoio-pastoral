@@ -92,7 +92,12 @@ export function useDistrictPresence(): DistrictPresence {
         const transport = createSyncTransport()
         if (transport.name !== 'disabled' && syncKey) {
           try {
-            await new SyncService(transport).synchronize(account.id, currentDeviceId(account.id), syncKey)
+            const resumo = await new SyncService(transport).synchronize(account.id, currentDeviceId(account.id), syncKey)
+            // Rodada que não chegou ao fim não prova conta vazia: o distrito
+            // pode estar nas páginas que faltaram. Sem esta linha, um distrito
+            // grande levava o pastor à tela de criar distrito, e ele criaria um
+            // segundo por cima do primeiro.
+            if (resumo.incomplete) { if (!cancelled) setPresenca('indisponivel'); return }
             district = await districtService.getDistrict(account.id, masterKey)
           } catch {
             // Não deu para receber. Se este aparelho nunca completou uma
