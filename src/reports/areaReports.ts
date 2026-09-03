@@ -21,14 +21,20 @@ export function visitReportLines(visits: VisitEntity[], rounds: VisitRoundEntity
   ]
 }
 
-export function agendaReportLines(events: AgendaEventEntity[], churchName: (id: string | null) => string, includeNotes = false): string[] {
+/**
+ * Relatório de agenda. `includeNames` libera o título e as observações, que são
+ * onde os nomes aparecem — "Visita a Fulana", "Batismo de Beltrano". Sem marcar,
+ * saem data, tipo e local: o relatório continua servindo para prestar contas do
+ * trabalho sem entregar quem foi visitado.
+ */
+export function agendaReportLines(events: AgendaEventEntity[], churchName: (id: string | null) => string, includeNames = false): string[] {
   return [
     `Compromissos incluídos: ${events.length}`,
     ...events.flatMap((event) => [
       `${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', ...(event.allDay ? {} : { timeStyle: 'short' as const }) }).format(new Date(event.startAt))} · ${AGENDA_CATEGORY_LABELS[event.category]}`,
-      event.title,
+      ...(includeNames ? [event.title] : []),
       [churchName(event.churchId), event.location, event.address].filter(Boolean).join(' · '),
-      ...(includeNotes && event.notes ? [event.notes] : []),
+      ...(includeNames && event.notes ? [event.notes] : []),
       '',
     ]),
   ]
@@ -51,10 +57,19 @@ export function goalsReportLines(year: number, areas: GoalReportArea[], mission:
   ]
 }
 
-export function sermonReportLines(preachings: AgendaEventEntity[], sermonCount: number, churchName: (id: string | null) => string): string[] {
+/**
+ * Histórico de pregações. O título vem do compromisso e pode carregar nome de
+ * pessoa — um batismo, um casamento, uma dedicação anotados ali. Por isso ele
+ * segue a mesma regra do itinerário: sem marcar, saem data e igreja.
+ */
+export function sermonReportLines(preachings: AgendaEventEntity[], sermonCount: number, churchName: (id: string | null) => string, includeNames = false): string[] {
   return [
     `Pregações: ${preachings.length}`,
-    ...preachings.map((event) => `${dataCurta(event.startAt)} · ${churchName(event.churchId)} · ${event.sermonSnapshot?.title ?? event.title}`),
+    ...preachings.map((event) => [
+      dataCurta(event.startAt),
+      churchName(event.churchId),
+      ...(includeNames ? [event.sermonSnapshot?.title ?? event.title] : []),
+    ].join(' · ')),
     `Sermões no acervo: ${sermonCount}`,
   ]
 }

@@ -58,8 +58,10 @@ describe('assinatura dos metadados da sincronização', () => {
   it('recusa operação sem assinatura e assinatura de versão anterior', async () => {
     const { sync } = await generateVaultKeys()
     const assinada = await withOperationMac(sync, operacaoFicticia())
+    const semMac = { ...assinada }
+    delete semMac.mac
 
-    expect(await operationMacIsValid(sync, { ...assinada, mac: undefined })).toBe(false)
+    expect(await operationMacIsValid(sync, semMac)).toBe(false)
     expect(await operationMacIsValid(sync, { ...assinada, macVersion: MAC_VERSION - 1 })).toBe(false)
   })
 

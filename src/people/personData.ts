@@ -9,6 +9,12 @@ type Dados = Record<string, unknown>
 
 const lista = (valor: unknown): string[] => Array.isArray(valor) ? valor.filter((item): item is string => typeof item === 'string') : []
 
+/** Lista de objetos guardada dentro de um registro, quando é isso mesmo. */
+const objetos = (valor: unknown): Dados[] => Array.isArray(valor) ? valor.filter((item): item is Dados => typeof item === 'object' && item !== null) : []
+
+/** Apaga a citação da pessoa em um campo de identificação única. */
+const semCitacao = (valor: unknown, personId: string, vazio: string | null = ''): unknown => valor === personId ? vazio : valor
+
 /** O registro fala só desta pessoa: apagá-lo não tira nada de mais ninguém. */
 export function isOnlyAboutPerson(payload: VaultPayload, personId: string): boolean {
   const dados = payload.data as Dados
@@ -53,14 +59,142 @@ export function withoutPerson(payload: VaultPayload, personId: string): VaultPay
       }
     }
     case 'visit': {
-      const participantes = payload.data as { participants?: Array<{ personId?: string }>; versions?: Array<{ participants?: Array<{ personId?: string }> }> }
-      const versoes = participantes.versions
-      if (!versoes?.some((versao) => versao.participants?.some((item) => item.personId === personId))) return null
+      // Visita de família em que a pessoa esteve presente. As respostas da
+      // entrevista trazem `subjectId`: sem tirá-las, o conteúdo mais íntimo da
+      // pessoa continuaria guardado depois de ela pedir para ser apagada.
+      const versoes = objetos(dados.versions)
+      const citado = versoes.some((versao) =>
+        objetos(versao.participants).some((item) => item.personId === personId)
+        || objetos(versao.answers).some((item) => item.subjectId === personId))
+      const rendas = objetos(dados.incomeAnswers).some((item) => item.personId === personId)
+      if (!citado && !rendas) return null
       return {
         ...payload,
         data: {
           ...dados,
-          versions: versoes.map((versao) => ({ ...versao, participants: (versao.participants ?? []).filter((item) => item.personId !== personId) })),
+          versions: versoes.map((versao) => ({
+            ...versao,
+            participants: objetos(versao.participants).filter((item) => item.personId !== personId),
+            answers: objetos(versao.answers).filter((item) => item.subjectId !== personId),
+          })),
+          ...(dados.incomeAnswers ? { incomeAnswers: objetos(dados.incomeAnswers).filter((item) => item.personId !== personId) } : {}),
+        },
+      }
+    }
+    case 'commission_config': {
+      const citado = lista(dados.boardMemberIds).includes(personId) || lista(dados.elderIds).includes(personId)
+        || dados.boardPresidentId === personId || dados.secretaryId === personId
+      if (!citado) return null
+      return {
+        ...payload,
+        data: {
+          ...dados,
+          boardMemberIds: lista(dados.boardMemberIds).filter((id) => id !== personId),
+          ...(dados.elderIds ? { elderIds: lista(dados.elderIds).filter((id) => id !== personId) } : {}),
+          boardPresidentId: semCitacao(dados.boardPresidentId, personId),
+          secretaryId: semCitacao(dados.secretaryId, personId),
+        },
+      }
+    }
+    case 'commission_meeting': {
+      const pauta = objetos(dados.agenda)
+      const citado = lista(dados.participantIds).includes(personId) || dados.presidentId === personId
+        || dados.secretaryId === personId || pauta.some((item) => item.responsibleId === personId)
+      if (!citado) return null
+      return {
+        ...payload,
+        data: {
+          ...dados,
+          participantIds: lista(dados.participantIds).filter((id) => id !== personId),
+          presidentId: semCitacao(dados.presidentId, personId),
+          secretaryId: semCitacao(dados.secretaryId, personId),
+          agenda: pauta.map((item) => ({ ...item, responsibleId: semCitacao(item.responsibleId, personId) })),
+        },
+      }
+    }
+    case 'commission_task': {
+      if (dados.responsibleId !== personId) return null
+      return { ...payload, data: { ...dados, responsibleId: '' } }
+    }
+    case 'nomination_process': {
+      // Um processo de nomeações cita a pessoa em muitos lugares, e o relatório
+      // final guarda o nome escrito. Tudo isso sai; o processo continua.
+      const candidatos = objetos(dados.candidates)
+      const reunioes = objetos(dados.meetings)
+      const votos = objetos(dados.officialVotes)
+      const relatorios = objetos(dados.reports)
+      const tarefas = objetos(dados.tasks)
+      const formacao = (typeof dados.formation === 'object' && dados.formation !== null ? dados.formation : {}) as Dados
+      const emReuniao = (registro: Dados) => lista(registro.participantIds).includes(personId)
+        || registro.presidentId === personId || registro.secretaryId === personId
+      const citado = candidatos.some((item) => item.personId === personId)
+        || reunioes.some(emReuniao) || votos.some(emReuniao)
+        || relatorios.some((relatorio) => objetos(relatorio.lines).some((linha) => linha.personId === personId))
+        || tarefas.some((tarefa) => tarefa.responsibleId === personId)
+        || lista(formacao.organizingCommitteeIds).includes(personId) || lista(formacao.committeeMemberIds).includes(personId)
+        || formacao.presidentId === personId || formacao.secretaryId === personId || formacao.districtLeaderId === personId
+      if (!citado) return null
+      const semPessoaEmReuniao = (registro: Dados) => ({
+        ...registro,
+        participantIds: lista(registro.participantIds).filter((id) => id !== personId),
+        presidentId: semCitacao(registro.presidentId, personId),
+        secretaryId: semCitacao(registro.secretaryId, personId),
+      })
+      return {
+        ...payload,
+        data: {
+          ...dados,
+          formation: {
+            ...formacao,
+            organizingCommitteeIds: lista(formacao.organizingCommitteeIds).filter((id) => id !== personId),
+            committeeMemberIds: lista(formacao.committeeMemberIds).filter((id) => id !== personId),
+            presidentId: semCitacao(formacao.presidentId, personId),
+            secretaryId: semCitacao(formacao.secretaryId, personId),
+            districtLeaderId: semCitacao(formacao.districtLeaderId, personId),
+          },
+          candidates: candidatos.filter((item) => item.personId !== personId),
+          meetings: reunioes.map(semPessoaEmReuniao),
+          officialVotes: votos.map(semPessoaEmReuniao),
+          reports: relatorios.map((relatorio) => ({ ...relatorio, lines: objetos(relatorio.lines).filter((linha) => linha.personId !== personId) })),
+          tasks: tarefas.map((tarefa) => ({ ...tarefa, responsibleId: semCitacao(tarefa.responsibleId, personId) })),
+        },
+      }
+    }
+    case 'evangelism_campaign': {
+      const equipe = objetos(dados.team)
+      const pontos = objetos(dados.points)
+      const tarefas = objetos(dados.tasks)
+      const citado = equipe.some((item) => item.personId === personId)
+        || pontos.some((ponto) => lista(ponto.teamPersonIds).includes(personId))
+        || tarefas.some((tarefa) => tarefa.responsibleId === personId)
+      if (!citado) return null
+      return {
+        ...payload,
+        data: {
+          ...dados,
+          team: equipe.filter((item) => item.personId !== personId),
+          points: pontos.map((ponto) => ({ ...ponto, teamPersonIds: lista(ponto.teamPersonIds).filter((id) => id !== personId) })),
+          tasks: tarefas.map((tarefa) => ({ ...tarefa, responsibleId: semCitacao(tarefa.responsibleId, personId, null) })),
+        },
+      }
+    }
+    case 'import_batch': {
+      // O lote de importação guarda os dados anteriores da pessoa para poder
+      // desfazer. Apagar a pessoa e deixar essa cópia para trás seria apagar
+      // só a metade visível.
+      const desfazer = (typeof dados.undo === 'object' && dados.undo !== null ? dados.undo : {}) as Dados
+      const anteriores = objetos(desfazer.previousPeople)
+      const criados = lista(desfazer.createdPersonIds)
+      if (!criados.includes(personId) && !anteriores.some((item) => item.id === personId)) return null
+      return {
+        ...payload,
+        data: {
+          ...dados,
+          undo: {
+            ...desfazer,
+            createdPersonIds: criados.filter((id) => id !== personId),
+            previousPeople: anteriores.filter((item) => item.id !== personId),
+          },
         },
       }
     }
@@ -84,6 +218,75 @@ export function withoutPerson(payload: VaultPayload, personId: string): VaultPay
     }
     default: return null
   }
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  person: 'Pessoa', visit: 'Visita', prayer_request: 'Pedido de oração', follow_up: 'Acompanhamento',
+  task: 'Tarefa', bible_study: 'Estudo bíblico', family: 'Família', missionary_pair: 'Dupla missionária',
+  sabbath_class: 'Classe da Escola Sabatina', small_group: 'Pequeno Grupo', agenda_event: 'Compromisso',
+  commission_config: 'Configuração de comissão', commission_meeting: 'Reunião de comissão',
+  commission_task: 'Pendência de comissão', nomination_process: 'Processo de nomeações',
+  evangelism_campaign: 'Campanha de evangelismo', import_batch: 'Importação de lista',
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  name: 'Nome', birthDate: 'Nascimento', whatsapp: 'WhatsApp', email: 'E-mail', phone: 'Telefone',
+  address: 'Endereço', notes: 'Observações', privateNotes: 'Observações reservadas', text: 'Texto',
+  description: 'Descrição', title: 'Título', pastoralStatus: 'Situação pastoral', incomeStatus: 'Fidelidade',
+  status: 'Situação', reason: 'Motivo', kind: 'Tipo', startAt: 'Início', endAt: 'Término', dueAt: 'Prazo',
+  requestedAt: 'Pedido em', reviewAt: 'Revisar em', testimony: 'Testemunho', outcome: 'Desfecho',
+  createdAt: 'Criado em', updatedAt: 'Atualizado em', startedAt: 'Iniciado em', completedAt: 'Concluído em',
+  followUp: 'Acompanhamento', correctionNote: 'Nota de correção', value: 'Resposta', question: 'Pergunta',
+  priority: 'Prioridade', mode: 'Modo', months: 'Meses', category: 'Categoria', externalCode: 'Código externo',
+}
+
+/** Campos que só existem para o aplicativo se localizar. Não dizem nada a quem lê. */
+const CAMPOS_TECNICOS = new Set([
+  'id', 'churchId', 'targetId', 'targetType', 'subjectId', 'subjectType', 'relatedId', 'relatedType',
+  'personId', 'interestId', 'visitId', 'roundId', 'scheduledEventId', 'agendaEventId', 'currentVersion',
+  'schemaVersion', 'memberIds', 'participantIds', 'code', 'version',
+])
+
+function rotuloDeTipo(tipo: string): string {
+  return TYPE_LABELS[tipo] ?? 'Outro registro'
+}
+
+function valorLegivel(valor: unknown): string | null {
+  if (valor === null || valor === undefined || valor === '') return 'não informado'
+  if (typeof valor === 'boolean') return valor ? 'Sim' : 'Não'
+  if (typeof valor === 'number') return String(valor)
+  if (typeof valor === 'string') return valor
+  if (Array.isArray(valor)) {
+    const textos = valor.filter((item): item is string => typeof item === 'string')
+    return textos.length === valor.length ? (textos.join(', ') || 'não informado') : null
+  }
+  return null
+}
+
+/**
+ * Transforma o conteúdo já decifrado em linhas legíveis, incluindo o que está
+ * dentro de listas de objetos — as respostas de uma entrevista, por exemplo,
+ * que são justamente a parte que interessa a quem pede os próprios dados.
+ */
+function linhasDoConteudo(conteudo: unknown, prefixo = ''): string[] {
+  if (!conteudo || typeof conteudo !== 'object') return [`${prefixo}${valorLegivel(conteudo) ?? 'não informado'}`]
+  const dados = conteudo as Dados
+  const linhas: string[] = []
+  for (const [chave, valor] of Object.entries(dados)) {
+    if (CAMPOS_TECNICOS.has(chave)) continue
+    const rotulo = `${prefixo}${FIELD_LABELS[chave] ?? chave}`
+    const simples = valorLegivel(valor)
+    if (simples !== null) { linhas.push(`${rotulo}: ${simples}`); continue }
+    if (Array.isArray(valor)) {
+      const itens = valor.filter((item): item is Dados => typeof item === 'object' && item !== null)
+      if (!itens.length) continue
+      linhas.push(`${rotulo}:`)
+      for (const item of itens) linhas.push(...linhasDoConteudo(item, `${prefixo}  `))
+      continue
+    }
+    linhas.push(`${rotulo}:`, ...linhasDoConteudo(valor, `${prefixo}  `))
+  }
+  return linhas
 }
 
 export interface PersonRemovalPlan { removed: Carregado[]; edited: Array<{ record: VaultRecord; payload: VaultPayload }> }
@@ -113,25 +316,38 @@ export class PersonDataService {
   /**
    * Exportação legível dos dados desta pessoa. Sai do cofre já decifrado, para
    * o pastor entregar a quem pediu; nada é enviado para lugar nenhum.
+   *
+   * Antes saíam cinco campos e uma contagem por tipo. Quem pede os próprios
+   * dados tem direito ao conteúdo, não a um resumo: os registros que falam só
+   * dela saem inteiros. Os registros em que ela aparece ao lado de outras
+   * pessoas continuam fora, e por um motivo — o conteúdo deles também é dos
+   * outros; deles fica a indicação de que existem.
    */
   async exportLines(accountId: string, key: CryptoKey, personId: string): Promise<string[]> {
     const todos = await this.carregar(accountId, key)
     const pessoa = todos.find(({ record }) => record.id === personId)
     if (!pessoa) throw new Error('Pessoa não encontrada.')
-    const dados = pessoa.payload.data as { name?: string; birthDate?: string | null; whatsapp?: string; pastoralStatus?: string; notes?: string }
+
     const linhas = [
-      `Nome: ${dados.name ?? ''}`,
-      `Nascimento: ${dados.birthDate ?? 'não informado'}`,
-      `WhatsApp: ${dados.whatsapp ?? 'não informado'}`,
-      `Situação pastoral: ${dados.pastoralStatus ?? ''}`,
-      `Observações: ${dados.notes ?? ''}`,
-      '',
-      'Registros ligados a esta pessoa:',
+      'Dados pessoais',
+      ...linhasDoConteudo(pessoa.payload.data),
     ]
-    const ligados = todos.filter(({ record, payload }) => record.id !== personId && (isOnlyAboutPerson(payload, personId) || withoutPerson(payload, personId) !== null))
-    const porTipo = ligados.reduce<Record<string, number>>((contagem, { payload }) => ({ ...contagem, [payload.type]: (contagem[payload.type] ?? 0) + 1 }), {})
-    for (const [tipo, total] of Object.entries(porTipo).sort()) linhas.push(`- ${tipo}: ${total}`)
-    if (!ligados.length) linhas.push('- nenhum')
+
+    const somenteDela = todos.filter(({ record, payload }) => record.id !== personId && isOnlyAboutPerson(payload, personId))
+    linhas.push('', 'Registros que falam somente desta pessoa')
+    if (!somenteDela.length) linhas.push('- nenhum')
+    for (const { payload } of somenteDela) {
+      linhas.push('', `${rotuloDeTipo(payload.type)}`, ...linhasDoConteudo(payload.data))
+    }
+
+    const compartilhados = todos.filter(({ record, payload }) => record.id !== personId
+      && !isOnlyAboutPerson(payload, personId) && withoutPerson(payload, personId) !== null)
+    linhas.push('', 'Registros em que esta pessoa aparece junto de outras')
+    linhas.push('O conteúdo destes registros também é das outras pessoas citadas, por isso não sai aqui.')
+    const porTipo = compartilhados.reduce<Record<string, number>>((contagem, { payload }) => ({ ...contagem, [payload.type]: (contagem[payload.type] ?? 0) + 1 }), {})
+    for (const [tipo, total] of Object.entries(porTipo).sort()) linhas.push(`- ${rotuloDeTipo(tipo)}: ${total}`)
+    if (!compartilhados.length) linhas.push('- nenhum')
+
     return linhas
   }
 

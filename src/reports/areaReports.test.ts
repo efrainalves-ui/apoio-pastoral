@@ -63,7 +63,23 @@ describe('relatórios de cada área', () => {
     const linhas = sermonReportLines([evento({ category: 'preaching', title: 'Pregação Fictícia' })], 7, nomeIgreja)
 
     expect(linhas[0]).toBe('Pregações: 1')
-    expect(linhas[1]).toContain('Igreja Fictícia · Pregação Fictícia')
+    // Por padrão o título fica de fora: ele pode carregar nome de pessoa.
+    expect(linhas[1]).toContain('Igreja Fictícia')
+    expect(linhas.join('\n')).not.toContain('Pregação Fictícia')
     expect(linhas.at(-1)).toBe('Sermões no acervo: 7')
+  })
+
+  it('só inclui o título da pregação quando o pastor pede nomes', () => {
+    const linhas = sermonReportLines([evento({ category: 'preaching', title: 'Batismo de Pessoa Fictícia' })], 7, nomeIgreja, true)
+
+    expect(linhas[1]).toContain('Batismo de Pessoa Fictícia')
+  })
+
+  it('o relatório de agenda também guarda os títulos por padrão', () => {
+    const linhas = agendaReportLines([evento({ category: 'visit', title: 'Visita a Pessoa Fictícia' })], nomeIgreja)
+
+    expect(linhas.join('\n')).not.toContain('Pessoa Fictícia')
+    expect(agendaReportLines([evento({ category: 'visit', title: 'Visita a Pessoa Fictícia' })], nomeIgreja, true).join('\n'))
+      .toContain('Visita a Pessoa Fictícia')
   })
 })
