@@ -224,6 +224,9 @@ select homologacao_testes.exigir(
   public.purge_record_history(array[]::uuid[]) = 0,
   'expurgo sem registro nenhum não faz nada');
 
+-- As provas de privilégio a seguir criam objetos, e quem cria é o dono.
+reset role;
+
 -- ---------------------------------------------------------------------------
 -- 6. Privilégios de toda tabela futura de public.
 -- ---------------------------------------------------------------------------
