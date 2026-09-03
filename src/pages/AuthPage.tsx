@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { openedFromPasswordReset } from '../auth/passwordReset'
 import { hasSupabaseConfiguration, onPasswordRecovery } from '../auth/supabase'
+import { isHomologationEnvironment } from '../sync/config'
 import { Button } from '../components/ui/Button'
 import { Field } from '../components/ui/Field'
 
@@ -121,6 +122,13 @@ export function AuthPage() {
       </section>
       <section className="auth-panel">
         <div className="auth-form-wrap">
+          {/*
+            O aviso de homologação vem antes do login, e não depois.
+            Descobrir que a instalação é de teste só depois de entrar já é
+            tarde: a essa altura o pastor pode ter digitado um nome real numa
+            base que existe para ser apagada.
+          */}
+          {isHomologationEnvironment && <p className="auth-env" role="status">Homologação — instalação de teste. Use apenas dados fictícios.</p>}
           <h2>{mode === 'register' ? 'Crie sua conta' : mode === 'recover' ? 'Recupere o acesso' : mode === 'reset' ? 'Defina sua senha nova' : 'Entre na sua conta'}</h2>
           {mode === 'reset' && <p className="field__hint">Este link define a senha nova da sua conta. Como o cofre era aberto pela senha anterior, informe também a sua chave de recuperação: nem o serviço nem este aplicativo conseguem abrir o conteúdo sem ela.</p>}
           {mode !== 'recover' && mode !== 'reset' && accounts.length > 0 && <div className="account-switcher">

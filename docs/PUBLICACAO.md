@@ -161,15 +161,22 @@ script. Enquanto isso não for feito e registrado, a alternativa não é
 documentada — documentar uma opção com proteção inferior é oferecer a opção
 errada.
 
-## 5.2 Homologação privada no Cloudflare Pages
+## 5.2 A homologação no Cloudflare Pages
 
-A homologação vai para um **projeto Pages próprio**, separado de qualquer
-publicação anterior e de produção. Nome usado: `apoio-pastoral-homologacao`.
+O repositório já está ligado a um projeto Pages, de uma publicação de teste
+antiga e desatualizada. Em vez de criar um segundo projeto sobre o mesmo
+repositório, esse projeto passa a ser **exclusivamente a homologação**: mesma
+origem, uma configuração só, e nenhuma dúvida sobre qual endereço é qual.
+
+Um projeto Pages não pode ser renomeado. O endereço continua com o nome antigo,
+então o nome do endereço **não** é o que diz o ambiente — quem diz é o próprio
+aplicativo, na tela, antes do login.
 
 | Campo | Valor |
 |---|---|
 | Build command | `pnpm build` |
 | Build output directory | `dist` |
+| Root directory | `/` |
 | Variável de build | `NODE_VERSION` = `22` (o projeto exige Node ≥ 22) |
 
 O repositório já traz o que o Pages precisa: `public/_redirects` devolve
@@ -186,7 +193,9 @@ painel, nunca em documento, mensagem ou log:
 - `VITE_DISABLE_SYNC` = `false`
 - `NODE_VERSION` = `22`
 
-Nenhuma variável de E2E e nenhuma variável de produção.
+Nenhuma variável de E2E e nenhuma variável de produção. Variável antiga que
+sobrou de outra configuração é apagada: o que não está escrito hoje não pode
+continuar valendo por inércia.
 
 **As variáveis precisam existir antes da build que vai ser usada.** O Vite grava
 o valor delas dentro do arquivo compilado; publicar antes de configurá-las gera
@@ -194,23 +203,33 @@ um aplicativo que abre na tela "Esta instalação não está configurada" e não
 passa dali. Isso é a trava funcionando, e está provado: uma build sem variável
 nenhuma carrega essa tela e não carrega endereço de projeto nenhum.
 
-### O endereço privado, sem domínio próprio
+Pelo mesmo motivo, marcar uma variável `VITE_` como secreta no painel não
+esconde nada: ela termina dentro do arquivo que o navegador baixa. A chave
+pública do Supabase é feita para ficar visível — quem protege os dados é o RLS
+e a criptografia no aparelho, não o segredo da chave.
+
+### O endereço é público, e isso não é contornável aqui
 
 O Cloudflare Access protege endereços de um domínio **seu**. `pages.dev` é
-domínio da Cloudflare, então **o endereço de produção do projeto Pages não pode
-receber Access sem domínio próprio** — ele fica público para quem souber a URL.
+domínio da Cloudflare, então **o endereço de produção de um projeto Pages não
+recebe Access sem domínio próprio**. Ele é alcançável por qualquer pessoa que
+tenha a URL.
 
-A alternativa gratuita e segura, e a que esta fase usa: **a homologação não sai
-pelo endereço de produção do projeto**. A branch de produção do projeto Pages é
-apontada para uma branch que não existe no repositório, e a `main` sai como
-**preview**, em endereço estável de branch. Previews aceitam Access no plano
-gratuito. O resultado é um endereço fixo atrás de autenticação, sem domínio
-próprio e sem custo.
+Portanto a homologação **não é privada**, e não é chamada disso. A consequência
+prática é uma regra, não um conforto: **na homologação só entram contas, nomes,
+e-mails e números fictícios.** Nenhum dado de membro real, em nenhuma tela, em
+nenhum momento.
 
-Se o painel não oferecer Access para previews, a homologação **não** é tratada
-como privada: nesse caso, ou se registra um domínio próprio, ou a rodada física
-acontece apenas com dados fictícios e com a consciência de que o endereço é
-alcançável por quem o tiver. Não se chama de protegido um endereço que não está.
+Existem duas formas de fechar o endereço, se um dia for necessário:
+
+1. **Domínio próprio** apontado para o projeto — aí o Access se aplica.
+2. **Sair por preview em vez de produção**: apontar a branch de produção do
+   projeto para uma branch que não existe e deixar a `main` sair como preview,
+   que aceita Access no plano gratuito. Custa o endereço de produção do projeto,
+   que passa a não servir para nada.
+
+Enquanto nenhuma das duas estiver feita, o endereço é público e a regra do
+dado fictício é o que protege — não a obscuridade da URL.
 
 ## 6. Migrations, na ordem de aplicação
 

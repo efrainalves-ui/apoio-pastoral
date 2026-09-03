@@ -13,11 +13,15 @@ const authState = vi.hoisted(() => ({
   clearRecoveryCode: vi.fn(),
 }))
 
-const ambiente = vi.hoisted(() => ({ temServicoRemoto: false }))
+const ambiente = vi.hoisted(() => ({ temServicoRemoto: false, homologacao: false }))
 
 vi.mock('../auth/supabase', () => ({
   get hasSupabaseConfiguration() { return ambiente.temServicoRemoto },
   onPasswordRecovery: () => () => undefined,
+}))
+
+vi.mock('../sync/config', () => ({
+  get isHomologationEnvironment() { return ambiente.homologacao },
 }))
 
 vi.mock('../auth/AuthVaultContext', () => ({
@@ -38,6 +42,7 @@ describe('tela de acesso', () => {
     authState.account = null
     authState.recoveryCode = null
     ambiente.temServicoRemoto = false
+    ambiente.homologacao = false
     vi.clearAllMocks()
   })
 
@@ -125,5 +130,22 @@ describe('tela de acesso', () => {
 
     expect(screen.getByRole('heading', { name: 'Recupere o acesso' })).toBeInTheDocument()
     expect(screen.getByLabelText('Chave de recuperação')).toBeRequired()
+  })
+
+  it('a instalação de homologação se declara antes do login, não depois', async () => {
+    // Descobrir que a base é de teste só depois de entrar é tarde: a essa
+    // altura já dá para ter digitado um nome real numa base descartável.
+    ambiente.homologacao = true
+    render(<AuthPage />)
+
+    const aviso = await screen.findByText(/Homologação — instalação de teste/i)
+    expect(aviso).toBeInTheDocument()
+    expect(aviso.textContent).toMatch(/dados fictícios/i)
+  })
+
+  it('a instalação de produção não mostra aviso de teste nenhum', () => {
+    render(<AuthPage />)
+
+    expect(screen.queryByText(/Homologação/i)).not.toBeInTheDocument()
   })
 })
