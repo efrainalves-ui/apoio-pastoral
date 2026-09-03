@@ -5,6 +5,7 @@ import { agendaReportLines, goalsReportLines, sermonReportLines, visitReportLine
 import { CommissionService } from '../commissions/service'
 import { campaignReportLines } from '../evangelism/report'
 import { publicReportText } from '../nominations/core'
+import { NominationService } from '../nominations/service'
 import { NOME_OMITIDO, personNameResolver } from './includeNames'
 
 const IGREJA = 'igreja-ficticia'
@@ -133,4 +134,56 @@ describe('a confirmação de nomes é a mesma em todo documento', () => {
     expect(campaignReportLines(campanha, true).join('\n')).toContain('Pessoa Fictícia Acompanhada')
   })
 
+
+  it('o modelo salvo pelo pastor não é servido sem a confirmação de nomes', () => {
+    // Um modelo salvo é texto livre: o aplicativo não sabe quais palavras ali
+    // são nomes. Servi-lo com a caixa desmarcada seria dizer "sem nomes" e
+    // entregar os nomes que o pastor digitou.
+    const service = new NominationService()
+    const processo = { period: '2026-2027', formation: {}, offices: [], candidates: [], meetings: [], reports: [], objections: [], officialVotes: [], vacancyProcesses: [], tasks: [], history: [], churchId: 'i1', status: 'ready', createdAt: '', updatedAt: '' } as never
+    const reuniao = {
+      id: 'r1', date: '2026-05-01', time: '19:30', location: 'Igreja Fictícia', presidentId: 'p1', secretaryId: 'p2',
+      participantIds: ['p1'], guestNames: [], quorum: 2, openingPrayer: '', reflection: '', agenda: [], confidentialNotes: '',
+      nextMeetingDate: '', corrections: [],
+      agendaTemplate: 'Pauta escrita à mão citando Pessoa Fictícia Presidente',
+      minutesTemplate: 'Ata escrita à mão citando Pessoa Fictícia Presidente',
+    }
+    const nome = (id: string) => (id === 'p1' ? 'Pessoa Fictícia Presidente' : 'Pessoa Fictícia Secretária')
+
+    for (const gerar of [
+      (incluir: boolean) => service.meetingAgendaTemplate('Igreja Fictícia', processo, reuniao, personNameResolver(incluir, nome), incluir),
+      (incluir: boolean) => service.meetingMinutesTemplate('Igreja Fictícia', processo, reuniao, personNameResolver(incluir, nome), incluir),
+    ]) {
+      expect(gerar(false)).not.toContain('Pessoa Fictícia Presidente')
+      expect(gerar(false)).toContain(NOME_OMITIDO)
+      expect(gerar(true)).toContain('Pessoa Fictícia Presidente')
+    }
+  })
+
+  it('o modelo do relatório final segue a mesma regra', () => {
+    const service = new NominationService()
+    const processo = { period: '2026-2027', formation: {}, offices: [], candidates: [], meetings: [], reports: [], objections: [], officialVotes: [], vacancyProcesses: [], tasks: [], history: [], churchId: 'i1', status: 'ready', createdAt: '', updatedAt: '' } as never
+    const versao = {
+      id: 'v1', version: 1, createdAt: '', presentationDate: '2026-06-01', officialVoteDate: '',
+      lines: [{ officeId: 'o1', officeTitle: 'Ancião', personId: 'p1', personName: 'Pessoa Fictícia Indicada' }],
+      openOffices: [], publicNote: '', reportTemplate: 'Relatório à mão com Pessoa Fictícia Indicada',
+    }
+
+    expect(service.finalReportTemplate('Igreja Fictícia', processo, versao)).not.toContain('Pessoa Fictícia Indicada')
+    expect(service.finalReportTemplate('Igreja Fictícia', processo, versao, true)).toContain('Pessoa Fictícia Indicada')
+  })
+
+  it('o registro confidencial da reunião também obedece à confirmação', () => {
+    const service = new NominationService()
+    const processo = { period: '2026-2027', formation: {}, offices: [], candidates: [], meetings: [], reports: [], objections: [], officialVotes: [], vacancyProcesses: [], tasks: [], history: [], churchId: 'i1', status: 'ready', createdAt: '', updatedAt: '' } as never
+    const reuniao = {
+      id: 'r1', date: '2026-05-01', time: '19:30', location: 'Igreja Fictícia', presidentId: 'p1', secretaryId: 'p2',
+      participantIds: ['p1'], guestNames: [], quorum: 2, openingPrayer: '', reflection: '', agenda: [], confidentialNotes: '',
+      nextMeetingDate: '', corrections: [],
+    }
+    const nome = () => 'Pessoa Fictícia Presidente'
+
+    expect(service.internalRecord(processo, reuniao, personNameResolver(false, nome))).not.toContain('Pessoa Fictícia Presidente')
+    expect(service.internalRecord(processo, reuniao, personNameResolver(true, nome))).toContain('Pessoa Fictícia Presidente')
+  })
 })

@@ -248,8 +248,42 @@ describe('exportação e exclusão de uma pessoa', () => {
 
     expect(texto).toContain('Pequeno Grupo')
     expect(texto).toContain('PG Fictício')
-    expect(texto).toContain('terceiros')
+    // O papel dela é o que interessa a quem pede os próprios dados: dizer
+    // apenas "aparece neste registro" não responde nada.
+    expect(texto).toContain('Como esta pessoa aparece')
+    expect(texto).toContain('líder')
+    expect(texto).toContain('participante')
+    expect(texto).toContain('Sobre as outras pessoas')
     expect(texto).not.toContain('outra-pessoa')
+  })
+
+  it('descreve o papel em comissão, nomeação e campanha sem citar terceiro', () => {
+    const comissao = redactForPerson({
+      schemaVersion: 1, type: 'commission_meeting',
+      data: { date: '2026-05-01', presidentId: 'p1', secretaryId: 'p2', participantIds: ['p1', 'p2'], agenda: [{ id: 'a1', title: 'Assunto Fictício', responsibleId: 'p1' }] },
+    }, 'p1')
+    const textoComissao = JSON.stringify(comissao)
+    expect(textoComissao).toContain('presidente')
+    expect(textoComissao).toContain('participante')
+    expect(textoComissao).not.toContain('p2')
+
+    const nomeacoes = redactForPerson({
+      schemaVersion: 1, type: 'nomination_process',
+      data: {
+        period: '2026-2027', formation: {}, meetings: [], officialVotes: [], reports: [], tasks: [],
+        candidates: [{ id: 'c1', personId: 'p1', officeId: 'o1' }, { id: 'c2', personId: 'p2', officeId: 'o2' }],
+      },
+    }, 'p1')
+    expect(JSON.stringify(nomeacoes)).toContain('indicada para um cargo')
+    expect(JSON.stringify(nomeacoes)).not.toContain('"c2"')
+
+    const campanha = redactForPerson({
+      schemaVersion: 1, type: 'evangelism_campaign',
+      data: { name: 'Campanha Fictícia', team: [{ id: 'e1', personId: 'p1', role: 'music' }, { id: 'e2', personId: 'p2', role: 'sound' }], points: [], tasks: [], followUps: [] },
+    }, 'p1')
+    expect(JSON.stringify(campanha)).toContain('na equipe da campanha')
+    expect(JSON.stringify(campanha)).toContain('music')
+    expect(JSON.stringify(campanha)).not.toContain('sound')
   })
 
   it('apaga o rastro que a exclusão deixaria para trás', async () => {

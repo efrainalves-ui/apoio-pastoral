@@ -5,7 +5,7 @@ import { ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { OutboxRecord } from '../db/types'
 import { SyncService, firstSyncPending } from './service'
-import { withOperationMac } from './operationMac'
+import { MAC_VERSION, signOperation, withOperationMac } from './operationMac'
 import { PURGE_BATCH_SIZE, type PurgeTarget } from '../auth/supabase'
 import { LocalDevelopmentTransport, PAGE_SIZE, resetLocalDevelopmentTransport } from './transport'
 import type { EncryptedOperation, PullResult, PushResult, SyncTransport } from './types'
@@ -234,6 +234,34 @@ describe('sincronização cifrada', () => {
     await expect(new SyncService(new PullTransport({ operations: [operation], cursor: '1' }), database, () => true).synchronize(accountId, deviceId, keys.sync)).rejects.toThrow('outra conta')
     expect(await database.vaultRecords.get(operation.recordId)).toBeUndefined()
   })
+
+  it('recebe mais de dez mil operações sem parar no meio', async () => {
+    // Dez mil era o teto antigo: cinquenta páginas de duzentas. A conta que
+    // passasse disso recebia parte, ouvia "Dados atualizados" e era mandada
+    // criar um distrito por cima do que faltava chegar.
+    const { database, accountId, deviceId, keys } = await fixture()
+    const envelope = await encryptPayload(keys.master, { schemaVersion: 1, type: 'foundation_fixture', data: 'ficticio' }, crypto.randomUUID())
+    const mac = await signOperation(keys.sync, {
+      id: 'modelo', ownerId: accountId, deviceId: 'aparelho', recordId: 'registro',
+      operation: 'upsert', baseVersion: 0, recordVersion: 1, schemaVersion: 1, payload: envelope, createdAt: '2026-01-01T00:00:00.000Z',
+    })
+    // Assinar dez mil operações uma a uma levaria minutos sem provar nada a
+    // mais: o que se prova aqui é a paginação, então elas nascem iguais e a
+    // assinatura é conferida do mesmo jeito, uma por uma, ao aplicar.
+    const todas: EncryptedOperation[] = Array.from({ length: 10_001 }, () => ({
+      id: 'modelo', ownerId: accountId, deviceId: 'aparelho', recordId: 'registro',
+      operation: 'upsert' as const, baseVersion: 0, recordVersion: 1, schemaVersion: 1,
+      payload: envelope, createdAt: '2026-01-01T00:00:00.000Z', mac, macVersion: MAC_VERSION,
+    }))
+    const transport = new PaginatedTransport(todas)
+
+    const summary = await new SyncService(transport, database, () => true).synchronize(accountId, deviceId, keys.sync)
+
+    expect(transport.paginas).toBe(Math.ceil(todas.length / PAGE_SIZE))
+    expect(summary.incomplete).toBe(false)
+    expect((await database.syncState.get(accountId))?.cursor).toBe(String(todas.length))
+    expect((await database.syncState.get(accountId))?.firstSyncAt).toBeTruthy()
+  }, 60_000)
 
   it('recebe todas as páginas, quantas forem, antes de se declarar em dia', async () => {
     // O teto antigo eram cinquenta páginas — dez mil operações — e a rodada

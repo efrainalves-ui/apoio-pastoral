@@ -265,6 +265,7 @@ const FIELD_LABELS: Record<string, string> = {
   followUp: 'Acompanhamento', correctionNote: 'Nota de correção', value: 'Resposta', question: 'Pergunta',
   priority: 'Prioridade', mode: 'Modo', months: 'Meses', category: 'Categoria', externalCode: 'Código externo',
   sobreEstaPessoa: 'Sobre esta pessoa', terceiros: 'Sobre as outras pessoas', objective: 'Objetivo',
+  comoAparece: 'Como esta pessoa aparece',
   area: 'Área', year: 'Ano', time: 'Hora', ageGroup: 'Faixa etária', day: 'Dia', active: 'Ativo',
 }
 
@@ -345,35 +346,91 @@ const CONTEXTO_COMPARTILHADO = new Set([
 ])
 
 /**
+ * Como esta pessoa aparece dentro de um registro compartilhado.
+ *
+ * Um item de lista sozinho não diz nada a quem lê: `{"personId": "..."}` é
+ * técnico e vazio. O que a pessoa tem direito de saber é o papel — que ela era
+ * a professora daquela classe, que estava entre os participantes daquela
+ * reunião, que foi indicada para aquele cargo. Estes rótulos são exatamente
+ * isso, e nenhum deles precisa citar terceiro para ser dito.
+ */
+const PAPEIS: Record<string, string> = {
+  memberIds: 'integrante', participantIds: 'participante', teamPersonIds: 'na equipe',
+  teacherId: 'professora ou professor', assistantId: 'auxiliar', leaderId: 'líder',
+  associateId: 'associada ou associado', presidentId: 'presidente', secretaryId: 'secretária ou secretário',
+  responsibleId: 'responsável', personId: 'citada', subjectId: 'citada', recordId: 'em acompanhamento',
+  organizingCommitteeIds: 'na comissão organizadora', committeeMemberIds: 'na comissão',
+  districtLeaderId: 'líder distrital',
+}
+
+const PAPEIS_POR_LISTA: Record<string, string> = {
+  candidates: 'indicada para um cargo', team: 'na equipe da campanha',
+  followUps: 'em acompanhamento', meetings: 'em reunião', officialVotes: 'em votação',
+  reports: 'no relatório', tasks: 'responsável por tarefa', agenda: 'responsável por assunto',
+  points: 'na equipe de um ponto', previousPeople: 'na lista importada',
+  answers: 'respondeu na entrevista', participants: 'presente na visita',
+  incomeAnswers: 'informou fidelidade', references: 'referência da meta', lines: 'indicada no relatório',
+}
+
+/** Em que papéis a pessoa aparece dentro de um item, sem citar mais ninguém. */
+function papeisNoItem(item: Dados, personId: string): string[] {
+  const papeis: string[] = []
+  for (const [campo, rotulo] of Object.entries(PAPEIS)) {
+    const valor = item[campo]
+    if (valor === personId || (Array.isArray(valor) && lista(valor).includes(personId))) papeis.push(rotulo)
+  }
+  return papeis
+}
+
+/**
  * Versão redigida de um registro que fala desta pessoa junto de outras.
  *
  * Quem pede os próprios dados tem direito a saber o que existe sobre si em um
- * registro compartilhado — em que classe estava, o que respondeu numa visita
- * de família, para qual cargo foi indicada. Não tem direito ao que ali é de
- * terceiro, e entregar o registro inteiro entregaria os dois. Esta função
- * devolve o contexto do registro e apenas as entradas que falam dela.
+ * registro compartilhado — em que classe estava e como, o que respondeu numa
+ * visita de família, para qual cargo foi indicada. Não tem direito ao que ali
+ * é de terceiro, e entregar o registro inteiro entregaria os dois.
+ *
+ * O que sai é o contexto do registro, o papel dela em cada parte e o conteúdo
+ * das entradas que falam só dela. Os campos de contexto são uma lista fechada
+ * de propósito: a regra inversa — "tire o que é de terceiro" — erra sempre que
+ * aparece um campo novo, e erra entregando.
  */
 export function redactForPerson(payload: VaultPayload, personId: string): VaultPayload | null {
   if (withoutPerson(payload, personId) === null) return null
   const dados = payload.data as Dados
   const contexto: Dados = {}
-  const sobreEstaPessoa: Dados[] = []
+  const papeis: string[] = []
+  const conteudo: Dados[] = []
 
   for (const [chave, valor] of Object.entries(dados)) {
     if (CONTEXTO_COMPARTILHADO.has(chave) && (typeof valor !== 'object' || valor === null)) {
       contexto[chave] = valor
       continue
     }
-    if (Array.isArray(valor)) {
-      for (const item of objetos(valor)) {
-        // Uma volta a mais: a visita guarda as respostas dentro de cada versão.
-        for (const [subChave, subValor] of Object.entries(item)) {
-          for (const interno of objetos(subValor)) {
-            if (itemFalaDaPessoa(interno, personId)) sobreEstaPessoa.push({ [`${chave}.${subChave}`]: interno })
-          }
+    // Lista de identificadores no próprio registro: só o papel dela sai.
+    if (Array.isArray(valor) && lista(valor).includes(personId) && PAPEIS[chave]) {
+      papeis.push(PAPEIS[chave])
+      continue
+    }
+    if (typeof valor === 'string' && valor === personId && PAPEIS[chave]) {
+      papeis.push(PAPEIS[chave])
+      continue
+    }
+    if (!Array.isArray(valor)) continue
+
+    for (const item of objetos(valor)) {
+      // Uma volta a mais: a visita guarda as respostas dentro de cada versão.
+      for (const [subChave, subValor] of Object.entries(item)) {
+        for (const interno of objetos(subValor)) {
+          if (!itemFalaDaPessoa(interno, personId)) continue
+          papeis.push(PAPEIS_POR_LISTA[subChave] ?? `citada em ${subChave}`)
+          conteudo.push(interno)
         }
-        if (itemFalaDaPessoa(item, personId)) sobreEstaPessoa.push({ [chave]: item })
       }
+      if (!itemFalaDaPessoa(item, personId)) continue
+      const noItem = papeisNoItem(item, personId)
+      papeis.push(noItem.length ? `${PAPEIS_POR_LISTA[chave] ?? `citada em ${chave}`} (${noItem.join(', ')})` : PAPEIS_POR_LISTA[chave] ?? `citada em ${chave}`)
+      conteudo.push(item)
     }
   }
 
@@ -381,7 +438,8 @@ export function redactForPerson(payload: VaultPayload, personId: string): VaultP
     ...payload,
     data: {
       ...contexto,
-      sobreEstaPessoa: sobreEstaPessoa.length ? sobreEstaPessoa : 'aparece apenas como integrante, sem conteúdo próprio neste registro',
+      comoAparece: papeis.length ? [...new Set(papeis)].join('; ') : 'aparece sem papel registrado',
+      sobreEstaPessoa: conteudo.length ? conteudo : 'nenhum conteúdo próprio dentro deste registro',
       terceiros: 'o restante deste registro é de outras pessoas e não sai nesta exportação',
     },
   }

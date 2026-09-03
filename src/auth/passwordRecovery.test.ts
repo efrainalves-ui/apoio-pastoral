@@ -4,6 +4,8 @@ import { createPasswordEnvelope, createRecoveryEnvelope, generateMasterSecret, o
 import { ApoioDatabase } from '../db/database'
 import { keyEnvelopeId } from '../db/types'
 import { isPasswordRecoveryUrl } from './passwordReset'
+import { currentDeviceId } from './device'
+import { pendingDistrictClosure, resumeDistrictClosure } from '../district/closeDistrict'
 
 const databases: ApoioDatabase[] = []
 
@@ -387,5 +389,42 @@ describe('redefinição por e-mail interrompida', () => {
     await session.unlockAccount(EMAIL, 'senha-ficticia-nova-2027', database)
     expect(servico.envelopeGuardado).toBeTruthy()
     expect((await database.keyEnvelopes.get(keyEnvelopeId(CONTA, 'password')))?.pendingRemote).toBe(false)
+  })
+})
+
+describe('encerramento pendente atravessa o login', () => {
+  it('entrar com a senha certa não falha por causa do aparelho revogado', async () => {
+    // O caminho real: o pastor fecha o navegador no meio do encerramento e
+    // abre de novo. Antes, `authorizeCurrentDevice` recusava com "aparelho
+    // removido" e a entrada falhava — ele nunca chegava à tela que conclui.
+    const { database, session } = await carregar()
+    await contaInstalada(database, 'senha-ficticia-antiga-2026')
+    const aparelho = currentDeviceId(CONTA)
+    await database.devices.put({ id: aparelho, accountId: CONTA, label: 'Computador', status: 'revoked', createdAt: '', lastSeenAt: '', revokedAt: new Date().toISOString() })
+    await database.pendingActions.put({ id: `${CONTA}:close_district`, accountId: CONTA, kind: 'close_district', createdAt: new Date().toISOString(), stage: 'reauthorizing', newDeviceId: 'aparelho-ficticio-novo' })
+
+    const resultado = await session.unlockAccount(EMAIL, 'senha-ficticia-antiga-2026', database)
+
+    expect(resultado.account.id).toBe(CONTA)
+    // A autorização não aconteceu aqui: quem autoriza é a retomada, com o
+    // identificador que já estava escolhido.
+    expect(currentDeviceId(CONTA)).toBe(aparelho)
+    expect(await pendingDistrictClosure(CONTA, database)).toBe(true)
+
+    const { newDeviceId } = await resumeDistrictClosure(CONTA, database, () => Promise.resolve(0))
+
+    expect(newDeviceId).toBe('aparelho-ficticio-novo')
+    const ativos = (await database.devices.where('accountId').equals(CONTA).toArray()).filter(({ status }) => status === 'active')
+    expect(ativos.map(({ id }) => id)).toEqual(['aparelho-ficticio-novo'])
+    expect(await pendingDistrictClosure(CONTA, database)).toBe(false)
+  })
+
+  it('sem encerramento pendente, o aparelho revogado continua sendo recusado', async () => {
+    const { database, session } = await carregar()
+    await contaInstalada(database, 'senha-ficticia-antiga-2026')
+    const aparelho = currentDeviceId(CONTA)
+    await database.devices.put({ id: aparelho, accountId: CONTA, label: 'Computador', status: 'revoked', createdAt: '', lastSeenAt: '', revokedAt: new Date().toISOString() })
+
+    await expect(session.unlockAccount(EMAIL, 'senha-ficticia-antiga-2026', database)).rejects.toThrow('removido da conta')
   })
 })

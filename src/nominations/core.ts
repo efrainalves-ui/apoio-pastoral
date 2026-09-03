@@ -113,14 +113,14 @@ export function defaultMeetingMinutes(churchName: string, process: NominationPro
   ].filter(Boolean).join('\n\n')
 }
 
-export function defaultFinalReport(churchName: string, process: NominationProcessData, report: NominationReportVersion): string {
+export function defaultFinalReport(churchName: string, process: NominationProcessData, report: NominationReportVersion, includeNames = false): string {
   return [
     `${churchName} · Comissão de Nomeações`,
     `Relatório final · Período ${process.period} · Versão ${report.version}`,
     report.presentationDate ? `Primeira leitura: ${report.presentationDate}` : 'Primeira leitura: a definir',
     report.officialVoteDate ? `Votação pela igreja: ${report.officialVoteDate}` : 'Votação pela igreja: a definir, uma ou duas semanas após a primeira leitura',
     'Nomes indicados:',
-    ...report.lines.map((line) => `- ${line.officeTitle}: ${line.personName}`),
+    ...report.lines.map((line) => `- ${line.officeTitle}: ${includeNames ? line.personName : 'nome não incluído'}`),
     ...(report.openOffices.length ? ['Cargos ainda em aberto:', ...report.openOffices.map((office) => `- ${office}`)] : []),
     'Objeções: quem quiser apresentar observações deve procurar o presidente da comissão ou o pastor antes da segunda leitura. A comissão ouvirá cada pessoa e decidirá se muda a recomendação.',
     'A aprovação de cada nome se dá por maioria dos membros presentes que votarem.',

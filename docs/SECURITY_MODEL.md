@@ -155,8 +155,12 @@ foram apagados enquanto isso permanece recuperável não seria verdade.
 - o do serviço entra em fila e roda na sincronização seguinte, logo depois do
   envio: apagar o histórico antes de a lápide subir deixaria os outros
   aparelhos sem saber da remoção;
-- `purge_record_history` guarda apenas a operação mais recente de cada
-  registro, que é a lápide;
+- a fila guarda, para cada registro, a operação que este aparelho publicou.
+  `purge_record_history` só apaga quando aquela operação ainda é a última —
+  qualquer coisa mais recente é alteração concorrente de outro aparelho, e o
+  histórico dela não some por causa de uma decisão tomada antes de ela existir;
+  o registro fica pendente para o pastor decidir de novo;
+- o envio vai em lotes de 500, que é o teto do serviço;
 - **o que o expurgo não alcança**: o que outro aparelho já baixou continua
   nele, backups já salvos continuam com quem os salvou, e o serviço continua
   sabendo que houve operações e quando. Nenhum aplicativo alcança isso, e
@@ -225,17 +229,23 @@ Toda **tabela** criada depois nasce fora do alcance de `anon` e `authenticated`:
 os privilégios padrão de `public` foram zerados. Antes, uma tabela nova nasceria
 legível e gravável pelo navegador, e sem RLS ligada não haveria barreira nenhuma.
 
-Com **função** o caminho foi outro, e vale registrar por que: o PostgreSQL
-concede EXECUTE a `PUBLIC` em toda função nova, e o `alter default privileges`
-não deixa entrada nenhuma em `pg_default_acl` para funções — um diagnóstico no
-CI mostrou isso preto no branco, depois de a afirmação contrária ter sido
-escrita aqui e desmentida pela própria prova. Quem fecha é um gatilho de
-evento: toda função criada em `public` perde o EXECUTE de `PUBLIC` na hora,
-inclusive uma criada fora das migrations, pelo editor SQL do painel.
+Com **função e procedimento** o caminho foi outro, e vale registrar por que: o
+PostgreSQL concede EXECUTE a `PUBLIC` em toda função nova, e o
+`alter default privileges` não deixa entrada nenhuma em `pg_default_acl` para
+funções — um diagnóstico no CI mostrou isso preto no branco, depois de a
+afirmação contrária ter sido escrita aqui e desmentida pela própria prova. Quem
+fecha é um gatilho de evento: toda função e todo procedimento criados em
+`public` perdem o EXECUTE de `PUBLIC` na hora, inclusive fora das migrations,
+pelo editor SQL do painel.
+
+Se o ambiente não permitir criar o gatilho, a migration `0007` **falha** e não
+conclui: melhor parar e alguém decidir do que passar afirmando uma proteção
+automática que não existe. E a garantia não é afirmada em lugar nenhum —
+`public.protecao_de_funcao_nova()` lê o catálogo, então apagar ou desabilitar o
+gatilho depois faz a checklist de homologação e `pnpm test:api` reprovarem.
 
 A conferência de `01_rls_isolation.sql` continua no lugar e continua sendo ela
-quem reprova se algo escapar — um gatilho que não pôde ser criado, em algum
-ambiente gerenciado, não pode virar garantia silenciosa. Essa conferência tinha
+quem reprova se algo escapar. Essa conferência tinha
 um furo: `PUBLIC` aparece com identificador zero, sem linha em `pg_roles`, e o
 `join` a descartava justamente no caso que mais importava. Corrigido, ele
 apanhou a função de gatilho da primeira migration, aberta desde então.

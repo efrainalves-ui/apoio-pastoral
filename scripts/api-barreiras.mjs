@@ -138,9 +138,14 @@ exigir(aindaExiste.corpo.trim() !== '[]', 'o envelope de senha continua no lugar
 const claimNovoPeloRevogado = await rpc(b2, 'claim_device', { p_device_id: crypto.randomUUID(), p_label: 'Volta do revogado' })
 exigir(claimNovoPeloRevogado.status >= 400, 'a sessão revogada não reivindica um identificador novo')
 
-// 6. Revogação em massa: é o que o encerramento de distrito precisa.
+// 6. Revogação em massa: é o que o encerramento de distrito precisa, e ela
+//    precisa aguentar ser repetida — a retomada de um encerramento
+//    interrompido chama de novo, e "já revogado" não pode chegar como erro.
 const revogaTudo = await rpc(b, 'revoke_all_devices')
 exigir(revogaTudo.status === 200, 'a conta B revoga todos os próprios aparelhos de uma vez')
+const revogaDeNovo = await rpc(b, 'revoke_all_devices')
+exigir(revogaDeNovo.status === 200 && revogaDeNovo.corpo.trim() === '0',
+  'repetir a revogação devolve zero em vez de erro')
 const aparelhosB = await tabela(b, 'devices?select=id,status')
 exigir(!aparelhosB.corpo.includes('"active"'), 'nenhum aparelho da conta B continua ativo')
 const autorizacaoNova = await rpc(b, 'claim_device', { p_device_id: crypto.randomUUID(), p_label: 'Teste Fictício B novo' })
@@ -148,13 +153,24 @@ exigir(autorizacaoNova.status === 200, 'a sessão que encerrou registra a autori
 
 // 7. Versão do esquema e ambiente declarado, para o aplicativo conferir.
 const versao = await rpc(a, 'app_schema_version')
-exigir(versao.corpo.trim() === '4', 'o serviço responde a versão de esquema esperada')
+exigir(versao.corpo.trim() === '8', 'o serviço responde a versão de esquema esperada')
 const ambiente = await rpc(a, 'app_environment')
 exigir(ambiente.corpo.includes('homologacao'), 'o serviço declara ser o ambiente de homologação')
 const escritaAmbiente = await tabela(a, 'service_environment', {
   method: 'POST', body: JSON.stringify({ environment: 'producao' }),
 })
 exigir(escritaAmbiente.status >= 400, 'o navegador não reescreve o ambiente declarado')
+
+// 8. A proteção de função nova é lida do catálogo, não afirmada por ninguém.
+const protecao = await rpc(a, 'protecao_de_funcao_nova')
+exigir(protecao.corpo.trim() === 'true',
+  'o gatilho que fecha função e procedimento novos está ativo neste projeto')
+
+// 9. Expurgo: sem a operação esperada, o serviço não apaga nada.
+const expurgoInvalido = await rpc(a, 'purge_record_history', { p_expected: [{ record_id: crypto.randomUUID() }] })
+exigir(expurgoInvalido.status >= 400, 'expurgo sem a operação esperada é recusado')
+const expurgoVazio = await rpc(a, 'purge_record_history', { p_expected: [] })
+exigir(expurgoVazio.status === 200, 'expurgo de lista vazia é aceito e não faz nada')
 
 // Limpeza: os aparelhos fictícios criados aqui não ficam ativos.
 await rpc(a, 'revoke_device', { p_device_id: aparelhoA })

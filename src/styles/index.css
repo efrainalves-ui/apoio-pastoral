@@ -134,6 +134,16 @@ button.entity-row { width: 100%; background: none; border-top: 0; border-inline:
   .app-main, .app-content { margin: 0 !important; padding: 0 !important; }
   .commission-print-root .page-hero, .commission-print-root > .alert { display: none; }
   .commission-document { border: 0; padding: 0; }
+
+  /* Imprimir levava a página inteira: as listas de participantes, os seletores
+     de presidente e os cartões ao redor entravam no papel com os nomes que o
+     documento tinha acabado de omitir. Agora sai o documento, e só ele. */
+  .commission-print-root .card:not(.commission-printable) { display: none !important; }
+  .commission-printable .card__header,
+  .commission-printable .form-actions,
+  .commission-printable .field,
+  .commission-printable details { display: none !important; }
+  .commission-printable { border: 0; box-shadow: none; padding: 0; }
 }
 
 .auth-page { min-height: 100vh; display: grid; grid-template-columns: minmax(420px, 1.1fr) minmax(420px, .9fr); }

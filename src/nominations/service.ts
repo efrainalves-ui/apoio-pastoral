@@ -65,19 +65,27 @@ export class NominationService {
   async addTaskToAgenda(accountId: string, masterKey: CryptoKey, processId: string, taskId: string): Promise<NominationProcessEntity> { const process = await this.required(accountId, masterKey, processId); const task = process.tasks.find((item) => item.id === taskId); if (!task) throw new Error('Pendência não encontrada.'); if (task.agendaEventId) return process; const date = task.dueDate || new Date().toISOString().slice(0, 10); const event = await this.agenda.createEvent(accountId, masterKey, { title: task.title, category: 'committee', churchId: process.churchId, location: '', address: '', visitTarget: 'none', sermonId: null, sermonSnapshot: null, startAt: `${date}T08:00`, endAt: `${date}T09:00`, allDay: false, reminderMinutes: 60, notes: 'Pendência da Comissão de Nomeações.', includeInItinerary: true, mondayException: true }); return this.persist(accountId, masterKey, { ...process, tasks: process.tasks.map((item) => item.id === taskId ? { ...item, agendaEventId: event.id } : item), history: [...process.history, history('Pendência adicionada à Agenda pastoral')] }) }
 
   reportText(churchName: string, process: NominationProcessEntity, report: NominationReportVersion, includeNames = false): string { return publicReportText(churchName, process, report, includeNames) }
-  /** Modelo de pauta: usa o texto salvo pelo pastor ou o modelo pastoral padrão. */
-  meetingAgendaTemplate(churchName: string, process: NominationProcessEntity, meeting: NominationMeeting, personName: (id: string) => string): string {
-    return meeting.agendaTemplate?.trim() ? meeting.agendaTemplate : defaultMeetingAgenda(churchName, process, meeting, personName)
+  /**
+   * Modelo de pauta: usa o texto salvo pelo pastor ou o modelo pastoral padrão.
+   *
+   * Um modelo salvo é texto livre que o pastor escreveu, e o aplicativo não
+   * tem como saber quais palavras ali são nomes de pessoas. Por isso, com a
+   * confirmação de nomes desmarcada, ele não é servido: vale o modelo padrão,
+   * que passa por `personName` e obedece à escolha. Servir o texto salvo seria
+   * dizer "sem nomes" e entregar os nomes que o pastor digitou.
+   */
+  meetingAgendaTemplate(churchName: string, process: NominationProcessEntity, meeting: NominationMeeting, personName: (id: string) => string, includeNames = false): string {
+    return includeNames && meeting.agendaTemplate?.trim() ? meeting.agendaTemplate : defaultMeetingAgenda(churchName, process, meeting, personName)
   }
 
-  /** Modelo de ata: usa o texto salvo pelo pastor ou o modelo pastoral padrão. */
-  meetingMinutesTemplate(churchName: string, process: NominationProcessEntity, meeting: NominationMeeting, personName: (id: string) => string): string {
-    return meeting.minutesTemplate?.trim() ? meeting.minutesTemplate : defaultMeetingMinutes(churchName, process, meeting, personName)
+  /** Modelo de ata, com a mesma regra do modelo de pauta. */
+  meetingMinutesTemplate(churchName: string, process: NominationProcessEntity, meeting: NominationMeeting, personName: (id: string) => string, includeNames = false): string {
+    return includeNames && meeting.minutesTemplate?.trim() ? meeting.minutesTemplate : defaultMeetingMinutes(churchName, process, meeting, personName)
   }
 
-  /** Modelo do relatório final: usa o texto salvo pelo pastor ou o padrão. */
-  finalReportTemplate(churchName: string, process: NominationProcessEntity, report: NominationReportVersion): string {
-    return report.reportTemplate?.trim() ? report.reportTemplate : defaultFinalReport(churchName, process, report)
+  /** Modelo do relatório final, com a mesma regra dos demais. */
+  finalReportTemplate(churchName: string, process: NominationProcessEntity, report: NominationReportVersion, includeNames = false): string {
+    return includeNames && report.reportTemplate?.trim() ? report.reportTemplate : defaultFinalReport(churchName, process, report, includeNames)
   }
 
   async saveMeetingTemplates(accountId: string, masterKey: CryptoKey, processId: string, meetingId: string, patch: { agendaTemplate?: string; minutesTemplate?: string }): Promise<NominationProcessEntity> {

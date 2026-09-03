@@ -48,7 +48,26 @@ Abra `http://localhost:5173`. Sem `.env`, o aplicativo usa somente o transporte 
 
 Para uma homologação estritamente local, defina `VITE_DISABLE_SYNC=true` em `.env.local`. Nesse modo, autenticação remota, transporte e fila de saída ficam desativados; gravações continuam cifradas no IndexedDB.
 
-Para usar Supabase, copie `.env.example` para `.env.local`, preencha URL e chave anônima e aplique, nesta ordem, `supabase/migrations/0001_marco_zero_up.sql` e `supabase/migrations/0002_password_key_envelopes_up.sql` no projeto. O cadastro por e-mail pode exigir confirmação conforme a configuração do Auth.
+Para usar Supabase, copie `.env.example` para `.env.local`, preencha URL, chave anônima e `VITE_SUPABASE_PROJECT_REF`, e aplique as migrations **nesta ordem**:
+
+```
+0001_marco_zero_up.sql
+0002_password_key_envelopes_up.sql
+0003_device_sessions_up.sql
+0004_sessao_revogada_e_ambiente_up.sql
+0005_ambiente_antes_da_senha_up.sql
+0006_expurgo_de_historico_up.sql
+0007_funcao_nova_fechada_up.sql
+0008_revogacao_idempotente_up.sql
+```
+
+Depois, declare uma única vez o que aquele banco é — sem esta linha o aplicativo se recusa a sincronizar, de propósito:
+
+```sql
+insert into public.service_environment (environment) values ('homologacao');
+```
+
+A versão de esquema esperada por esta build é **8** (`public.app_schema_version()`). O cadastro por e-mail pode exigir confirmação conforme a configuração do Auth. Reversão: aplique os arquivos `*_down.sql` na ordem inversa.
 
 ## Verificações
 
