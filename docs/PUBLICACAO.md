@@ -177,7 +177,7 @@ aplicativo, na tela, antes do login.
 | Build command | `pnpm build` |
 | Build output directory | `dist` |
 | Root directory | `/` |
-| Variável de build | `NODE_VERSION` = `22` (o projeto exige Node ≥ 22) |
+| Variável de build | `NODE_VERSION` = `24.20.0` (o projeto exige Node ≥ 22; é a versão em que a suíte e a build foram provadas) |
 
 O repositório já traz o que o Pages precisa: `public/_redirects` devolve
 `index.html` nas rotas internas e `public/_headers` leva os cabeçalhos de
@@ -191,7 +191,7 @@ painel, nunca em documento, mensagem ou log:
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_SUPABASE_PROJECT_REF`
 - `VITE_DISABLE_SYNC` = `false`
-- `NODE_VERSION` = `22`
+- `NODE_VERSION` = `24.20.0`
 
 Nenhuma variável de E2E e nenhuma variável de produção. Variável antiga que
 sobrou de outra configuração é apagada: o que não está escrito hoje não pode
