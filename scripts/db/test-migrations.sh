@@ -59,6 +59,7 @@ fi
 echo "    papel sem superusuario e fora de supabase_admin"
 
 echo "==> 3/7 Aplicando as migrations de homologação"
+psql_migracao -f "$migrations/0000_plataforma_fechada_up.sql"
 psql_migracao -f "$migrations/0001_marco_zero_up.sql"
 psql_migracao -f "$migrations/0002_password_key_envelopes_up.sql"
 psql_migracao -f "$migrations/0003_device_sessions_up.sql"
@@ -91,6 +92,7 @@ psql_migracao -f "$migrations/0004_sessao_revogada_e_ambiente_down.sql"
 psql_migracao -f "$migrations/0003_device_sessions_down.sql"
 psql_migracao -f "$migrations/0002_password_key_envelopes_down.sql"
 psql_migracao -f "$migrations/0001_marco_zero_down.sql"
+psql_migracao -f "$migrations/0000_plataforma_fechada_down.sql"
 
 tabelas="$(contar_tabelas)"
 if [ "$tabelas" -ne 0 ]; then
@@ -117,6 +119,7 @@ fi
 echo "    reversão limpa"
 
 echo "==> 6/7 Reaplicando as migrations sobre a base revertida"
+psql_migracao -f "$migrations/0000_plataforma_fechada_up.sql"
 psql_migracao -f "$migrations/0001_marco_zero_up.sql"
 psql_migracao -f "$migrations/0002_password_key_envelopes_up.sql"
 psql_migracao -f "$migrations/0003_device_sessions_up.sql"

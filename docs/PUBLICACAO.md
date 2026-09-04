@@ -237,6 +237,7 @@ No projeto de produção recém-criado, aplique nesta ordem:
 
 | Ordem | Arquivo | O que cria |
 |---|---|---|
+| 0 | `supabase/migrations/0000_plataforma_fechada_up.sql` | Nada. Retira o `EXECUTE` que PUBLIC recebe por padrão sobre funções de gatilho de evento em `public` criadas pelo provisionamento do projeto |
 | 1 | `supabase/migrations/0001_marco_zero_up.sql` | `devices`, `device_key_envelopes`, `recovery_key_envelopes`, `encrypted_operations`; índice do cursor de sincronização; gatilho que impede reativar aparelho revogado; RLS por dono e privilégios mínimos |
 | 2 | `supabase/migrations/0002_password_key_envelopes_up.sql` | `password_key_envelopes`, com RLS por dono e mínimo de 600 mil iterações |
 | 3 | `supabase/migrations/0003_device_sessions_up.sql` | ordem de chegada (`seq`) e assinatura das operações; `device_sessions` e `revoked_sessions`; funções `claim_device`, `approve_device`, `revoke_device`, `upload_operations`, `download_operations` e `app_schema_version`; retirada da escrita direta em `devices` e `encrypted_operations`; privilégios padrão do schema revogados |
@@ -246,6 +247,17 @@ No projeto de produção recém-criado, aplique nesta ordem:
 | 7 | `supabase/migrations/0007_funcao_nova_fechada_up.sql` | auditoria do catálogo: `funcoes_publicas_abertas()` lista as funções de `public` ao alcance de PUBLIC ou de anon, e `protecao_de_funcao_nova()` responde se a lista está vazia |
 | 8 | `supabase/migrations/0008_revogacao_idempotente_up.sql` | `revoke_all_devices` idempotente: repetir devolve zero em vez de erro, e é assim que a retomada distingue trabalho já feito de falha |
 | 9 | `supabase/migrations/0009_sessoes_fora_de_alcance_up.sql` | `device_sessions` e `revoked_sessions` saem do alcance direto do cliente, e suas políticas passam a exigir sessão não revogada |
+
+A `0000` existe por um caso concreto: um projeto Supabase criado depois de
+setembro de 2026 chega com o gatilho de evento `ensure_rls`, cuja função
+`rls_auto_enable()` vive em `public`, pertence a `postgres` e não tem ACL
+explícita — e sem ACL o PostgreSQL concede `EXECUTE` a PUBLIC. A auditoria da
+`0007` então aborta, corretamente, ao encontrar função de `public` ao alcance de
+PUBLIC. Não é porta explorável (o PostgreSQL recusa a chamada direta de função
+de gatilho), mas é exceção ao invariante, e uma auditoria com exceção tolerada
+deixa de servir. A `0000` fecha a concessão, não apaga nada da plataforma, não
+cria objeto e **não** muda `app_schema_version()` — por isso ela é `0000` e não
+`0010`: é pré-condição do contrato, não parte dele.
 
 O aplicativo espera a versão de esquema **9** (`app_schema_version()`) e recusa
 sincronizar com um serviço em versão diferente. Aplicar as nove migrations é
