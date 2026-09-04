@@ -13,7 +13,14 @@ export interface ImportIssue {
 }
 
 export interface ParsedMemberRow { churchName: string; name: string; birthDate: string | null; needsReview: boolean }
-export interface ParsedDistrictList { districtName: string | null; rows: ParsedMemberRow[]; unparsedLines: string[] }
+/**
+ * `unparsedCount` é o total real de linhas não reconhecidas; `unparsedLines` é
+ * uma amostra delas, limitada para a tela não virar um despejo do arquivo
+ * inteiro. Os dois são campos separados porque já foram um só: a lista vinha
+ * cortada em 30 e o seu tamanho era exibido como se fosse o total, então um
+ * arquivo com 200 linhas perdidas anunciava 30.
+ */
+export interface ParsedDistrictList { districtName: string | null; rows: ParsedMemberRow[]; unparsedLines: string[]; unparsedCount: number }
 export type FidelityRange = '1-7' | '8-12'
 export interface ParsedFidelityRow { churchName: string; name: string; months: number | null; range?: FidelityRange; category?: FidelityCategory }
 

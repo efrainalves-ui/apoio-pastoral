@@ -28,10 +28,21 @@ export function normalizePdfChurchName(value: string): string {
   return value.split('-')[0]!.trim()
 }
 
-export function parseMemberText(text: string): ParsedMemberRow[] {
+/**
+ * Lê o PDF e devolve, junto das pessoas, **as linhas que não viraram ninguém**.
+ *
+ * Antes essa segunda informação era adivinhada depois, remontando cada linha e
+ * comparando com o que tinha sido lido. A remontagem escrevia a data como
+ * `12-05-1990` e o que fora lido guardava `1990-05-12`: as duas nunca batiam, e
+ * cada membro importado com sucesso era anunciado como linha não reconhecida.
+ * Adivinhar o que já se sabe é como se erra sem perceber; aqui o próprio laço
+ * marca a linha que produziu alguém.
+ */
+function lerMembros(text: string): { rows: ParsedMemberRow[]; naoAproveitadas: string[] } {
   const lines = cleanLines(text)
   if (lines.length === 0) throw new ImportFormatError('O PDF está vazio ou não contém texto selecionável. Se for escaneado, gere uma versão com OCR.')
   const rows: ParsedMemberRow[] = []
+  const naoAproveitadas: string[] = []
   let currentChurch = ''
   for (const line of lines) {
     const header = headerChurch(line)
@@ -41,20 +52,25 @@ export function parseMemberText(text: string): ParsedMemberRow[] {
       const explicitChurch = separated.length >= 3
       const churchName = explicitChurch ? normalizePdfChurchName(separated[0]!) : currentChurch
       const name = explicitChurch ? separated.slice(1, -1).join(' ') : separated.slice(0, -1).join(' ')
-      if (!churchName) continue
+      if (!churchName) { naoAproveitadas.push(line); continue }
       const parsed = parseBrazilianDate(separated.at(-1)!)
       rows.push({ churchName, name: name.trim(), birthDate: parsed.date, needsReview: parsed.review || /\d/u.test(name) })
       continue
     }
-    if (!currentChurch) continue
+    if (!currentChurch) { naoAproveitadas.push(line); continue }
     const matches = [...line.matchAll(/([A-Za-zÀ-ÖØ-öø-ÿ'´`.-][A-Za-zÀ-ÖØ-öø-ÿ0-9'´`.\- ]{2,}?)\s+(\d{2}\/\d{2}\/\d{4})(?=\s{2,}|$)/gu)]
+    if (matches.length === 0) { naoAproveitadas.push(line); continue }
     for (const match of matches) {
       const name = match[1]!.trim(); const parsed = parseBrazilianDate(match[2]!)
       rows.push({ churchName: currentChurch, name, birthDate: parsed.date, needsReview: parsed.review || /\d/u.test(name) })
     }
   }
   if (rows.length === 0) throw new ImportFormatError('O formato do PDF não foi reconhecido. Nenhuma pessoa será alterada.')
-  return rows
+  return { rows, naoAproveitadas }
+}
+
+export function parseMemberText(text: string): ParsedMemberRow[] {
+  return lerMembros(text).rows
 }
 
 /**
@@ -97,13 +113,20 @@ export function parsePastedMemberList(text: string, churchName: string): ParsedM
   return rows
 }
 
+/** Quantas linhas não reconhecidas a tela mostra. O resto entra só na contagem. */
+export const AMOSTRA_NAO_RECONHECIDA = 30
+
 export function parseDistrictListText(text: string): ParsedDistrictList {
   const lines = cleanLines(text)
   const districtName = lines.map((line) => line.match(/^(?:DISTRITO|NOME DO DISTRITO)\s*[:-]\s*(.+)$/iu)?.[1]?.trim() ?? null).find(Boolean) ?? null
-  const rows = parseMemberText(text)
-  const recognized = new Set(rows.map(({ name, birthDate }) => `${name}|${birthDate ?? ''}`))
-  const unparsedLines = lines.filter((line) => !/^(?:DISTRITO|NOME DO DISTRITO|IGREJA|UNIDADE|GRUPO|PONTO DE PREGA[CÇ][AÃ]O)\s*[:-]/iu.test(line) && !recognized.has(line.replace(/\s*[;|\t]\s*/gu, '|').replace(/\//gu, '-')) && /[A-Za-zÀ-ÖØ-öø-ÿ]/u.test(line)).slice(0, 30)
-  return { districtName, rows, unparsedLines }
+  const { rows, naoAproveitadas } = lerMembros(text)
+  // Linha sem uma letra sequer é numeração de página ou risco de tabela: não é
+  // informação perdida, e anunciá-la só faria o aviso perder credibilidade.
+  const naoReconhecidas = naoAproveitadas.filter((line) => /[A-Za-zÀ-ÖØ-öø-ÿ]/u.test(line))
+  // O corte é da amostra que vai à tela, nunca da contagem. Cortar antes de
+  // contar fazia o limite virar a resposta: um arquivo com 200 linhas perdidas
+  // anunciava exatamente 30, e quem lia concluía que eram só os cabeçalhos.
+  return { districtName, rows, unparsedLines: naoReconhecidas.slice(0, AMOSTRA_NAO_RECONHECIDA), unparsedCount: naoReconhecidas.length }
 }
 
 export function parseFidelityText(text: string): ParsedFidelityRow[] {
