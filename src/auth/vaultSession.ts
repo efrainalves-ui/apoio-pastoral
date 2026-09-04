@@ -1,3 +1,4 @@
+import { ambienteJaAprovado } from './ambienteAprovado'
 import { pareceFalhaDeRede } from './servicoIndisponivel'
 import {
   createPasswordEnvelope,
@@ -190,16 +191,31 @@ export async function unlockAccount(
   // nunca abriu cofre nenhum aqui, ela só confirma de qual conta é a sessão.
   // Exigi-la para destravar transformava falta de sinal em porta trancada, num
   // aplicativo cujo propósito é funcionar no meio do distrito.
+  //
+  // A permissão para abrir offline não é dada por estar offline: ela depende de
+  // este aparelho já ter confirmado, com o serviço respondendo, que esta build
+  // e este banco são do mesmo ambiente. Sem essa aprovação guardada, falta de
+  // rede continua trancando — que é o certo, porque aí ninguém sabe com quem
+  // este aplicativo fala.
+  const aprovadoAntes = ambienteJaAprovado()
   let semServico = false
   if (account.authMode === 'supabase') {
-    try {
-      const remoteId = remoteAccountId ?? await signInRemoteAccount(normalizedEmail, password)
-      if (remoteId !== account.id) throw new Error('Esta conta não corresponde à conta deste dispositivo.')
-    } catch (reason) {
-      // Serviço que **respondeu** recusando a credencial continua barrando. O
-      // que deixa de barrar é o serviço que não respondeu.
-      if (!pareceFalhaDeRede(reason)) throw reason
+    const semRede = typeof navigator !== 'undefined' && navigator.onLine === false
+    if (aprovadoAntes && semRede) {
+      // Nem tenta: o navegador já sabe que não há rede, e uma tentativa
+      // condenada só atrasaria a abertura em alguns segundos.
       semServico = true
+    } else {
+      try {
+        const remoteId = remoteAccountId ?? await signInRemoteAccount(normalizedEmail, password)
+        if (remoteId !== account.id) throw new Error('Esta conta não corresponde à conta deste dispositivo.')
+      } catch (reason) {
+        // Serviço que **respondeu** recusando a credencial continua barrando. O
+        // que deixa de barrar é o serviço que não respondeu — e só para quem já
+        // tinha aprovação guardada.
+        if (!pareceFalhaDeRede(reason) || !aprovadoAntes) throw reason
+        semServico = true
+      }
     }
   }
   const { record: envelopeRecord, precisaGravar } = await envelopeDeSenhaParaAbrir(account, database)

@@ -1,3 +1,4 @@
+import { registrarAmbienteAprovado } from './ambienteAprovado'
 import { pareceFalhaDeRede, ServicoIndisponivelError } from './servicoIndisponivel'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { PasswordKeyEnvelope, RecoveryKeyEnvelope } from '../crypto/types'
@@ -223,7 +224,16 @@ export async function assertServiceSchema(): Promise<void> {
  */
 export async function assertServiceIdentity(): Promise<void> {
   if (!hasSupabaseConfiguration || servicoConferido) return
-  const versao = await remoteSchemaVersion()
+  // Uma falha de rede aqui não é um veredito sobre o ambiente: é ausência de
+  // veredito. Quem chama precisa poder distinguir as duas coisas, porque uma
+  // manda parar e a outra manda seguir com o que já foi aprovado antes.
+  let versao: number | null
+  try {
+    versao = await remoteSchemaVersion()
+  } catch (reason) {
+    if (pareceFalhaDeRede(reason)) throw new ServicoIndisponivelError()
+    throw reason
+  }
   // Resposta nula, de outro tipo ou inesperada não é "seguir em frente": é um
   // serviço que não sabe dizer o que é. Antes isto passava direto, e uma
   // instalação apontada para um projeto sem as funções de identificação
@@ -234,7 +244,13 @@ export async function assertServiceIdentity(): Promise<void> {
   if (versao !== EXPECTED_SCHEMA_VERSION) {
     throw new Error('O serviço desta conta está em uma versão diferente da deste aplicativo. Atualize o aplicativo antes de sincronizar.')
   }
-  const ambiente = await remoteEnvironment()
+  let ambiente: string | null
+  try {
+    ambiente = await remoteEnvironment()
+  } catch (reason) {
+    if (pareceFalhaDeRede(reason)) throw new ServicoIndisponivelError()
+    throw reason
+  }
   if (!ambiente) {
     throw new Error('Este serviço não declara se é homologação ou produção. Nenhuma sincronização foi feita.')
   }
@@ -242,6 +258,10 @@ export async function assertServiceIdentity(): Promise<void> {
     throw new Error('Este aplicativo e este serviço são de ambientes diferentes. Nenhuma sincronização foi feita.')
   }
   servicoConferido = true
+  // O serviço respondeu e conferiu. Guardar isso é o que permite a este
+  // aparelho abrir offline mais tarde, sem afrouxar a separação: a aprovação
+  // vale só para esta identidade de build, e só para abrir o que já está aqui.
+  registrarAmbienteAprovado(versao)
 }
 
 /** Ambiente que o próprio serviço declara, ou `null` quando ele não declara. */

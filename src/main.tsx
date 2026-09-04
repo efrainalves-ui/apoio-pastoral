@@ -6,7 +6,31 @@ import { App } from './app/App'
 import { AuthVaultProvider } from './auth/AuthVaultContext'
 import './styles/index.css'
 
-registerSW({ immediate: true })
+/**
+ * A versão nova entra sozinha, e sem ninguém precisar apagar dados.
+ *
+ * A estratégia já era `autoUpdate`: o service worker novo assume assim que é
+ * descoberto. O problema era o *descobrir* — o navegador só procura quando a
+ * página carrega, então um aplicativo instalado, aberto por dias, seguia
+ * servindo a versão antiga indefinidamente. A saída visível para o usuário era
+ * apagar os dados do site, que é justamente o que ele nunca deveria precisar
+ * fazer.
+ *
+ * Agora ele procura ao voltar para a frente e de hora em hora. Procurar não é
+ * baixar: quando não há versão nova, a checagem é uma requisição condicional
+ * que o servidor responde com "nada mudou".
+ */
+const UMA_HORA = 60 * 60 * 1000
+
+registerSW({
+  immediate: true,
+  onRegisteredSW(_url, registro) {
+    if (!registro) return
+    const procurar = () => { void registro.update().catch(() => { /* sem rede: a próxima tentativa resolve */ }) }
+    window.setInterval(procurar, UMA_HORA)
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) procurar() })
+  },
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

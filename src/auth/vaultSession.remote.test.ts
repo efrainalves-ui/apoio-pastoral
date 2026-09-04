@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createPasswordEnvelope, decryptPayload, encryptPayload, generateMasterSecret, importVaultKeys } from '../crypto/vault'
 import { ApoioDatabase } from '../db/database'
 import { keyEnvelopeId } from '../db/types'
+import type * as ConfiguracaoDeSincronizacao from '../sync/config'
 import { ServicoIndisponivelError } from './servicoIndisponivel'
 
 const databases: ApoioDatabase[] = []
@@ -11,6 +12,7 @@ afterEach(async () => {
   localStorage.clear()
   await Promise.all(databases.splice(0).map((database) => database.delete()))
   vi.doUnmock('./supabase')
+  vi.doUnmock('../sync/config')
   vi.resetModules()
 })
 
@@ -37,7 +39,14 @@ async function loadRemoteSession(passwordEnvelope: Awaited<ReturnType<typeof cre
     fetchRemoteDeviceStatus: vi.fn(),
     revokeRemoteDevice: vi.fn(),
   }))
-  return { remote, session: await import('./vaultSession') }
+  // Uma build de verdade declara ambiente e projeto; sem isso não existe
+  // identidade para aprovar, e a abertura offline nunca seria autorizada.
+  vi.doMock('../sync/config', async (importarOriginal) => ({
+    ...(await importarOriginal<typeof ConfiguracaoDeSincronizacao>()),
+    declaredEnvironment: 'homologacao',
+    declaredProjectRef: 'ficticio-homolog',
+  }))
+  return { remote, ambiente: await import('./ambienteAprovado'), session: await import('./vaultSession') }
 }
 
 describe('entrada remota em novo dispositivo', () => {
@@ -68,12 +77,14 @@ describe('entrada remota em novo dispositivo', () => {
     const password = 'senha-ficticia-segura-2026'
     const secret = generateMasterSecret()
     const envelope = await createPasswordEnvelope(secret, password)
-    const { remote, session } = await loadRemoteSession(envelope)
+    const { remote, ambiente, session } = await loadRemoteSession(envelope)
     const database = new ApoioDatabase(`remote-offline-${crypto.randomUUID()}`)
     databases.push(database)
 
-    // Primeira entrada com serviço: é ela que deixa a conta conhecida aqui.
+    // Primeira entrada com serviço: é ela que deixa a conta conhecida aqui e,
+    // no aplicativo de verdade, é ela que registra a aprovação do ambiente.
     await session.unlockAccount('conta.ficticia@example.invalid', password, database)
+    ambiente.registrarAmbienteAprovado(9)
 
     // Agora o serviço não responde mais.
     remote.signIn.mockImplementation(() => Promise.reject(new ServicoIndisponivelError()))
@@ -91,10 +102,11 @@ describe('entrada remota em novo dispositivo', () => {
     const password = 'senha-ficticia-segura-2026'
     const secret = generateMasterSecret()
     const envelope = await createPasswordEnvelope(secret, password)
-    const { remote, session } = await loadRemoteSession(envelope)
+    const { remote, ambiente, session } = await loadRemoteSession(envelope)
     const database = new ApoioDatabase(`remote-offline-senha-${crypto.randomUUID()}`)
     databases.push(database)
     await session.unlockAccount('conta.ficticia@example.invalid', password, database)
+    ambiente.registrarAmbienteAprovado(9)
 
     remote.signIn.mockImplementation(() => Promise.reject(new ServicoIndisponivelError()))
     remote.authorize.mockImplementation(() => Promise.reject(new ServicoIndisponivelError()))
@@ -116,6 +128,47 @@ describe('entrada remota em novo dispositivo', () => {
     remote.signIn.mockImplementation(() => Promise.reject(new Error('E-mail ou senha inválidos.')))
 
     await expect(session.unlockAccount('conta.ficticia@example.invalid', password, database)).rejects.toThrow('E-mail ou senha inválidos.')
+  })
+
+  it('sem aprovação guardada, ficar sem rede continua trancando', async () => {
+    // Abrir offline não é permitido por estar offline: é permitido porque este
+    // aparelho já confirmou, com o serviço respondendo, que a build e o banco
+    // são do mesmo ambiente. Sem essa confirmação ninguém sabe com quem este
+    // aplicativo fala, e falhar fechado é o certo.
+    const password = 'senha-ficticia-segura-2026'
+    const secret = generateMasterSecret()
+    const envelope = await createPasswordEnvelope(secret, password)
+    const { remote, session } = await loadRemoteSession(envelope)
+    const database = new ApoioDatabase(`remote-sem-aprovacao-${crypto.randomUUID()}`)
+    databases.push(database)
+    await session.unlockAccount('conta.ficticia@example.invalid', password, database)
+
+    // Nenhuma aprovação foi registrada.
+    remote.signIn.mockImplementation(() => Promise.reject(new ServicoIndisponivelError()))
+
+    await expect(session.unlockAccount('conta.ficticia@example.invalid', password, database)).rejects.toThrow()
+  })
+
+  it('aprovação de outro ambiente não vale para esta build', async () => {
+    // É esta regra que impede a abertura offline de virar uma fresta entre
+    // homologação e produção: a aprovação é guardada por identidade de build.
+    const password = 'senha-ficticia-segura-2026'
+    const secret = generateMasterSecret()
+    const envelope = await createPasswordEnvelope(secret, password)
+    const { remote, session } = await loadRemoteSession(envelope)
+    const database = new ApoioDatabase(`remote-outro-ambiente-${crypto.randomUUID()}`)
+    databases.push(database)
+    await session.unlockAccount('conta.ficticia@example.invalid', password, database)
+
+    localStorage.setItem('apoio-pastoral:ambiente-aprovado', JSON.stringify({
+      environment: 'producao',
+      projectRef: 'ficticio-producao',
+      schemaVersion: 9,
+      checkedAt: new Date().toISOString(),
+    }))
+    remote.signIn.mockImplementation(() => Promise.reject(new ServicoIndisponivelError()))
+
+    await expect(session.unlockAccount('conta.ficticia@example.invalid', password, database)).rejects.toThrow()
   })
 
   it('entra normalmente em um aparelho novo com e-mail e senha', async () => {
