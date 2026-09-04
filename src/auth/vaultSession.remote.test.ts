@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createPasswordEnvelope, decryptPayload, encryptPayload, generateMasterSecret, importVaultKeys } from '../crypto/vault'
 import { ApoioDatabase } from '../db/database'
 import { keyEnvelopeId } from '../db/types'
+import { ServicoIndisponivelError } from './servicoIndisponivel'
 
 const databases: ApoioDatabase[] = []
 
@@ -57,6 +58,64 @@ describe('entrada remota em novo dispositivo', () => {
     expect(await database.keyEnvelopes.get(keyEnvelopeId(result.account.id, 'password'))).toMatchObject({ accountId: result.account.id, envelope })
     expect(remote.signIn).toHaveBeenCalledTimes(1)
     expect(remote.authorize).toHaveBeenCalledTimes(1)
+  })
+
+  it('abre o cofre sem serviço, quando este aparelho já conhece a conta', async () => {
+    // Um pastor no meio do distrito, sem sinal, precisa abrir a própria agenda.
+    // Quem prova a senha é o envelope guardado aqui — a rede nunca abriu cofre
+    // nenhum; ela só confirma de qual conta é a sessão. Exigi-la para destravar
+    // transformava falta de sinal em porta trancada.
+    const password = 'senha-ficticia-segura-2026'
+    const secret = generateMasterSecret()
+    const envelope = await createPasswordEnvelope(secret, password)
+    const { remote, session } = await loadRemoteSession(envelope)
+    const database = new ApoioDatabase(`remote-offline-${crypto.randomUUID()}`)
+    databases.push(database)
+
+    // Primeira entrada com serviço: é ela que deixa a conta conhecida aqui.
+    await session.unlockAccount('conta.ficticia@example.invalid', password, database)
+
+    // Agora o serviço não responde mais.
+    remote.signIn.mockImplementation(() => Promise.reject(new ServicoIndisponivelError()))
+    remote.authorize.mockImplementation(() => Promise.reject(new ServicoIndisponivelError()))
+
+    const semRede = await session.unlockAccount('conta.ficticia@example.invalid', password, database)
+
+    expect(semRede.account.id).toBe('00000000-0000-4000-8000-000000000001')
+    expect(semRede.keys.master).toBeDefined()
+  })
+
+  it('sem serviço, a senha errada continua sendo recusada', async () => {
+    // Deixar de exigir a rede não pode virar deixar de exigir a senha: quem
+    // barra é o envelope, e ele não abre com senha que não é a dele.
+    const password = 'senha-ficticia-segura-2026'
+    const secret = generateMasterSecret()
+    const envelope = await createPasswordEnvelope(secret, password)
+    const { remote, session } = await loadRemoteSession(envelope)
+    const database = new ApoioDatabase(`remote-offline-senha-${crypto.randomUUID()}`)
+    databases.push(database)
+    await session.unlockAccount('conta.ficticia@example.invalid', password, database)
+
+    remote.signIn.mockImplementation(() => Promise.reject(new ServicoIndisponivelError()))
+    remote.authorize.mockImplementation(() => Promise.reject(new ServicoIndisponivelError()))
+
+    await expect(session.unlockAccount('conta.ficticia@example.invalid', 'outra-senha-ficticia-2026', database)).rejects.toThrow()
+  })
+
+  it('serviço que responde recusando a credencial continua barrando', async () => {
+    // A distinção é o ponto inteiro: sem resposta, o envelope local decide;
+    // com resposta negativa, ninguém entra.
+    const password = 'senha-ficticia-segura-2026'
+    const secret = generateMasterSecret()
+    const envelope = await createPasswordEnvelope(secret, password)
+    const { remote, session } = await loadRemoteSession(envelope)
+    const database = new ApoioDatabase(`remote-recusa-${crypto.randomUUID()}`)
+    databases.push(database)
+    await session.unlockAccount('conta.ficticia@example.invalid', password, database)
+
+    remote.signIn.mockImplementation(() => Promise.reject(new Error('E-mail ou senha inválidos.')))
+
+    await expect(session.unlockAccount('conta.ficticia@example.invalid', password, database)).rejects.toThrow('E-mail ou senha inválidos.')
   })
 
   it('entra normalmente em um aparelho novo com e-mail e senha', async () => {

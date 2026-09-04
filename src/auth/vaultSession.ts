@@ -1,3 +1,4 @@
+import { pareceFalhaDeRede } from './servicoIndisponivel'
 import {
   createPasswordEnvelope,
   createRecoveryEnvelope,
@@ -162,7 +163,16 @@ export async function unlockAccount(
   let remoteAccountId: string | null = null
   if (!account) {
     if (hasSupabaseConfiguration) {
-      const accountId = await signInRemoteAccount(normalizedEmail, password)
+      // Aparelho que ainda não conhece esta conta precisa buscar o envelope de
+      // senha no serviço — não há o que abrir aqui sem isso. Sem rede, o certo
+      // é dizer exatamente essa diferença, em vez de repetir "não foi possível
+      // falar com o serviço" e deixar o titular sem saber o que fazer.
+      const accountId = await signInRemoteAccount(normalizedEmail, password).catch((reason: unknown) => {
+        if (pareceFalhaDeRede(reason)) {
+          throw new Error('Sem conexão agora, e este aparelho ainda não conhece esta conta. A primeira entrada em um aparelho novo precisa de internet; depois dela, ele abre offline.')
+        }
+        throw reason
+      })
       remoteAccountId = accountId
       const envelope = await fetchRemotePasswordEnvelope()
       account = { id: accountId, email: normalizedEmail, createdAt: new Date().toISOString(), authMode: 'supabase' }
@@ -175,9 +185,22 @@ export async function unlockAccount(
       throw new Error('E-mail ou senha inválidos.')
     }
   }
+  // Sem serviço, mas com a conta já conhecida por este aparelho: o cofre abre
+  // do mesmo jeito. Quem sempre provou a senha foi o envelope local — a rede
+  // nunca abriu cofre nenhum aqui, ela só confirma de qual conta é a sessão.
+  // Exigi-la para destravar transformava falta de sinal em porta trancada, num
+  // aplicativo cujo propósito é funcionar no meio do distrito.
+  let semServico = false
   if (account.authMode === 'supabase') {
-    const remoteId = remoteAccountId ?? await signInRemoteAccount(normalizedEmail, password)
-    if (remoteId !== account.id) throw new Error('Esta conta não corresponde à conta deste dispositivo.')
+    try {
+      const remoteId = remoteAccountId ?? await signInRemoteAccount(normalizedEmail, password)
+      if (remoteId !== account.id) throw new Error('Esta conta não corresponde à conta deste dispositivo.')
+    } catch (reason) {
+      // Serviço que **respondeu** recusando a credencial continua barrando. O
+      // que deixa de barrar é o serviço que não respondeu.
+      if (!pareceFalhaDeRede(reason)) throw reason
+      semServico = true
+    }
   }
   const { record: envelopeRecord, precisaGravar } = await envelopeDeSenhaParaAbrir(account, database)
   const keys = await abrirEnvelopeDeSenha(account, envelopeRecord, password, database, precisaGravar)
@@ -194,9 +217,19 @@ export async function unlockAccount(
   // chegava à tela que conclui o encerramento. Quem autoriza, ali, é a
   // retomada, com o identificador que já estava escolhido.
   if (await pendingDistrictClosure(account.id, database)) return { account, keys }
+  // Offline, registrar a autorização no serviço é impossível — e não é
+  // condição para abrir o que já está neste aparelho. A próxima entrada com
+  // internet registra.
+  if (semServico) return { account, keys }
   // Entrar com e-mail e senha vale como autorização do aparelho; quem decide a
   // situação é o serviço.
-  await authorizeCurrentDevice(account.id, database)
+  try {
+    await authorizeCurrentDevice(account.id, database)
+  } catch (reason) {
+    // "Aparelho removido da conta" e "vinculado a outra conta" são respostas do
+    // serviço e continuam barrando. Rede que caiu no meio, não.
+    if (!pareceFalhaDeRede(reason)) throw reason
+  }
   return { account, keys }
 }
 

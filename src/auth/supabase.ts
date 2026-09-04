@@ -1,3 +1,4 @@
+import { pareceFalhaDeRede, ServicoIndisponivelError } from './servicoIndisponivel'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { PasswordKeyEnvelope, RecoveryKeyEnvelope } from '../crypto/types'
 import { declaredEnvironment, declaredProjectRef, EXPECTED_SCHEMA_VERSION, isRemoteEnvironmentAllowed, isSyncDisabled, remoteProjectProblem } from '../sync/config'
@@ -124,9 +125,20 @@ export async function signInRemoteAccount(email: string, password: string): Prom
   // conferência ficava depois da autenticação, e nesse desenho uma build
   // apontada para o projeto errado entregava a credencial do titular a um
   // serviço que não era o dele e só depois reclamava.
-  await assertServiceIdentity()
+  try {
+    await assertServiceIdentity()
+  } catch (reason) {
+    // Sem rede, esta conferência não tem como acontecer — e não ter acontecido
+    // não é sinal de ambiente errado. Qualquer outra falha aqui é justamente o
+    // que ela existe para pegar, e continua subindo.
+    if (pareceFalhaDeRede(reason)) throw new ServicoIndisponivelError()
+    throw reason
+  }
   const { data, error } = await getSupabaseClient().auth.signInWithPassword({ email, password })
   if (error) {
+    // Rede que não chegou ao serviço não é credencial recusada. Dizer "senha
+    // inválida" aqui manda o titular a duvidar do que ele sabe.
+    if (pareceFalhaDeRede(error)) throw new ServicoIndisponivelError()
     if (/email not confirmed|not confirmed/iu.test(error.message)) {
       throw new Error('Confirme o e-mail desta conta pelo link que enviamos e entre de novo.')
     }
