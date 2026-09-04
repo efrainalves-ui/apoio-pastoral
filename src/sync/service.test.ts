@@ -214,6 +214,68 @@ describe('sincronização cifrada', () => {
     expect(pessoas.map(({ name }) => name)).toContain('Pessoa Fictícia do Outro Aparelho')
   })
 
+  it('busca de novo o que ficou na quarentena, e para de buscar quando ela esvazia', async () => {
+    // Operação em quarentena continua existindo no serviço, mas o cursor já
+    // passou por ela: sem rebobinar, ela nunca mais seria pedida. Foi assim que
+    // um defeito de assinatura — depois corrigido — deixaria centenas de
+    // registros parados para sempre num aparelho, com um aviso vermelho que
+    // nada faria diminuir.
+    const { database, accountId, deviceId, keys } = await fixture()
+    const recordId = crypto.randomUUID()
+    const envelope = await encryptPayload(keys.master, {
+      schemaVersion: 1,
+      type: 'person',
+      data: { name: 'Pessoa Fictícia Reprocessada', churchId: crypto.randomUUID(), status: 'active' },
+    }, recordId)
+    const base: EncryptedOperation = {
+      id: crypto.randomUUID(),
+      ownerId: accountId,
+      deviceId: crypto.randomUUID(),
+      recordId,
+      operation: 'upsert',
+      baseVersion: 0,
+      recordVersion: 1,
+      schemaVersion: 1,
+      payload: envelope,
+      createdAt: '2026-09-01T00:00:00.000Z',
+    }
+
+    class ServicoQueLembra extends CaptureTransport {
+      cursores: Array<string | null> = []
+      constructor(public operacao: EncryptedOperation) { super() }
+      override pull(_ownerId: string, cursor: string | null): Promise<PullResult> {
+        this.cursores.push(cursor)
+        this.pulls += 1
+        // Já entregue: quem pede a partir do fim não recebe nada de novo.
+        if (cursor === '1') return Promise.resolve({ operations: [], cursor: '1' })
+        return Promise.resolve({ operations: [this.operacao], cursor: '1' })
+      }
+    }
+
+    const deOutraConta = (await generateVaultKeys()).sync
+    const servico = new ServicoQueLembra({ ...base, mac: await signOperation(deOutraConta, base), macVersion: MAC_VERSION })
+
+    const primeira = await new SyncService(servico, database, () => true).synchronize(accountId, deviceId, keys.sync)
+    expect(primeira.quarantined).toBe(1)
+    expect(await database.quarantine.count()).toBe(1)
+    expect((await database.syncState.get(accountId))?.cursor).toBe('1')
+
+    // A assinatura passa a conferir, que é o que acontece quando o defeito é
+    // corrigido. A operação é a mesma e continua onde sempre esteve.
+    servico.operacao = await withOperationMac(keys.sync, base)
+    const segunda = await new SyncService(servico, database, () => true).synchronize(accountId, deviceId, keys.sync)
+
+    expect(segunda.pulled).toBe(1)
+    expect(await database.quarantine.count()).toBe(0)
+    const pessoas = await new PeopleService(database).listPeople(accountId, keys.master)
+    expect(pessoas.map(({ name }) => name)).toContain('Pessoa Fictícia Reprocessada')
+
+    // Sem quarentena, rebobinar de novo seria baixar a conta inteira a cada
+    // rodada. A terceira pergunta parte de onde parou.
+    await new SyncService(servico, database, () => true).synchronize(accountId, deviceId, keys.sync)
+    expect(servico.cursores).toEqual([null, null, '1'])
+  })
+
   it('preserva conflito cifrado e não substitui silenciosamente a versão local', async () => {
     const { database, accountId, deviceId, plaintext, keys } = await fixture()
     const local = (await database.vaultRecords.toCollection().first())!

@@ -137,7 +137,14 @@ export class SyncService {
     let conflitos = 0
     let quarentena = 0
     let incompleto = false
-    let cursor = (await this.database.syncState.get(accountId))?.cursor ?? null
+    const estadoAntes = await this.database.syncState.get(accountId)
+    const naQuarentena = await this.database.quarantine.where('accountId').equals(accountId).count()
+    // Quarentena não se resolve sozinha: o cursor já passou por aquelas
+    // operações e elas nunca mais seriam pedidas. Elas continuam no serviço,
+    // então buscar de novo é a recuperação — e é o que faz um conserto de
+    // verificação valer para o que já ficou para trás, não só para o futuro.
+    const rebobinar = naQuarentena > 0 && naQuarentena !== estadoAntes?.quarantineRetryFor
+    let cursor = rebobinar ? null : estadoAntes?.cursor ?? null
 
     // Página por página até o serviço não ter mais nada. Parar antes disso
     // deixaria para trás tudo que passasse do limite, e o aparelho seguiria
@@ -179,11 +186,19 @@ export class SyncService {
     // que um distrito grande virava "conta vazia" e o pastor era mandado criar
     // um segundo distrito por cima do primeiro.
     const estado = await this.database.syncState.get(accountId)
+    // O marcador registra **para qual quarentena já se rebobinou**, e por isso
+    // só é escrito quando houve rebobinada. Gravá-lo em toda rodada o fazia
+    // nascer igual ao tamanho atual, e aí a tentativa nunca acontecia: o aviso
+    // ficava na tela para sempre sem nada que o fizesse diminuir. Uma rodada
+    // incompleta também não marca nada — desistir por causa de uma queda de
+    // rede seria abandonar dado bom por um motivo passageiro.
+    const jaTentadoPara = rebobinar && !incompleto ? naQuarentena : estadoAntes?.quarantineRetryFor
     await this.database.syncState.put({
       accountId,
       cursor,
       lastSyncedAt: new Date().toISOString(),
       firstSyncAt: estado?.firstSyncAt ?? (incompleto ? null : new Date().toISOString()),
+      ...(jaTentadoPara === undefined ? {} : { quarantineRetryFor: jaTentadoPara }),
     })
 
     // O que sobrou na fila de envio e o que sobrou na fila de expurgo dizem, os
@@ -237,11 +252,17 @@ export class SyncService {
         }
 
         // Eco da própria operação, que volta do serviço depois do envio.
-        if (existing && existing.version === operation.recordVersion && sameEnvelope(operation.payload, existing)) continue
+        if (existing && existing.version === operation.recordVersion && sameEnvelope(operation.payload, existing)) {
+          await this.database.quarantine.delete(operation.id)
+          continue
+        }
 
         const linhagemBate = !existing || existing.version === operation.baseVersion
         if (!linhagemBate) {
           await this.database.syncConflicts.put(conflictRecord(accountId, operation, existing.version))
+          // Virou revisão pendente, que é um destino conhecido e visível: não
+          // pode continuar contando também como recebido que ninguém tratou.
+          await this.database.quarantine.delete(operation.id)
           conflitos += 1
           continue
         }
@@ -257,6 +278,10 @@ export class SyncService {
           ...(operation.operation === 'delete' ? { deletedAt: operation.createdAt } : {}),
         }
         await this.database.vaultRecords.put(remoteRecord)
+        // Entrou: a linha de quarentena daquela operação deixou de descrever a
+        // realidade, e um aviso que não descreve a realidade é pior do que
+        // aviso nenhum — ele ensina o pastor a ignorar avisos.
+        await this.database.quarantine.delete(operation.id)
         aplicadas += 1
       }
     })

@@ -77,6 +77,17 @@ export interface SyncStateRecord {
    * está vazia" — a diferença entre esperar e criar um distrito duplicado.
    */
   firstSyncAt?: string | null
+  /**
+   * Para qual tamanho de quarentena este aparelho já rebobinou o cursor.
+   *
+   * Operação que cai na quarentena continua existindo no serviço, mas o cursor
+   * já passou por ela e ela nunca mais seria buscada — foi assim que um defeito
+   * de assinatura, depois corrigido, deixaria 949 registros parados para sempre
+   * naquele aparelho. Rebobinar resolve; rebobinar em toda sincronização faria
+   * um download completo por rodada. Guardar o tamanho já tentado é o meio
+   * termo: tenta de novo quando a quarentena muda, e para quando não muda.
+   */
+  quarantineRetryFor?: number
 }
 
 /**

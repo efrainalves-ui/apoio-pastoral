@@ -68,7 +68,7 @@ export function SyncPage() {
         <div><small>Histórico a apagar no serviço</small><strong>{purgePending}</strong></div>
       </div>
       {purgePending > 0 && <div className="alert alert--warning" role="status">{purgePending} registro(s) apagado(s) aqui ainda têm histórico no serviço. Sincronize com internet até este aviso sumir.</div>}
-      {quarantined > 0 && <div className="alert alert--error" role="alert">Recebemos {quarantined} alteração(ões) que não conferem com a sua conta e não foram aplicadas. Elas ficaram guardadas de lado, sem alterar nada. Se isso se repetir, avise antes de continuar usando este aparelho.</div>}
+      {quarantined > 0 && <div className="alert alert--error" role="alert">Recebemos {quarantined} alteração(ões) que não conferem com a sua conta e não foram aplicadas. Elas ficaram guardadas de lado, sem alterar nada, e a próxima sincronização vai buscá-las de novo. Se o número não diminuir depois de sincronizar, avise antes de continuar usando este aparelho.</div>}
       {corrupted > 0 && <div className="alert alert--error" role="alert">{corrupted} registro(s) não abriram neste aparelho e ficaram em quarentena. O restante continua acessível — listas, backup, exportação e encerramento seguem funcionando; restaurar um backup costuma resolver.</div>}
       <Card title="Sincronização manual" action={navigator.onLine ? <Cloud /> : <CloudOff />}>
         <p className="card-copy">{transport.name === 'disabled' ? 'A sincronização não está habilitada. Suas informações permanecem somente neste dispositivo.' : 'Se houver uma interrupção, as alterações pendentes serão mantidas para uma nova tentativa.'}</p>
