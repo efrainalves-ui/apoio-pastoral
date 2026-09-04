@@ -81,4 +81,56 @@ describe('assinatura dos metadados da sincronização', () => {
 
     expect(await operationMacIsValid(sync, { ...segunda, mac, macVersion: MAC_VERSION })).toBe(false)
   })
+
+  it('aceita o mesmo instante escrito do jeito do banco, e não do jeito do JavaScript', async () => {
+    // Este é o defeito que mandou uma importação inteira para a quarentena. O
+    // aparelho assina `...Z`; o Postgres devolve `...+00:00`. Mesmo instante,
+    // grafia diferente — e a conferência recusava tudo o que voltava do
+    // serviço, que é justamente o caminho normal de qualquer dado.
+    const { sync } = await generateVaultKeys()
+    const assinada = await withOperationMac(sync, operacaoFicticia())
+    const comoOServicoDevolve = { ...assinada, createdAt: '2026-09-01T12:00:00.000+00:00' }
+
+    expect(await operationMacIsValid(sync, comoOServicoDevolve)).toBe(true)
+  })
+
+  it('aceita o mesmo instante em outro fuso, porque o instante é o mesmo', async () => {
+    const { sync } = await generateVaultKeys()
+    const assinada = await withOperationMac(sync, operacaoFicticia())
+
+    expect(await operationMacIsValid(sync, { ...assinada, createdAt: '2026-09-01T09:00:00.000-03:00' })).toBe(true)
+  })
+
+  it('continua recusando um instante diferente', async () => {
+    // Normalizar a grafia não pode virar aceitar qualquer data: reescrever o
+    // carimbo muda `createdAt`, `updatedAt` e `deletedAt` do registro guardado.
+    const { sync } = await generateVaultKeys()
+    const assinada = await withOperationMac(sync, operacaoFicticia())
+
+    expect(await operationMacIsValid(sync, { ...assinada, createdAt: '2026-09-01T12:00:00.001Z' })).toBe(false)
+    expect(await operationMacIsValid(sync, { ...assinada, createdAt: '2026-09-02T12:00:00.000Z' })).toBe(false)
+  })
+
+  it('não inventa normalização para o que não é data', async () => {
+    // Duas porcarias diferentes precisam continuar produzindo assinaturas
+    // diferentes; normalizar lixo para um valor único as tornaria trocáveis.
+    const { sync } = await generateVaultKeys()
+    const lixo = { ...operacaoFicticia(), createdAt: 'nao-e-data' }
+    const assinada = await withOperationMac(sync, lixo)
+
+    expect(await operationMacIsValid(sync, assinada)).toBe(true)
+    expect(await operationMacIsValid(sync, { ...assinada, createdAt: 'outra-nao-data' })).toBe(false)
+  })
+
+  it('a assinatura de saída não mudou de valor com a normalização', async () => {
+    // Se o corpo assinado tivesse mudado para dados bem-formados, as operações
+    // já enviadas ao serviço passariam a não conferir e teriam de ser
+    // reenviadas. O carimbo do aparelho já é ISO: normalizar não o altera.
+    const { sync } = await generateVaultKeys()
+    const operacao = operacaoFicticia()
+
+    expect(await signOperation(sync, operacao)).toBe(
+      await signOperation(sync, { ...operacao, createdAt: new Date(operacao.createdAt).toISOString() }),
+    )
+  })
 })
