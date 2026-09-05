@@ -14,6 +14,7 @@ import { GoalsService, parseGoalsPdf } from '../goals/service'
 import { HISTORY_AREAS, type GoalHistoryData, type GoalImportPreview } from '../goals/types'
 import { useGoalSources } from '../goals/useGoalSources'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
+import { AREA_PDF_DOCUMENT } from '../goals/areas'
 
 const goalsService = new GoalsService()
 
@@ -30,6 +31,11 @@ export function GoalAreaPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const year = new Date().getFullYear()
+  // O texto que saiu do PDF fica à mão quando nada é reconhecido. Sem isso, o
+  // pastor só tem "não reconhecido" e ninguém consegue descobrir o porquê — o
+  // arquivo dele não pode sair do aparelho para alguém olhar.
+  const [textoLido, setTextoLido] = useState('')
+  const [mostrarTexto, setMostrarTexto] = useState(false)
 
   if (!area) return <div className="page-stack"><p>Meta não encontrada.</p><Link className="text-link" to="/app/metas">Voltar às metas</Link></div>
   if (!ready) return <div className="app-loading" role="status">Abrindo a meta…</div>
@@ -40,6 +46,12 @@ export function GoalAreaPage() {
   const maiorMes = Math.max(1, ...meses)
   const porIgreja = churchProgress(area, goals, sources, year, churches.map(({ id }) => id))
   const anoTerminou = year < new Date().getFullYear() || new Date().getMonth() === 11
+  /**
+   * Sem nenhum resultado, enviar o relatório é o que a tela existe para pedir —
+   * então ele sobe. Com dados dentro, o que importa é o acompanhamento, e o
+   * envio vira manutenção: desce para o fim, discreto.
+   */
+  const semNenhumResultado = progresso.result === 0 && !progresso.hasPrevious
 
   async function salvarMeta(event: FormEvent, churchId: string | null, valor: string) {
     event.preventDefault()
@@ -74,7 +86,10 @@ export function GoalAreaPage() {
     try {
       validatePdfFile(file)
       const bytes = await file.arrayBuffer()
-      setPreview(parseGoalsPdf(await extractPdfText(bytes), await pdfHash(bytes)))
+      const texto = await extractPdfText(bytes)
+      setTextoLido(texto)
+      setMostrarTexto(false)
+      setPreview(parseGoalsPdf(texto, await pdfHash(bytes)))
     } catch (motivo) {
       setError(motivo instanceof Error ? motivo.message : 'Não foi possível ler o arquivo. Nada foi alterado; escolha outro e tente de novo.')
     } finally { setBusy(false) }
@@ -157,12 +172,22 @@ export function GoalAreaPage() {
       </Card>
 
       {AREA_USES_PDF[area] && (
-        <Card title="Enviar PDF" eyebrow="Resultados do período">
+        <Card className={semNenhumResultado ? 'goal-pdf-card goal-pdf-card--primeiro' : 'goal-pdf-card'} title={`Enviar o ${AREA_PDF_DOCUMENT[area]?.nome ?? 'PDF'}`} eyebrow="Resultados do período">
+          <p className="card-copy">{AREA_PDF_DOCUMENT[area]?.caminho}</p>
           <label className="file-picker">
             <FileUp />
-            <span><strong>{busy ? 'Lendo o arquivo…' : `Escolher PDF de ${GOAL_AREA_LABELS[area]}`}</strong><small>Você confere igreja, período e totais antes de salvar.</small></span>
+            <span><strong>{busy ? 'Lendo o arquivo…' : `Escolher o ${AREA_PDF_DOCUMENT[area]?.nome ?? 'PDF'}`}</strong><small>Você confere igreja, período e totais antes de salvar.</small></span>
             <input type="file" accept="application/pdf,.pdf" disabled={busy} onChange={(event) => { void lerPdf(event.target.files?.[0]); event.currentTarget.value = '' }} />
           </label>
+          {textoLido && preview?.entries.length === 0 && <>
+            <button type="button" className="text-button" onClick={() => setMostrarTexto((atual) => !atual)}>
+              {mostrarTexto ? 'Esconder o texto lido' : 'Ver o texto que foi lido do arquivo'}
+            </button>
+            {mostrarTexto && <>
+              <p className="field__hint">Isto é o que o aplicativo enxergou dentro do PDF. Serve para descobrir por que o formato não foi reconhecido — o arquivo em si não sai deste aparelho.</p>
+              <textarea className="field__input" rows={12} readOnly value={textoLido} aria-label="Texto lido do arquivo" />
+            </>}
+          </>}
           {preview && <div className="goal-preview">
             <h3>Confira antes de salvar</h3>
             {preview.entries.length === 0

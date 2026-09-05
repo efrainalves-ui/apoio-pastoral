@@ -39,6 +39,24 @@ export const AREA_USES_PDF: Record<GoalArea, boolean> = {
   financial: true, baptisms: true, bible_studies: false, uapg: false,
 }
 
+/**
+ * O documento do ACMS que alimenta cada área, com o nome que ele tem lá.
+ *
+ * A tela pedia "Escolher PDF de Financeiro", e quem tem o ACMS aberto não
+ * encontra nada com esse nome. Dizer o nome do relatório e o caminho até ele
+ * transforma uma tentativa e erro em dois cliques.
+ */
+export const AREA_PDF_DOCUMENT: Partial<Record<GoalArea, { nome: string; caminho: string }>> = {
+  baptisms: {
+    nome: 'Análise de Movimento',
+    caminho: 'No ACMS: Relatórios → Movimento → Análise de movimento. Traz só números, sem nomes de pessoas.',
+  },
+  financial: {
+    nome: 'Comparativo de Entrada',
+    caminho: 'No ACMS: Relatórios → Entrada → escolha o tipo de entrada, igreja mês a mês.',
+  },
+}
+
 export interface AreaSources {
   entries: GoalEntryEntity[]
   studies: Array<{ churchId: string; startedAt: string }>

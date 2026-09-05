@@ -222,6 +222,12 @@ button.entity-row { width: 100%; background: none; border-top: 0; border-inline:
 .quick-actions__menu a:hover, .quick-actions__menu a:focus-visible { background: var(--green-50); }
 .quick-actions__menu svg { width: 19px; height: 19px; color: var(--green-800); }
 .page-stack { display: grid; gap: 24px; }
+/*
+  O envio do relatório sobe para o topo enquanto não há resultado nenhum: é a
+  ação que a tela existe para pedir. Com dados dentro, ele volta ao fim, porque
+  aí o que importa é acompanhar, e enviar de novo é manutenção.
+*/
+.goal-pdf-card--primeiro { order: -1; }
 .page-narrow { max-width: 980px; margin: 0 auto; }
 .page-hero { min-height: 104px; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .page-hero h1 { margin: 0 0 9px; font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -.055em; color: var(--green-950); }
