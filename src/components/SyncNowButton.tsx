@@ -89,27 +89,30 @@ export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
    */
   useEffect(() => {
     if (!account || !syncKey || transport.name === 'disabled') return
-    const tentar = () => {
+    const tentar = (motivo: 'tick' | 'retorno') => {
       if (deveSincronizarAgora({
         online: navigator.onLine,
         emCurso: emCurso.current,
         pendentes,
         ultimaRodada: ultimaRodada.current,
         agora: Date.now(),
+        motivo,
       })) void sincronizar({ automatica: true })
     }
+    const aoRetornar = () => { tentar('retorno') }
+    const aoRelogio = () => { tentar('tick') }
 
-    tentar()
-    const relogio = window.setInterval(tentar, 15_000)
-    const aoVoltar = () => { if (!document.hidden) tentar() }
-    window.addEventListener('focus', tentar)
-    window.addEventListener('online', tentar)
-    document.addEventListener('visibilitychange', aoVoltar)
+    aoRetornar()
+    const relogio = window.setInterval(aoRelogio, 15_000)
+    const aoTrocarVisibilidade = () => { if (!document.hidden) aoRetornar() }
+    window.addEventListener('focus', aoRetornar)
+    window.addEventListener('online', aoRetornar)
+    document.addEventListener('visibilitychange', aoTrocarVisibilidade)
     return () => {
       window.clearInterval(relogio)
-      window.removeEventListener('focus', tentar)
-      window.removeEventListener('online', tentar)
-      document.removeEventListener('visibilitychange', aoVoltar)
+      window.removeEventListener('focus', aoRetornar)
+      window.removeEventListener('online', aoRetornar)
+      document.removeEventListener('visibilitychange', aoTrocarVisibilidade)
     }
   }, [account, pendentes, sincronizar, syncKey, transport.name])
 
