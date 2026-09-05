@@ -90,7 +90,7 @@ describe('tela de acesso', () => {
     await user.type(screen.getByLabelText(/Senha/), 'Senha-Ficticia-2026')
     await user.click(screen.getByRole('button', { name: 'Entrar' }))
 
-    expect(authState.unlock).toHaveBeenCalledWith('conta-entrada@exemplo.test', 'Senha-Ficticia-2026')
+    expect(authState.unlock).toHaveBeenCalledWith('conta-entrada@exemplo.test', 'Senha-Ficticia-2026', false)
   })
 
   it('oferece recuperação de acesso somente quando já existe uma conta', async () => {
@@ -167,5 +167,22 @@ describe('tela de acesso', () => {
     // Entrar com outra conta continua possível: digita-se o e-mail dela.
     expect(screen.getByLabelText('E-mail')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Criar conta' })).toBeInTheDocument()
+  })
+
+  it('permanecer conectado só vale quando o pastor marca', async () => {
+    // A caixa vem desmarcada, e marcá-la muda onde a chave fica guardada: é
+    // decisão dele, não do aplicativo.
+    const user = userEvent.setup()
+    authState.account = { id: 'conta-ficticia', email: 'conta-entrada@exemplo.test' } as AccountRecord
+    render(<AuthPage />)
+
+    const caixa = screen.getByRole('checkbox', { name: /Permanecer conectado/i })
+    expect(caixa).not.toBeChecked()
+
+    await user.click(caixa)
+    await user.type(screen.getByLabelText(/Senha/), 'Senha-Ficticia-2026')
+    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(authState.unlock).toHaveBeenCalledWith('conta-entrada@exemplo.test', 'Senha-Ficticia-2026', true)
   })
 })
