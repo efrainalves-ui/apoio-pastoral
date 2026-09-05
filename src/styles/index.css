@@ -925,7 +925,13 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .answer-summary__bar span { display: block; height: 100%; background: var(--green-800); }
 .answer-summary__value { text-align: right; font-variant-numeric: tabular-nums; }
 .visit-members { display: grid; gap: 6px; margin-top: 12px; }
-.visit-members__list { display: flex; flex-wrap: wrap; gap: 8px; }
+.visit-members__chosen { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; padding: 0; list-style: none; }
+.visit-members__chip { display: inline-flex; gap: 6px; align-items: center; min-height: 34px; padding: 0 10px 0 12px; border: 1px solid var(--green-800); border-radius: 999px; background: var(--green-50); color: var(--green-900); font: inherit; font-size: .82rem; font-weight: 650; cursor: pointer; }
+.visit-members__chip svg { width: 15px; height: 15px; }
+.visit-members__results { display: grid; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; max-height: 260px; overflow-y: auto; }
+.visit-members__results button { width: 100%; min-height: 44px; padding: 0 12px; display: flex; gap: 10px; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: 11px; background: var(--paper); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.visit-members__results button:hover { border-color: var(--green-800); }
+.visit-members__results svg { width: 17px; height: 17px; flex: 0 0 auto; color: var(--green-700); }
 
 .sidebar__footer-actions { display: flex; gap: 8px; }
 .sidebar__footer-actions .button { flex: 1; min-width: 0; padding-inline: 10px; }
