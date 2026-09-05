@@ -53,3 +53,61 @@ describe('cartão de pergunta da entrevista', () => {
     expect(questionNumber('FAM-01')).toBe('1')
   })
 })
+
+const perguntaDeEscolha: QuestionSnapshot = {
+  code: 'REL-04', version: 1, category: 'Relacionamento', text: 'Você participa de um Pequeno Grupo?',
+  scope: 'individual', responseType: 'choice', options: ['Sim', 'Não', 'Gostaria'], sensitivity: 'pastoral',
+}
+
+const duasPessoas = [
+  { id: 'pessoa-1', label: 'Pessoa Fictícia Um' },
+  { id: 'pessoa-2', label: 'Pessoa Fictícia Dois' },
+]
+
+describe('mesma resposta para todos', () => {
+  it('grava a resposta para cada pessoa, e não uma resposta coletiva', async () => {
+    // O atalho é de digitação, não de armazenamento: quem lê depois precisa
+    // continuar sabendo o que cada pessoa respondeu.
+    const user = userEvent.setup()
+    const responder = vi.fn()
+    render(<QuestionCard question={perguntaDeEscolha} targets={duasPessoas} sameForAll valueFor={() => ''} registered={false} onAnswer={responder} onToggleRegistered={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Sim' }))
+
+    expect(responder).toHaveBeenCalledTimes(2)
+    expect(responder).toHaveBeenCalledWith('pessoa-1', 'Sim')
+    expect(responder).toHaveBeenCalledWith('pessoa-2', 'Sim')
+  })
+
+  it('mostra um campo só, em vez de um por pessoa', () => {
+    // É isso que encurta a tela: catorze opções repetidas por pessoa, em vinte
+    // perguntas, é o tipo de trabalho que faz alguém desistir de responder.
+    render(<QuestionCard question={perguntaDeEscolha} targets={duasPessoas} sameForAll valueFor={() => ''} registered={false} onAnswer={vi.fn()} onToggleRegistered={vi.fn()} />)
+
+    expect(screen.getByText('Todos os presentes')).toBeInTheDocument()
+    expect(screen.queryByText('Pessoa Fictícia Um')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Sim' })).toHaveLength(1)
+  })
+
+  it('desmarcado, volta a perguntar um a um', async () => {
+    const user = userEvent.setup()
+    const responder = vi.fn()
+    render(<QuestionCard question={perguntaDeEscolha} targets={duasPessoas} valueFor={() => ''} registered={false} onAnswer={responder} onToggleRegistered={vi.fn()} />)
+
+    expect(screen.getByText('Pessoa Fictícia Um')).toBeInTheDocument()
+    expect(screen.getByText('Pessoa Fictícia Dois')).toBeInTheDocument()
+
+    await user.click(screen.getAllByRole('button', { name: 'Sim' })[0]!)
+
+    expect(responder).toHaveBeenCalledTimes(1)
+    expect(responder).toHaveBeenCalledWith('pessoa-1', 'Sim')
+  })
+
+  it('com uma pessoa só, o atalho não muda nada', () => {
+    // Não há o que juntar, e um rótulo "Todos os presentes" para uma pessoa
+    // seria só ruído.
+    render(<QuestionCard question={perguntaDeEscolha} targets={[duasPessoas[0]!]} sameForAll valueFor={() => ''} registered={false} onAnswer={vi.fn()} onToggleRegistered={vi.fn()} />)
+
+    expect(screen.queryByText('Todos os presentes')).not.toBeInTheDocument()
+  })
+})
