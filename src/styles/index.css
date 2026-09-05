@@ -1019,9 +1019,16 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   .app-header__search input { min-height: 40px; border-color: transparent; background: rgb(255 255 255 / 14%); color: #fff; }
   .app-header__search input::placeholder { color: rgb(255 255 255 / 70%); }
   .app-header__search svg { color: rgb(255 255 255 / 78%); }
-  .quick-actions { margin-left: auto; }
+  /*
+    O menu do "+" ancorava no próprio botão, e o botão não fica na borda: ele é
+    o primeiro de cinco ícones no canto direito do cabeçalho. Um menu de 280px
+    abrindo para a esquerda a partir dali começava fora da tela, e "compromisso"
+    aparecia como "compromiss". Tirando a âncora do botão, ela passa a ser o
+    bloco de ações, que termina na borda — e o menu cabe.
+  */
+  .quick-actions { position: static; margin-left: auto; }
   .quick-actions__trigger { min-width: 40px; min-height: 40px; }
-  .quick-actions__menu { right: -4px; min-width: min(280px, calc(100vw - 24px)); color: var(--ink); }
+  .quick-actions__menu { right: 0; left: auto; min-width: 0; width: min(280px, calc(100vw - 24px)); max-width: calc(100vw - 24px); color: var(--ink); }
   .content { padding: 30px 18px calc(90px + env(safe-area-inset-bottom)); }
   .bottom-nav { position: fixed; z-index: 15; inset: auto 0 0; min-height: calc(65px + env(safe-area-inset-bottom)); padding: 7px 4px env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); background: rgb(255 254 251 / 96%); backdrop-filter: blur(16px); }
   .bottom-nav__item { min-height: 48px; display: grid; place-items: center; align-content: center; gap: 3px; color: var(--muted); text-decoration: none; font-size: .68rem; font-weight: 700; }
