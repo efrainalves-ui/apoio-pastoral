@@ -15,6 +15,7 @@ import { HISTORY_AREAS, type GoalHistoryData, type GoalImportPreview } from '../
 import { useGoalSources } from '../goals/useGoalSources'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
 import { AREA_PDF_DOCUMENT } from '../goals/areas'
+import { previaDeBatismos, previaFinanceira } from '../goals/importacaoAcms'
 
 const goalsService = new GoalsService()
 
@@ -36,6 +37,10 @@ export function GoalAreaPage() {
   // arquivo dele não pode sair do aparelho para alguém olhar.
   const [textoLido, setTextoLido] = useState('')
   const [mostrarTexto, setMostrarTexto] = useState(false)
+  // O Comparativo traz o ano anterior junto. Guardá-lo aqui é o que permite
+  // gravar a base de comparação no mesmo gesto, sem pedir para ninguém digitar
+  // o ano passado inteiro.
+  const [anoAnteriorDoPdf, setAnoAnteriorDoPdf] = useState<{ ano: number; total: number } | null>(null)
 
   if (!area) return <div className="page-stack"><p>Meta não encontrada.</p><Link className="text-link" to="/app/metas">Voltar às metas</Link></div>
   if (!ready) return <div className="app-loading" role="status">Abrindo a meta…</div>
@@ -89,7 +94,17 @@ export function GoalAreaPage() {
       const texto = await extractPdfText(bytes)
       setTextoLido(texto)
       setMostrarTexto(false)
-      setPreview(parseGoalsPdf(texto, await pdfHash(bytes)))
+      setAnoAnteriorDoPdf(null)
+      const hash = await pdfHash(bytes)
+      if (area === 'baptisms') {
+        setPreview(previaDeBatismos(texto, hash, churches))
+      } else if (area === 'financial') {
+        const lida = previaFinanceira(texto, hash, churches)
+        setAnoAnteriorDoPdf({ ano: lida.anoAnterior, total: lida.totalDoAnoAnterior })
+        setPreview(lida)
+      } else {
+        setPreview(parseGoalsPdf(texto, hash))
+      }
     } catch (motivo) {
       setError(motivo instanceof Error ? motivo.message : 'Não foi possível ler o arquivo. Nada foi alterado; escolha outro e tente de novo.')
     } finally { setBusy(false) }
@@ -100,7 +115,18 @@ export function GoalAreaPage() {
     setBusy(true); setError('')
     try {
       await goalsService.addEntries(account.id, masterKey, preview.entries.map((entry) => ({ ...entry, source: 'pdf' as const })))
-      setPreview(null); setNotice('Resultados aplicados.')
+      // O ano anterior veio no mesmo arquivo: guardá-lo aqui é o que faz a
+      // comparação existir sem trabalho manual nenhum.
+      if (anoAnteriorDoPdf && guardaHistorico && anoAnteriorDoPdf.ano < year) {
+        await goalsService.saveHistory(account.id, masterKey, {
+          area: area as GoalHistoryData['area'],
+          year: anoAnteriorDoPdf.ano,
+          amount: anoAnteriorDoPdf.total,
+          source: 'pdf',
+          reference: `Comparativo de Entradas ${anoAnteriorDoPdf.ano}`,
+        })
+      }
+      setPreview(null); setAnoAnteriorDoPdf(null); setNotice('Resultados aplicados.')
       await reload()
     } catch {
       setError('Não foi possível aplicar. Nada foi alterado.')
