@@ -10,7 +10,7 @@ import { Field } from '../components/ui/Field'
 type Mode = 'register' | 'unlock' | 'recover' | 'reset'
 
 export function AuthPage() {
-  const { account, accounts, register, unlock, recover, completeReset, recoveryCode, clearRecoveryCode, awaitingConfirmation, resendConfirmation, sendPasswordReset, sessionLostMessage } = useAuthVault()
+  const { account, register, unlock, recover, completeReset, recoveryCode, clearRecoveryCode, awaitingConfirmation, resendConfirmation, sendPasswordReset, sessionLostMessage } = useAuthVault()
   const [mode, setMode] = useState<Mode>(openedFromPasswordReset ? 'reset' : account ? 'unlock' : 'register')
   const [email, setEmail] = useState(account?.email ?? '')
   const [password, setPassword] = useState('')
@@ -131,18 +131,6 @@ export function AuthPage() {
           {isHomologationEnvironment && <p className="auth-env" role="status">Homologação — instalação de teste. Use apenas dados fictícios.</p>}
           <h2>{mode === 'register' ? 'Crie sua conta' : mode === 'recover' ? 'Recupere o acesso' : mode === 'reset' ? 'Defina sua senha nova' : 'Entre na sua conta'}</h2>
           {mode === 'reset' && <p className="field__hint">Este link define a senha nova da sua conta. Como o cofre era aberto pela senha anterior, informe também a sua chave de recuperação: nem o serviço nem este aplicativo conseguem abrir o conteúdo sem ela.</p>}
-          {/*
-            Trocar de conta só existe quando há mais de uma.
-            Com uma conta só — o caso de quase todo pastor —, este bloco era uma
-            lista de um item, ocupando a metade de cima da tela para oferecer
-            uma escolha que não existe: o e-mail já vem preenchido no campo logo
-            abaixo. Aparecer sempre também dava a entender que era preciso
-            escolher algo antes de entrar.
-          */}
-          {mode !== 'recover' && mode !== 'reset' && accounts.length > 1 && <div className="account-switcher">
-            <p className="field__hint">Contas neste aparelho</p>
-            <ul>{accounts.map((conta) => <li key={conta.id}><button type="button" className={`account-switcher__option${email.trim().toLowerCase() === conta.email ? ' account-switcher__option--on' : ''}`} onClick={() => { setMode('unlock'); setEmail(conta.email); setPassword(''); setError('') }}>{conta.email}</button></li>)}</ul>
-          </div>}
           {mode !== 'recover' && mode !== 'reset' && <div className="auth-tabs" role="tablist" aria-label="Acesso">
             <button ref={unlockTab} id="auth-tab-unlock" type="button" role="tab" aria-controls="auth-panel-unlock" aria-selected={mode === 'unlock'} tabIndex={mode === 'unlock' ? 0 : -1} onClick={() => selectMode('unlock')} onKeyDown={moveBetweenTabs}>Entrar</button>
             <button ref={registerTab} id="auth-tab-register" type="button" role="tab" aria-controls="auth-panel-register" aria-selected={mode === 'register'} tabIndex={mode === 'register' ? 0 : -1} onClick={() => selectMode('register')} onKeyDown={moveBetweenTabs}>Criar conta</button>

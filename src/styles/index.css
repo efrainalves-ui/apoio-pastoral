@@ -934,16 +934,6 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .sync-now__notice { flex-basis: 100%; margin: 6px 0 0; font-size: 0.9rem; color: var(--muted); }
 .sync-now__notice--ok { color: var(--green-800); }
 
-/*
-  Fichas lado a lado, e não botões empilhados na largura toda. Empilhados, três
-  contas viravam um paredão antes do formulário; o que se procura ali é entrar,
-  não administrar contas.
-*/
-.account-switcher { margin: 0 0 14px; }
-.account-switcher ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
-.account-switcher__option { max-width: 100%; min-height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); font: inherit; font-size: .82rem; color: inherit; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-.account-switcher__option:hover { border-color: var(--green-800); }
-.account-switcher__option--on { border-color: var(--green-800); box-shadow: inset 0 0 0 1px var(--green-800); }
 
 .question-card__label { margin: 0; font-size: 0.82rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--green-800); }
 .question-card__text { margin: 4px 0 12px; font-size: 1.02rem; }

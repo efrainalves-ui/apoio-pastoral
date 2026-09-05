@@ -151,24 +151,21 @@ describe('tela de acesso', () => {
     expect(screen.queryByText(/Homologação/i)).not.toBeInTheDocument()
   })
 
-  it('não oferece trocar de conta quando só existe uma neste aparelho', () => {
-    // Com uma conta só, a lista era de um item e ocupava a metade de cima da
-    // tela para oferecer uma escolha que não existe — o e-mail já vem
-    // preenchido no campo abaixo.
-    authState.contas = [{ id: 'conta-1', email: 'conta.unica@exemplo.test' }]
-    render(<AuthPage />)
-
-    expect(screen.queryByText('Contas neste aparelho')).not.toBeInTheDocument()
-  })
-
-  it('oferece trocar de conta quando há mais de uma', () => {
+  it('não mostra lista de contas do aparelho: o navegador já guarda o e-mail', () => {
+    // O bloco "Contas neste aparelho" repetia o que o próprio navegador e o
+    // celular já fazem — a primeira letra digitada já completa o endereço. Uma
+    // segunda lista, acima do formulário, só empurrava para baixo o que a
+    // pessoa veio fazer, que é entrar.
     authState.contas = [
       { id: 'conta-1', email: 'primeira@exemplo.test' },
       { id: 'conta-2', email: 'segunda@exemplo.test' },
     ]
     render(<AuthPage />)
 
-    expect(screen.getByText('Contas neste aparelho')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'segunda@exemplo.test' })).toBeInTheDocument()
+    expect(screen.queryByText('Contas neste aparelho')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'segunda@exemplo.test' })).not.toBeInTheDocument()
+    // Entrar com outra conta continua possível: digita-se o e-mail dela.
+    expect(screen.getByLabelText('E-mail')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Criar conta' })).toBeInTheDocument()
   })
 })
