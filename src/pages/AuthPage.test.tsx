@@ -5,6 +5,7 @@ import type { AccountRecord } from '../db/types'
 import { AuthPage } from './AuthPage'
 
 const authState = vi.hoisted(() => ({
+  contas: [] as Array<{ id: string; email: string }>,
   account: null as AccountRecord | null,
   recoveryCode: null as string | null,
   register: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock('../sync/config', () => ({
 }))
 
 vi.mock('../auth/AuthVaultContext', () => ({
-  useAuthVault: () => ({ accounts: [],
+  useAuthVault: () => ({ accounts: authState.contas,
     account: authState.account,
     recoveryCode: authState.recoveryCode,
     register: authState.register,
@@ -39,6 +40,7 @@ describe('tela de acesso', () => {
   afterEach(cleanup)
 
   beforeEach(() => {
+    authState.contas = []
     authState.account = null
     authState.recoveryCode = null
     ambiente.temServicoRemoto = false
@@ -147,5 +149,26 @@ describe('tela de acesso', () => {
     render(<AuthPage />)
 
     expect(screen.queryByText(/Homologação/i)).not.toBeInTheDocument()
+  })
+
+  it('não oferece trocar de conta quando só existe uma neste aparelho', () => {
+    // Com uma conta só, a lista era de um item e ocupava a metade de cima da
+    // tela para oferecer uma escolha que não existe — o e-mail já vem
+    // preenchido no campo abaixo.
+    authState.contas = [{ id: 'conta-1', email: 'conta.unica@exemplo.test' }]
+    render(<AuthPage />)
+
+    expect(screen.queryByText('Contas neste aparelho')).not.toBeInTheDocument()
+  })
+
+  it('oferece trocar de conta quando há mais de uma', () => {
+    authState.contas = [
+      { id: 'conta-1', email: 'primeira@exemplo.test' },
+      { id: 'conta-2', email: 'segunda@exemplo.test' },
+    ]
+    render(<AuthPage />)
+
+    expect(screen.getByText('Contas neste aparelho')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'segunda@exemplo.test' })).toBeInTheDocument()
   })
 })
