@@ -1,7 +1,8 @@
 import { RefreshCw } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { currentDeviceId } from '../auth/device'
+import { deveSincronizarAgora } from '../sync/autoSync'
 import { countPendingChanges, pendingLabel } from '../sync/pending'
 import { SyncService, syncConfirmed } from '../sync/service'
 import { createSyncTransport } from '../sync/transport'
@@ -28,6 +29,12 @@ export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
   const service = useMemo(() => new SyncService(transport), [transport])
   const [situacao, setSituacao] = useState<Situacao>('parado')
   const [pendentes, setPendentes] = useState(0)
+  // Em `ref`, e não em estado: quem decide se pode começar uma rodada precisa
+  // do valor do instante, não do valor que existia quando o efeito foi criado.
+  // Com estado, dois gatilhos próximos leem "parado" ao mesmo tempo e disparam
+  // duas rodadas sobre o mesmo cursor.
+  const emCurso = useRef(false)
+  const ultimaRodada = useRef<number | null>(null)
 
   // A fila é local: conferir de tempos em tempos custa pouco e mantém o aviso
   // certo mesmo quando o registro foi salvo em outra tela.
@@ -44,9 +51,11 @@ export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
     return () => { window.clearInterval(relogio); window.removeEventListener('focus', aoVoltar) }
   }, [conferirFila])
 
-  const sincronizar = useCallback(async () => {
-    if (!account || !syncKey || situacao === 'sincronizando') return
-    if (!navigator.onLine) { setSituacao('offline'); return }
+  const sincronizar = useCallback(async ({ automatica = false } = {}) => {
+    if (!account || !syncKey || emCurso.current) return
+    if (!navigator.onLine) { if (!automatica) setSituacao('offline'); return }
+    emCurso.current = true
+    ultimaRodada.current = Date.now()
     setSituacao('sincronizando')
     try {
       const resumo = await service.synchronize(account.id, currentDeviceId(account.id), syncKey)
@@ -56,9 +65,49 @@ export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
     } catch {
       setSituacao(navigator.onLine ? 'erro' : 'offline')
     } finally {
+      emCurso.current = false
       await conferirFila()
     }
-  }, [account, conferirFila, service, situacao, syncKey])
+  }, [account, conferirFila, service, syncKey])
+
+  /**
+   * A sincronização acontece sozinha, e o botão continua existindo.
+   *
+   * Antes era só manual, e o custo apareceu na prática: um distrito inteiro
+   * importado num aparelho, o outro aberto e vazio, porque ninguém apertou um
+   * botão. Agora ela é tentada ao abrir, ao voltar para a tela, quando a
+   * internet volta, pouco depois de uma alteração e de tempos em tempos —
+   * sempre pelas mesmas regras, que vivem em `autoSync` e têm teste.
+   *
+   * Falha de rodada automática não vira aviso vermelho: quem não pediu nada não
+   * precisa ser alarmado por uma tentativa de fundo que não deu certo. O botão
+   * manual continua dizendo tudo, porque ali houve um pedido.
+   */
+  useEffect(() => {
+    if (!account || !syncKey || transport.name === 'disabled') return
+    const tentar = () => {
+      if (deveSincronizarAgora({
+        online: navigator.onLine,
+        emCurso: emCurso.current,
+        pendentes,
+        ultimaRodada: ultimaRodada.current,
+        agora: Date.now(),
+      })) void sincronizar({ automatica: true })
+    }
+
+    tentar()
+    const relogio = window.setInterval(tentar, 15_000)
+    const aoVoltar = () => { if (!document.hidden) tentar() }
+    window.addEventListener('focus', tentar)
+    window.addEventListener('online', tentar)
+    document.addEventListener('visibilitychange', aoVoltar)
+    return () => {
+      window.clearInterval(relogio)
+      window.removeEventListener('focus', tentar)
+      window.removeEventListener('online', tentar)
+      document.removeEventListener('visibilitychange', aoVoltar)
+    }
+  }, [account, pendentes, sincronizar, syncKey, transport.name])
 
   if (transport.name === 'disabled') return null
 
