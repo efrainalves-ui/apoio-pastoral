@@ -1,3 +1,4 @@
+import { esquecerSessaoAberta, manterSessaoAberta, retomarSessaoAberta } from './sessaoAberta'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { AccountRecord } from '../db/types'
 import { technicalEvent } from '../logging/safeLogger'
@@ -33,7 +34,7 @@ interface AuthVaultContextValue {
   register: (email: string, password: string) => Promise<void>
   resendConfirmation: (email: string) => Promise<void>
   sendPasswordReset: (email: string) => Promise<void>
-  unlock: (email: string, password: string) => Promise<void>
+  unlock: (email: string, password: string, permanecerConectado?: boolean) => Promise<void>
   recover: (email: string, recoveryCode: string, newPassword: string) => Promise<void>
   /** Conclui a redefinição aberta pelo link do e-mail: define a senha e reabre o cofre. */
   completeReset: (email: string, recoveryCode: string, newPassword: string) => Promise<void>
@@ -70,6 +71,7 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
   useEffect(() => onAccountSessionLost(() => {
     setMasterKey(null)
     setSyncKey(null)
+    void esquecerSessaoAberta()
     setSessionLostMessage('Outra conta entrou neste navegador e esta aba foi bloqueada. Entre de novo com e-mail e senha para continuar nesta conta.')
     technicalEvent('vault.locked')
   }), [])
@@ -81,6 +83,14 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
     void (async () => {
       const found = await findLocalAccount()
       setAccount(found ?? null)
+      // Recarregar a página não é sair. Se esta mesma aba tinha o cofre aberto
+      // e o pastor pediu para permanecer conectado, ele volta aberto.
+      if (found) {
+        const guardadas = await retomarSessaoAberta(found.id)
+        if (guardadas) { setMasterKey(guardadas.master); setSyncKey(guardadas.sync) }
+      } else {
+        await esquecerSessaoAberta()
+      }
       await refreshAccounts()
       setInitialized(true)
     })()
@@ -116,7 +126,7 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
     await requestPasswordReset(email, `${window.location.origin}/acesso`)
   }, [])
 
-  const unlock = useCallback(async (email: string, password: string) => {
+  const unlock = useCallback(async (email: string, password: string, permanecerConectado = false) => {
     // O acesso novo é o único que desfaz o bloqueio da aba: era ele que
     // faltava, e é ele que prova de quem é a sessão que vai valer agora.
     clearAccountSessionLock()
@@ -125,6 +135,10 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
     setAccount(result.account)
     setMasterKey(result.keys.master)
     setSyncKey(result.keys.sync)
+    // Só quando o pastor pediu. Guardar por conta própria seria decidir por ele
+    // uma coisa que muda onde a chave dele fica.
+    if (permanecerConectado) await manterSessaoAberta(result.account.id, result.keys)
+    else await esquecerSessaoAberta()
     await refreshAccounts()
     technicalEvent('auth.succeeded')
   }, [refreshAccounts])
@@ -158,6 +172,9 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
   const lock = useCallback(() => {
     setMasterKey(null)
     setSyncKey(null)
+    // Bloquear precisa bloquear de verdade: deixar a chave guardada faria o
+    // próximo recarregamento reabrir o cofre que alguém acabou de fechar.
+    void esquecerSessaoAberta()
     technicalEvent('vault.locked')
   }, [])
 
@@ -171,6 +188,7 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
     setSessionLostMessage('')
     setMasterKey(null)
     setSyncKey(null)
+    await esquecerSessaoAberta()
     setAccount(null)
     await refreshAccounts()
     await signOutRemoteAccount()
@@ -182,6 +200,7 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
     setSessionLostMessage('')
     setMasterKey(null)
     setSyncKey(null)
+    await esquecerSessaoAberta()
     await signOutRemoteAccount()
     technicalEvent('vault.locked')
   }, [])

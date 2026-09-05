@@ -18,6 +18,9 @@ export function AuthPage() {
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [busy, setBusy] = useState(false)
+  // Desmarcado por padrão, de propósito: marcar por conta própria seria decidir
+  // pelo pastor onde a chave dele fica guardada.
+  const [permanecerConectado, setPermanecerConectado] = useState(false)
   const unlockTab = useRef<HTMLButtonElement>(null)
   const registerTab = useRef<HTMLButtonElement>(null)
 
@@ -84,7 +87,7 @@ export function AuthPage() {
     setBusy(true)
     try {
       if (mode === 'register') await register(email, password)
-      else if (mode === 'unlock') await unlock(email, password)
+      else if (mode === 'unlock') await unlock(email, password, permanecerConectado)
       else if (mode === 'reset') await completeReset(email, recovery, password)
       else await recover(email, recovery, password)
     } catch (reason) {
@@ -151,6 +154,10 @@ export function AuthPage() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
+              {mode === 'unlock' && <label className="confirmation-check auth-keep">
+                <input type="checkbox" checked={permanecerConectado} onChange={(event) => setPermanecerConectado(event.target.checked)} />
+                <span>Permanecer conectado<small>Recarregar a página não pede a senha de novo. Fechar a aba, sim — e o cofre continua se trancando sozinho depois de um tempo parado.</small></span>
+              </label>}
               {sessionLostMessage && <div className="alert alert--error" role="alert">{sessionLostMessage}</div>}
               {error && <div className="alert alert--error" role="alert">{error}</div>}
               {aviso && <div className="alert alert--success" role="status">{aviso}</div>}
