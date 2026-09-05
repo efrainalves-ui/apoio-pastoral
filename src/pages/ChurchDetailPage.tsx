@@ -1,3 +1,4 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { Archive, ArrowLeft, CalendarDays, Clock3, FileUp, History, MapPin, Pencil, Plus, Trash2, UsersRound } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -88,7 +89,7 @@ export function ChurchDetailPage() {
     }
   }, [account, churchId, masterKey])
 
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
   // No celular a faixa de abas rola: a aba escolhida fica sempre à vista.
   useEffect(() => { document.querySelector('.tab-bar .button--primary')?.scrollIntoView({ inline: 'center', block: 'nearest' }) }, [tab])
 

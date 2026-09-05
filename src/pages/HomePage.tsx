@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { BookHeart, Cake, CalendarDays, ChevronRight, Church, Heart, HeartHandshake, ListChecks, Megaphone, ShieldCheck, SquareCheck, UsersRound } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { AgendaService } from '../agenda/service'
@@ -55,7 +56,7 @@ export function HomePage() {
     setPeople(nextPeople); setFamilies(nextFamilies.length); setChurches(nextChurches); setTodayBirthdays(upcomingBirthdays(nextPeople, new Date(), 0)); setEvents(nextEvents); setTodayEvents(nextEvents.filter(({ startAt }) => startAt.slice(0, 10) === today)); setTasks(nextTasks); setPrayers(nextPrayers); setFollowUps(nextFollowUps); setRounds(nextRounds); setCampaigns(nextCampaigns); setInterests(nextInterests); setStudies(nextStudies)
   }, [account, masterKey])
 
-  useEffect(() => { void refresh() }, [refresh])
+  useReloadOnSync(refresh)
 
   const today = new Date().toISOString().slice(0, 10)
   const overdueTasks = tasks.filter(({ status, dueAt }) => status === 'pending' && dueAt < today)

@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, CheckCircle2, FileSearch, FileUp, RotateCcw, ShieldCheck, TriangleAlert } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -28,7 +29,7 @@ async function listHash(churchId: string, text: string): Promise<string> {
  */
 export function MemberImportPage({ churchId = '', embedded = false }: { churchId?: string; embedded?: boolean } = {}) {
   const { account, masterKey } = useAuthVault(); const [people, setPeople] = useState<PersonEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [batches, setBatches] = useState<ImportBatchEntity[]>([]); const [preview, setPreview] = useState<MemberImportPreview | null>(null); const [confirmed, setConfirmed] = useState(false); const [report, setReport] = useState<ImportBatchEntity | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [pasted, setPasted] = useState(''); const [listChurchId, setListChurchId] = useState(churchId)
-  const load = useCallback(async () => { if (!account || !masterKey) return; const district = await districtService.getDistrict(account.id, masterKey); const [nextPeople, nextChurches, nextBatches] = await Promise.all([peopleService.listPeople(account.id, masterKey), district ? districtService.listChurches(account.id, masterKey, district.id) : [], imports.listBatches(account.id, masterKey, 'members')]); setPeople(nextPeople); setChurches(nextChurches); setBatches(nextBatches) }, [account, masterKey]); useEffect(() => { void load() }, [load])
+  const load = useCallback(async () => { if (!account || !masterKey) return; const district = await districtService.getDistrict(account.id, masterKey); const [nextPeople, nextChurches, nextBatches] = await Promise.all([peopleService.listPeople(account.id, masterKey), district ? districtService.listChurches(account.id, masterKey, district.id) : [], imports.listBatches(account.id, masterKey, 'members')]); setPeople(nextPeople); setChurches(nextChurches); setBatches(nextBatches) }, [account, masterKey]); useReloadOnSync(load)
   async function analyze(text: string, hash: string) { if (!account || !masterKey) return; setPreview(await imports.previewMembers(account.id, masterKey, hash, parseMemberText(text), people, churches)); setConfirmed(false); setReport(null) }
   // A lista colada e a do Word passam pela mesma prévia do PDF: nada é aplicado
   // sem o pastor conferir.

@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { Cake, FileUp, Search, UsersRound } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Card } from '../components/ui/Card'
@@ -17,7 +18,7 @@ export function PeoplePage() {
   const { account, masterKey } = useAuthVault(); const [people, setPeople] = useState<PersonEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([])
   const [query, setQuery] = useState(''); const [churchId, setChurchId] = useState(searchParams.get('church') ?? ''); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
   const load = useCallback(async () => { if (!account || !masterKey) return; setLoading(true); try { const district = await districtService.getDistrict(account.id, masterKey); setPeople(await service.listPeople(account.id, masterKey)); setChurches(district ? await districtService.listChurches(account.id, masterKey, district.id) : []) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível abrir as pessoas.') } finally { setLoading(false) } }, [account, masterKey])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
   const filtered = useMemo(() => people.filter((person) => (!churchId || person.currentChurchId === churchId) && (!query || normalizePersonName(person.name).includes(normalizePersonName(query)))), [people, churchId, query])
   const churchName = (id: string) => churches.find((church) => church.id === id)?.name ?? 'Igreja não encontrada'
   if (loading) return <div className="app-loading" role="status">Abrindo pessoas…</div>

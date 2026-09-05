@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowRight, ClipboardCheck, ClipboardList, Plus, Settings, Vote } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -56,7 +57,7 @@ export function CommissionsPage() {
     }
   }, [account, masterKey, churchId])
 
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   const pending = meetings.filter((meeting) => !meeting.finalizedAt).length
 

@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, Clock3, Edit3, History, LockKeyhole, UsersRound } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { CareService } from '../care/service'
@@ -13,7 +14,7 @@ const care = new CareService(); const families = new FamilyService(); const peop
 export function VisitDetailPage() {
   const { account, masterKey } = useAuthVault(); const { visitId = '' } = useParams(); const [visit, setVisit] = useState<VisitEntity | null>(null); const [targetName, setTargetName] = useState(''); const [editing, setEditing] = useState(false); const [answers, setAnswers] = useState<VisitAnswer[]>([]); const [notes, setNotes] = useState(''); const [correctionNote, setCorrectionNote] = useState(''); const [error, setError] = useState('')
   const load = useCallback(async () => { if (!account || !masterKey) return; const current = await care.getVisit(account.id, masterKey, visitId); setVisit(current); if (!current) return; const target = current.targetType === 'family' ? await families.getFamily(account.id, masterKey, current.targetId) : await people.getPerson(account.id, masterKey, current.targetId); setTargetName(target?.name ?? 'Cadastro preservado'); const latest = current.versions.at(-1)!; setAnswers(latest.answers.map((answer) => ({ ...answer, value: Array.isArray(answer.value) ? [...answer.value] : answer.value }))); setNotes(latest.notes) }, [account, masterKey, visitId])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
   async function correct() { if (!account || !masterKey || !visit) return; const latest = visit.versions.at(-1)!; try { await care.correctVisit(account.id, masterKey, visit.id, { correctionNote: correctionNote.trim() || 'Correção registrada pelo pastor', answers, participants: latest.participants, reason: latest.reason, startAt: latest.startAt, endAt: latest.endAt, notes }); setEditing(false); setCorrectionNote(''); await load() } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível registrar a correção.') } }
   if (!visit) return <div className="empty-state"><LockKeyhole /><strong>Visita não encontrada</strong></div>
   const latest = visit.versions.at(-1)!

@@ -1,6 +1,7 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { ArrowLeft, CalendarPlus, Link2, Pencil, Plus, Trash2 } from 'lucide-react'
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { type FormEvent, useCallback, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AgendaService } from '../agenda/service'
 import type { AgendaEventEntity } from '../agenda/types'
@@ -50,7 +51,7 @@ export function GoalTrackingPage() {
       setGoal(encontrada); setEvents(agenda)
     } catch { setError('Não foi possível abrir o acompanhamento desta meta.') } finally { setCarregando(false) }
   }, [account, goalId, masterKey])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   async function salvar(mudanca: Partial<AnnualGoalInput>, aviso: string) {
     if (!account || !masterKey || !goal) return

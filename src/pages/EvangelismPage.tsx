@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { CalendarDays, Megaphone, Plus, TriangleAlert } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Card } from '../components/ui/Card'
@@ -12,7 +13,7 @@ import { CAMPAIGN_STATUS_LABELS, type CampaignStatus, type EvangelismCampaignEnt
 const service = new EvangelismPlanningService(); const districtService = new DistrictService()
 export function EvangelismPage() {
   const { account, masterKey } = useAuthVault(); const [campaigns, setCampaigns] = useState<EvangelismCampaignEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [churchId, setChurchId] = useState(''); const [year, setYear] = useState(new Date().getFullYear()); const [status, setStatus] = useState<CampaignStatus | ''>(''); const [error, setError] = useState('')
-  const load = useCallback(async () => { if (!account || !masterKey) return; try { const district = await districtService.getDistrict(account.id, masterKey); const [nextCampaigns, nextChurches] = await Promise.all([service.listCampaigns(account.id, masterKey), district ? districtService.listChurches(account.id, masterKey, district.id) : []]); setCampaigns(nextCampaigns); setChurches(nextChurches) } catch { setError('Não foi possível abrir as campanhas.') } }, [account, masterKey]); useEffect(() => { void load() }, [load])
+  const load = useCallback(async () => { if (!account || !masterKey) return; try { const district = await districtService.getDistrict(account.id, masterKey); const [nextCampaigns, nextChurches] = await Promise.all([service.listCampaigns(account.id, masterKey), district ? districtService.listChurches(account.id, masterKey, district.id) : []]); setCampaigns(nextCampaigns); setChurches(nextChurches) } catch { setError('Não foi possível abrir as campanhas.') } }, [account, masterKey]); useReloadOnSync(load)
   const visible = campaigns.filter((campaign) => campaign.startDate.startsWith(String(year)) && (!churchId || campaign.churchIds.includes(churchId)) && (!status || campaign.status === status)); const summary = campaignDashboard(campaigns.filter((campaign) => campaign.startDate.startsWith(String(year)))); const tasks = visible.flatMap((campaign) => campaign.tasks.map((task) => ({ task, campaign }))); const upcoming = visible.filter(({ endDate }) => endDate >= new Date().toISOString().slice(0, 10)).sort((a, b) => a.startDate.localeCompare(b.startDate)).slice(0, 5)
   return <div className="page-stack evangelism-page"><header className="page-hero"><div><h1>Evangelismo</h1></div><Link className="button" to="/app/evangelismo/nova"><Plus />Nova campanha</Link></header>{error && <div className="alert alert--error">{error}</div>}
     <section className="dashboard-metrics" aria-label="Resumo das campanhas"><div><small>Em planejamento</small><strong>{summary.planning}</strong><span>campanhas</span></div><div><small>Em preparação</small><strong>{summary.preparing}</strong><span>organização ativa</span></div><div><small>Acontecendo</small><strong>{summary.happening}</strong><span>neste período</span></div><div><small>Concluídas</small><strong>{summary.completed}</strong><span>no ano</span></div></section>

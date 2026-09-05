@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, Save, Search } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -17,7 +18,7 @@ const service = new FamilyService(); const peopleService = new PeopleService(); 
 export function FamilyFormPage() {
   const { familyId } = useParams<{ familyId: string }>(); const { account, masterKey } = useAuthVault(); const navigate = useNavigate(); const [input, setInput] = useState<FamilyInput>(emptyFamilyInput()); const [people, setPeople] = useState<PersonEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [query, setQuery] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false)
   const load = useCallback(async () => { if (!account || !masterKey) return; try { const district = await districtService.getDistrict(account.id, masterKey); const nextChurches = district ? await districtService.listChurches(account.id, masterKey, district.id) : []; setChurches(nextChurches); setPeople(await peopleService.listPeople(account.id, masterKey)); if (familyId) { const family = await service.getFamily(account.id, masterKey, familyId); if (!family) throw new Error('Família não encontrada.'); setInput({ name: family.name, primaryChurchId: family.primaryChurchId, memberIds: family.memberIds, address: family.address, notes: family.notes }) } else if (nextChurches.length === 1) setInput((current) => ({ ...current, primaryChurchId: nextChurches[0]!.id })) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível abrir a família.') } finally { setLoading(false) } }, [account, familyId, masterKey])
-  useEffect(() => { void load() }, [load]); const filtered = useMemo(() => people.filter(({ name }) => normalizePersonName(name).includes(normalizePersonName(query))), [people, query]); const churchName = (id: string) => churches.find((church) => church.id === id)?.name ?? 'Igreja'
+  useReloadOnSync(load); const filtered = useMemo(() => people.filter(({ name }) => normalizePersonName(name).includes(normalizePersonName(query))), [people, query]); const churchName = (id: string) => churches.find((church) => church.id === id)?.name ?? 'Igreja'
   function toggle(id: string) { setInput((current) => ({ ...current, memberIds: current.memberIds.includes(id) ? current.memberIds.filter((personId) => personId !== id) : [...current.memberIds, id] })) }
   async function submit(event: React.FormEvent) { event.preventDefault(); if (!account || !masterKey) return; setBusy(true); setError(''); try { const family = familyId ? await service.updateFamily(account.id, masterKey, familyId, input) : await service.createFamily(account.id, masterKey, input); await navigate(`/app/familias/${family.id}`, { replace: true }) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível salvar a família.') } finally { setBusy(false) } }
   if (loading) return <div className="app-loading">Abrindo a família…</div>

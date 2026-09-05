@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, CheckCircle2, FileSearch, FileUp, LockKeyhole, RotateCcw, TriangleAlert } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -53,7 +54,7 @@ export function FidelityPage() {
     setPeople(nextPeople); setChurches(nextChurches); setBatches(nextBatches)
   }, [account, masterKey])
 
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
   const fidelityPeople = useMemo(() => people.filter((person) => person.fidelity && (!churchId || person.currentChurchId === churchId) && (!category || person.fidelity.category === category)), [category, churchId, people])
   const percent = (count: number, total: number) => total ? `${Math.round(count / total * 100)}%` : '0%'
   const churchName = (id: string) => churches.find((church) => church.id === id)?.name ?? 'Igreja'

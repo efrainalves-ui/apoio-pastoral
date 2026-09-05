@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { Archive, Building2, Church, MapPin, Pencil, Plus, Search, Trash2, UsersRound } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -61,7 +62,7 @@ export function DistrictPage() {
     }
   }, [account, masterKey])
 
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   async function saveDistrict(event: React.FormEvent) {
     event.preventDefault()

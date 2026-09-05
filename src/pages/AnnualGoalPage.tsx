@@ -1,6 +1,7 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { ArrowLeft } from 'lucide-react'
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { type FormEvent, useCallback, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -37,7 +38,7 @@ export function AnnualGoalPage() {
     void _id; void _campanhas; void _eventos; void _historico; void _criada; void _atualizada
     setDraft(input)
   }, [account, goalId, masterKey])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   async function save(event: FormEvent) {
     event.preventDefault()

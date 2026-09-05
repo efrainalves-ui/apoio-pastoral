@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { BookOpen, FileText, MapPin, Plus, Search, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { PreachingPanel } from '../components/PreachingPanel'
@@ -41,7 +42,7 @@ export function SermonsPage() {
     setPreachings(eventos.filter((event) => event.category === 'preaching').sort((a, b) => b.startAt.localeCompare(a.startAt)))
     setChurches(igrejas)
   }, [account, masterKey])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
   const visible = sermons.filter((sermon) => (!status || sermon.status === status) && `${sermon.title} ${sermon.theme} ${sermon.mainText} ${sermon.tags.join(' ')}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR')))
   async function remove(sermon: SermonEntity) { if (!account || !masterKey || !window.confirm('Remover este sermão? O histórico de pregações continuará preservado.')) return; try { await sermonsService.remove(account.id, masterKey, sermon.id); await load() } catch { setError('Não foi possível remover o sermão.') } }
   return <div className="page-stack"><header className="page-hero"><div><p className="eyebrow">Sermões</p><h1>Sermões e pregações</h1></div><div className="page-actions"><Button variant="secondary" icon={<FileText />} onClick={() => setRelatorioAberto((valor) => !valor)}>Histórico de pregações</Button><Link className="button" to="/app/sermoes/novo"><Plus />Novo sermão</Link></div></header>{error && <div className="alert alert--error" role="alert">{error}</div>}{relatorioAberto && <Card eyebrow="Relatório local" title="Histórico de pregações"><label className="confirmation-check"><input type="checkbox" checked={comNomes} onChange={(event) => setComNomes(event.target.checked)} /><span><strong>Incluir nomes neste relatório</strong><small>Sem marcar, saem data e igreja. Com nomes, o título da pregação entra e pode conter dados pessoais: compartilhe com cuidado.</small></span></label><Button icon={<FileText />} onClick={() => previewLocalPdf('Sermões e Pregações', sermonReportLines(preachings, sermons.length, (id) => churches.find((church) => church.id === id)?.name ?? 'Distrito', comNomes))}>Gerar histórico</Button></Card>}<Card><div className="filter-bar"><label className="field search-only"><span className="field__label">Pesquisar</span><span className="search-input"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} /></span></label><label className="field"><span className="field__label">Situação</span><select className="field__input" value={status} onChange={(event) => setStatus(event.target.value as SermonStatus | '')}><option value="">Todas</option>{Object.entries(SERMON_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>{!visible.length ? <div className="empty-state"><BookOpen /><strong>Nenhum sermão encontrado</strong><Link className="button" to="/app/sermoes/novo">Criar sermão</Link></div> : <div className="sermon-list">{visible.map((sermon) => <article className="sermon-row" key={sermon.id}>

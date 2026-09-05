@@ -1,6 +1,7 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { ArrowLeft, TriangleAlert } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -29,7 +30,7 @@ export function CloseDistrictPage() {
     if (!account || !masterKey) return
     try { setPrevia(await service.preview(account.id, masterKey)) } catch { setError('Não foi possível abrir os dados do distrito.') }
   }, [account, masterKey, service])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   async function encerrar() {
     if (!account || !masterKey || texto.trim().toUpperCase() !== CONFIRMACAO || !ciente) return

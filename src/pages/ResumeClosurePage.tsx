@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { TriangleAlert } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -30,7 +31,7 @@ export function ResumeClosurePage({ onDone }: { onDone: () => void }) {
     if (!account) return
     setEtapa(await districtClosureStage(account.id))
   }, [account])
-  useEffect(() => { void carregar() }, [carregar])
+  useReloadOnSync(carregar)
 
   async function concluir() {
     if (!account || !masterKey) return

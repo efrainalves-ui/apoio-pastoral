@@ -1,3 +1,4 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, ClipboardList, Plus, Settings, Vote } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -62,7 +63,7 @@ export function CommissionKindPage({ kind }: { kind: CommissionKind }) {
     }
   }, [account, masterKey, requestedChurchId, churchId, kind])
 
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   const createMeeting = useCallback(async () => {
     if (!account || !masterKey || !churchId || creating.current) return

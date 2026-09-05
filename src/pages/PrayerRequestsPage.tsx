@@ -1,6 +1,7 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { ArrowLeft, Church, MessageCircle, Pencil, Plus, Trash2, UserRound } from 'lucide-react'
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { CareService } from '../care/service'
@@ -51,7 +52,7 @@ export function PrayerRequestsPage({ embedded = false }: { embedded?: boolean } 
     ])
     setPrayers(nextPrayers); setPeople(nextPeople); setChurches(nextChurches)
   }, [account, masterKey])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   const selectablePeople = useMemo(() => peopleForPrayerChurch(people, draft?.churchId ?? ''), [draft?.churchId, people])
   const churchName = (churchId: string) => churches.find(({ id }) => id === churchId)?.name ?? 'Igreja não encontrada'

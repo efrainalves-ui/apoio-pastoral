@@ -1,6 +1,7 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { FileSpreadsheet, Trash2, Upload } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -47,7 +48,7 @@ export function AcmsPage() {
     setLoading(true)
     try { setReports(await service.reports(account.id, masterKey)) } catch (motivo) { setError(motivo instanceof Error ? motivo.message : 'Não foi possível abrir os relatórios.') } finally { setLoading(false) }
   }, [account, masterKey])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   const atual = reports[0] ?? null
   const totais = useMemo(() => atual ? acmsTotals(atual.rows) : null, [atual])

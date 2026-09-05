@@ -1,3 +1,4 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { BookCheck, BookOpen, Clock3, Goal, Pencil, Plus, Trash2 } from 'lucide-react'
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -22,7 +23,7 @@ export function ReadingPage() {
   const currentGoal = goals.find((goal) => goal.month === month) ?? null; const [goalBooks, setGoalBooks] = useState(0); const [goalPages, setGoalPages] = useState(0); const [goalMinutes, setGoalMinutes] = useState(0)
   const [notice, setNotice] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
   const load = useCallback(async () => { if (!account || !masterKey) return; const [nextBooks, nextSessions, nextGoals] = await Promise.all([service.books(account.id, masterKey), service.sessions(account.id, masterKey), service.goals(account.id, masterKey)]); setBooks(nextBooks); setSessions(nextSessions); setGoals(nextGoals); const goal = nextGoals.find((item) => item.month === month); setGoalBooks(goal?.books ?? 0); setGoalPages(goal?.pages ?? 0); setGoalMinutes(goal?.minutes ?? 0) }, [account, masterKey, month, setGoalBooks, setGoalPages, setGoalMinutes])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
   // Abrir o cadastro leva a tela até ele e deixa o cursor no primeiro campo.
   // A rolagem é imediata para o formulário já aparecer inteiro, acima do teclado.
   const formOpen = bookDraft !== null

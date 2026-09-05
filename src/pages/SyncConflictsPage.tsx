@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, Check, Copy, Laptop, Smartphone } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -46,7 +47,7 @@ export function SyncConflictsPage() {
     setLoading(false)
   }, [account, masterKey])
 
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   async function choose(conflictId: string, choice: ConflictChoice) {
     if (!account || !masterKey) return

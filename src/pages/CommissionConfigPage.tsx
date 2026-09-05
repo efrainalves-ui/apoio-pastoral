@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useReloadOnSync } from '../sync/useReloadOnSync'
+import { useCallback, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -69,7 +70,7 @@ export function CommissionConfigPage() {
     }
   }, [account, masterKey, requestedChurchId, churchId])
 
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   async function save() {
     if (!account || !masterKey || !churchId || busy) return

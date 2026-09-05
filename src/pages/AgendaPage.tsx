@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { BookOpen, CalendarDays, ChevronLeft, ChevronRight, Clock3, Download, Edit3, MapPin, Plus, Trash2, TriangleAlert } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AgendaService, mondayRestItems } from '../agenda/service'
 import { downloadItineraryPdf, itineraryItems } from '../agenda/itineraryPdf'
@@ -33,7 +34,7 @@ function EventChip({ event, compact = false }: { event: AgendaEventEntity; compa
 export function AgendaPage() {
   const { account, masterKey } = useAuthVault(); const [events, setEvents] = useState<AgendaEventEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [view, setView] = useState<AgendaView>('week'); const [anchor, setAnchor] = useState(() => new Date()); const [category, setCategory] = useState<AgendaCategory | ''>(''); const [churchId, setChurchId] = useState(''); const [selected, setSelected] = useState<Set<string>>(new Set()); const [comNomes, setComNomes] = useState(false); const [pdfOpen, setPdfOpen] = useState(false); const [error, setError] = useState('')
   const load = useCallback(async () => { if (!account || !masterKey) return; const district = await districts.getDistrict(account.id, masterKey); const [nextEvents, nextChurches] = await Promise.all([agenda.listEvents(account.id, masterKey), district ? districts.listChurches(account.id, masterKey, district.id) : []]); setEvents(nextEvents); setChurches(nextChurches); setSelected(new Set(nextEvents.filter(({ includeInItinerary }) => includeInItinerary).map(({ id }) => id))) }, [account, masterKey])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
   const [from, to] = useMemo(() => periodBounds(view, anchor), [anchor, view]); const periodEvents = events.filter((event) => new Date(event.startAt) <= to && new Date(event.endAt) >= from); const visibleEvents = periodEvents.filter((event) => (!category || event.category === category) && (!churchId || event.churchId === churchId)); const restItems = mondayRestItems(from, to); const churchName = (id: string | null) => churches.find((church) => church.id === id)?.name
   const days = useMemo(() => { const output: Date[] = []; const cursor = dayStart(from); while (cursor <= to) { output.push(new Date(cursor)); cursor.setDate(cursor.getDate() + 1) } return output }, [from, to])
   const monthDays = useMemo(() => { const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1); const cursor = new Date(first); cursor.setDate(first.getDate() - first.getDay()); return Array.from({ length: 42 }, (_, index) => { const date = new Date(cursor); date.setDate(cursor.getDate() + index); return date }) }, [anchor])

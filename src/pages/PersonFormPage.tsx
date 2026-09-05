@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, Save } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -16,7 +17,7 @@ const service = new PeopleService(); const districtService = new DistrictService
 export function PersonFormPage() {
   const { personId } = useParams<{ personId: string }>(); const [searchParams] = useSearchParams(); const { account, masterKey } = useAuthVault(); const navigate = useNavigate(); const [input, setInput] = useState<PersonInput>(() => ({ ...emptyPersonInput(), currentChurchId: searchParams.get('church') ?? '' })); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [errors, setErrors] = useState<PersonFieldErrors>({}); const [error, setError] = useState(''); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false)
   const load = useCallback(async () => { if (!account || !masterKey) return; try { const district = await districtService.getDistrict(account.id, masterKey); const nextChurches = district ? await districtService.listChurches(account.id, masterKey, district.id) : []; setChurches(nextChurches); if (personId) { const person = await service.getPerson(account.id, masterKey, personId); if (!person) throw new Error('Pessoa não encontrada.'); setInput({ name: person.name, birthDate: person.birthDate ?? '', whatsapp: person.whatsapp, notes: person.notes, pastoralStatus: person.pastoralStatus, currentChurchId: person.currentChurchId }) } else if (nextChurches.length === 1) setInput((current) => ({ ...current, currentChurchId: nextChurches[0]!.id })) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível abrir o cadastro.') } finally { setLoading(false) } }, [account, masterKey, personId])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
   function update<K extends keyof PersonInput>(field: K, value: PersonInput[K]) { setInput((current) => ({ ...current, [field]: value })); setErrors((current) => ({ ...current, [field]: '' })) }
   async function submit(event: React.FormEvent) { event.preventDefault(); if (!account || !masterKey) return; const validation = validatePersonInput(input); setErrors(validation); if (Object.keys(validation).length) { setError('Revise os campos destacados.'); return } setBusy(true); setError(''); try { const person = personId ? await service.updatePerson(account.id, masterKey, personId, input) : await service.createPerson(account.id, masterKey, input); await navigate(`/app/pessoas/${person.id}`, { replace: true }) } catch (reason) { if (reason instanceof PersonValidationError) setErrors(reason.fieldErrors); setError(reason instanceof Error ? reason.message : 'Não foi possível salvar a pessoa.') } finally { setBusy(false) } }
   if (loading) return <div className="app-loading" role="status">Abrindo o cadastro…</div>

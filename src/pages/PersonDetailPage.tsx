@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, Cake, Church, Clock3, FileText, Pencil, Phone, ShieldCheck, Trash2, UsersRound } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -18,7 +19,7 @@ const dadosPessoais = new PersonDataService(); const districtService = new Distr
 export function PersonDetailPage() {
   const { personId = '' } = useParams<{ personId: string }>(); const { account, masterKey } = useAuthVault(); const navigate = useNavigate(); const [person, setPerson] = useState<PersonEntity | null>(null); const [churchName, setChurchName] = useState(''); const [family, setFamily] = useState<{ id: string; name: string } | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [confirmDelete, setConfirmDelete] = useState(false); const [plano, setPlano] = useState<PersonRemovalPlan | null>(null)
   const load = useCallback(async () => { if (!account || !masterKey) return; try { const next = await service.getPerson(account.id, masterKey, personId); if (!next) throw new Error('Pessoa não encontrada.'); setPerson(next); const district = await districtService.getDistrict(account.id, masterKey); const churches = district ? await districtService.listChurches(account.id, masterKey, district.id) : []; setChurchName(churches.find(({ id }) => id === next.currentChurchId)?.name ?? 'Igreja não encontrada'); const found = (await familyService.listFamilies(account.id, masterKey)).find(({ memberIds }) => memberIds.includes(next.id)); setFamily(found ? { id: found.id, name: found.name } : null) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível abrir o perfil.') } finally { setLoading(false) } }, [account, masterKey, personId])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
   async function prepararPlano() {
     if (!account || !masterKey || !person) return
     try { setPlano(await dadosPessoais.plan(account.id, masterKey, person.id)) } catch { /* segue sem a contagem */ }

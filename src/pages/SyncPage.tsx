@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { Cloud, CloudOff, RefreshCw, ShieldCheck } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { currentDeviceId } from '../auth/device'
 import { useAuthVault } from '../auth/AuthVaultContext'
@@ -39,7 +40,7 @@ export function SyncPage() {
     setPurgePending((await pendingRemotePurge(account.id)).length)
   }, [account])
 
-  useEffect(() => { void refresh() }, [refresh])
+  useReloadOnSync(refresh)
 
   async function synchronize() {
     if (!account || !syncKey) return

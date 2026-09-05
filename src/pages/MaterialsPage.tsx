@@ -1,6 +1,7 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { Boxes, ClipboardList, PackageCheck, Plus, Split, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -75,7 +76,7 @@ export function MaterialsPage() {
       setError(motivo instanceof Error ? motivo.message : 'Não foi possível abrir os materiais.')
     } finally { setLoading(false) }
   }, [account, masterKey])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   const nomeDaIgreja = useMemo(() => {
     const porId = new Map(churches.map((church) => [church.id, church.name]))

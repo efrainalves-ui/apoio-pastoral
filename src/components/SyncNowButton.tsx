@@ -1,3 +1,4 @@
+import { notificarDadosSincronizados } from '../sync/useReloadOnSync'
 import { RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthVault } from '../auth/AuthVaultContext'
@@ -62,6 +63,9 @@ export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
       // "Dados atualizados" é uma afirmação, e ela só pode ser feita quando a
       // rodada terminou de verdade.
       setSituacao(syncConfirmed(resumo) ? 'pronto' : resumo.status === 'offline' ? 'offline' : 'incompleto')
+      // Chegou coisa de outro aparelho: as telas abertas precisam saber, senão
+      // o dado está no banco e a lista na frente do pastor continua a de antes.
+      if (resumo.pulled > 0 || resumo.conflicts > 0) notificarDadosSincronizados()
     } catch {
       setSituacao(navigator.onLine ? 'erro' : 'offline')
     } finally {

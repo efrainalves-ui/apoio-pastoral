@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, BookOpen, FileUp } from 'lucide-react'
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { type FormEvent, useCallback, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -9,7 +10,7 @@ import { extractDocxText, validateDocxFile } from '../imports/docx'
 import { SERMON_CONTENT_LIMIT, SermonService } from '../sermons/service'
 import { SERMON_STATUS_LABELS, type SermonInput, type SermonStatus } from '../sermons/types'
 const service = new SermonService(); const empty = (): SermonInput => ({ title: '', theme: '', mainText: '', complementaryTexts: '', objective: '', introduction: '', content: '', conclusion: '', appeal: '', notes: '', tags: [], status: 'draft' })
-export function SermonFormPage() { const { account, masterKey } = useAuthVault(); const { sermonId } = useParams(); const [search] = useSearchParams(); const navigate = useNavigate(); const [input, setInput] = useState(empty); const [tags, setTags] = useState(''); const [error, setError] = useState(''); const load = useCallback(async () => { if (!account || !masterKey) return; const source = sermonId ?? search.get('duplicar'); if (!source) return; const sermon = await service.get(account.id, masterKey, source); if (sermon) { const { id: _id, createdAt: _created, updatedAt: _updated, ...data } = sermon; setInput({ ...data, title: sermonId ? data.title : `${data.title} (cópia)` }); setTags(data.tags.join(', ')); void _id; void _created; void _updated } }, [account, masterKey, search, sermonId]); useEffect(() => { void load() }, [load]); function set<K extends keyof SermonInput>(key: K, value: SermonInput[K]) { setInput((current) => ({ ...current, [key]: value })) }
+export function SermonFormPage() { const { account, masterKey } = useAuthVault(); const { sermonId } = useParams(); const [search] = useSearchParams(); const navigate = useNavigate(); const [input, setInput] = useState(empty); const [tags, setTags] = useState(''); const [error, setError] = useState(''); const load = useCallback(async () => { if (!account || !masterKey) return; const source = sermonId ?? search.get('duplicar'); if (!source) return; const sermon = await service.get(account.id, masterKey, source); if (sermon) { const { id: _id, createdAt: _created, updatedAt: _updated, ...data } = sermon; setInput({ ...data, title: sermonId ? data.title : `${data.title} (cópia)` }); setTags(data.tags.join(', ')); void _id; void _created; void _updated } }, [account, masterKey, search, sermonId]); useReloadOnSync(load); function set<K extends keyof SermonInput>(key: K, value: SermonInput[K]) { setInput((current) => ({ ...current, [key]: value })) }
   // O sermão escrito no Word entra inteiro no conteúdo, para ficar disponível no
   // púlpito mesmo sem rede. A leitura é local: o arquivo não sai daqui.
   async function importarDoWord(file: File | undefined) {

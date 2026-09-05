@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, Clock3, Plus, Save, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -73,7 +74,7 @@ export function ChurchFormPage() {
     }
   }, [account, churchId, masterKey])
 
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   function update<K extends keyof ChurchInput>(field: K, value: ChurchInput[K]) {
     setInput((current) => ({ ...current, [field]: value }))

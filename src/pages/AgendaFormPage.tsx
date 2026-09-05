@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, CalendarPlus, TriangleAlert } from 'lucide-react'
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { categoryForm, resolveTitle } from '../agenda/categoryForm'
 import { AgendaService, findAgendaConflicts, isMonday } from '../agenda/service'
@@ -28,7 +29,7 @@ function durationMinutes(input: AgendaEventInput): number { return Math.max(0, M
 export function AgendaFormPage() {
   const { account, masterKey } = useAuthVault(); const { eventId } = useParams(); const [searchParams] = useSearchParams(); const navigate = useNavigate(); const [input, setInput] = useState(() => initialInput(searchParams.get('inicio') ?? undefined)); const [events, setEvents] = useState<AgendaEventEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [sermons, setSermons] = useState<SermonEntity[]>([]); const [people, setPeople] = useState<PersonEntity[]>([]); const [error, setError] = useState(''); const [outraIgreja, setOutraIgreja] = useState(false); const [busy, setBusy] = useState(false)
   const load = useCallback(async () => { if (!account || !masterKey) return; const district = await districts.getDistrict(account.id, masterKey); const [nextEvents, nextChurches, current, nextSermons, nextPeople] = await Promise.all([agenda.listEvents(account.id, masterKey), district ? districts.listChurches(account.id, masterKey, district.id) : [], eventId ? agenda.getEvent(account.id, masterKey, eventId) : null, sermonsService.list(account.id, masterKey), peopleService.listPeople(account.id, masterKey)]); setEvents(nextEvents); setChurches(nextChurches); setSermons(nextSermons); setPeople(nextPeople); if (current) { const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...data } = current; setInput(data); void _id; void _createdAt; void _updatedAt } }, [account, eventId, masterKey])
-  useEffect(() => { void load() }, [load]); const conflicts = useMemo(() => { try { return findAgendaConflicts(input, events, eventId) } catch { return [] } }, [eventId, events, input])
+  useReloadOnSync(load); const conflicts = useMemo(() => { try { return findAgendaConflicts(input, events, eventId) } catch { return [] } }, [eventId, events, input])
   function set<K extends keyof AgendaEventInput>(key: K, value: AgendaEventInput[K]) { setInput((current) => ({ ...current, [key]: value })) }
   /** Mudar o início leva o término junto, preservando a duração escolhida. */
   function changeStart(novoInicio: string) {

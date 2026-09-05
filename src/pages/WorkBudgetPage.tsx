@@ -1,6 +1,7 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { ArrowLeft, ArrowRight, Car, HandCoins, Plus, ReceiptText, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { BudgetAreaNav } from '../components/BudgetAreaNav'
@@ -75,7 +76,7 @@ export function WorkBudgetPage() {
       setLoading(false)
     }
   }, [account, masterKey, month])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   const nomeDaIgreja = useMemo(() => {
     const porId = new Map(churches.map((church) => [church.id, church.name]))

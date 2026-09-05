@@ -1,6 +1,7 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { Check, Plus, ReceiptText, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { currency } from '../family-budget/core'
@@ -38,7 +39,7 @@ export function ShoppingListView({ accountId, masterKey, onDone, onFail }: {
     setCarregando(true)
     try { setItens(await service.items(accountId, masterKey)) } catch (motivo) { onFail(motivo) } finally { setCarregando(false) }
   }, [accountId, masterKey, onFail])
-  useEffect(() => { void carregar() }, [carregar])
+  useReloadOnSync(carregar)
 
   const totais = useMemo(() => shoppingTotals(itens), [itens])
   const frequentes = useMemo(() => frequentItems(itens).filter((nome) => !itens.some((item) => item.name === nome && !item.confirmed)), [itens])

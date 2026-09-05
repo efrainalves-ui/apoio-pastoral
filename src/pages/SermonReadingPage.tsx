@@ -1,3 +1,4 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, Minus, Plus } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -42,7 +43,7 @@ export function SermonReadingPage() {
     if (!account || !masterKey) return
     setSermon(await service.get(account.id, masterKey, sermonId))
   }, [account, masterKey, sermonId])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   if (!sermon) return <div className="app-loading" role="status">Abrindo o sermão…</div>
 

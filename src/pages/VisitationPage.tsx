@@ -1,3 +1,4 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { CalendarPlus, CheckCircle2, ChevronRight, Circle, FileText, HeartHandshake, ListChecks, Plus, RotateCcw, UsersRound } from 'lucide-react'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
@@ -61,7 +62,7 @@ export function VisitationPage() {
       setVisits(nextVisits); setFollowUps(nextFollowUps); setTasks(nextTasks); setRounds(nextRounds); setFamilies(nextFamilies); setPeople(nextPeople); setChurches(nextChurches)
     } catch (motivo) { setError(motivo instanceof Error ? motivo.message : 'Não foi possível abrir a visitação.') }
   }, [account, masterKey])
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
   // No celular a faixa de abas rola: a aba escolhida fica sempre à vista.
   useEffect(() => { document.querySelector('.tab-bar .button--primary')?.scrollIntoView({ inline: 'center', block: 'nearest' }) }, [tab])
 

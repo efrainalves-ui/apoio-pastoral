@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, Cake, Check, Copy } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -12,7 +13,7 @@ import { PeopleService } from '../people/service'
 const service = new PeopleService(); const districtService = new DistrictService()
 export function BirthdaysPage() {
   const { account, masterKey } = useAuthVault(); const [birthdays, setBirthdays] = useState<BirthdayPerson[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [churchId, setChurchId] = useState(''); const [selected, setSelected] = useState<BirthdayPerson | null>(null); const [message, setMessage] = useState(''); const [copied, setCopied] = useState(false); const [loading, setLoading] = useState(true)
-  const load = useCallback(async () => { if (!account || !masterKey) return; const district = await districtService.getDistrict(account.id, masterKey); const people = await service.listPeople(account.id, masterKey); setBirthdays(upcomingBirthdays(people, new Date(), 60)); setChurches(district ? await districtService.listChurches(account.id, masterKey, district.id) : []); setLoading(false) }, [account, masterKey]); useEffect(() => { void load() }, [load])
+  const load = useCallback(async () => { if (!account || !masterKey) return; const district = await districtService.getDistrict(account.id, masterKey); const people = await service.listPeople(account.id, masterKey); setBirthdays(upcomingBirthdays(people, new Date(), 60)); setChurches(district ? await districtService.listChurches(account.id, masterKey, district.id) : []); setLoading(false) }, [account, masterKey]); useReloadOnSync(load)
   const visible = useMemo(() => birthdays.filter(({ person }) => !churchId || person.currentChurchId === churchId), [birthdays, churchId]); const today = visible.filter(({ daysUntil }) => daysUntil === 0); const next = visible.filter(({ daysUntil }) => daysUntil > 0)
   function choose(item: BirthdayPerson) { setSelected(item); setMessage(birthdayMessage(item.person.name, item.turningAge)); setCopied(false) }
   async function copy() { if (!message.trim()) return; await navigator.clipboard.writeText(message.trim()); setCopied(true) }

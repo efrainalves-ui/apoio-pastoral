@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { CalendarPlus, Check, ChevronDown, ChevronUp, Copy, FileText, Printer, Send, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -61,7 +62,7 @@ export function CommissionMeetingPage() {
     setTasks(await service.tasks(account.id, masterKey, meetingId))
   }, [account, masterKey, meetingId])
 
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
   const personName = useCallback((id: string) => people.find((person) => person.id === id)?.name ?? (id ? 'Pessoa não localizada' : 'A confirmar'), [people])
   // A pauta e a ata nomeiam presidente, secretário, participantes e
   // responsáveis. Documentos assim existem para serem lidos por outras

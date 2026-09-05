@@ -1,5 +1,6 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, Edit3, Plus, Save, Trash2, UsersRound, X } from 'lucide-react'
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { type FormEvent, useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -51,7 +52,7 @@ export function CommunityGroupsPage() {
     } catch { setError('Não foi possível abrir os registros missionários.') }
   }, [account, masterKey])
 
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
 
   const churchName = (id: string) => churches.find((church) => church.id === id)?.name ?? 'Igreja não encontrada'
   const personName = (id: string | null) => people.find((person) => person.id === id)?.name ?? (id ? 'Pessoa não encontrada' : 'Não informado')

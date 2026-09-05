@@ -1,3 +1,4 @@
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { ArrowLeft, ArrowRight, Banknote, CalendarClock, Check, CheckCircle2, ChevronRight, CircleDollarSign, Copy, CreditCard, Download, FileBarChart, HandCoins, LayoutDashboard, OctagonAlert, Plus, ReceiptText, Trash2, TriangleAlert, WalletCards } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -82,7 +83,7 @@ export function FamilyBudgetPage() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível abrir o orçamento.') } finally { setLoading(false) }
   }, [account, masterKey, month])
 
-  useEffect(() => { void load() }, [load])
+  useReloadOnSync(load)
   useEffect(() => {
     if (!newRequested) return
     if (section === 'entradas') setIncomeDraft(withSelectedMonth(emptyIncome(), month))
