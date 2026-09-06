@@ -268,6 +268,15 @@ export function GoalAreaPage() {
                 </span>
               </span>
               <small>{MONTH_LABELS[mes - 1]}</small>
+              {/*
+                O gráfico mostra a forma; o número mostra o tamanho. Sem ele,
+                dois meses parecidos ficam indistinguíveis, e é justamente a
+                diferença entre eles que se foi procurar ali.
+              */}
+              <small className="goal-months__valores">
+                <span className="goal-months__valor--anterior">{formatGoalValue(area, anterior)}</span>
+                <span className={caiu ? 'goal-months__valor--queda' : ''}>{formatGoalValue(area, atual)}</span>
+              </small>
             </li>
           })}</ul>
         </div>

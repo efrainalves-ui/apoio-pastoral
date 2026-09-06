@@ -51,7 +51,7 @@ h1, h2, h3, .brand strong { font-family: ui-rounded, "SF Pro Rounded", Inter, ui
 .button:disabled { opacity: .55; cursor: not-allowed; }
 .button--primary { background: var(--green-900); color: white; }
 .button--secondary { border-color: #7f958d; background: transparent; color: var(--green-900); }
-.button--quiet { background: var(--green-50); color: var(--green-900); }
+.button--quiet { background: var(--green-50); color: var(--ink); }
 .button--danger { background: #f9e7e5; color: #8d2924; }
 .button--full { width: 100%; }
 .icon-button { width: 44px; height: 44px; border: 0; border-radius: 12px; display: inline-grid; place-items: center; color: inherit; background: transparent; cursor: pointer; }
@@ -231,6 +231,16 @@ button.entity-row { width: 100%; background: none; border-top: 0; border-inline:
 */
 .goal-pdf-card--primeiro { order: -1; }
 
+/* Visitas separadas por igreja, com o alcance do distrito no topo. */
+.visit-total { margin: 0 0 14px; color: var(--muted); font-size: .92rem; }
+.visit-total strong { color: var(--ink); font-size: 1.3rem; }
+.visit-church + .visit-church { margin-top: 18px; }
+.visit-church h3 { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin: 0 0 8px; font-size: .96rem; }
+.visit-church h3 small { color: var(--muted); font-weight: 500; }
+/* A linha da visita abre o registro; editar e excluir ficam ao lado dela. */
+.visit-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px; align-items: center; }
+.visit-row > a:first-child { min-width: 0; }
+
 /* Divisória entre o que se lê e o que se edita. */
 .goal-section { margin: 10px 0 -8px; font-size: .82rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 
@@ -269,6 +279,9 @@ button.entity-row { width: 100%; background: none; border-top: 0; border-inline:
 */
 .goal-months__par .goal-months__bar--anterior > span { background: #9bb5ab; }
 .goal-months__par .goal-months__bar--queda > span { background: #c9564c; }
+.goal-months__valores { display: grid; gap: 1px; justify-items: center; font-variant-numeric: tabular-nums; font-size: .68rem; line-height: 1.25; }
+.goal-months__valor--anterior { color: var(--muted); }
+.goal-months__valor--queda { color: #b3261e; font-weight: 700; }
 .goal-months__legenda { display: flex; gap: 8px; align-items: center; margin-top: 10px; color: var(--muted); font-size: .78rem; }
 .goal-months__amostra { width: 12px; height: 12px; margin-left: 6px; border-radius: 3px; background: var(--green-700); }
 .goal-months__amostra--anterior { margin-left: 0; background: #9bb5ab; }
@@ -321,7 +334,7 @@ button.entity-row { width: 100%; background: none; border-top: 0; border-inline:
 .commission-type-card__arrow { width: 20px; color: var(--green-700); }
 .commission-type-card__new { position: absolute; z-index: 2; left: 24px; bottom: 24px; }
 .commission-nominations-card { grid-column: 1 / -1; }
-.commission-return-note { padding: 14px 16px; border: 1px solid #b9d5c8; border-radius: 12px; color: var(--green-900); background: var(--green-50); }
+.commission-return-note { padding: 14px 16px; border: 1px solid #b9d5c8; border-radius: 12px; color: var(--ink); background: var(--green-50); }
 .commission-setup-card { max-width: 680px; }
 .commission-setup-card p { margin: 0 0 18px; color: var(--muted); line-height: 1.55; }
 .dashboard-number { margin: 0; color: var(--green-900); font-size: 3rem; font-weight: 800; line-height: 1; }
@@ -884,7 +897,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .checklist-list > div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 5px; align-items: center; }
 .checklist-list .confirmation-check { min-width: 0; margin: 0; padding: 11px 13px; align-items: center; }
 .checklist-list .icon-button { width: 40px; height: 40px; color: var(--muted); }
-.checklist-list .icon-button:hover { color: var(--green-900); background: var(--green-50); }
+.checklist-list .icon-button:hover { color: var(--ink); background: var(--green-50); }
 .checklist-add { margin-top: 14px; }
 .linked-goal-list { display: grid; gap: 10px; }
 
@@ -991,7 +1004,12 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .answer-summary__value { text-align: right; font-variant-numeric: tabular-nums; }
 .visit-members { display: grid; gap: 6px; margin-top: 12px; }
 .visit-members__chosen { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; padding: 0; list-style: none; }
-.visit-members__chip { display: inline-flex; gap: 6px; align-items: center; min-height: 34px; padding: 0 10px 0 12px; border: 1px solid var(--green-800); border-radius: 999px; background: var(--green-50); color: var(--green-900); font: inherit; font-size: .82rem; font-weight: 650; cursor: pointer; }
+/*
+  A cor do texto tem de virar junto com a do fundo. `--green-50` fica escuro no
+  modo escuro, e o texto continuava `--green-900`, também escuro: as fichas
+  apareciam preenchidas e vazias, com o nome invisível dentro.
+*/
+.visit-members__chip { display: inline-flex; gap: 6px; align-items: center; min-height: 34px; padding: 0 10px 0 12px; border: 1px solid var(--green-800); border-radius: 999px; background: var(--green-50); color: var(--ink); font: inherit; font-size: .82rem; font-weight: 650; cursor: pointer; }
 .visit-members__chip svg { width: 15px; height: 15px; }
 .visit-members__results { display: grid; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; max-height: 260px; overflow-y: auto; }
 .visit-members__results button { width: 100%; min-height: 44px; padding: 0 12px; display: flex; gap: 10px; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: 11px; background: var(--paper); color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -1214,71 +1232,146 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root { color: #e4ece8; background: #0e1714; --cream: #0e1714; --paper: #16211d; --ink: #e4ece8; --muted: #a6b4ae; --line: #2d3a35; --green-50: #213a31; }
-  .field__input { color: var(--ink); background: #111b17; border-color: #415049; }
-  .search-input { background: #111b17; border-color: #415049; }
-  .field__label { color: #d1ded8; }
-  .auth-panel { background: #111a17; }
-  .auth-tabs button[aria-selected='true'] { color: #d5eee3; border-bottom-color: #78bda0; }
-  .auth-panel .button--primary { background: #286c59; }
-  .auth-panel .text-button { color: #9ed4bd; }
-  .bottom-nav { background: rgb(22 33 29 / 96%); }
-  .page-hero h1 { color: #eef5f1; }
-  .button--secondary { color: #d9e7e1; border-color: #6d8279; }
-  .scope-note { color: #dbc58f; background: #3c3322; }
-  .privacy-list__blocked { background: #332d21; }
-  .danger-card { background: #2c201f; border-color: #70423f; }
-  .danger-card h2 { color: #f0b0aa; }
-  .danger-card p { color: #c6aaa7; }
-  .form-actions--sticky { background: rgb(22 33 29 / 94%); }
-  .issue-list { background: #302918; border-color: #65552f; }
-  .alert--success { color: #d9eee5; background: #1e3a30; border-color: #4f7565; }
-  .alert--error { color: #f5c6c2; background: #3b2523; border-color: #744b47; }
-  .alert--warning { color: #f0dcb4; background: #3a3121; border-color: #6d5c3a; }
-  .dashboard-metrics strong, .dashboard-number, .district-metrics strong, .community-summary strong, .reading-metrics strong, .missionary-record-groups h3, .segmented button.active { color: #d9eee5; }
-  .segmented button.active { background: rgb(255 255 255 / 12%); box-shadow: none; }
-  .eyebrow, .text-link, .commission-type-card__arrow { color: #9ed4bd; }
-  .commission-type-card__icon, .commission-kind-page__icon { color: #d9eee5; background: #29463a; }
-  .commission-return-note { color: #d9eee5; background: #1e3a30; border-color: #4f7565; }
-  .button--secondary:disabled { color: #a6b4ae; border-color: #46564f; opacity: .72; }
-  .checklist-add { background: rgb(255 255 255 / 6%); }
+/*
+  O escuro vale por três caminhos, e a ordem importa.
 
-  /* Nenhuma ação com texto escuro sobre fundo escuro: no tema escuro os verdes
+  1. `prefers-color-scheme`, quando a pessoa não escolheu nada — mas só se ela
+     não tiver escolhido claro, senão a escolha dela seria ignorada pelo
+     aparelho.
+  2. `data-tema="escuro"`, quando ela escolheu escuro num aparelho claro.
+
+  Escolher "seguir o aparelho" apaga a marca em vez de escrever um valor: é a
+  diferença entre seguir o sistema e ficar preso ao tema do momento da escolha.
+*/
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) { color: #e4ece8; background: #0e1714; --cream: #0e1714; --paper: #16211d; --ink: #e4ece8; --muted: #a6b4ae; --line: #2d3a35; --green-50: #213a31; }
+  :root:not([data-tema='claro']) .field__input { color: var(--ink); background: #111b17; border-color: #415049; }
+  :root:not([data-tema='claro']) .search-input { background: #111b17; border-color: #415049; }
+  :root:not([data-tema='claro']) .field__label { color: #d1ded8; }
+  :root:not([data-tema='claro']) .auth-panel { background: #111a17; }
+  :root:not([data-tema='claro']) .auth-tabs button[aria-selected='true'] { color: #d5eee3; border-bottom-color: #78bda0; }
+  :root:not([data-tema='claro']) .auth-panel .button--primary { background: #286c59; }
+  :root:not([data-tema='claro']) .auth-panel .text-button { color: #9ed4bd; }
+  :root:not([data-tema='claro']) .bottom-nav { background: rgb(22 33 29 / 96%); }
+  :root:not([data-tema='claro']) .page-hero h1 { color: #eef5f1; }
+  :root:not([data-tema='claro']) .button--secondary { color: #d9e7e1; border-color: #6d8279; }
+  :root:not([data-tema='claro']) .scope-note { color: #dbc58f; background: #3c3322; }
+  :root:not([data-tema='claro']) .privacy-list__blocked { background: #332d21; }
+  :root:not([data-tema='claro']) .danger-card { background: #2c201f; border-color: #70423f; }
+  :root:not([data-tema='claro']) .danger-card h2 { color: #f0b0aa; }
+  :root:not([data-tema='claro']) .danger-card p { color: #c6aaa7; }
+  :root:not([data-tema='claro']) .form-actions--sticky { background: rgb(22 33 29 / 94%); }
+  :root:not([data-tema='claro']) .issue-list { background: #302918; border-color: #65552f; }
+  :root:not([data-tema='claro']) .alert--success { color: #d9eee5; background: #1e3a30; border-color: #4f7565; }
+  :root:not([data-tema='claro']) .alert--error { color: #f5c6c2; background: #3b2523; border-color: #744b47; }
+  :root:not([data-tema='claro']) .alert--warning { color: #f0dcb4; background: #3a3121; border-color: #6d5c3a; }
+  :root:not([data-tema='claro']) .dashboard-metrics strong, :root:not([data-tema='claro']) .dashboard-number, :root:not([data-tema='claro']) .district-metrics strong, :root:not([data-tema='claro']) .community-summary strong, :root:not([data-tema='claro']) .reading-metrics strong, :root:not([data-tema='claro']) .missionary-record-groups h3, :root:not([data-tema='claro']) .segmented button.active { color: #d9eee5; }
+  :root:not([data-tema='claro']) .segmented button.active { background: rgb(255 255 255 / 12%); box-shadow: none; }
+  :root:not([data-tema='claro']) .eyebrow, :root:not([data-tema='claro']) .text-link, :root:not([data-tema='claro']) .commission-type-card__arrow { color: #9ed4bd; }
+  :root:not([data-tema='claro']) .commission-type-card__icon, :root:not([data-tema='claro']) .commission-kind-page__icon { color: #d9eee5; background: #29463a; }
+  :root:not([data-tema='claro']) .commission-return-note { color: #d9eee5; background: #1e3a30; border-color: #4f7565; }
+  :root:not([data-tema='claro']) .button--secondary:disabled { color: #a6b4ae; border-color: #46564f; opacity: .72; }
+  :root:not([data-tema='claro']) .checklist-add { background: rgb(255 255 255 / 6%); }
+  :root:not([data-tema='claro']) /* Nenhuma ação com texto escuro sobre fundo escuro: no tema escuro os verdes
      de texto e de ícone precisam clarear para continuarem legíveis. */
   .button--quiet { color: #d9e7e1; background: rgb(255 255 255 / 8%); }
-  .button--quiet:hover:not(:disabled) { background: rgb(255 255 255 / 14%); }
-  .text-button, .nomination-page summary, .accent-icon, .readiness-card__check, .quick-actions__menu svg { color: #9ed4bd; }
-  .readiness-card__icon, .device-row__icon, .church-card__icon, .fixture-row > span:first-child, .avatar, .birthday-date, .file-picker, .budget-hero > svg { color: #d9eee5; }
-  .detail-highlight svg, .privacy-list li > svg, .check-list svg, .search-results > a > svg, .budget-quick-actions svg { color: #9ed4bd; }
-  .budget-nav a.active, .tab-bar .button--primary { color: #0e1714; background: #9ed4bd; }
-  .tab-bar .button--secondary { color: #b9c7c1; }
-  .budget-metrics .positive { border-color: #4f7565; background: #1e3a30; }
-  .budget-outlook--ok { border-color: #4f7565; background: #1e3a30; }
-  .budget-outlook--atencao { border-color: #6d5c3a; background: #3a3121; }
-  .budget-outlook--risco { border-color: #744b47; background: #3b2523; }
-  .budget-tips__item--atencao svg { color: #f0dcb4; }
-  .budget-tips__item--risco svg { color: #f5c6c2; }
-  .budget-flow__row--saida .budget-flow__bar > span { background: #d38a63; }
-  .empty-state svg { color: #9ed4bd; }
-  .agenda-view-tabs { background: rgb(255 255 255 / 6%); }
-  .agenda-view-tabs button.active { color: #0e1714; background: #9ed4bd; box-shadow: none; }
-  .agenda-week-add, .agenda-today-marker { color: #9ed4bd; }
-  .budget-metrics .negative { background: #3b2523; border-color: #744b47; }
-  .budget-tithe-note, .budget-tithe-choice { color: #ead9a7; background: #342e20; border-color: #756339; }
-  .budget-tithe-choice small { color: #d5c28c; }
-  .prayer-status--answered { color: #d9eee5; background: #244638; }
-  .prayer-status--closed, .prayer-status--archived { color: #d5ded9; background: #35413c; }
-  .planning-upcoming time, .annual-calendar a svg, .campaign-card > svg { color: #9ed4bd; }
-  .annual-calendar h3 { color: #d9eee5; }
-  .campaign-status--planning, .status--planned, .priority--normal { color: #d5ded9; background: #35413c; }
-  .campaign-status--preparing, .status--in_progress, .priority--high { color: #ead9a7; background: #3c3322; }
-  .campaign-status--happening, .status--completed { color: #d9eee5; background: #244638; }
-  .campaign-status--completed { color: #d5e9f5; background: #29414f; }
-  .campaign-status--cancelled, .status--cancelled, .status--paused { color: #e2ccd6; background: #44333b; }
-  .priority--urgent { color: #f5c6c2; background: #3b2523; }
-
+  :root:not([data-tema='claro']) .button--quiet:hover:not(:disabled) { background: rgb(255 255 255 / 14%); }
+  :root:not([data-tema='claro']) .text-button, :root:not([data-tema='claro']) .nomination-page summary, :root:not([data-tema='claro']) .accent-icon, :root:not([data-tema='claro']) .readiness-card__check, :root:not([data-tema='claro']) .quick-actions__menu svg { color: #9ed4bd; }
+  :root:not([data-tema='claro']) .readiness-card__icon, :root:not([data-tema='claro']) .device-row__icon, :root:not([data-tema='claro']) .church-card__icon, :root:not([data-tema='claro']) .fixture-row > span:first-child, :root:not([data-tema='claro']) .avatar, :root:not([data-tema='claro']) .birthday-date, :root:not([data-tema='claro']) .file-picker, :root:not([data-tema='claro']) .budget-hero > svg { color: #d9eee5; }
+  :root:not([data-tema='claro']) .detail-highlight svg, :root:not([data-tema='claro']) .privacy-list li > svg, :root:not([data-tema='claro']) .check-list svg, :root:not([data-tema='claro']) .search-results > a > svg, :root:not([data-tema='claro']) .budget-quick-actions svg { color: #9ed4bd; }
+  :root:not([data-tema='claro']) .budget-nav a.active, :root:not([data-tema='claro']) .tab-bar .button--primary { color: #0e1714; background: #9ed4bd; }
+  :root:not([data-tema='claro']) .tab-bar .button--secondary { color: #b9c7c1; }
+  :root:not([data-tema='claro']) .budget-metrics .positive { border-color: #4f7565; background: #1e3a30; }
+  :root:not([data-tema='claro']) .budget-outlook--ok { border-color: #4f7565; background: #1e3a30; }
+  :root:not([data-tema='claro']) .budget-outlook--atencao { border-color: #6d5c3a; background: #3a3121; }
+  :root:not([data-tema='claro']) .budget-outlook--risco { border-color: #744b47; background: #3b2523; }
+  :root:not([data-tema='claro']) .budget-tips__item--atencao svg { color: #f0dcb4; }
+  :root:not([data-tema='claro']) .budget-tips__item--risco svg { color: #f5c6c2; }
+  :root:not([data-tema='claro']) .budget-flow__row--saida .budget-flow__bar > span { background: #d38a63; }
+  :root:not([data-tema='claro']) .empty-state svg { color: #9ed4bd; }
+  :root:not([data-tema='claro']) .agenda-view-tabs { background: rgb(255 255 255 / 6%); }
+  :root:not([data-tema='claro']) .agenda-view-tabs button.active { color: #0e1714; background: #9ed4bd; box-shadow: none; }
+  :root:not([data-tema='claro']) .agenda-week-add, :root:not([data-tema='claro']) .agenda-today-marker { color: #9ed4bd; }
+  :root:not([data-tema='claro']) .budget-metrics .negative { background: #3b2523; border-color: #744b47; }
+  :root:not([data-tema='claro']) .budget-tithe-note, :root:not([data-tema='claro']) .budget-tithe-choice { color: #ead9a7; background: #342e20; border-color: #756339; }
+  :root:not([data-tema='claro']) .budget-tithe-choice small { color: #d5c28c; }
+  :root:not([data-tema='claro']) .prayer-status--answered { color: #d9eee5; background: #244638; }
+  :root:not([data-tema='claro']) .prayer-status--closed, :root:not([data-tema='claro']) .prayer-status--archived { color: #d5ded9; background: #35413c; }
+  :root:not([data-tema='claro']) .planning-upcoming time, :root:not([data-tema='claro']) .annual-calendar a svg, :root:not([data-tema='claro']) .campaign-card > svg { color: #9ed4bd; }
+  :root:not([data-tema='claro']) .annual-calendar h3 { color: #d9eee5; }
+  :root:not([data-tema='claro']) .campaign-status--planning, :root:not([data-tema='claro']) .status--planned, :root:not([data-tema='claro']) .priority--normal { color: #d5ded9; background: #35413c; }
+  :root:not([data-tema='claro']) .campaign-status--preparing, :root:not([data-tema='claro']) .status--in_progress, :root:not([data-tema='claro']) .priority--high { color: #ead9a7; background: #3c3322; }
+  :root:not([data-tema='claro']) .campaign-status--happening, :root:not([data-tema='claro']) .status--completed { color: #d9eee5; background: #244638; }
+  :root:not([data-tema='claro']) .campaign-status--completed { color: #d5e9f5; background: #29414f; }
+  :root:not([data-tema='claro']) .campaign-status--cancelled, :root:not([data-tema='claro']) .status--cancelled, :root:not([data-tema='claro']) .status--paused { color: #e2ccd6; background: #44333b; }
+  :root:not([data-tema='claro']) .priority--urgent { color: #f5c6c2; background: #3b2523; }
 }
+
+:root[data-tema='escuro'] {
+  color-scheme: dark;
+}
+:root[data-tema='escuro'] { color: #e4ece8; background: #0e1714; --cream: #0e1714; --paper: #16211d; --ink: #e4ece8; --muted: #a6b4ae; --line: #2d3a35; --green-50: #213a31; }
+:root[data-tema='escuro'] .field__input { color: var(--ink); background: #111b17; border-color: #415049; }
+:root[data-tema='escuro'] .search-input { background: #111b17; border-color: #415049; }
+:root[data-tema='escuro'] .field__label { color: #d1ded8; }
+:root[data-tema='escuro'] .auth-panel { background: #111a17; }
+:root[data-tema='escuro'] .auth-tabs button[aria-selected='true'] { color: #d5eee3; border-bottom-color: #78bda0; }
+:root[data-tema='escuro'] .auth-panel .button--primary { background: #286c59; }
+:root[data-tema='escuro'] .auth-panel .text-button { color: #9ed4bd; }
+:root[data-tema='escuro'] .bottom-nav { background: rgb(22 33 29 / 96%); }
+:root[data-tema='escuro'] .page-hero h1 { color: #eef5f1; }
+:root[data-tema='escuro'] .button--secondary { color: #d9e7e1; border-color: #6d8279; }
+:root[data-tema='escuro'] .scope-note { color: #dbc58f; background: #3c3322; }
+:root[data-tema='escuro'] .privacy-list__blocked { background: #332d21; }
+:root[data-tema='escuro'] .danger-card { background: #2c201f; border-color: #70423f; }
+:root[data-tema='escuro'] .danger-card h2 { color: #f0b0aa; }
+:root[data-tema='escuro'] .danger-card p { color: #c6aaa7; }
+:root[data-tema='escuro'] .form-actions--sticky { background: rgb(22 33 29 / 94%); }
+:root[data-tema='escuro'] .issue-list { background: #302918; border-color: #65552f; }
+:root[data-tema='escuro'] .alert--success { color: #d9eee5; background: #1e3a30; border-color: #4f7565; }
+:root[data-tema='escuro'] .alert--error { color: #f5c6c2; background: #3b2523; border-color: #744b47; }
+:root[data-tema='escuro'] .alert--warning { color: #f0dcb4; background: #3a3121; border-color: #6d5c3a; }
+:root[data-tema='escuro'] .dashboard-metrics strong, :root[data-tema='escuro'] .dashboard-number, :root[data-tema='escuro'] .district-metrics strong, :root[data-tema='escuro'] .community-summary strong, :root[data-tema='escuro'] .reading-metrics strong, :root[data-tema='escuro'] .missionary-record-groups h3, :root[data-tema='escuro'] .segmented button.active { color: #d9eee5; }
+:root[data-tema='escuro'] .segmented button.active { background: rgb(255 255 255 / 12%); box-shadow: none; }
+:root[data-tema='escuro'] .eyebrow, :root[data-tema='escuro'] .text-link, :root[data-tema='escuro'] .commission-type-card__arrow { color: #9ed4bd; }
+:root[data-tema='escuro'] .commission-type-card__icon, :root[data-tema='escuro'] .commission-kind-page__icon { color: #d9eee5; background: #29463a; }
+:root[data-tema='escuro'] .commission-return-note { color: #d9eee5; background: #1e3a30; border-color: #4f7565; }
+:root[data-tema='escuro'] .button--secondary:disabled { color: #a6b4ae; border-color: #46564f; opacity: .72; }
+:root[data-tema='escuro'] .checklist-add { background: rgb(255 255 255 / 6%); }
+:root[data-tema='escuro'] /* Nenhuma ação com texto escuro sobre fundo escuro: no tema escuro os verdes
+   de texto e de ícone precisam clarear para continuarem legíveis. */
+.button--quiet { color: #d9e7e1; background: rgb(255 255 255 / 8%); }
+:root[data-tema='escuro'] .button--quiet:hover:not(:disabled) { background: rgb(255 255 255 / 14%); }
+:root[data-tema='escuro'] .text-button, :root[data-tema='escuro'] .nomination-page summary, :root[data-tema='escuro'] .accent-icon, :root[data-tema='escuro'] .readiness-card__check, :root[data-tema='escuro'] .quick-actions__menu svg { color: #9ed4bd; }
+:root[data-tema='escuro'] .readiness-card__icon, :root[data-tema='escuro'] .device-row__icon, :root[data-tema='escuro'] .church-card__icon, :root[data-tema='escuro'] .fixture-row > span:first-child, :root[data-tema='escuro'] .avatar, :root[data-tema='escuro'] .birthday-date, :root[data-tema='escuro'] .file-picker, :root[data-tema='escuro'] .budget-hero > svg { color: #d9eee5; }
+:root[data-tema='escuro'] .detail-highlight svg, :root[data-tema='escuro'] .privacy-list li > svg, :root[data-tema='escuro'] .check-list svg, :root[data-tema='escuro'] .search-results > a > svg, :root[data-tema='escuro'] .budget-quick-actions svg { color: #9ed4bd; }
+:root[data-tema='escuro'] .budget-nav a.active, :root[data-tema='escuro'] .tab-bar .button--primary { color: #0e1714; background: #9ed4bd; }
+:root[data-tema='escuro'] .tab-bar .button--secondary { color: #b9c7c1; }
+:root[data-tema='escuro'] .budget-metrics .positive { border-color: #4f7565; background: #1e3a30; }
+:root[data-tema='escuro'] .budget-outlook--ok { border-color: #4f7565; background: #1e3a30; }
+:root[data-tema='escuro'] .budget-outlook--atencao { border-color: #6d5c3a; background: #3a3121; }
+:root[data-tema='escuro'] .budget-outlook--risco { border-color: #744b47; background: #3b2523; }
+:root[data-tema='escuro'] .budget-tips__item--atencao svg { color: #f0dcb4; }
+:root[data-tema='escuro'] .budget-tips__item--risco svg { color: #f5c6c2; }
+:root[data-tema='escuro'] .budget-flow__row--saida .budget-flow__bar > span { background: #d38a63; }
+:root[data-tema='escuro'] .empty-state svg { color: #9ed4bd; }
+:root[data-tema='escuro'] .agenda-view-tabs { background: rgb(255 255 255 / 6%); }
+:root[data-tema='escuro'] .agenda-view-tabs button.active { color: #0e1714; background: #9ed4bd; box-shadow: none; }
+:root[data-tema='escuro'] .agenda-week-add, :root[data-tema='escuro'] .agenda-today-marker { color: #9ed4bd; }
+:root[data-tema='escuro'] .budget-metrics .negative { background: #3b2523; border-color: #744b47; }
+:root[data-tema='escuro'] .budget-tithe-note, :root[data-tema='escuro'] .budget-tithe-choice { color: #ead9a7; background: #342e20; border-color: #756339; }
+:root[data-tema='escuro'] .budget-tithe-choice small { color: #d5c28c; }
+:root[data-tema='escuro'] .prayer-status--answered { color: #d9eee5; background: #244638; }
+:root[data-tema='escuro'] .prayer-status--closed, :root[data-tema='escuro'] .prayer-status--archived { color: #d5ded9; background: #35413c; }
+:root[data-tema='escuro'] .planning-upcoming time, :root[data-tema='escuro'] .annual-calendar a svg, :root[data-tema='escuro'] .campaign-card > svg { color: #9ed4bd; }
+:root[data-tema='escuro'] .annual-calendar h3 { color: #d9eee5; }
+:root[data-tema='escuro'] .campaign-status--planning, :root[data-tema='escuro'] .status--planned, :root[data-tema='escuro'] .priority--normal { color: #d5ded9; background: #35413c; }
+:root[data-tema='escuro'] .campaign-status--preparing, :root[data-tema='escuro'] .status--in_progress, :root[data-tema='escuro'] .priority--high { color: #ead9a7; background: #3c3322; }
+:root[data-tema='escuro'] .campaign-status--happening, :root[data-tema='escuro'] .status--completed { color: #d9eee5; background: #244638; }
+:root[data-tema='escuro'] .campaign-status--completed { color: #d5e9f5; background: #29414f; }
+:root[data-tema='escuro'] .campaign-status--cancelled, :root[data-tema='escuro'] .status--cancelled, :root[data-tema='escuro'] .status--paused { color: #e2ccd6; background: #44333b; }
+:root[data-tema='escuro'] .priority--urgent { color: #f5c6c2; background: #3b2523; }
+
 
 /* Marca discreta de homologação: presente o bastante para ninguém confundir
    com o ambiente real, apagada o bastante para não disputar a tela. */

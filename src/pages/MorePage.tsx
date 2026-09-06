@@ -1,5 +1,7 @@
 import { ArchiveRestore, ChevronRight, Cloud, GitCompare, Link2, LockKeyhole, Search, ShieldCheck, TriangleAlert } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { guardarTema, temaGuardado, type Tema } from '../app/tema'
 import { Card } from '../components/ui/Card'
 
 const groups = [
@@ -20,7 +22,24 @@ const groups = [
 ]
 
 export function MorePage() {
-  return <div className="page-stack page-narrow"><header className="page-hero"><div><h1>Configurações</h1></div></header><Card title="Onde ficam seus dados">
+  const [tema, setTema] = useState<Tema>(() => temaGuardado())
+  function escolherTema(escolha: Tema) { setTema(escolha); guardarTema(escolha) }
+
+  return <div className="page-stack page-narrow"><header className="page-hero"><div><h1>Configurações</h1></div></header>
+  {/*
+    A preferência de tema fica neste aparelho, e não na conta: ela é sobre a
+    tela que está na frente da pessoa. Seguir o aparelho continua sendo o
+    padrão — a escolha existe para o púlpito com luz forte e para a visita à
+    noite, quando o que o celular decidiu não serve.
+  */}
+  <Card title="Aparência">
+    <div className="segmented" role="group" aria-label="Tema do aplicativo">
+      <button type="button" className={tema === 'sistema' ? 'active' : ''} aria-pressed={tema === 'sistema'} onClick={() => escolherTema('sistema')}>Seguir o aparelho</button>
+      <button type="button" className={tema === 'claro' ? 'active' : ''} aria-pressed={tema === 'claro'} onClick={() => escolherTema('claro')}>Claro</button>
+      <button type="button" className={tema === 'escuro' ? 'active' : ''} aria-pressed={tema === 'escuro'} onClick={() => escolherTema('escuro')}>Escuro</button>
+    </div>
+  </Card>
+  <Card title="Onde ficam seus dados">
     <ul className="plain-list">
       <li>Tudo é gravado cifrado neste aparelho e abre com a sua senha.</li>
       <li>O backup é um arquivo cifrado que só você guarda e restaura.</li>

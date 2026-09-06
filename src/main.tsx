@@ -4,7 +4,12 @@ import { BrowserRouter } from 'react-router-dom'
 import { registerSW } from 'virtual:pwa-register'
 import { App } from './app/App'
 import { AuthVaultProvider } from './auth/AuthVaultContext'
+import { aplicarTema, temaGuardado } from './app/tema'
 import './styles/index.css'
+
+// Antes de pintar a primeira tela: aplicar depois faria a página piscar no tema
+// errado a cada abertura.
+aplicarTema(temaGuardado())
 
 /**
  * A versão nova entra sozinha, e sem ninguém precisar apagar dados.

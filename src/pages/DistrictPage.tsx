@@ -12,6 +12,7 @@ import { CHURCH_STATUS_LABELS, CHURCH_TYPE_LABELS, type ChurchEntity, type Distr
 import { DomainValidationError } from '../district/validation'
 import { FamilyService } from '../families/service'
 import type { FamilyEntity } from '../families/types'
+import { MemberImportPage } from './MemberImportPage'
 import { PeopleService } from '../people/service'
 import type { PersonEntity } from '../people/types'
 import { normalizePersonName } from '../people/validation'
@@ -149,6 +150,16 @@ export function DistrictPage() {
           <Button variant="danger" onClick={() => { setConfirmDelete(true); setEditing(false) }} icon={<Trash2 size={17} />}>Excluir distrito</Button>
         </div>
       </header>
+      {/*
+        Distrito sem ninguém dentro é um distrito recém-criado, e o primeiro
+        trabalho de quem chega é trazer a lista. O envio ficava escondido na
+        tela de cada igreja: quem não passou pela primeira configuração não
+        encontrava, e cadastrava trezentas pessoas à mão.
+      */}
+      {people.length === 0 && <Card eyebrow="Comece por aqui" title="Importar a lista de membros">
+        <p className="card-copy">Ainda não há ninguém cadastrado neste distrito. Envie a lista em PDF, o arquivo do Word, ou cole os nomes — tudo é lido dentro deste aparelho.</p>
+        <MemberImportPage embedded />
+      </Card>}
 
       {error && <div className="alert alert--error" role="alert">{error}</div>}
 

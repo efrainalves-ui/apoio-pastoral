@@ -126,6 +126,27 @@ export class CareService {
     return { id, ...data }
   }
 
+  /**
+   * Apagar a visita inteira.
+   *
+   * O desenho antigo tratava a visita como retrato imutável: só se corrigia
+   * criando uma versão nova, e nada se apagava. A intenção era boa — registro
+   * pastoral não deve ser reescrito sem deixar rastro —, mas o custo apareceu
+   * no uso: uma visita começada por engano, ou interrompida na primeira
+   * pergunta, ficava para sempre na lista sem jeito de sair.
+   *
+   * Quem escreve o registro é o próprio pastor, sobre o próprio distrito. Ele
+   * pode corrigir e pode apagar, e a lápide continua viajando na sincronização
+   * para os outros aparelhos ficarem sabendo.
+   */
+  async deleteVisit(accountId: string, masterKey: CryptoKey, visitId: string): Promise<void> {
+    const visita = (await this.listVisits(accountId, masterKey)).find(({ id }) => id === visitId)
+    if (!visita) throw new Error('Visita não encontrada.')
+    const deletedAt = new Date().toISOString()
+    const tombstone = await encryptPayload(masterKey, { schemaVersion: 1, type: 'visit_tombstone', data: { deletedAt } }, visitId)
+    await this.repository.deleteEncrypted(accountId, currentDeviceId(accountId), visitId, tombstone)
+  }
+
   async deletePrayerRequest(accountId: string, masterKey: CryptoKey, prayerId: string): Promise<void> {
     const prayer = (await this.listPrayerRequests(accountId, masterKey)).find(({ id }) => id === prayerId)
     if (!prayer) throw new Error('Pedido não encontrado.')

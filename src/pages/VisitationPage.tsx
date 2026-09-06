@@ -1,8 +1,9 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import { CalendarPlus, CheckCircle2, ChevronRight, Circle, FileText, HeartHandshake, ListChecks, Plus, RotateCcw, UsersRound } from 'lucide-react'
+import { CalendarPlus, CheckCircle2, ChevronRight, Circle, Edit3, FileText, HeartHandshake, ListChecks, Plus, RotateCcw, Trash2, UsersRound } from 'lucide-react'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { agruparVisitasPorIgreja } from '../care/visitasPorIgreja'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { CareService } from '../care/service'
 import { FOLLOW_UP_LABELS, VISIT_REASON_LABELS, type FollowUpEntity, type TaskEntity, type VisitEntity, type VisitRoundEntity } from '../care/types'
@@ -73,6 +74,23 @@ export function VisitationPage() {
     ? families.find(({ id }) => id === visit.targetId)?.name
     : people.find(({ id }) => id === visit.targetId)?.name
 
+  /**
+   * Apagar a visita direto da lista.
+   *
+   * Antes só havia "registrar correção" dentro da visita, e nada apagava: uma
+   * visita começada por engano ficava na lista para sempre.
+   */
+  async function apagarVisita(visitId: string) {
+    if (!account || !masterKey) return
+    if (!window.confirm('Apagar esta visita? O registro sai da lista e dos relatórios.')) return
+    try {
+      await care.deleteVisit(account.id, masterKey, visitId)
+      await load()
+    } catch (motivo) {
+      setError(motivo instanceof Error ? motivo.message : 'Não foi possível apagar a visita.')
+    }
+  }
+
   async function toggleFollow(follow: FollowUpEntity) {
     if (!account || !masterKey) return
     await care.updateFollowUp(account.id, masterKey, follow, follow.status === 'pending' ? 'completed' : 'pending')
@@ -121,12 +139,24 @@ export function VisitationPage() {
       <Card title="Visitas registradas" action={<Button variant="secondary" icon={<FileText />} onClick={() => previewLocalPdf('Relatório de Visitações', visitReportLines(visits, rounds, 'Distrito'))}>Relatório</Button>}>
         {!visits.length
           ? <div className="empty-state"><HeartHandshake /><strong>Nenhuma visita registrada</strong><p>Uma visita espontânea não precisa de agendamento prévio.</p></div>
-          : <div className="visit-list">{visits.map((visit) => { const version = visit.versions.at(-1)!; return <Link key={visit.id} to={`/app/visitas/${visit.id}`}>
-            <span className="avatar"><UsersRound /></span>
-            <span><strong>{targetName(visit) ?? 'Cadastro preservado'}</strong><small>{VISIT_REASON_LABELS[version.reason]} · {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(version.startAt))}</small></span>
-            <span className="entity-badge">v{visit.currentVersion}</span>
-            <ChevronRight />
-          </Link> })}</div>}
+          : (() => {
+            const agrupado = agruparVisitasPorIgreja(visits, churches)
+            return <>
+              <p className="visit-total"><strong>{agrupado.pessoasNoDistrito}</strong> pessoa(s) visitada(s) no distrito, em {visits.length} visita(s).</p>
+              {agrupado.igrejas.map((igreja) => <section className="visit-church" key={igreja.churchId}>
+                <h3>{igreja.nome}<small>{igreja.pessoas} pessoa(s) · {igreja.visitas.length} visita(s)</small></h3>
+                <div className="visit-list">{igreja.visitas.map((visit) => { const version = visit.versions.at(-1)!; return <div className="visit-row" key={visit.id}>
+                  <Link to={`/app/visitas/${visit.id}`}>
+                    <span className="avatar"><UsersRound /></span>
+                    <span><strong>{targetName(visit) ?? 'Cadastro preservado'}</strong><small>{VISIT_REASON_LABELS[version.reason]} · {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(version.startAt))}</small></span>
+                    <ChevronRight />
+                  </Link>
+                  <Link className="icon-button" to={`/app/visitas/${visit.id}`} aria-label={`Editar visita de ${targetName(visit) ?? 'cadastro preservado'}`}><Edit3 /></Link>
+                  <button type="button" className="icon-button danger-icon" aria-label={`Excluir visita de ${targetName(visit) ?? 'cadastro preservado'}`} onClick={() => void apagarVisita(visit.id)}><Trash2 /></button>
+                </div> })}</div>
+              </section>)}
+            </>
+          })()}
       </Card>
       <Card title="Rodadas de visitação">
         <form className="round-form" onSubmit={createRound}>
