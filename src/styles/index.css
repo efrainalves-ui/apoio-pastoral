@@ -232,6 +232,32 @@ button.entity-row { width: 100%; background: none; border-top: 0; border-inline:
 .goal-pdf-card--primeiro { order: -1; }
 
 /* Visitas separadas por igreja, com o alcance do distrito no topo. */
+/*
+  A cor diz o que o número quer dizer. Não dizimista em vermelho e não
+  sistemático em amarelo é o que faz o pastor ver, de relance, onde o
+  acompanhamento é mais urgente — sem precisar ler três rótulos.
+*/
+.fidelidade--nao strong { color: #b3261e; }
+.fidelidade--parcial strong { color: #8a6300; }
+:root:not([data-tema='claro']) .fidelidade--nao strong, :root[data-tema='escuro'] .fidelidade--nao strong { color: #f19289; }
+:root:not([data-tema='claro']) .fidelidade--parcial strong, :root[data-tema='escuro'] .fidelidade--parcial strong { color: #e8c477; }
+/* Fidelidade ano a ano: uma coluna por ano, empilhada pelas três classificações. */
+.fidelidade-anos { display: flex; gap: 18px; align-items: flex-end; margin: 0; padding: 0; list-style: none; }
+.fidelidade-anos li { display: grid; gap: 6px; justify-items: center; }
+.fidelidade-anos__barra { width: 42px; height: 132px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; border-radius: 8px; }
+.fidelidade-anos__nao { background: #b3261e; }
+.fidelidade-anos__parcial { background: #d8a51e; }
+.fidelidade-anos__sim { background: var(--green-700); }
+.fidelidade-anos__valores { display: grid; gap: 1px; justify-items: center; font-variant-numeric: tabular-nums; font-size: .7rem; line-height: 1.25; }
+.fidelidade-anos__valor--sim { color: var(--green-700); font-weight: 700; }
+.fidelidade-anos__valor--parcial { color: #8a6300; }
+.fidelidade-anos__valor--nao { color: #b3261e; }
+.fidelidade-amostra--sim { background: var(--green-700); }
+.fidelidade-amostra--parcial { background: #d8a51e; }
+.fidelidade-amostra--nao { background: #b3261e; }
+:root:not([data-tema='claro']) .fidelidade-anos__valor--parcial, :root[data-tema='escuro'] .fidelidade-anos__valor--parcial { color: #e8c477; }
+:root:not([data-tema='claro']) .fidelidade-anos__valor--nao, :root[data-tema='escuro'] .fidelidade-anos__valor--nao { color: #f19289; }
+:root:not([data-tema='claro']) .fidelidade-anos__valor--sim, :root[data-tema='escuro'] .fidelidade-anos__valor--sim { color: #86c9ab; }
 .visit-total { margin: 0 0 14px; color: var(--muted); font-size: .92rem; }
 .visit-total strong { color: var(--ink); font-size: 1.3rem; }
 .visit-church + .visit-church { margin-top: 18px; }

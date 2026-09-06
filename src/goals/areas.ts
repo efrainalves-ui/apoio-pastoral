@@ -165,9 +165,9 @@ export interface ComparacaoMensal {
  * mês do calendário —, porque um relatório enviado até agosto não diz nada sobre
  * setembro, e contar setembro como zero inventaria uma queda.
  */
-export function comparacaoMensal(area: GoalArea, sources: AreaSources, year: number): ComparacaoMensal {
+export function comparacaoMensal(area: GoalArea, sources: AreaSources, year: number, anoBase = year - 1): ComparacaoMensal {
   const atual = monthlyResults(area, sources, year)
-  const anterior = monthlyResults(area, sources, year - 1)
+  const anterior = monthlyResults(area, sources, anoBase)
   const meses = atual.map((valor, indice) => ({ mes: indice + 1, atual: valor, anterior: anterior[indice] ?? 0 }))
 
   let ateOMes = 0
@@ -184,6 +184,25 @@ export function comparacaoMensal(area: GoalArea, sources: AreaSources, year: num
     acumuladoAnterior,
     variacao: acumuladoAnterior > 0 ? Math.round(((acumuladoAtual - acumuladoAnterior) / acumuladoAnterior) * 100) : null,
   }
+}
+
+/** Até onde faz sentido guardar histórico: um pastor fica no máximo cinco anos. */
+export const ANOS_DE_HISTORICO = 5
+
+/**
+ * Os anos anteriores que já têm resultado, do mais recente para o mais antigo.
+ *
+ * O pastor pode chegar ao aplicativo com quatro anos de distrito nas costas e
+ * enviar os relatórios antigos. Saber quais anos já entraram é o que permite
+ * escolher contra qual comparar — e o que mostra, sem dizer, que dá para
+ * mandar mais.
+ */
+export function anosComResultado(area: GoalArea, sources: AreaSources, year: number, limite = ANOS_DE_HISTORICO): number[] {
+  const anos: number[] = []
+  for (let anterior = year - 1; anterior >= year - limite; anterior -= 1) {
+    if (previousResult(area, sources, anterior) > 0) anos.push(anterior)
+  }
+  return anos
 }
 
 export interface ChurchProgress { churchId: string; target: number; result: number; percent: number }

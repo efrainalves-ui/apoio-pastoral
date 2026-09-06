@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { comparacaoMensal, type AreaSources } from './areas'
+import { anosComResultado, comparacaoMensal, type AreaSources } from './areas'
 import type { GoalEntryEntity } from './types'
 
 const lancamento = (ano: number, mes: number, amount: number): GoalEntryEntity => ({
@@ -55,5 +55,34 @@ describe('comparação do mesmo período entre dois anos', () => {
     const comparacao = comparacaoMensal('baptisms', fontes([lancamento(2025, 1, 10), lancamento(2026, 1, 15)]), 2026)
 
     expect(comparacao.variacao).toBe(50)
+  })
+})
+
+describe('comparar com anos anteriores', () => {
+  it('lista os anos que já têm resultado, do mais recente para o mais antigo', () => {
+    // O pastor pode chegar com quatro anos de distrito e enviar os relatórios
+    // antigos. Saber quais anos entraram é o que permite escolher.
+    const fontesComHistorico = fontes([
+      lancamento(2026, 1, 5), lancamento(2025, 1, 10), lancamento(2023, 1, 8),
+    ])
+
+    expect(anosComResultado('baptisms', fontesComHistorico, 2026)).toEqual([2025, 2023])
+  })
+
+  it('não olha mais que cinco anos para trás', () => {
+    // Um pastor fica no máximo cinco anos no distrito; guardar mais é guardar
+    // o distrito de outra pessoa.
+    const antigo = fontes([lancamento(2026, 1, 5), lancamento(2020, 1, 9)])
+
+    expect(anosComResultado('baptisms', antigo, 2026)).toEqual([])
+  })
+
+  it('compara com o ano escolhido, e não só com o anterior', () => {
+    const comHistorico = fontes([
+      lancamento(2026, 3, 12), lancamento(2025, 3, 10), lancamento(2023, 3, 4),
+    ])
+
+    expect(comparacaoMensal('baptisms', comHistorico, 2026, 2023).acumuladoAnterior).toBe(4)
+    expect(comparacaoMensal('baptisms', comHistorico, 2026, 2025).acumuladoAnterior).toBe(10)
   })
 })

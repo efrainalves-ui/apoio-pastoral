@@ -14,7 +14,7 @@ import { GoalsService, parseGoalsPdf } from '../goals/service'
 import { HISTORY_AREAS, type GoalHistoryData, type GoalImportPreview } from '../goals/types'
 import { useGoalSources } from '../goals/useGoalSources'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
-import { AREA_PDF_DOCUMENT, PERCENT_TARGET_AREAS, comparacaoMensal } from '../goals/areas'
+import { AREA_PDF_DOCUMENT, ANOS_DE_HISTORICO, PERCENT_TARGET_AREAS, anosComResultado, comparacaoMensal } from '../goals/areas'
 import { previaDeBatismos, previaFinanceira } from '../goals/importacaoAcms'
 import { comparativoDeDoadores } from '../goals/doadores'
 import { PeopleService } from '../people/service'
@@ -45,6 +45,9 @@ export function GoalAreaPage() {
   // pede para alterar — que é o gesto raro, e não o estado normal da tela.
   const [alterandoMeta, setAlterandoMeta] = useState(false)
   const [corrigindoAnoAnterior, setCorrigindoAnoAnterior] = useState(false)
+  // Contra qual ano comparar. O padrão é o anterior, e a escolha existe porque
+  // quem chega com quatro anos de distrito pode enviar os relatórios antigos.
+  const [anoBase, setAnoBase] = useState<number | null>(null)
   const carregarPessoas = useCallback(async () => {
     if (!account || !masterKey) return
     setPessoas(await peopleService.listPeople(account.id, masterKey))
@@ -67,7 +70,9 @@ export function GoalAreaPage() {
 
   const progresso = areaComparison(area, goals, sources, year)
   const guardaHistorico = HISTORY_AREAS.includes(area as GoalHistoryData['area'])
-  const comparacao = comparacaoMensal(area, sources, year)
+  const anosDisponiveis = anosComResultado(area, sources, year)
+  const anoComparado = anoBase ?? anosDisponiveis[0] ?? year - 1
+  const comparacao = comparacaoMensal(area, sources, year, anoComparado)
   const porIgreja = churchProgress(area, goals, sources, year, churches.map(({ id }) => id))
   const anoTerminou = year < new Date().getFullYear() || new Date().getMonth() === 11
   /**
@@ -226,13 +231,20 @@ export function GoalAreaPage() {
         quatro de oito parece uma queda enorme e pode ser um crescimento: a
         conta antiga mentia, e um número que mente é pior do que número nenhum.
       */}
-      {guardaHistorico && <Card title={`Comparação com ${year - 1}`} eyebrow={comparacao.ateOMes > 0 ? `Janeiro a ${MONTH_LABELS[comparacao.ateOMes - 1]}, nos dois anos` : 'Sem resultado neste ano ainda'}>
+      {guardaHistorico && <Card title={`Comparação com ${anoComparado} e anos anteriores`} eyebrow={comparacao.ateOMes > 0 ? `Janeiro a ${MONTH_LABELS[comparacao.ateOMes - 1]}, nos dois anos` : 'Sem resultado neste ano ainda'}>
+        <p className="card-copy">Envie {AREA_PDF_DOCUMENT[area]?.artigo ?? 'o'} {AREA_PDF_DOCUMENT[area]?.nome ?? 'relatório'} de anos anteriores — até {ANOS_DE_HISTORICO} atrás — para comparar com qualquer um deles, ano a ano e mês a mês.</p>
+        {anosDisponiveis.length > 1 && <label className="field goal-ano-base">
+          <span className="field__label">Comparar com</span>
+          <select className="field__input" value={anoComparado} onChange={(event) => setAnoBase(Number(event.target.value))}>
+            {anosDisponiveis.map((ano) => <option key={ano} value={ano}>{ano}</option>)}
+          </select>
+        </label>}
         {comparacao.ateOMes === 0
           ? <p className="field__hint">Envie {AREA_PDF_DOCUMENT[area]?.artigo ?? 'o'} {AREA_PDF_DOCUMENT[area]?.nome ?? 'relatório'} deste ano para a comparação aparecer.</p>
           : <>
             <div className="goal-compare">
               <div>
-                <small>{year - 1}</small>
+                <small>{anoComparado}</small>
                 <strong>{formatGoalValue(area, comparacao.acumuladoAnterior)}</strong>
               </div>
               <div>
@@ -244,7 +256,7 @@ export function GoalAreaPage() {
                 <strong>{comparacao.variacao === null ? '—' : `${comparacao.variacao >= 0 ? '+' : '−'}${Math.abs(comparacao.variacao)}%`}</strong>
               </div>
             </div>
-            {comparacao.variacao === null && <p className="field__hint">Ainda não há resultado de {year - 1} no mesmo período para comparar.</p>}
+            {comparacao.variacao === null && <p className="field__hint">Ainda não há resultado de {anoComparado} no mesmo período para comparar.</p>}
           </>}
       </Card>}
 
@@ -253,14 +265,14 @@ export function GoalAreaPage() {
         horizontal em vez de encolher: barra espremida não deixa comparar nada,
         que é a única coisa que este gráfico existe para permitir.
       */}
-      <Card title="Mês a mês" eyebrow={`${year - 1} e ${year} lado a lado`}>
+      <Card title="Mês a mês" eyebrow={`${anoComparado} e ${year} lado a lado`}>
         <div className="goal-months-scroll">
           <ul className="goal-months goal-months--duplo">{comparacao.meses.map(({ mes, atual, anterior }) => {
             const teto = Math.max(1, ...comparacao.meses.flatMap((item) => [item.atual, item.anterior]))
             const caiu = anterior > 0 && atual < anterior
             return <li key={MONTH_LABELS[mes - 1]}>
               <span className="goal-months__par">
-                <span className="goal-months__bar goal-months__bar--anterior" title={`${MONTH_LABELS[mes - 1]} de ${year - 1}: ${formatGoalValue(area, anterior)}`}>
+                <span className="goal-months__bar goal-months__bar--anterior" title={`${MONTH_LABELS[mes - 1]} de ${anoComparado}: ${formatGoalValue(area, anterior)}`}>
                   <span style={{ height: `${Math.round((anterior / teto) * 100)}%` }} />
                 </span>
                 <span className={`goal-months__bar${caiu ? ' goal-months__bar--queda' : ''}`} title={`${MONTH_LABELS[mes - 1]} de ${year}: ${formatGoalValue(area, atual)}`}>
@@ -280,7 +292,7 @@ export function GoalAreaPage() {
             </li>
           })}</ul>
         </div>
-        <p className="goal-months__legenda"><span className="goal-months__amostra goal-months__amostra--anterior" />{year - 1}<span className="goal-months__amostra" />{year}</p>
+        <p className="goal-months__legenda"><span className="goal-months__amostra goal-months__amostra--anterior" />{anoComparado}<span className="goal-months__amostra" />{year}</p>
       </Card>
 
       <h2 className="goal-section">Ajustes</h2>

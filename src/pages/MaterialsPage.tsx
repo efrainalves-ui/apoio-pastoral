@@ -2,7 +2,7 @@ import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { Boxes, ClipboardList, PackageCheck, Plus, Split, Trash2 } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -255,7 +255,5 @@ export function MaterialsPage() {
         </div>)}</div>}
       </Card>
     </>}
-
-    <p className="muted">Materiais e necessidades são dados do distrito e saem no encerramento de distrito. <Link className="text-link" to="/app/metas/acms">Relatório ACMS</Link></p>
   </div>
 }

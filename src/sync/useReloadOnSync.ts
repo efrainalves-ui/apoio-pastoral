@@ -31,9 +31,16 @@ export function notificarDadosSincronizados(): void {
  */
 export function useReloadOnSync(carregar: () => void | Promise<void>): void {
   useEffect(() => {
-    void carregar()
-    const aoChegarDados = () => { void carregar() }
-    window.addEventListener(EVENTO_DADOS_SINCRONIZADOS, aoChegarDados)
-    return () => { window.removeEventListener(EVENTO_DADOS_SINCRONIZADOS, aoChegarDados) }
+    /*
+      Uma falha ao carregar não pode virar rejeição sem dono.
+      Acontece de verdade quando a tela sai antes de a leitura terminar — o
+      banco fecha, a promessa quebra, e ninguém está mais ali para tratar. A
+      falha em si já é da conta de cada tela, que guarda o próprio aviso de
+      erro; o que não serve a ninguém é o estouro solto no console.
+    */
+    const tentar = () => { void Promise.resolve(carregar()).catch(() => undefined) }
+    tentar()
+    window.addEventListener(EVENTO_DADOS_SINCRONIZADOS, tentar)
+    return () => { window.removeEventListener(EVENTO_DADOS_SINCRONIZADOS, tentar) }
   }, [carregar])
 }
