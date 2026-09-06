@@ -37,8 +37,19 @@ function avisoDeIgrejaAusente(nome: string): string {
   return `“${normalizePdfChurchName(nome)}” está no relatório e não está cadastrada no distrito. Os números dela ficaram de fora.`
 }
 
+export interface PreviaDeRelatorio extends GoalImportPreview {
+  ano: number
+  /**
+   * Os meses que este relatório cobre.
+   *
+   * É o que permite substituir em vez de somar: o relatório é a verdade sobre o
+   * período que ele traz, e nada diz sobre os meses que ainda não chegaram.
+   */
+  mesesCobertos: number[]
+}
+
 /** Batismos por igreja e mês, a partir da Análise de Movimentos. */
-export function previaDeBatismos(texto: string, hash: string, igrejas: readonly IgrejaCadastrada[]): GoalImportPreview {
+export function previaDeBatismos(texto: string, hash: string, igrejas: readonly IgrejaCadastrada[]): PreviaDeRelatorio {
   const lido = parseMovimentoDeBatismos(texto)
   const entries: GoalImportPreview['entries'] = []
   const errors: string[] = []
@@ -60,10 +71,18 @@ export function previaDeBatismos(texto: string, hash: string, igrejas: readonly 
     })
   }
 
-  return { hash, entries, errors }
+  return {
+    hash,
+    entries,
+    errors,
+    ano: lido.ano,
+    // O cabeçalho diz "Até ao mês: 9/2026": é ele quem define o período coberto,
+    // e não os meses que por acaso tiveram batismo.
+    mesesCobertos: Array.from({ length: lido.ateOMes }, (_, indice) => indice + 1),
+  }
 }
 
-export interface PreviaFinanceira extends GoalImportPreview {
+export interface PreviaFinanceira extends PreviaDeRelatorio {
   anoAtual: number
   anoAnterior: number
   /** Dízimos e ofertas do ano anterior, somados, para a comparação. */
@@ -94,5 +113,8 @@ export function previaFinanceira(texto: string, hash: string, igrejas: readonly 
     }
   }
 
-  return { hash, entries, errors, anoAtual: lido.anoAtual, anoAnterior: lido.anoAnterior, totalDoAnoAnterior }
+  // Aqui o período vem dos meses que aparecem no relatório, que é como ele diz
+  // até onde vai.
+  const mesesCobertos = [...new Set(lido.igrejas.flatMap((igreja) => igreja.meses.map(({ mes }) => mes)))].sort((esquerda, direita) => esquerda - direita)
+  return { hash, entries, errors, ano: lido.anoAtual, mesesCobertos, anoAtual: lido.anoAtual, anoAnterior: lido.anoAnterior, totalDoAnoAnterior }
 }

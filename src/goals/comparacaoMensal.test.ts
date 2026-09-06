@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { anosComResultado, comparacaoMensal, type AreaSources } from './areas'
+import { anosComResultado, comparacaoMensal, resumoPorAno, type AreaSources } from './areas'
 import type { GoalEntryEntity } from './types'
 
 const lancamento = (ano: number, mes: number, amount: number): GoalEntryEntity => ({
@@ -84,5 +84,38 @@ describe('comparar com anos anteriores', () => {
 
     expect(comparacaoMensal('baptisms', comHistorico, 2026, 2023).acumuladoAnterior).toBe(4)
     expect(comparacaoMensal('baptisms', comHistorico, 2026, 2025).acumuladoAnterior).toBe(10)
+  })
+})
+
+describe('todos os anos de uma vez', () => {
+  const quatroAnos = fontes([
+    lancamento(2022, 5, 40), lancamento(2022, 11, 57),
+    lancamento(2025, 4, 60),
+    lancamento(2026, 1, 3), lancamento(2026, 8, 31),
+  ])
+
+  it('devolve os doze meses de cada ano, com o total', () => {
+    const anos = resumoPorAno('baptisms', quatroAnos, 2026)
+
+    expect(anos.map(({ ano }) => ano)).toEqual([2022, 2025, 2026])
+    expect(anos[0]?.meses).toHaveLength(12)
+    expect(anos[0]?.total).toBe(97)
+    expect(anos[2]?.total).toBe(34)
+  })
+
+  it('mostra os meses que ainda não chegaram, zerados', () => {
+    // Um ano que termina em agosto não está terminado. Setembro a dezembro
+    // zerados dizem que ainda vão acontecer — e é ali que o lançamento manual
+    // entra depois.
+    const anos = resumoPorAno('baptisms', quatroAnos, 2026)
+    const atual = anos.find(({ ano }) => ano === 2026)
+
+    expect(atual?.meses.slice(8)).toEqual([0, 0, 0, 0])
+    expect(atual?.meses[0]).toBe(3)
+    expect(atual?.meses[7]).toBe(31)
+  })
+
+  it('ano sem nenhum resultado não vira linha vazia', () => {
+    expect(resumoPorAno('baptisms', quatroAnos, 2026).map(({ ano }) => ano)).not.toContain(2024)
   })
 })

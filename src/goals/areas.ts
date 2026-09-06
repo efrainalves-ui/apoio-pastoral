@@ -205,6 +205,57 @@ export function anosComResultado(area: GoalArea, sources: AreaSources, year: num
   return anos
 }
 
+export interface AnoResumido { ano: number; meses: number[]; total: number }
+
+/**
+ * Cada ano com resultado, mês a mês e com o total.
+ *
+ * A comparação de dois anos por vez respondia "melhorou ou piorou". Não
+ * respondia a pergunta que o pastor faz olhando quatro anos de distrito: em que
+ * mês o distrito batiza, e o que mudou de um ano para o outro. Para isso é
+ * preciso ver todos os anos juntos.
+ *
+ * Os doze meses aparecem sempre, inclusive os que ainda não chegaram. Um ano
+ * que termina em agosto não está terminado — mostrar setembro a dezembro
+ * zerados é dizer que ainda vão acontecer, e é onde o lançamento manual entra
+ * depois.
+ */
+export function resumoPorAno(area: GoalArea, sources: AreaSources, year: number, limite = ANOS_DE_HISTORICO): AnoResumido[] {
+  const anos: AnoResumido[] = []
+  for (let ano = year - limite; ano <= year; ano += 1) {
+    const meses = monthlyResults(area, sources, ano)
+    const total = meses.reduce((soma, valor) => soma + valor, 0)
+    // Ano sem nada não vira linha vazia: ela só ocuparia espaço dizendo que não
+    // há relatório daquele ano, coisa que a ausência já diz.
+    if (total <= 0) continue
+    anos.push({ ano, meses, total })
+  }
+  return anos
+}
+
+export interface IgrejaPorAno { churchId: string; totais: Map<number, number>; total: number }
+
+/**
+ * Quanto cada igreja fez, em cada ano.
+ *
+ * É a pergunta seguinte à do resumo anual: sabendo que o distrito caiu, saber
+ * em qual igreja caiu é o que transforma o número em visita marcada.
+ */
+export function resumoPorIgrejaEAno(area: GoalArea, sources: AreaSources, anos: readonly number[], churchIds: readonly string[]): IgrejaPorAno[] {
+  return churchIds.map((churchId) => {
+    const totais = new Map<number, number>()
+    let total = 0
+    for (const ano of anos) {
+      const doAno = areaResults(area, sources, ano)
+        .filter((item) => item.churchId === churchId)
+        .reduce((soma, item) => soma + item.amount, 0)
+      totais.set(ano, doAno)
+      total += doAno
+    }
+    return { churchId, totais, total }
+  }).filter(({ total }) => total > 0)
+}
+
 export interface ChurchProgress { churchId: string; target: number; result: number; percent: number }
 
 /** Metas e resultados por igreja, sem ordenar por desempenho. */

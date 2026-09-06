@@ -17,4 +17,37 @@ export class GoalsService { private readonly repo: VaultRepository; constructor(
     await this.repo.saveEncrypted(accountId, currentDeviceId(accountId), id, await encryptPayload(key, { schemaVersion: 1, type: 'goal_history', data }, id), 'goal_history')
     return { id, ...data }
   }
- async saveGoal(accountId: string, key: CryptoKey, input: Omit<GoalData, 'createdAt' | 'updatedAt'>) { if (!Number.isFinite(input.target) || input.target < 0) throw new Error('Informe uma meta válida.'); const current = (await this.listGoals(accountId, key)).find((item) => item.churchId === input.churchId && item.year === input.year && item.metric === input.metric); const now = new Date().toISOString(); const id = current?.id ?? crypto.randomUUID(); const data: GoalData = { ...input, createdAt: current?.createdAt ?? now, updatedAt: now }; await this.repo.saveEncrypted(accountId, currentDeviceId(accountId), id, await encryptPayload(key, { schemaVersion: 1, type: 'goal', data }, id), 'goal'); return { id, ...data } } async addEntries(accountId: string, key: CryptoKey, entries: Array<Omit<GoalEntryData, 'createdAt' | 'source'> & { source?: GoalEntryData['source'] }>) { const now = new Date().toISOString(); for (const entry of entries) { if (!entry.churchId || !Number.isFinite(entry.amount) || entry.amount < 0) throw new Error('Revise o lançamento.'); const id = crypto.randomUUID(); const data: GoalEntryData = { ...entry, source: entry.source ?? 'manual', createdAt: now }; await this.repo.saveEncrypted(accountId, currentDeviceId(accountId), id, await encryptPayload(key, { schemaVersion: 1, type: 'goal_entry', data }, id), 'goal_entry') } } }
+ async saveGoal(accountId: string, key: CryptoKey, input: Omit<GoalData, 'createdAt' | 'updatedAt'>) { if (!Number.isFinite(input.target) || input.target < 0) throw new Error('Informe uma meta válida.'); const current = (await this.listGoals(accountId, key)).find((item) => item.churchId === input.churchId && item.year === input.year && item.metric === input.metric); const now = new Date().toISOString(); const id = current?.id ?? crypto.randomUUID(); const data: GoalData = { ...input, createdAt: current?.createdAt ?? now, updatedAt: now }; await this.repo.saveEncrypted(accountId, currentDeviceId(accountId), id, await encryptPayload(key, { schemaVersion: 1, type: 'goal', data }, id), 'goal'); return { id, ...data } }  /**
+   * Aplica um relatório substituindo o período que ele cobre.
+   *
+   * O pastor envia o relatório do ACMS todo mês, e cada envio traz o ano
+   * inteiro até ali — o de setembro repete janeiro a agosto. Acrescentar os
+   * lançamentos, como se fazia, somaria os mesmos batismos de novo a cada
+   * envio: em dezembro o distrito teria quatro vezes o que realmente aconteceu,
+   * e o número errado é pior do que número nenhum, porque parece certo.
+   *
+   * Os meses cobertos pelo relatório são apagados antes de entrar o que ele
+   * traz. Mês fora do período — dezembro, quando o relatório vai até setembro —
+   * fica intacto, inclusive o que foi lançado à mão.
+   */
+  async replaceReportEntries(
+    accountId: string,
+    key: CryptoKey,
+    metric: GoalMetric,
+    year: number,
+    mesesCobertos: readonly number[],
+    entries: Array<Omit<GoalEntryData, 'createdAt' | 'source'>>,
+  ): Promise<void> {
+    const cobertos = new Set(mesesCobertos)
+    const antigos = (await this.listEntries(accountId, key)).filter((entry) => entry.metric === metric
+      && entry.date.startsWith(`${year}-`)
+      && cobertos.has(Number(entry.date.slice(5, 7))))
+    const deletedAt = new Date().toISOString()
+    for (const antigo of antigos) {
+      const tombstone = await encryptPayload(key, { schemaVersion: 1, type: 'goal_entry_tombstone', data: { deletedAt } }, antigo.id)
+      await this.repo.deleteEncrypted(accountId, currentDeviceId(accountId), antigo.id, tombstone)
+    }
+    await this.addEntries(accountId, key, entries.map((entry) => ({ ...entry, source: 'pdf' as const })))
+  }
+
+ async addEntries(accountId: string, key: CryptoKey, entries: Array<Omit<GoalEntryData, 'createdAt' | 'source'> & { source?: GoalEntryData['source'] }>) { const now = new Date().toISOString(); for (const entry of entries) { if (!entry.churchId || !Number.isFinite(entry.amount) || entry.amount < 0) throw new Error('Revise o lançamento.'); const id = crypto.randomUUID(); const data: GoalEntryData = { ...entry, source: entry.source ?? 'manual', createdAt: now }; await this.repo.saveEncrypted(accountId, currentDeviceId(accountId), id, await encryptPayload(key, { schemaVersion: 1, type: 'goal_entry', data }, id), 'goal_entry') } } }

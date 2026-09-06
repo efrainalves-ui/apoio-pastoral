@@ -14,8 +14,8 @@ import { GoalsService, parseGoalsPdf } from '../goals/service'
 import { HISTORY_AREAS, type GoalHistoryData, type GoalImportPreview } from '../goals/types'
 import { useGoalSources } from '../goals/useGoalSources'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
-import { AREA_PDF_DOCUMENT, ANOS_DE_HISTORICO, PERCENT_TARGET_AREAS, anosComResultado, comparacaoMensal } from '../goals/areas'
-import { previaDeBatismos, previaFinanceira } from '../goals/importacaoAcms'
+import { AREA_PDF_DOCUMENT, ANOS_DE_HISTORICO, PERCENT_TARGET_AREAS, anosComResultado, comparacaoMensal, resumoPorAno, resumoPorIgrejaEAno } from '../goals/areas'
+import { previaDeBatismos, previaFinanceira, type PreviaDeRelatorio } from '../goals/importacaoAcms'
 import { comparativoDeDoadores } from '../goals/doadores'
 import { PeopleService } from '../people/service'
 import type { PersonEntity } from '../people/types'
@@ -71,6 +71,8 @@ export function GoalAreaPage() {
   const progresso = areaComparison(area, goals, sources, year)
   const guardaHistorico = HISTORY_AREAS.includes(area as GoalHistoryData['area'])
   const anosDisponiveis = anosComResultado(area, sources, year)
+  const anosResumidos = resumoPorAno(area, sources, year)
+  const igrejasPorAno = resumoPorIgrejaEAno(area, sources, anosResumidos.map(({ ano }) => ano), churches.map(({ id }) => id))
   const anoComparado = anoBase ?? anosDisponiveis[0] ?? year - 1
   const comparacao = comparacaoMensal(area, sources, year, anoComparado)
   const porIgreja = churchProgress(area, goals, sources, year, churches.map(({ id }) => id))
@@ -183,10 +185,18 @@ export function GoalAreaPage() {
   }
 
   async function aplicarPreview() {
-    if (!account || !masterKey || !preview) return
+    if (!account || !masterKey || !preview || !area) return
     setBusy(true); setError('')
     try {
-      await goalsService.addEntries(account.id, masterKey, preview.entries.map((entry) => ({ ...entry, source: 'pdf' as const })))
+      // Substituir o período coberto, não somar. Cada relatório do ACMS traz o
+      // ano inteiro até a data dele: acrescentar faria os mesmos batismos
+      // entrarem de novo a cada envio.
+      const doRelatorio = preview as Partial<PreviaDeRelatorio>
+      if (doRelatorio.ano && doRelatorio.mesesCobertos?.length) {
+        await goalsService.replaceReportEntries(account.id, masterKey, AREA_TARGET_METRIC[area], doRelatorio.ano, doRelatorio.mesesCobertos, preview.entries)
+      } else {
+        await goalsService.addEntries(account.id, masterKey, preview.entries.map((entry) => ({ ...entry, source: 'pdf' as const })))
+      }
       // O ano anterior veio no mesmo arquivo: guardá-lo aqui é o que faz a
       // comparação existir sem trabalho manual nenhum.
       if (anoAnteriorDoPdf && guardaHistorico && anoAnteriorDoPdf.ano < year) {
@@ -224,6 +234,50 @@ export function GoalAreaPage() {
         <p className="goal-card__percent">{progresso.target > 0 ? `${progresso.percent}% alcançado` : 'Defina a meta do ano para acompanhar'}</p>
         {anoTerminou && progresso.target > 0 && <p className="card-copy">{progresso.reached ? 'Meta do ano alcançada.' : `Faltaram ${formatGoalValue(area, progresso.missing)} para a meta do ano.`}</p>}
       </Card>
+
+      {/*
+        Todos os anos de uma vez, mês a mês, com o total de cada um.
+        A comparação de dois anos respondia "melhorou ou piorou". Não respondia
+        a pergunta de quem tem quatro anos de distrito: em que mês o distrito
+        batiza, e o que mudou de um ano para o outro. Para isso é preciso ver os
+        anos juntos — e é daqui que sai a ideia, não do número isolado.
+      */}
+      {anosResumidos.length > 0 && <Card title="Ano a ano" eyebrow={`Mês a mês, com o total de cada ano`}>
+        <div className="goal-months-scroll">
+          <table className="goal-anos">
+            <thead>
+              <tr><th scope="col">Ano</th>{MONTH_LABELS.map((mes) => <th scope="col" key={mes}>{mes}</th>)}<th scope="col">Total</th></tr>
+            </thead>
+            <tbody>
+              {anosResumidos.map(({ ano, meses, total }) => <tr key={ano}>
+                <th scope="row">{ano}</th>
+                {meses.map((valor, indice) => <td key={indice} className={valor === 0 ? 'goal-anos__vazio' : ''}>{valor === 0 ? '—' : formatGoalValue(area, valor)}</td>)}
+                <td className="goal-anos__total">{formatGoalValue(area, total)}</td>
+              </tr>)}
+            </tbody>
+          </table>
+        </div>
+        <p className="field__hint">Os doze meses aparecem sempre. Os que ainda não chegaram ficam vazios até o próximo relatório — ou até você lançar à mão.</p>
+      </Card>}
+
+      {igrejasPorAno.length > 0 && anosResumidos.length > 1 && <Card title="Por igreja, ano a ano" eyebrow="Onde mudou">
+        <div className="goal-months-scroll">
+          <table className="goal-anos">
+            <thead>
+              <tr><th scope="col">Igreja</th>{anosResumidos.map(({ ano }) => <th scope="col" key={ano}>{ano}</th>)}</tr>
+            </thead>
+            <tbody>
+              {igrejasPorAno.map(({ churchId, totais }) => <tr key={churchId}>
+                <th scope="row" className="goal-anos__igreja">{nomeIgreja(churchId)}</th>
+                {anosResumidos.map(({ ano }) => {
+                  const valor = totais.get(ano) ?? 0
+                  return <td key={ano} className={valor === 0 ? 'goal-anos__vazio' : ''}>{valor === 0 ? '—' : formatGoalValue(area, valor)}</td>
+                })}
+              </tr>)}
+            </tbody>
+          </table>
+        </div>
+      </Card>}
 
       {/*
         A comparação é do **mesmo período**, e não do ano inteiro passado contra
