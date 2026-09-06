@@ -1,5 +1,5 @@
 import { ArrowLeft, FileUp } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -16,8 +16,13 @@ import { useGoalSources } from '../goals/useGoalSources'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
 import { AREA_PDF_DOCUMENT, PERCENT_TARGET_AREAS } from '../goals/areas'
 import { previaDeBatismos, previaFinanceira } from '../goals/importacaoAcms'
+import { comparativoDeDoadores } from '../goals/doadores'
+import { PeopleService } from '../people/service'
+import type { PersonEntity } from '../people/types'
+import { useReloadOnSync } from '../sync/useReloadOnSync'
 
 const goalsService = new GoalsService()
+const peopleService = new PeopleService()
 
 export function GoalAreaPage() {
   const { account, masterKey } = useAuthVault()
@@ -31,6 +36,17 @@ export function GoalAreaPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  // As pessoas entram só para contar doadores: é a metade em gente da meta
+  // financeira, e ela diz o que o dinheiro sozinho não diz — se o crescimento
+  // veio de mais gente participando ou de poucos dando mais.
+  const [pessoas, setPessoas] = useState<PersonEntity[]>([])
+  const [doadoresInput, setDoadoresInput] = useState('')
+  const carregarPessoas = useCallback(async () => {
+    if (!account || !masterKey) return
+    setPessoas(await peopleService.listPeople(account.id, masterKey))
+  }, [account, masterKey])
+  useReloadOnSync(carregarPessoas)
+
   const year = new Date().getFullYear()
   // O texto que saiu do PDF fica à mão quando nada é reconhecido. Sem isso, o
   // pastor só tem "não reconhecido" e ninguém consegue descobrir o porquê — o
@@ -89,6 +105,22 @@ export function GoalAreaPage() {
       await reload()
     } catch (motivo) {
       setError(motivo instanceof Error ? motivo.message : 'Não foi possível guardar o resultado do ano anterior.')
+    }
+  }
+
+  async function salvarMetaDeDoadores(event: FormEvent) {
+    event.preventDefault()
+    if (!account || !masterKey || !area) return
+    setError(''); setNotice('')
+    try {
+      await goalsService.saveGoal(account.id, masterKey, {
+        churchId: null, year, metric: 'donors', target: Number(doadoresInput), targetKind: 'percent',
+      })
+      setDoadoresInput('')
+      setNotice('Meta de doadores salva.')
+      await reload()
+    } catch (motivo) {
+      setError(motivo instanceof Error ? motivo.message : 'Não foi possível salvar a meta de doadores.')
     }
   }
 
@@ -209,6 +241,34 @@ export function GoalAreaPage() {
         </form>
         {progresso.targetsMismatch && <p className="field__hint">A soma das igrejas está em {formatGoalValue(area, progresso.churchTargetsSum)}, diferente do total do distrito.</p>}
       </Card>
+
+      {area === 'financial' && (() => {
+        const metaDeDoadores = goals.find((goal) => goal.churchId === null && goal.year === year && goal.metric === 'donors')
+        const doadores = comparativoDeDoadores(pessoas, year, metaDeDoadores?.target ?? 0)
+        return <Card title="Doadores" eyebrow="A outra metade da meta financeira">
+          <p className="card-copy">Quantas pessoas devolvem, sistemáticas ou não. Entrada maior com os mesmos doadores é uma história; entrada maior com mais gente participando é outra.</p>
+          <div className="goal-card__numbers">
+            <div><small>{year}</small><strong>{doadores.atual}</strong></div>
+            <div><small>{year - 1}</small><strong>{doadores.temAnterior ? doadores.anterior : '—'}</strong></div>
+            {doadores.objetivo > 0 && <div><small>Objetivo</small><strong>{doadores.objetivo}</strong></div>}
+          </div>
+          {doadores.semBaseDeComparacao
+            ? <p className="field__hint">Ainda não há leitura de fidelidade de {year - 1} para comparar. Envie o relatório de fidelidade daquele ano e o objetivo aparece sozinho.</p>
+            : metaDeDoadores && <p className="goal-card__percent">Meta: +{metaDeDoadores.target}% sobre {year - 1} · {doadores.percentualAlcancado}% alcançado</p>}
+          <form className="inline-form" onSubmit={(event) => void salvarMetaDeDoadores(event)}>
+            <Field
+              label={`Aumento de doadores sobre ${year - 1} (%)`}
+              name="donors-target"
+              type="number"
+              min={0}
+              value={doadoresInput}
+              onChange={(event) => setDoadoresInput(event.target.value)}
+              hint={metaDeDoadores ? `Hoje: +${metaDeDoadores.target}%` : 'Quantos por cento a mais de pessoas devolvendo.'}
+            />
+            <Button type="submit" disabled={!doadoresInput}>Salvar</Button>
+          </form>
+        </Card>
+      })()}
 
       <Card title="Metas das igrejas" eyebrow="Distribuição do total">
         {churches.length === 0
