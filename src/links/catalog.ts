@@ -12,7 +12,10 @@
  *   - todo endereço é `https`, sem exceção;
  *   - nada de link que peça login pessoal do pastor ou que leve a dado de
  *     membro;
- *   - descrição curta, que diga o que a pessoa encontra do outro lado.
+ *   - descrição curta, que diga o que a pessoa encontra do outro lado;
+ *   - endereço sem parâmetro, com uma exceção: `resourcekey`, que o Google
+ *     exige em pastas antigas do Drive e sem a qual o acervo simplesmente não
+ *     abre para quem nunca entrou nele.
  */
 
 export const LINK_CATEGORIES = ['institucional', 'estudo', 'formulario', 'ferramenta'] as const
@@ -42,13 +45,6 @@ export const USEFUL_LINKS: readonly UsefulLink[] = [
     url: 'https://www.adventistas.org',
   },
   {
-    id: 'manual-da-igreja',
-    title: 'Manual da Igreja',
-    description: 'Referência de organização, cargos e procedimentos da igreja local.',
-    category: 'institucional',
-    url: 'https://www.adventist.org/documents/church-manual/',
-  },
-  {
     id: 'licao-da-escola-sabatina',
     title: 'Lição da Escola Sabatina',
     description: 'Estudo da semana, para preparo pessoal e da classe.',
@@ -68,6 +64,55 @@ export const USEFUL_LINKS: readonly UsefulLink[] = [
     description: 'Texto bíblico em várias versões, para consulta e preparo de sermão.',
     category: 'estudo',
     url: 'https://www.bible.com',
+  },
+  {
+    id: 'cursos-biblicos',
+    title: 'Cursos bíblicos em PDF',
+    description: 'Acervo de cursos bíblicos prontos para imprimir ou enviar ao interessado.',
+    category: 'estudo',
+    url: 'https://drive.google.com/drive/folders/1i1Vlodgome0w5POupIwJ2pzhNvjQO4t5',
+  },
+  {
+    id: 'pra-ser-feliz',
+    title: 'Pra Ser Feliz',
+    description: 'Material da série, para uso em pequenos grupos e visitas.',
+    category: 'estudo',
+    url: 'https://drive.google.com/drive/folders/1w_yWI0Gr7-NAsrCAVRtMw4jGWR9e2_39',
+  },
+  {
+    id: 'livros-logos',
+    title: 'Livros — Logos',
+    description: 'Biblioteca de apoio ao estudo e ao preparo do sermão.',
+    category: 'estudo',
+    url: 'https://drive.google.com/drive/folders/1S6uNZnr64mroMs3rJZGy0Hs7Db6wyAX-',
+  },
+  {
+    id: 'projeto-live',
+    title: 'Projeto Live — Viva a vida ao vivo',
+    description: 'Material do projeto, para programação e divulgação.',
+    category: 'estudo',
+    url: 'https://drive.google.com/drive/folders/1EihsUyPu4zOrjCFUiiJO75RnuFGnYj8v',
+  },
+  {
+    id: 'livros-1',
+    title: 'Livros 1',
+    description: 'Primeira parte do acervo de livros.',
+    category: 'estudo',
+    url: 'https://drive.google.com/drive/folders/0BwTeMlwOGyxGTzZOWEFGOHpQc3M?resourcekey=0-vjc--HWFpJtuItNqlWocSw',
+  },
+  {
+    id: 'livros-2',
+    title: 'Livros 2',
+    description: 'Segunda parte do acervo de livros.',
+    category: 'estudo',
+    url: 'https://drive.google.com/drive/folders/1-Ax5-YG16e7Xy7gbyjWHUKMGR8GKL9nb',
+  },
+  {
+    id: 'ferramentas-biblicas',
+    title: 'Ferramentas bíblicas',
+    description: 'Recursos de consulta e apoio ao estudo da Bíblia.',
+    category: 'ferramenta',
+    url: 'https://drive.google.com/drive/folders/1jVTIW2EzHsOpuBQLPmXh_AWJDP1NeORp',
   },
   {
     id: 'esperanca-mais',

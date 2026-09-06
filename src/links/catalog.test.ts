@@ -34,8 +34,16 @@ describe('links úteis, versionados no aplicativo', () => {
   it('nenhum link carrega dado do distrito no endereço', () => {
     // A lista é a mesma para todos os pastores. Um parâmetro de consulta aqui
     // seria dado de um distrito viajando para fora do aparelho.
+    //
+    // A única exceção é `resourcekey`: o Google passou a exigi-la em pastas
+    // antigas do Drive, e sem ela o acervo não abre para quem nunca entrou
+    // nele. Ela é parte do endereço da pasta, não informação de ninguém.
     for (const link of USEFUL_LINKS) {
-      expect(link.url, `${link.id} não pode levar parâmetro`).not.toMatch(/[?#]/u)
+      const [, consulta = ''] = link.url.split('?')
+      expect(link.url, `${link.id} não pode levar âncora`).not.toMatch(/#/u)
+      for (const parametro of consulta ? consulta.split('&') : []) {
+        expect(parametro, `${link.id} não pode levar parâmetro`).toMatch(/^resourcekey=/u)
+      }
     }
   })
 })
