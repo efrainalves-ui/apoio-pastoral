@@ -46,13 +46,15 @@ export const AREA_USES_PDF: Record<GoalArea, boolean> = {
  * encontra nada com esse nome. Dizer o nome do relatório e o caminho até ele
  * transforma uma tentativa e erro em dois cliques.
  */
-export const AREA_PDF_DOCUMENT: Partial<Record<GoalArea, { nome: string; caminho: string }>> = {
+export const AREA_PDF_DOCUMENT: Partial<Record<GoalArea, { nome: string; artigo: 'a' | 'o'; caminho: string }>> = {
   baptisms: {
-    nome: 'Análise de Movimento',
+    nome: 'Análise de Movimentos',
+    artigo: 'a',
     caminho: 'No ACMS: Relatórios → Movimento → Análise de movimento. Traz só números, sem nomes de pessoas.',
   },
   financial: {
-    nome: 'Comparativo de Entrada',
+    nome: 'Comparativo de Entradas',
+    artigo: 'o',
     caminho: 'No ACMS: Relatórios → Entrada → escolha o tipo de entrada, igreja mês a mês.',
   },
 }
@@ -137,6 +139,51 @@ export function monthlyResults(area: GoalArea, sources: AreaSources, year: numbe
     if (mes >= 0 && mes < 12) meses[mes] = (meses[mes] ?? 0) + item.amount
   }
   return meses
+}
+
+export interface MesComparado { mes: number; atual: number; anterior: number }
+export interface ComparacaoMensal {
+  meses: MesComparado[]
+  /** Último mês com resultado no ano corrente. Zero quando não há nenhum. */
+  ateOMes: number
+  /** Somas do mesmo período nos dois anos: janeiro até `ateOMes`. */
+  acumuladoAtual: number
+  acumuladoAnterior: number
+  /** Crescimento no mesmo período, em porcentagem. `null` sem base. */
+  variacao: number | null
+}
+
+/**
+ * Os dois anos mês a mês, e o acumulado do **mesmo período**.
+ *
+ * Comparar o ano inteiro passado com o ano em andamento é a comparação que a
+ * tela fazia, e ela mente: cento e quatorze batismos de doze meses contra trinta
+ * e quatro de oito meses parece uma queda enorme, e pode ser um crescimento. A
+ * comparação honesta é janeiro-a-agosto contra janeiro-a-agosto.
+ *
+ * O período é definido pelo último mês com resultado no ano corrente — não pelo
+ * mês do calendário —, porque um relatório enviado até agosto não diz nada sobre
+ * setembro, e contar setembro como zero inventaria uma queda.
+ */
+export function comparacaoMensal(area: GoalArea, sources: AreaSources, year: number): ComparacaoMensal {
+  const atual = monthlyResults(area, sources, year)
+  const anterior = monthlyResults(area, sources, year - 1)
+  const meses = atual.map((valor, indice) => ({ mes: indice + 1, atual: valor, anterior: anterior[indice] ?? 0 }))
+
+  let ateOMes = 0
+  atual.forEach((valor, indice) => { if (valor > 0) ateOMes = indice + 1 })
+
+  const noPeriodo = (valores: number[]) => valores.slice(0, ateOMes).reduce((soma, valor) => soma + valor, 0)
+  const acumuladoAtual = noPeriodo(atual)
+  const acumuladoAnterior = noPeriodo(anterior)
+
+  return {
+    meses,
+    ateOMes,
+    acumuladoAtual,
+    acumuladoAnterior,
+    variacao: acumuladoAnterior > 0 ? Math.round(((acumuladoAtual - acumuladoAnterior) / acumuladoAnterior) * 100) : null,
+  }
 }
 
 export interface ChurchProgress { churchId: string; target: number; result: number; percent: number }

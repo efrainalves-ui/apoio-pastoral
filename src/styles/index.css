@@ -73,7 +73,9 @@ h1, h2, h3, .brand strong { font-family: ui-rounded, "SF Pro Rounded", Inter, ui
 .eyebrow { margin: 0 0 8px; color: var(--green-700); font-weight: 800; font-size: .73rem; letter-spacing: .12em; text-transform: uppercase; }
 .eyebrow--light { color: #a9d3c1; }
 .muted, .card-copy { color: var(--muted); line-height: 1.58; }
-.card { background: var(--paper); border: 1px solid var(--line); border-radius: 18px; padding: 24px; box-shadow: 0 1px 0 rgb(20 45 38 / 3%); }
+/* `min-width: 0` para o cartão poder encolher: sem isso um conteúdo largo
+   dentro dele empurra a página inteira para os lados. */
+.card { min-width: 0; background: var(--paper); border: 1px solid var(--line); border-radius: 18px; padding: 24px; box-shadow: 0 1px 0 rgb(20 45 38 / 3%); }
 .card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .card__title { margin: 0; font-size: 1.18rem; letter-spacing: -.02em; }
 .accent-icon { color: var(--green-700); }
@@ -228,6 +230,63 @@ button.entity-row { width: 100%; background: none; border-top: 0; border-inline:
   aí o que importa é acompanhar, e enviar de novo é manutenção.
 */
 .goal-pdf-card--primeiro { order: -1; }
+
+/* Divisória entre o que se lê e o que se edita. */
+.goal-section { margin: 10px 0 -8px; font-size: .82rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+/* A comparação do mesmo período: dois números e a variação, que é o que importa. */
+.goal-compare { min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: end; }
+.goal-compare > div { display: grid; gap: 4px; }
+.goal-compare small { color: var(--muted); font-size: .78rem; }
+.goal-compare strong { font-size: 1.6rem; line-height: 1.1; letter-spacing: -.03em; }
+.goal-compare__variacao strong { font-size: 1.9rem; }
+.goal-compare__variacao--alta strong { color: var(--green-700); }
+.goal-compare__variacao--queda strong { color: #b3261e; }
+
+/*
+  Doze meses com duas barras cada não cabem em tela de celular sem espremer, e
+  barra espremida não deixa comparar nada — que é a única coisa que este gráfico
+  existe para permitir. Por isso ele rola na horizontal em vez de encolher.
+*/
+/*
+  `min-width: 0` porque o cartão é um item de grade: sem isso ele cresce até
+  caber a lista inteira e empurra a página toda para os lados, em vez de a lista
+  rolar dentro dele.
+*/
+.goal-months-scroll { min-width: 0; overflow-x: auto; padding-bottom: 6px; }
+.goal-months--duplo { min-width: 520px; }
+.goal-months--duplo li { display: grid; gap: 6px; justify-items: center; }
+.goal-months__par { display: flex; gap: 3px; align-items: flex-end; height: 108px; }
+/*
+  Sem trilho de fundo. Com duas barras por mês, um trilho de altura cheia lê-se
+  como barra cheia — e o ano passado parecia estar no máximo todo mês.
+*/
+.goal-months__par .goal-months__bar { width: 13px; height: 100%; display: flex; align-items: flex-end; border-radius: 5px; background: transparent; }
+.goal-months__par .goal-months__bar > span { width: 100%; min-height: 2px; border-radius: 5px; background: var(--green-700); }
+/*
+  A especificidade tem de vencer a regra do par acima, senão as duas barras
+  saem da mesma cor — e um gráfico de comparação com uma cor só não compara.
+*/
+.goal-months__par .goal-months__bar--anterior > span { background: #9bb5ab; }
+.goal-months__par .goal-months__bar--queda > span { background: #c9564c; }
+.goal-months__legenda { display: flex; gap: 8px; align-items: center; margin-top: 10px; color: var(--muted); font-size: .78rem; }
+.goal-months__amostra { width: 12px; height: 12px; margin-left: 6px; border-radius: 3px; background: var(--green-700); }
+.goal-months__amostra--anterior { margin-left: 0; background: #9bb5ab; }
+
+/* A meta definida é um número, não um formulário. */
+.goal-definida { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; margin: 0; }
+.goal-definida strong { font-size: 1.5rem; letter-spacing: -.03em; }
+.goal-origem { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin: -8px 0 0; color: var(--muted); font-size: .86rem; }
+
+/* Uma linha por igreja, e um botão só para todas. */
+.goal-church-table { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.goal-church-table li { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto 110px; gap: 12px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.goal-church-table li:last-child { border-bottom: 0; }
+.goal-church-table__cabecalho { color: var(--muted); font-size: .74rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; border-bottom: 1px solid var(--line); }
+.goal-church-table__cabecalho span:last-child { text-align: right; }
+.goal-church-table__nome { font-weight: 650; overflow: hidden; text-overflow: ellipsis; }
+.goal-church-table__resultado { color: var(--muted); font-variant-numeric: tabular-nums; }
+.goal-church-table input { min-height: 38px; text-align: right; }
 .page-narrow { max-width: 980px; margin: 0 auto; }
 .page-hero { min-height: 104px; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .page-hero h1 { margin: 0 0 9px; font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -.055em; color: var(--green-950); }
@@ -869,7 +928,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 
 .goal-cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .goal-card { display: grid; gap: 10px; }
-.goal-card__numbers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.goal-card__numbers { min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .goal-card__numbers small { display: block; color: var(--muted); }
 .goal-card__numbers strong { font-size: 1.15rem; }
 .goal-card__percent { margin: 0; color: var(--muted); }
@@ -1107,6 +1166,9 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   .agenda-month-day .agenda-category { padding: 3px; }
   .agenda-month-day .agenda-category span, .agenda-month-day .agenda-category small { display: none; }
   .agenda-month-day .agenda-category strong { font-size: .58rem; }
+  .goal-compare { grid-template-columns: 1fr 1fr; }
+  .goal-compare__variacao { grid-column: 1 / -1; }
+  .goal-church-table li { grid-template-columns: minmax(0, 1fr) auto 88px; gap: 8px; }
   .agenda-item { grid-template-columns: 1fr auto; }
   .agenda-item__date { grid-column: 1 / -1; }
   .agenda-rest-note { grid-column: 1 / -1; }

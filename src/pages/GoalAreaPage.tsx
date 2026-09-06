@@ -7,14 +7,14 @@ import { Card } from '../components/ui/Card'
 import { Field } from '../components/ui/Field'
 import {
   AREA_TARGET_METRIC, AREA_USES_PDF, GOAL_AREAS, GOAL_AREA_LABELS,
-  areaComparison, churchProgress, monthlyResults, type GoalArea,
+  areaComparison, churchProgress, type GoalArea,
 } from '../goals/areas'
 import { MONTH_LABELS, formatGoalValue } from '../goals/format'
 import { GoalsService, parseGoalsPdf } from '../goals/service'
 import { HISTORY_AREAS, type GoalHistoryData, type GoalImportPreview } from '../goals/types'
 import { useGoalSources } from '../goals/useGoalSources'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
-import { AREA_PDF_DOCUMENT, PERCENT_TARGET_AREAS } from '../goals/areas'
+import { AREA_PDF_DOCUMENT, PERCENT_TARGET_AREAS, comparacaoMensal } from '../goals/areas'
 import { previaDeBatismos, previaFinanceira } from '../goals/importacaoAcms'
 import { comparativoDeDoadores } from '../goals/doadores'
 import { PeopleService } from '../people/service'
@@ -41,6 +41,10 @@ export function GoalAreaPage() {
   // veio de mais gente participando ou de poucos dando mais.
   const [pessoas, setPessoas] = useState<PersonEntity[]>([])
   const [doadoresInput, setDoadoresInput] = useState('')
+  // A meta definida vira número, não formulário. O campo volta quando alguém
+  // pede para alterar — que é o gesto raro, e não o estado normal da tela.
+  const [alterandoMeta, setAlterandoMeta] = useState(false)
+  const [corrigindoAnoAnterior, setCorrigindoAnoAnterior] = useState(false)
   const carregarPessoas = useCallback(async () => {
     if (!account || !masterKey) return
     setPessoas(await peopleService.listPeople(account.id, masterKey))
@@ -63,8 +67,7 @@ export function GoalAreaPage() {
 
   const progresso = areaComparison(area, goals, sources, year)
   const guardaHistorico = HISTORY_AREAS.includes(area as GoalHistoryData['area'])
-  const meses = monthlyResults(area, sources, year)
-  const maiorMes = Math.max(1, ...meses)
+  const comparacao = comparacaoMensal(area, sources, year)
   const porIgreja = churchProgress(area, goals, sources, year, churches.map(({ id }) => id))
   const anoTerminou = year < new Date().getFullYear() || new Date().getMonth() === 11
   /**
@@ -106,6 +109,31 @@ export function GoalAreaPage() {
     } catch (motivo) {
       setError(motivo instanceof Error ? motivo.message : 'Não foi possível guardar o resultado do ano anterior.')
     }
+  }
+
+  /**
+   * Todas as igrejas de uma vez.
+   *
+   * Um botão por igreja transformava distribuir a meta do distrito em doze
+   * gestos iguais — e um erro no meio deixava metade salva e metade não, sem
+   * ninguém saber qual metade.
+   */
+  async function salvarMetasDasIgrejas(event: FormEvent) {
+    event.preventDefault()
+    if (!account || !masterKey || !area) return
+    const preenchidas = Object.entries(churchInputs).filter(([, valor]) => valor.trim())
+    if (!preenchidas.length) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      for (const [churchId, valor] of preenchidas) {
+        await goalsService.saveGoal(account.id, masterKey, { churchId, year, metric: AREA_TARGET_METRIC[area], target: Number(valor) })
+      }
+      setChurchInputs({})
+      setNotice(preenchidas.length === 1 ? 'Meta salva.' : `${preenchidas.length} metas salvas.`)
+      await reload()
+    } catch (motivo) {
+      setError(motivo instanceof Error ? motivo.message : 'Não foi possível salvar as metas.')
+    } finally { setBusy(false) }
   }
 
   async function salvarMetaDeDoadores(event: FormEvent) {
@@ -183,7 +211,7 @@ export function GoalAreaPage() {
 
       <Card title="No ano">
         <div className="goal-card__numbers">
-          <div><small>Meta anual</small><strong>{progresso.target > 0 ? formatGoalValue(area, progresso.target) : 'A definir'}</strong></div>
+          <div><small>Meta anual</small><strong>{progresso.target > 0 ? formatGoalValue(area, progresso.objective || progresso.target) : 'A definir'}</strong></div>
           <div><small>Resultado</small><strong>{formatGoalValue(area, progresso.result)}</strong></div>
           <div><small>Falta</small><strong>{progresso.target > 0 ? formatGoalValue(area, progresso.missing) : '—'}</strong></div>
         </div>
@@ -192,55 +220,110 @@ export function GoalAreaPage() {
         {anoTerminou && progresso.target > 0 && <p className="card-copy">{progresso.reached ? 'Meta do ano alcançada.' : `Faltaram ${formatGoalValue(area, progresso.missing)} para a meta do ano.`}</p>}
       </Card>
 
-      {guardaHistorico && <Card title={`Comparação com ${year - 1}`}>
-        <div className="goal-card__numbers">
-          <div><small>Resultado {year - 1}</small><strong>{progresso.hasPrevious ? formatGoalValue(area, progresso.previous) : 'A registrar'}</strong></div>
-          <div><small>Meta {year}</small><strong>{progresso.target > 0 ? formatGoalValue(area, progresso.target) : 'A definir'}</strong></div>
-          <div><small>Resultado {year}</small><strong>{formatGoalValue(area, progresso.result)}</strong></div>
-          <div><small>Alcançado</small><strong>{progresso.target > 0 ? `${progresso.percent}%` : '—'}</strong></div>
-          <div><small>Falta</small><strong>{progresso.target > 0 ? formatGoalValue(area, progresso.missing) : '—'}</strong></div>
-          <div><small>Diferença</small><strong>{progresso.hasPrevious ? `${progresso.difference >= 0 ? '+' : '−'}${formatGoalValue(area, Math.abs(progresso.difference))}` : '—'}</strong></div>
-        </div>
-        <form className="inline-form" onSubmit={(event) => void salvarAnoAnterior(event)}>
-          <Field label={`Resultado consolidado de ${year - 1}`} name="previous-year" type="number" min={0} step="any" value={previousInput} onChange={(event) => setPreviousInput(event.target.value)} />
-          <Button type="submit" variant="secondary" disabled={!previousInput}>Guardar</Button>
-        </form>
+      {/*
+        A comparação é do **mesmo período**, e não do ano inteiro passado contra
+        o ano em andamento. Cento e quatorze de doze meses contra trinta e
+        quatro de oito parece uma queda enorme e pode ser um crescimento: a
+        conta antiga mentia, e um número que mente é pior do que número nenhum.
+      */}
+      {guardaHistorico && <Card title={`Comparação com ${year - 1}`} eyebrow={comparacao.ateOMes > 0 ? `Janeiro a ${MONTH_LABELS[comparacao.ateOMes - 1]}, nos dois anos` : 'Sem resultado neste ano ainda'}>
+        {comparacao.ateOMes === 0
+          ? <p className="field__hint">Envie {AREA_PDF_DOCUMENT[area]?.artigo ?? 'o'} {AREA_PDF_DOCUMENT[area]?.nome ?? 'relatório'} deste ano para a comparação aparecer.</p>
+          : <>
+            <div className="goal-compare">
+              <div>
+                <small>{year - 1}</small>
+                <strong>{formatGoalValue(area, comparacao.acumuladoAnterior)}</strong>
+              </div>
+              <div>
+                <small>{year}</small>
+                <strong>{formatGoalValue(area, comparacao.acumuladoAtual)}</strong>
+              </div>
+              <div className={`goal-compare__variacao${comparacao.variacao === null ? '' : comparacao.variacao < 0 ? ' goal-compare__variacao--queda' : ' goal-compare__variacao--alta'}`}>
+                <small>No mesmo período</small>
+                <strong>{comparacao.variacao === null ? '—' : `${comparacao.variacao >= 0 ? '+' : '−'}${Math.abs(comparacao.variacao)}%`}</strong>
+              </div>
+            </div>
+            {comparacao.variacao === null && <p className="field__hint">Ainda não há resultado de {year - 1} no mesmo período para comparar.</p>}
+          </>}
       </Card>}
 
-      <Card title="Mês a mês">
-        <ul className="goal-months">{meses.map((valor, indice) => (
-          <li key={MONTH_LABELS[indice]}>
-            <span className="goal-months__bar"><span style={{ height: `${Math.round((valor / maiorMes) * 100)}%` }} /></span>
-            <small>{MONTH_LABELS[indice]}</small>
-          </li>
-        ))}</ul>
+      {/*
+        Doze meses com as duas barras lado a lado. No celular a lista rola na
+        horizontal em vez de encolher: barra espremida não deixa comparar nada,
+        que é a única coisa que este gráfico existe para permitir.
+      */}
+      <Card title="Mês a mês" eyebrow={`${year - 1} e ${year} lado a lado`}>
+        <div className="goal-months-scroll">
+          <ul className="goal-months goal-months--duplo">{comparacao.meses.map(({ mes, atual, anterior }) => {
+            const teto = Math.max(1, ...comparacao.meses.flatMap((item) => [item.atual, item.anterior]))
+            const caiu = anterior > 0 && atual < anterior
+            return <li key={MONTH_LABELS[mes - 1]}>
+              <span className="goal-months__par">
+                <span className="goal-months__bar goal-months__bar--anterior" title={`${MONTH_LABELS[mes - 1]} de ${year - 1}: ${formatGoalValue(area, anterior)}`}>
+                  <span style={{ height: `${Math.round((anterior / teto) * 100)}%` }} />
+                </span>
+                <span className={`goal-months__bar${caiu ? ' goal-months__bar--queda' : ''}`} title={`${MONTH_LABELS[mes - 1]} de ${year}: ${formatGoalValue(area, atual)}`}>
+                  <span style={{ height: `${Math.round((atual / teto) * 100)}%` }} />
+                </span>
+              </span>
+              <small>{MONTH_LABELS[mes - 1]}</small>
+            </li>
+          })}</ul>
+        </div>
+        <p className="goal-months__legenda"><span className="goal-months__amostra goal-months__amostra--anterior" />{year - 1}<span className="goal-months__amostra" />{year}</p>
       </Card>
+
+      <h2 className="goal-section">Ajustes</h2>
 
       <Card title="Meta do distrito">
         {progresso.legacyValueTarget && <div className="alert alert--warning" role="status">
           Esta meta foi guardada como valor, antes de a área passar a ser combinada em porcentagem. Ela continua valendo assim — o aplicativo não a converte sozinho, porque transformar um valor em porcentagem inventaria um número. Informe abaixo quanto de aumento você quer sobre {year - 1}.
         </div>}
         {progresso.withoutBaseline && <div className="alert alert--warning" role="status">
-          A meta está em porcentagem e ainda não há resultado de {year - 1} para comparar. Envie o {AREA_PDF_DOCUMENT[area]?.nome ?? 'relatório'} — ele traz o ano anterior junto — e o objetivo aparece sozinho.
+          A meta está em porcentagem e ainda não há resultado de {year - 1} para comparar. Envie {AREA_PDF_DOCUMENT[area]?.artigo ?? 'o'} {AREA_PDF_DOCUMENT[area]?.nome ?? 'relatório'} — ele traz o ano anterior junto — e o objetivo aparece sozinho.
         </div>}
-        <form className="inline-form" onSubmit={(event) => void salvarMeta(event, null, districtInput)}>
-          <Field
-            label={PERCENT_TARGET_AREAS.includes(area) ? `Aumento sobre ${year - 1} (%)` : 'Total do ano'}
-            name="district-target"
-            type="number"
-            min={0}
-            value={districtInput}
-            onChange={(event) => setDistrictInput(event.target.value)}
-            hint={PERCENT_TARGET_AREAS.includes(area)
-              ? (progresso.targetKind === 'percent' && progresso.target > 0
-                ? `Hoje: +${progresso.target}%${progresso.objective > 0 ? ` sobre ${year - 1}, que dá ${formatGoalValue(area, progresso.objective)}` : ''}`
-                : `Quanto a mais que ${year - 1}, em porcentagem.`)
-              : (progresso.target > 0 ? `Hoje: ${formatGoalValue(area, progresso.target)}` : undefined)}
-          />
-          <Button type="submit" disabled={!districtInput}>Salvar</Button>
-        </form>
+        {progresso.target > 0 && !alterandoMeta
+          ? <p className="goal-definida">
+              <strong>{PERCENT_TARGET_AREAS.includes(area) && progresso.targetKind === 'percent'
+                ? `+${progresso.target}% sobre ${year - 1}${progresso.objective > 0 ? ` · ${formatGoalValue(area, progresso.objective)}` : ''}`
+                : formatGoalValue(area, progresso.target)}</strong>
+              <button type="button" className="text-button" onClick={() => setAlterandoMeta(true)}>Alterar</button>
+            </p>
+          : <form className="inline-form" onSubmit={(event) => { setAlterandoMeta(false); void salvarMeta(event, null, districtInput) }}>
+              <Field
+                label={PERCENT_TARGET_AREAS.includes(area) ? `Aumento sobre ${year - 1} (%)` : 'Total do ano'}
+                name="district-target"
+                type="number"
+                min={0}
+                value={districtInput}
+                onChange={(event) => setDistrictInput(event.target.value)}
+                hint={PERCENT_TARGET_AREAS.includes(area) ? `Quanto a mais que ${year - 1}, em porcentagem.` : undefined}
+              />
+              <Button type="submit" disabled={!districtInput}>Salvar</Button>
+              {progresso.target > 0 && <Button type="button" variant="secondary" onClick={() => setAlterandoMeta(false)}>Cancelar</Button>}
+            </form>}
         {progresso.targetsMismatch && <p className="field__hint">A soma das igrejas está em {formatGoalValue(area, progresso.churchTargetsSum)}, diferente do total do distrito.</p>}
       </Card>
+
+      {/*
+        O consolidado do ano anterior é digitado à mão só quando não veio de
+        relatório nenhum. Pedir o que o aplicativo já sabe é o tipo de campo que
+        faz o pastor duvidar se o número que ele está vendo vale.
+      */}
+      {guardaHistorico && (!progresso.hasPrevious || corrigindoAnoAnterior) && <Card title={`Resultado de ${year - 1}`} eyebrow={progresso.hasPrevious ? 'Corrigindo' : 'Sem relatório do ano anterior'}>
+        <p className="card-copy">{progresso.hasPrevious
+          ? `Hoje o aplicativo usa ${formatGoalValue(area, progresso.previous)}, vindo do que já foi importado. Informe outro valor apenas se este estiver errado.`
+          : `Envie ${AREA_PDF_DOCUMENT[area]?.artigo ?? 'o'} ${AREA_PDF_DOCUMENT[area]?.nome ?? 'relatório'} de ${year - 1}, ou informe o total aqui.`}</p>
+        <form className="inline-form" onSubmit={(event) => { setCorrigindoAnoAnterior(false); void salvarAnoAnterior(event) }}>
+          <Field label={`Total de ${year - 1}`} name="previous-year" type="number" min={0} step="any" value={previousInput} onChange={(event) => setPreviousInput(event.target.value)} />
+          <Button type="submit" variant="secondary" disabled={!previousInput}>Guardar</Button>
+        </form>
+      </Card>}
+      {guardaHistorico && progresso.hasPrevious && !corrigindoAnoAnterior && <p className="goal-origem">
+        Resultado de {year - 1}: <strong>{formatGoalValue(area, progresso.previous)}</strong>, do que já foi importado.
+        <button type="button" className="text-button" onClick={() => setCorrigindoAnoAnterior(true)}>Corrigir</button>
+      </p>}
 
       {area === 'financial' && (() => {
         const metaDeDoadores = goals.find((goal) => goal.churchId === null && goal.year === year && goal.metric === 'donors')
@@ -270,24 +353,45 @@ export function GoalAreaPage() {
         </Card>
       })()}
 
+      {/*
+        Doze igrejas em blocos altos, cada uma com o seu botão, viravam uma
+        página inteira de formulário. Aqui é uma linha por igreja e um botão só:
+        distribuir a meta é um gesto de uma vez, não doze gestos iguais.
+      */}
       <Card title="Metas das igrejas" eyebrow="Distribuição do total">
         {churches.length === 0
           ? <p className="field__hint">Cadastre igrejas para distribuir a meta.</p>
-          : <div className="goal-church-list">{porIgreja.map((item) => (
-            <form key={item.churchId} className="goal-church" onSubmit={(event) => void salvarMeta(event, item.churchId, churchInputs[item.churchId] ?? '')}>
-              <span><strong>{nomeIgreja(item.churchId)}</strong><small>{formatGoalValue(area, item.result)} de {item.target > 0 ? formatGoalValue(area, item.target) : 'meta a definir'}</small></span>
-              <input className="field__input" type="number" min={0} aria-label={`Meta de ${nomeIgreja(item.churchId)}`} placeholder={item.target > 0 ? String(item.target) : '0'} value={churchInputs[item.churchId] ?? ''} onChange={(event) => setChurchInputs((atual) => ({ ...atual, [item.churchId]: event.target.value }))} />
-              <Button type="submit" variant="secondary" disabled={!churchInputs[item.churchId]}>Salvar</Button>
-            </form>
-          ))}</div>}
+          : <form onSubmit={(event) => void salvarMetasDasIgrejas(event)}>
+            <ul className="goal-church-table">
+              <li className="goal-church-table__cabecalho"><span>Igreja</span><span>Resultado</span><span>Meta</span></li>
+              {porIgreja.map((item) => (
+                <li key={item.churchId}>
+                  <span className="goal-church-table__nome">{nomeIgreja(item.churchId)}</span>
+                  <span className="goal-church-table__resultado">{formatGoalValue(area, item.result)}</span>
+                  <input
+                    className="field__input"
+                    type="number"
+                    min={0}
+                    aria-label={`Meta de ${nomeIgreja(item.churchId)}`}
+                    placeholder={item.target > 0 ? String(item.target) : '—'}
+                    value={churchInputs[item.churchId] ?? ''}
+                    onChange={(event) => setChurchInputs((atual) => ({ ...atual, [item.churchId]: event.target.value }))}
+                  />
+                </li>
+              ))}
+            </ul>
+            <div className="form-actions">
+              <Button type="submit" disabled={busy || !Object.values(churchInputs).some((valor) => valor.trim())}>Salvar metas</Button>
+            </div>
+          </form>}
       </Card>
 
       {AREA_USES_PDF[area] && (
-        <Card className={semNenhumResultado ? 'goal-pdf-card goal-pdf-card--primeiro' : 'goal-pdf-card'} title={`Enviar o ${AREA_PDF_DOCUMENT[area]?.nome ?? 'PDF'}`} eyebrow="Resultados do período">
+        <Card className={semNenhumResultado ? 'goal-pdf-card goal-pdf-card--primeiro' : 'goal-pdf-card'} title={`Enviar ${AREA_PDF_DOCUMENT[area]?.artigo ?? 'o'} ${AREA_PDF_DOCUMENT[area]?.nome ?? 'PDF'}`} eyebrow="Resultados do período">
           <p className="card-copy">{AREA_PDF_DOCUMENT[area]?.caminho}</p>
           <label className="file-picker">
             <FileUp />
-            <span><strong>{busy ? 'Lendo o arquivo…' : `Escolher o ${AREA_PDF_DOCUMENT[area]?.nome ?? 'PDF'}`}</strong><small>Você confere igreja, período e totais antes de salvar.</small></span>
+            <span><strong>{busy ? 'Lendo o arquivo…' : `Escolher ${AREA_PDF_DOCUMENT[area]?.artigo ?? 'o'} ${AREA_PDF_DOCUMENT[area]?.nome ?? 'PDF'}`}</strong><small>Você confere igreja, período e totais antes de salvar.</small></span>
             <input type="file" accept="application/pdf,.pdf" disabled={busy} onChange={(event) => { void lerPdf(event.target.files?.[0]); event.currentTarget.value = '' }} />
           </label>
           {textoLido && preview?.entries.length === 0 && <>
