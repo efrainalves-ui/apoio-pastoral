@@ -24,11 +24,19 @@ function linhasUteis(texto: string): string[] {
   return texto.split('\n').map((linha) => linha.replace(/\s+/gu, ' ').trim()).filter(Boolean)
 }
 
-/** Célula do relatório: `-` é ausência, e ausência é zero. */
+/**
+ * Célula do relatório de movimento: `-` é ausência, e ausência é zero.
+ *
+ * Só número inteiro conta. A linha de resumo do distrito termina em
+ * `34 90 37,8` — total, alvo e porcentagem —, e ler `37,8` como se fosse um mês
+ * fazia a linha inteira passar por igreja: o distrito aparecia duas vezes e o
+ * total dobrava. Batismo é gente, e gente não vem com vírgula.
+ */
 function celula(token: string): number | null {
   if (token === '-' || token === '–') return 0
-  const numero = numeroBrasileiro(token)
-  return numero === null ? null : numero
+  if (!/^-?\d+$/u.test(token)) return null
+  const numero = Number(token)
+  return Number.isFinite(numero) ? numero : null
 }
 
 /**
@@ -108,7 +116,11 @@ export interface ComparativoLido { anoAnterior: number; anoAtual: number; igreja
  */
 export function parseComparativoDeEntradas(texto: string): ComparativoLido {
   const linhas = linhasUteis(texto)
-  const anos = linhas.map((linha) => /^m[êe]s\s+(\d{4})\s+(\d{4})\s+%/iu.exec(linha)).find(Boolean)
+  // Sem âncora no começo da linha. O cabeçalho do relatório real chega como
+  // "Position Igreja Mês 2025 2026 %% 2025 2026 %%": o rótulo da coluna da
+  // esquerda cai na mesma linha dos anos, e exigir que a linha comece em "Mês"
+  // fazia o arquivo certo ser recusado como se fosse outro documento.
+  const anos = linhas.map((linha) => /m[êe]s\s+(\d{4})\s+(\d{4})\s+%/iu.exec(linha)).find(Boolean)
   if (!anos) {
     throw new RelatorioNaoReconhecidoError('Este arquivo não parece o Comparativo de Entradas do ACMS: falta a linha com os dois anos. Nada foi alterado.')
   }

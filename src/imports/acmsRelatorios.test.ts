@@ -13,10 +13,11 @@ const movimentoFicticio = [
   'Distrito Fictício',
   'Até ao mês: 9/2026',
   'Distrito / Igreja Responsável Membros Jan Fev Mar Abr Maio Jun Jul Ago Set Out Nov Dez Total Alvo %',
-  '3 2 - 12 1 - 14 2 - - - - 34 90 37,8',
+  // Como o aplicativo extrai: o resumo do distrito vem com nome, e termina em
+  // total, alvo e porcentagem.
+  'Distrito Fictício Pastor Fictício 3 2 - 12 1 - 14 2 - - - - 34 90 37,8',
   'Central Fictícia - Distrito Fictício 171 I - - - 1 - - - - - - - - 1',
-  '37 G',
-  'Monte Fictício - Distrito Fictício - - - 1 - - 1 - - - - - 2',
+  'Monte Fictício - Distrito Fictício 37 G - - - 1 - - 1 - - - - - 2',
   'Sertão Fictício - Distrito Fictício 114 I - - - 6 - - 8 - - - - - 14',
   'Total da Entidade 3 2 - 12 1 - 14 2 - - - - 34 90 37,8',
 ].join('\n')
@@ -26,8 +27,9 @@ const comparativoFicticio = [
   'Comparativo de Entradas',
   'Igreja Mês a Mês',
   'Dízimo Oferta',
-  'Mês 2025 2026 %% 2025 2026 %%',
-  'Position Igreja',
+  // Como o extrator do aplicativo entrega de verdade: o rótulo da coluna da
+  // esquerda cai na mesma linha dos anos.
+  'Position Igreja Mês 2025 2026 %% 2025 2026 %%',
   '1 995 Central Fictícia - Distrito Fictício Janeiro 100,00 150,00 50.00 10,00 20,00 100.00',
   'Fevereiro 200,00 250,00 25.00 20,00 30,00 50.00',
   'Março 300,00 400,00 33.00 30,00 40,00 33.00',
@@ -38,7 +40,7 @@ const comparativoFicticio = [
   '24.00',
   'Fevereiro 500,00 600,00 20.00 50,00 60,00 20.00',
   // Igreja partida entre páginas: o cabeçalho volta e o nome reaparece.
-  'Mês 2025 2026 %% 2025 2026 %%',
+  'Position Igreja Mês 2025 2026 %% 2025 2026 %%',
   '2 1.149 Monte Fictício - Distrito Fictício Fevereiro 500,00 600,00 20.00 50,00 60,00 20.00',
   'Abril 700,00 800,00 14.00 70,00 80,00 14.00',
 ].join('\n')
@@ -163,5 +165,15 @@ describe('Comparativo de Entradas', () => {
 
   it('recusa e explica quando o arquivo é outro', () => {
     expect(() => parseComparativoDeEntradas('Outro documento\nqualquer')).toThrow(RelatorioNaoReconhecidoError)
+  })
+
+  it('não confunde a linha de resumo do distrito com uma igreja', () => {
+    // Ela tem nome de gente e quinze células: doze meses, total, alvo e a
+    // porcentagem. Lida como igreja, o distrito aparecia duas vezes e o total
+    // dobrava — porcentagem com vírgula entrava no lugar de um mês.
+    const lido = parseMovimentoDeBatismos(movimentoFicticio)
+
+    expect(lido.igrejas.map(({ nome }) => nome)).not.toContain('Distrito Fictício Pastor Fictício')
+    expect(lido.igrejas.reduce((soma, igreja) => soma + igreja.total, 0)).toBe(17)
   })
 })
