@@ -34,14 +34,12 @@ export class GoalsService { private readonly repo: VaultRepository; constructor(
     accountId: string,
     key: CryptoKey,
     metric: GoalMetric,
-    year: number,
-    mesesCobertos: readonly number[],
+    periodos: ReadonlyArray<{ ano: number; meses: readonly number[] }>,
     entries: Array<Omit<GoalEntryData, 'createdAt' | 'source'>>,
   ): Promise<void> {
-    const cobertos = new Set(mesesCobertos)
-    const antigos = (await this.listEntries(accountId, key)).filter((entry) => entry.metric === metric
-      && entry.date.startsWith(`${year}-`)
-      && cobertos.has(Number(entry.date.slice(5, 7))))
+    const cobertos = new Set(periodos.flatMap(({ ano, meses }) => meses.map((mes) => `${ano}-${String(mes).padStart(2, '0')}`)))
+    const antigos = (await this.listEntries(accountId, key)).filter((entry) =>
+      entry.metric === metric && cobertos.has(entry.date.slice(0, 7)))
     const deletedAt = new Date().toISOString()
     for (const antigo of antigos) {
       const tombstone = await encryptPayload(key, { schemaVersion: 1, type: 'goal_entry_tombstone', data: { deletedAt } }, antigo.id)

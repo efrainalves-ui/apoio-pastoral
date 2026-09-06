@@ -192,8 +192,8 @@ export function GoalAreaPage() {
       // ano inteiro até a data dele: acrescentar faria os mesmos batismos
       // entrarem de novo a cada envio.
       const doRelatorio = preview as Partial<PreviaDeRelatorio>
-      if (doRelatorio.ano && doRelatorio.mesesCobertos?.length) {
-        await goalsService.replaceReportEntries(account.id, masterKey, AREA_TARGET_METRIC[area], doRelatorio.ano, doRelatorio.mesesCobertos, preview.entries)
+      if (doRelatorio.periodos?.length) {
+        await goalsService.replaceReportEntries(account.id, masterKey, AREA_TARGET_METRIC[area], doRelatorio.periodos, preview.entries)
       } else {
         await goalsService.addEntries(account.id, masterKey, preview.entries.map((entry) => ({ ...entry, source: 'pdf' as const })))
       }

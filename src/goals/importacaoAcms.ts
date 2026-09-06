@@ -37,15 +37,17 @@ function avisoDeIgrejaAusente(nome: string): string {
   return `“${normalizePdfChurchName(nome)}” está no relatório e não está cadastrada no distrito. Os números dela ficaram de fora.`
 }
 
+export interface PeriodoDoRelatorio { ano: number; meses: number[] }
+
 export interface PreviaDeRelatorio extends GoalImportPreview {
-  ano: number
   /**
-   * Os meses que este relatório cobre.
+   * Os períodos que este relatório cobre — um por ano.
    *
    * É o que permite substituir em vez de somar: o relatório é a verdade sobre o
-   * período que ele traz, e nada diz sobre os meses que ainda não chegaram.
+   * que ele traz, e nada diz sobre os meses que ainda não chegaram. São vários
+   * porque o Comparativo de Entradas traz dois anos no mesmo arquivo.
    */
-  mesesCobertos: number[]
+  periodos: PeriodoDoRelatorio[]
 }
 
 /** Batismos por igreja e mês, a partir da Análise de Movimentos. */
@@ -75,10 +77,9 @@ export function previaDeBatismos(texto: string, hash: string, igrejas: readonly 
     hash,
     entries,
     errors,
-    ano: lido.ano,
-    // O cabeçalho diz "Até ao mês: 9/2026": é ele quem define o período coberto,
-    // e não os meses que por acaso tiveram batismo.
-    mesesCobertos: Array.from({ length: lido.ateOMes }, (_, indice) => indice + 1),
+    // O cabeçalho diz "Até ao mês: 9/2026": é ele quem define o período
+    // coberto, e não os meses que por acaso tiveram batismo.
+    periodos: [{ ano: lido.ano, meses: Array.from({ length: lido.ateOMes }, (_, indice) => indice + 1) }],
   }
 }
 
@@ -101,20 +102,36 @@ export function previaFinanceira(texto: string, hash: string, igrejas: readonly 
     if (!cadastrada) { errors.push(avisoDeIgrejaAusente(igreja.nome)); continue }
     totalDoAnoAnterior += totalDeEntradas(igreja.meses, 'anterior')
     for (const mes of igreja.meses) {
-      const valor = mes.dizimoAtual + mes.ofertaAtual
-      if (valor <= 0) continue
-      entries.push({
-        churchId: cadastrada.id,
-        metric: 'tithes_offerings',
-        date: mesIso(lido.anoAtual, mes.mes),
-        amount: valor,
-        reference: `Comparativo de Entradas ${lido.anoAtual}`,
-      })
+      // O relatório traz os dois anos, mês a mês. Guardar só o corrente e
+      // reduzir o anterior a um total apagava metade do arquivo: o gráfico
+      // aparecia com o ano passado zerado e a tabela com uma linha só, quando o
+      // dado estava ali o tempo todo.
+      for (const [ano, valor] of [
+        [lido.anoAnterior, mes.dizimoAnterior + mes.ofertaAnterior] as const,
+        [lido.anoAtual, mes.dizimoAtual + mes.ofertaAtual] as const,
+      ]) {
+        if (valor <= 0) continue
+        entries.push({
+          churchId: cadastrada.id,
+          metric: 'tithes_offerings',
+          date: mesIso(ano, mes.mes),
+          amount: valor,
+          reference: `Comparativo de Entradas ${lido.anoAtual}`,
+        })
+      }
     }
   }
 
   // Aqui o período vem dos meses que aparecem no relatório, que é como ele diz
-  // até onde vai.
-  const mesesCobertos = [...new Set(lido.igrejas.flatMap((igreja) => igreja.meses.map(({ mes }) => mes)))].sort((esquerda, direita) => esquerda - direita)
-  return { hash, entries, errors, ano: lido.anoAtual, mesesCobertos, anoAtual: lido.anoAtual, anoAnterior: lido.anoAnterior, totalDoAnoAnterior }
+  // até onde vai — e vale para os dois anos, porque o arquivo traz os dois.
+  const meses = [...new Set(lido.igrejas.flatMap((igreja) => igreja.meses.map(({ mes }) => mes)))].sort((esquerda, direita) => esquerda - direita)
+  return {
+    hash,
+    entries,
+    errors,
+    periodos: [{ ano: lido.anoAnterior, meses }, { ano: lido.anoAtual, meses }],
+    anoAtual: lido.anoAtual,
+    anoAnterior: lido.anoAnterior,
+    totalDoAnoAnterior,
+  }
 }
