@@ -1,4 +1,4 @@
-import type { GoalEntity, GoalEntryEntity, GoalHistoryEntity, GoalMetric } from './types'
+import type { GoalTargetKind, GoalEntity, GoalEntryEntity, GoalHistoryEntity, GoalMetric } from './types'
 
 /** As quatro metas que o pastor acompanha. */
 export type GoalArea = 'financial' | 'baptisms' | 'bible_studies' | 'uapg'
@@ -167,10 +167,55 @@ export interface AreaComparison extends AreaProgress {
   hasPrevious: boolean
   /** Diferença do ano corrente para o anterior. */
   difference: number
+  /** Como a meta do distrito foi escrita. */
+  targetKind: GoalTargetKind
+  /** A meta traduzida em número absoluto, que é contra o que se mede. */
+  objective: number
+  /**
+   * Meta em porcentagem sem ano anterior para comparar.
+   *
+   * Dez por cento a mais do que nada não é uma meta; a tela precisa dizer isso
+   * em vez de mostrar um progresso inventado.
+   */
+  withoutBaseline: boolean
+  /**
+   * Meta antiga, gravada como valor numa área que hoje se escreve em
+   * porcentagem. Fica pedindo para ser reescrita, e não é convertida sozinha.
+   */
+  legacyValueTarget: boolean
 }
+
+/** Áreas cuja meta é combinada como aumento sobre o ano anterior. */
+export const PERCENT_TARGET_AREAS: GoalArea[] = ['financial']
 
 export function areaComparison(area: GoalArea, goals: GoalEntity[], sources: AreaSources, year: number): AreaComparison {
   const progresso = areaProgress(area, goals, sources, year)
   const previous = previousResult(area, sources, year - 1)
-  return { ...progresso, previous, hasPrevious: previous > 0, difference: progresso.result - previous }
+  const hasPrevious = previous > 0
+  const meta = goals.find((goal) => goal.churchId === null && goal.year === year && goal.metric === AREA_TARGET_METRIC[area])
+  const emPorcentagem = PERCENT_TARGET_AREAS.includes(area)
+  const targetKind: GoalTargetKind = meta?.targetKind ?? 'value'
+
+  // Meta antiga de uma área que hoje se escreve em porcentagem: ela continua
+  // valendo como valor até alguém reescrevê-la. Reinterpretar "50000" como
+  // cinquenta mil por cento seria inventar um número em cima de dado real.
+  const legacyValueTarget = emPorcentagem && Boolean(meta) && targetKind === 'value'
+  const withoutBaseline = emPorcentagem && targetKind === 'percent' && !hasPrevious
+
+  const objective = targetKind === 'percent'
+    ? (hasPrevious ? previous * (1 + progresso.target / 100) : 0)
+    : progresso.target
+
+  return {
+    ...progresso,
+    percent: objective > 0 ? Math.min(100, Math.round((progresso.result / objective) * 100)) : 0,
+    missing: Math.max(0, objective - progresso.result),
+    previous,
+    hasPrevious,
+    difference: progresso.result - previous,
+    targetKind,
+    objective,
+    withoutBaseline,
+    legacyValueTarget,
+  }
 }

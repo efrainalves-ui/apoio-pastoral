@@ -14,7 +14,7 @@ import { GoalsService, parseGoalsPdf } from '../goals/service'
 import { HISTORY_AREAS, type GoalHistoryData, type GoalImportPreview } from '../goals/types'
 import { useGoalSources } from '../goals/useGoalSources'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
-import { AREA_PDF_DOCUMENT } from '../goals/areas'
+import { AREA_PDF_DOCUMENT, PERCENT_TARGET_AREAS } from '../goals/areas'
 import { previaDeBatismos, previaFinanceira } from '../goals/importacaoAcms'
 
 const goalsService = new GoalsService()
@@ -63,7 +63,14 @@ export function GoalAreaPage() {
     if (!account || !masterKey || !area) return
     setError(''); setNotice('')
     try {
-      await goalsService.saveGoal(account.id, masterKey, { churchId, year, metric: AREA_TARGET_METRIC[area], target: Number(valor) })
+      // A meta do distrito na área financeira é combinada como aumento sobre o
+      // ano anterior. As das igrejas continuam em valor: distribuir a
+      // porcentagem do distrito entre elas é outra conversa.
+      const emPorcentagem = PERCENT_TARGET_AREAS.includes(area) && churchId === null
+      await goalsService.saveGoal(account.id, masterKey, {
+        churchId, year, metric: AREA_TARGET_METRIC[area], target: Number(valor),
+        ...(emPorcentagem ? { targetKind: 'percent' as const } : {}),
+      })
       setNotice('Meta salva.')
       if (churchId === null) setDistrictInput('')
       await reload()
@@ -178,8 +185,26 @@ export function GoalAreaPage() {
       </Card>
 
       <Card title="Meta do distrito">
+        {progresso.legacyValueTarget && <div className="alert alert--warning" role="status">
+          Esta meta foi guardada como valor, antes de a área passar a ser combinada em porcentagem. Ela continua valendo assim — o aplicativo não a converte sozinho, porque transformar um valor em porcentagem inventaria um número. Informe abaixo quanto de aumento você quer sobre {year - 1}.
+        </div>}
+        {progresso.withoutBaseline && <div className="alert alert--warning" role="status">
+          A meta está em porcentagem e ainda não há resultado de {year - 1} para comparar. Envie o {AREA_PDF_DOCUMENT[area]?.nome ?? 'relatório'} — ele traz o ano anterior junto — e o objetivo aparece sozinho.
+        </div>}
         <form className="inline-form" onSubmit={(event) => void salvarMeta(event, null, districtInput)}>
-          <Field label="Total do ano" name="district-target" type="number" min={0} value={districtInput} onChange={(event) => setDistrictInput(event.target.value)} hint={progresso.target > 0 ? `Hoje: ${formatGoalValue(area, progresso.target)}` : undefined} />
+          <Field
+            label={PERCENT_TARGET_AREAS.includes(area) ? `Aumento sobre ${year - 1} (%)` : 'Total do ano'}
+            name="district-target"
+            type="number"
+            min={0}
+            value={districtInput}
+            onChange={(event) => setDistrictInput(event.target.value)}
+            hint={PERCENT_TARGET_AREAS.includes(area)
+              ? (progresso.targetKind === 'percent' && progresso.target > 0
+                ? `Hoje: +${progresso.target}%${progresso.objective > 0 ? ` sobre ${year - 1}, que dá ${formatGoalValue(area, progresso.objective)}` : ''}`
+                : `Quanto a mais que ${year - 1}, em porcentagem.`)
+              : (progresso.target > 0 ? `Hoje: ${formatGoalValue(area, progresso.target)}` : undefined)}
+          />
           <Button type="submit" disabled={!districtInput}>Salvar</Button>
         </form>
         {progresso.targetsMismatch && <p className="field__hint">A soma das igrejas está em {formatGoalValue(area, progresso.churchTargetsSum)}, diferente do total do distrito.</p>}
