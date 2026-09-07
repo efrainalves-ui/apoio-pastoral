@@ -14,7 +14,7 @@ import { GoalsService, parseGoalsPdf } from '../goals/service'
 import { HISTORY_AREAS, type GoalHistoryData, type GoalImportPreview } from '../goals/types'
 import { useGoalSources } from '../goals/useGoalSources'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
-import { AREA_PDF_DOCUMENT, ANOS_DE_HISTORICO, PERCENT_TARGET_AREAS, anosComResultado, comparacaoMensal, resumoPorAno, resumoPorIgrejaEAno } from '../goals/areas'
+import { AREA_PDF_DOCUMENT, ehFinanceira, ANOS_DE_HISTORICO, PERCENT_TARGET_AREAS, anosComResultado, comparacaoMensal, resumoPorAno, resumoPorIgrejaEAno } from '../goals/areas'
 import { previaDeBatismos, previaFinanceira, type PreviaDeRelatorio } from '../goals/importacaoAcms'
 import { comparativoDeDoadores } from '../goals/doadores'
 import { PeopleService } from '../people/service'
@@ -172,9 +172,9 @@ export function GoalAreaPage() {
       const hash = await pdfHash(bytes)
       if (area === 'baptisms') {
         setPreview(previaDeBatismos(texto, hash, churches))
-      } else if (area === 'financial') {
+      } else if (area && ehFinanceira(area)) {
         const lida = previaFinanceira(texto, hash, churches)
-        setAnoAnteriorDoPdf({ ano: lida.anoAnterior, total: lida.totalDoAnoAnterior })
+        setAnoAnteriorDoPdf({ ano: lida.anoAnterior, total: area === 'offerings' ? lida.totaisDoAnoAnterior.offerings : lida.totaisDoAnoAnterior.tithes })
         setPreview(lida)
       } else {
         setPreview(parseGoalsPdf(texto, hash))
@@ -192,8 +192,8 @@ export function GoalAreaPage() {
       // ano inteiro até a data dele: acrescentar faria os mesmos batismos
       // entrarem de novo a cada envio.
       const doRelatorio = preview as Partial<PreviaDeRelatorio>
-      if (doRelatorio.periodos?.length) {
-        await goalsService.replaceReportEntries(account.id, masterKey, AREA_TARGET_METRIC[area], doRelatorio.periodos, preview.entries)
+      if (doRelatorio.periodos?.length && doRelatorio.metricas?.length) {
+        await goalsService.replaceReportEntries(account.id, masterKey, doRelatorio.metricas, doRelatorio.periodos, preview.entries)
       } else {
         await goalsService.addEntries(account.id, masterKey, preview.entries.map((entry) => ({ ...entry, source: 'pdf' as const })))
       }
@@ -257,7 +257,6 @@ export function GoalAreaPage() {
             </tbody>
           </table>
         </div>
-        <p className="field__hint">Os doze meses aparecem sempre. Os que ainda não chegaram ficam vazios até o próximo relatório — ou até você lançar à mão.</p>
       </Card>}
 
       {igrejasPorAno.length > 0 && anosResumidos.length > 1 && <Card title="Por igreja, ano a ano" eyebrow="Onde mudou">
@@ -400,7 +399,7 @@ export function GoalAreaPage() {
         <button type="button" className="text-button" onClick={() => setCorrigindoAnoAnterior(true)}>Corrigir</button>
       </p>}
 
-      {area === 'financial' && (() => {
+      {area === 'tithes' && (() => {
         const metaDeDoadores = goals.find((goal) => goal.churchId === null && goal.year === year && goal.metric === 'donors')
         const doadores = comparativoDeDoadores(pessoas, year, metaDeDoadores?.target ?? 0)
         return <Card title="Doadores" eyebrow="A outra metade da meta financeira">
@@ -413,12 +412,8 @@ export function GoalAreaPage() {
           {doadores.semBaseDeComparacao
             ? <p className="field__hint">Ainda não há leitura de fidelidade de {year - 1} para comparar. Envie lá o relatório daquele ano e o objetivo aparece sozinho.</p>
             : metaDeDoadores && <p className="goal-card__percent">Meta: +{metaDeDoadores.target}% sobre {year - 1} · {doadores.percentualAlcancado}% alcançado</p>}
-          {/*
-            Este número não se digita aqui: ele vem do relatório de fidelidade,
-            que se envia noutra tela — um por ano. Sem dizer isso, a meta de
-            porcentagem fica esperando uma base que ninguém sabe onde alimentar.
-          */}
-          <p className="card-copy">Estes números vêm dos relatórios de fidelidade, um por ano. <Link className="text-link" to="/app/fidelidade">Abrir fidelidade</Link> para enviar o de {year} e o de {year - 1}.</p>
+          <Link className="text-link" to="/app/fidelidade">Abrir fidelidade</Link>
+          
           <form className="inline-form" onSubmit={(event) => void salvarMetaDeDoadores(event)}>
             <Field
               label={`Aumento de doadores sobre ${year - 1} (%)`}

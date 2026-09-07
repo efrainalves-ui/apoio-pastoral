@@ -85,4 +85,4 @@ export function goalBudget(items: GoalBudgetItem[] | undefined): GoalBudget {
   return { planned, spent, balance: planned - spent }
 }
 
-export const LINKABLE_AREAS: GoalArea[] = ['financial', 'baptisms', 'bible_studies', 'uapg']
+export const LINKABLE_AREAS: GoalArea[] = ['tithes', 'offerings', 'baptisms', 'bible_studies', 'uapg']

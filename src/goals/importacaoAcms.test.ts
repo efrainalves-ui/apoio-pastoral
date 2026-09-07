@@ -55,20 +55,27 @@ describe('batismos vindos da Análise de Movimentos', () => {
 })
 
 describe('financeiro vindo do Comparativo de Entradas', () => {
-  it('soma dízimo e oferta dos dois anos, mês a mês', () => {
-    // O arquivo traz 2025 e 2026 lado a lado. Guardar só o corrente deixava o
-    // gráfico com o ano passado zerado — e era o ano passado que o pastor
-    // queria comparar.
+  it('separa dízimo de oferta, nos dois anos, mês a mês', () => {
+    // O arquivo traz duas colunas e dois anos. Somar dízimo com oferta dava um
+    // número que não existe em relatório nenhum, e guardar só o ano corrente
+    // deixava o gráfico com o ano passado zerado.
     const previa = previaFinanceira(comparativo, 'hash-ficticio', igrejas)
 
     expect(previa.anoAtual).toBe(2026)
+    const ref = 'Comparativo de Entradas 2026'
     expect(previa.entries).toEqual([
-      { churchId: 'igreja-central', metric: 'tithes_offerings', date: '2025-01-01', amount: 110, reference: 'Comparativo de Entradas 2026' },
-      { churchId: 'igreja-central', metric: 'tithes_offerings', date: '2026-01-01', amount: 170, reference: 'Comparativo de Entradas 2026' },
-      { churchId: 'igreja-central', metric: 'tithes_offerings', date: '2025-02-01', amount: 220, reference: 'Comparativo de Entradas 2026' },
-      { churchId: 'igreja-central', metric: 'tithes_offerings', date: '2026-02-01', amount: 280, reference: 'Comparativo de Entradas 2026' },
-      { churchId: 'igreja-monte', metric: 'tithes_offerings', date: '2025-01-01', amount: 1100, reference: 'Comparativo de Entradas 2026' },
-      { churchId: 'igreja-monte', metric: 'tithes_offerings', date: '2026-01-01', amount: 2200, reference: 'Comparativo de Entradas 2026' },
+      { churchId: 'igreja-central', metric: 'tithes', date: '2025-01-01', amount: 100, reference: ref },
+      { churchId: 'igreja-central', metric: 'offerings', date: '2025-01-01', amount: 10, reference: ref },
+      { churchId: 'igreja-central', metric: 'tithes', date: '2026-01-01', amount: 150, reference: ref },
+      { churchId: 'igreja-central', metric: 'offerings', date: '2026-01-01', amount: 20, reference: ref },
+      { churchId: 'igreja-central', metric: 'tithes', date: '2025-02-01', amount: 200, reference: ref },
+      { churchId: 'igreja-central', metric: 'offerings', date: '2025-02-01', amount: 20, reference: ref },
+      { churchId: 'igreja-central', metric: 'tithes', date: '2026-02-01', amount: 250, reference: ref },
+      { churchId: 'igreja-central', metric: 'offerings', date: '2026-02-01', amount: 30, reference: ref },
+      { churchId: 'igreja-monte', metric: 'tithes', date: '2025-01-01', amount: 1000, reference: ref },
+      { churchId: 'igreja-monte', metric: 'offerings', date: '2025-01-01', amount: 100, reference: ref },
+      { churchId: 'igreja-monte', metric: 'tithes', date: '2026-01-01', amount: 2000, reference: ref },
+      { churchId: 'igreja-monte', metric: 'offerings', date: '2026-01-01', amount: 200, reference: ref },
     ])
   })
 
@@ -80,11 +87,13 @@ describe('financeiro vindo do Comparativo de Entradas', () => {
     expect(previa.periodos).toEqual([{ ano: 2025, meses: [1, 2] }, { ano: 2026, meses: [1, 2] }])
   })
 
-  it('traz o total do ano anterior, que é o que a meta em porcentagem compara', () => {
-    // Sem isto, "aumentar 10%" exigiria alguém digitar o ano passado inteiro.
+  it('traz o ano anterior por categoria, que é o que a meta em porcentagem compara', () => {
+    // Sem isto, "aumentar 10%" exigiria alguém digitar o ano passado inteiro —
+    // e somar as duas categorias mediria a meta contra um número que não existe
+    // em relatório nenhum.
     const previa = previaFinanceira(comparativo, 'hash-ficticio', igrejas)
 
     expect(previa.anoAnterior).toBe(2025)
-    expect(previa.totalDoAnoAnterior).toBe(1430)
+    expect(previa.totaisDoAnoAnterior).toEqual({ tithes: 1300, offerings: 130 })
   })
 })

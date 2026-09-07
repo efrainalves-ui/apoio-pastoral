@@ -148,7 +148,7 @@ describe('comparação com o ano anterior', () => {
   })
 
   it('avisa quando ainda não há ano anterior registrado', () => {
-    const comparacao = areaComparison('financial', [], vazio, ANO)
+    const comparacao = areaComparison('tithes', [], vazio, ANO)
 
     expect(comparacao.hasPrevious).toBe(false)
     expect(comparacao.previous).toBe(0)

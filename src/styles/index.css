@@ -981,8 +981,9 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .goal-cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .goal-card { display: grid; gap: 10px; }
 .goal-card__numbers { min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.goal-card__numbers > div { min-width: 0; overflow-wrap: anywhere; }
 .goal-card__numbers small { display: block; color: var(--muted); }
-.goal-card__numbers strong { font-size: 1.15rem; }
+.goal-card__numbers strong { font-size: 1.15rem; line-height: 1.2; }
 .goal-card__percent { margin: 0; color: var(--muted); }
 .goal-bar { display: block; height: 10px; border-radius: 999px; background: var(--green-50); overflow: hidden; }
 .goal-bar span { display: block; height: 100%; background: var(--green-800); }

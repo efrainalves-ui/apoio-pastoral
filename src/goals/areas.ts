@@ -1,20 +1,35 @@
 import type { GoalTargetKind, GoalEntity, GoalEntryEntity, GoalHistoryEntity, GoalMetric } from './types'
 
-/** As quatro metas que o pastor acompanha. */
-export type GoalArea = 'financial' | 'baptisms' | 'bible_studies' | 'uapg'
+/**
+ * As metas que o pastor acompanha.
+ *
+ * Dízimo e oferta são duas: o relatório do ACMS traz as duas colunas separadas,
+ * a igreja as trata como coisas diferentes e o crescimento de uma nada diz
+ * sobre o da outra. Somá-las numa só produzia um número que não existe em lugar
+ * nenhum e escondia qual das duas caiu.
+ */
+export type GoalArea = 'tithes' | 'offerings' | 'baptisms' | 'bible_studies' | 'uapg'
 
-export const GOAL_AREAS: GoalArea[] = ['financial', 'baptisms', 'bible_studies', 'uapg']
+export const GOAL_AREAS: GoalArea[] = ['tithes', 'offerings', 'baptisms', 'bible_studies', 'uapg']
 
 export const GOAL_AREA_LABELS: Record<GoalArea, string> = {
-  financial: 'Financeiro',
+  tithes: 'Dízimos',
+  offerings: 'Ofertas',
   baptisms: 'Batismos',
   bible_studies: 'Estudos Bíblicos',
-  uapg: 'UAPG — Unidades de Ação e Pequenos Grupos Integrados',
+  uapg: 'Escola Sabatina e Pequenos Grupos',
 }
 
 /** Nome curto, para o resumo da tela inicial. */
 export const GOAL_AREA_SHORT: Record<GoalArea, string> = {
-  financial: 'Financeiro', baptisms: 'Batismos', bible_studies: 'Estudos', uapg: 'UAPG',
+  tithes: 'Dízimos', offerings: 'Ofertas', baptisms: 'Batismos', bible_studies: 'Estudos', uapg: 'Escola Sabatina',
+}
+
+/** As áreas que vêm do mesmo Comparativo de Entradas. */
+export const AREAS_FINANCEIRAS: GoalArea[] = ['tithes', 'offerings']
+
+export function ehFinanceira(area: GoalArea): boolean {
+  return AREAS_FINANCEIRAS.includes(area)
 }
 
 /**
@@ -23,7 +38,8 @@ export const GOAL_AREA_SHORT: Record<GoalArea, string> = {
  * eles apenas somam no mesmo lugar.
  */
 export const AREA_METRICS: Record<GoalArea, GoalMetric[]> = {
-  financial: ['tithes_offerings'],
+  tithes: ['tithes'],
+  offerings: ['offerings'],
   baptisms: ['baptisms', 'rebaptisms', 'professions_faith'],
   bible_studies: ['bible_studies'],
   uapg: ['uapg'],
@@ -31,12 +47,12 @@ export const AREA_METRICS: Record<GoalArea, GoalMetric[]> = {
 
 /** Onde a meta anual daquela área é guardada. */
 export const AREA_TARGET_METRIC: Record<GoalArea, GoalMetric> = {
-  financial: 'tithes_offerings', baptisms: 'baptisms', bible_studies: 'bible_studies', uapg: 'uapg',
+  tithes: 'tithes', offerings: 'offerings', baptisms: 'baptisms', bible_studies: 'bible_studies', uapg: 'uapg',
 }
 
 /** Áreas alimentadas por PDF; as outras vêm do que já está cadastrado. */
 export const AREA_USES_PDF: Record<GoalArea, boolean> = {
-  financial: true, baptisms: true, bible_studies: false, uapg: false,
+  tithes: true, offerings: true, baptisms: true, bible_studies: false, uapg: false,
 }
 
 /**
@@ -52,7 +68,12 @@ export const AREA_PDF_DOCUMENT: Partial<Record<GoalArea, { nome: string; artigo:
     artigo: 'a',
     caminho: 'No ACMS: Relatórios → Movimento → Análise de movimento. Traz só números, sem nomes de pessoas.',
   },
-  financial: {
+  tithes: {
+    nome: 'Comparativo de Entradas',
+    artigo: 'o',
+    caminho: 'No ACMS: Relatórios → Entrada → escolha o tipo de entrada, igreja mês a mês.',
+  },
+  offerings: {
     nome: 'Comparativo de Entradas',
     artigo: 'o',
     caminho: 'No ACMS: Relatórios → Entrada → escolha o tipo de entrada, igreja mês a mês.',
@@ -303,7 +324,7 @@ export interface AreaComparison extends AreaProgress {
 }
 
 /** Áreas cuja meta é combinada como aumento sobre o ano anterior. */
-export const PERCENT_TARGET_AREAS: GoalArea[] = ['financial']
+export const PERCENT_TARGET_AREAS: GoalArea[] = ['tithes', 'offerings']
 
 export function areaComparison(area: GoalArea, goals: GoalEntity[], sources: AreaSources, year: number): AreaComparison {
   const progresso = areaProgress(area, goals, sources, year)

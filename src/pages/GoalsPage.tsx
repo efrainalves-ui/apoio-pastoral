@@ -49,12 +49,13 @@ export function GoalsPage() {
             <Card key={area} title={GOAL_AREA_LABELS[area]}>
               <div className="goal-card">
                 <div className="goal-card__numbers">
-                  <div><small>Meta anual</small><strong>{progresso.target > 0 ? formatGoalValue(area, progresso.target) : 'A definir'}</strong></div>
+                  <div><small>Meta anual</small><strong>{progresso.objective > 0 ? formatGoalValue(area, progresso.objective) : 'A definir'}</strong></div>
                   <div><small>Resultado</small><strong>{formatGoalValue(area, progresso.result)}</strong></div>
                   <div><small>Falta</small><strong>{progresso.target > 0 ? formatGoalValue(area, progresso.missing) : '—'}</strong></div>
                 </div>
                 <div className="goal-bar" role="img" aria-label={`${progresso.percent}% da meta`}><span style={{ width: `${progresso.percent}%` }} /></div>
-                <p className="goal-card__percent">{progresso.target > 0 ? `${progresso.percent}% alcançado` : 'Defina a meta do ano para acompanhar'}</p>
+                <p className="goal-card__percent">{progresso.objective > 0 ? `${progresso.percent}% alcançado` : progresso.withoutBaseline ? `Sem resultado de ${year - 1} para comparar` : 'Defina a meta do ano para acompanhar'}</p>
+                {progresso.targetKind === 'percent' && progresso.target > 0 && <p className="goal-card__percent">Meta: +{progresso.target}% sobre {year - 1}</p>}
                 {progresso.hasPrevious && <p className="goal-card__percent">{year - 1}: {formatGoalValue(area, progresso.previous)} · {progresso.difference >= 0 ? '+' : '−'}{formatGoalValue(area, Math.abs(progresso.difference))} neste ano</p>}
                 <Link className="button button--secondary" to={`/app/metas/${area}`}>Acompanhar</Link>
               </div>

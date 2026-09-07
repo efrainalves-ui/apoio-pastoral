@@ -1,4 +1,4 @@
-export type GoalMetric = 'tithes_offerings' | 'baptisms' | 'rebaptisms' | 'professions_faith' | 'bible_studies' | 'uapg' | 'donors'
+export type GoalMetric = 'tithes' | 'offerings' | 'tithes_offerings' | 'baptisms' | 'rebaptisms' | 'professions_faith' | 'bible_studies' | 'uapg' | 'donors'
 /**
  * Como a meta foi escrita.
  *
@@ -17,12 +17,15 @@ export interface GoalEntity extends GoalData { id: string }
 export interface GoalEntryData { churchId: string; metric: GoalMetric; date: string; amount: number; source: 'manual' | 'pdf'; reference: string; createdAt: string }
 export interface GoalEntryEntity extends GoalEntryData { id: string }
 export interface GoalImportPreview { hash: string; entries: Omit<GoalEntryData, 'source' | 'createdAt'>[]; errors: string[] }
-export const GOAL_LABELS: Record<GoalMetric, string> = { tithes_offerings: 'Dízimos e ofertas', baptisms: 'Batismos', rebaptisms: 'Rebatismos', professions_faith: 'Profissões de fé', bible_studies: 'Estudos Bíblicos', uapg: 'UAPG', donors: 'Doadores' }
+export const GOAL_LABELS: Record<GoalMetric, string> = { tithes: 'Dízimos', offerings: 'Ofertas', tithes_offerings: 'Dízimos e ofertas (desenho antigo)', baptisms: 'Batismos', rebaptisms: 'Rebatismos', professions_faith: 'Profissões de fé', bible_studies: 'Estudos Bíblicos', uapg: 'UAPG', donors: 'Doadores' }
 
 /**
  * Resultado consolidado de um ano anterior, guardado só para comparação.
  * Ele não entra nos lançamentos do ano corrente e não altera nenhuma meta.
  */
-export interface GoalHistoryData { area: 'financial' | 'baptisms'; year: number; amount: number; source: 'manual' | 'pdf'; reference: string; createdAt: string; updatedAt: string }
+export interface GoalHistoryData { area: 'tithes' | 'offerings' | 'baptisms' | 'financial'; year: number; amount: number; source: 'manual' | 'pdf'; reference: string; createdAt: string; updatedAt: string }
 export interface GoalHistoryEntity extends GoalHistoryData { id: string }
-export const HISTORY_AREAS: Array<GoalHistoryData['area']> = ['financial', 'baptisms']
+// 'financial' fica no tipo, e fora desta lista: os registros gravados quando
+// dízimo e oferta eram uma coisa só continuam legíveis, mas não alimentam mais
+// nenhuma área — o número deles era a soma das duas.
+export const HISTORY_AREAS: Array<GoalHistoryData['area']> = ['tithes', 'offerings', 'baptisms']

@@ -1,6 +1,6 @@
 import { normalizePdfChurchName } from '../imports/parsers'
-import { parseComparativoDeEntradas, parseMovimentoDeBatismos, totalDeEntradas } from '../imports/acmsRelatorios'
-import type { GoalImportPreview } from './types'
+import { parseComparativoDeEntradas, parseMovimentoDeBatismos } from '../imports/acmsRelatorios'
+import type { GoalImportPreview, GoalMetric } from './types'
 
 export interface IgrejaCadastrada { id: string; name: string }
 
@@ -48,6 +48,8 @@ export interface PreviaDeRelatorio extends GoalImportPreview {
    * porque o Comparativo de Entradas traz dois anos no mesmo arquivo.
    */
   periodos: PeriodoDoRelatorio[]
+  /** As métricas que este relatório substitui no período que cobre. */
+  metricas: GoalMetric[]
 }
 
 /** Batismos por igreja e mês, a partir da Análise de Movimentos. */
@@ -80,14 +82,15 @@ export function previaDeBatismos(texto: string, hash: string, igrejas: readonly 
     // O cabeçalho diz "Até ao mês: 9/2026": é ele quem define o período
     // coberto, e não os meses que por acaso tiveram batismo.
     periodos: [{ ano: lido.ano, meses: Array.from({ length: lido.ateOMes }, (_, indice) => indice + 1) }],
+    metricas: ['baptisms'],
   }
 }
 
 export interface PreviaFinanceira extends PreviaDeRelatorio {
   anoAtual: number
   anoAnterior: number
-  /** Dízimos e ofertas do ano anterior, somados, para a comparação. */
-  totalDoAnoAnterior: number
+  /** O ano anterior fechado, por categoria, para a comparação. */
+  totaisDoAnoAnterior: { tithes: number; offerings: number }
 }
 
 /** Dízimos e ofertas por igreja e mês, a partir do Comparativo de Entradas. */
@@ -95,25 +98,28 @@ export function previaFinanceira(texto: string, hash: string, igrejas: readonly 
   const lido = parseComparativoDeEntradas(texto)
   const entries: GoalImportPreview['entries'] = []
   const errors: string[] = []
-  let totalDoAnoAnterior = 0
+  const totaisDoAnoAnterior = { tithes: 0, offerings: 0 }
 
   for (const igreja of lido.igrejas) {
     const cadastrada = acharIgreja(igreja.nome, igrejas)
     if (!cadastrada) { errors.push(avisoDeIgrejaAusente(igreja.nome)); continue }
-    totalDoAnoAnterior += totalDeEntradas(igreja.meses, 'anterior')
     for (const mes of igreja.meses) {
-      // O relatório traz os dois anos, mês a mês. Guardar só o corrente e
-      // reduzir o anterior a um total apagava metade do arquivo: o gráfico
-      // aparecia com o ano passado zerado e a tabela com uma linha só, quando o
-      // dado estava ali o tempo todo.
-      for (const [ano, valor] of [
-        [lido.anoAnterior, mes.dizimoAnterior + mes.ofertaAnterior] as const,
-        [lido.anoAtual, mes.dizimoAtual + mes.ofertaAtual] as const,
-      ]) {
+      totaisDoAnoAnterior.tithes += mes.dizimoAnterior
+      totaisDoAnoAnterior.offerings += mes.ofertaAnterior
+      // O relatório traz duas colunas e dois anos. Somar dízimo com oferta
+      // produzia um número que não existe em relatório nenhum e escondia qual
+      // dos dois caiu; guardar só o ano corrente apagava a outra metade do
+      // arquivo, e era ela que fazia a comparação existir.
+      for (const [ano, metric, valor] of [
+        [lido.anoAnterior, 'tithes', mes.dizimoAnterior],
+        [lido.anoAnterior, 'offerings', mes.ofertaAnterior],
+        [lido.anoAtual, 'tithes', mes.dizimoAtual],
+        [lido.anoAtual, 'offerings', mes.ofertaAtual],
+      ] as const) {
         if (valor <= 0) continue
         entries.push({
           churchId: cadastrada.id,
-          metric: 'tithes_offerings',
+          metric,
           date: mesIso(ano, mes.mes),
           amount: valor,
           reference: `Comparativo de Entradas ${lido.anoAtual}`,
@@ -130,8 +136,11 @@ export function previaFinanceira(texto: string, hash: string, igrejas: readonly 
     entries,
     errors,
     periodos: [{ ano: lido.anoAnterior, meses }, { ano: lido.anoAtual, meses }],
+    // O desenho antigo entra junto para ser apagado: as entradas somadas do
+    // período coberto sairiam duplicando o total ao lado das novas.
+    metricas: ['tithes', 'offerings', 'tithes_offerings'],
     anoAtual: lido.anoAtual,
     anoAnterior: lido.anoAnterior,
-    totalDoAnoAnterior,
+    totaisDoAnoAnterior,
   }
 }
