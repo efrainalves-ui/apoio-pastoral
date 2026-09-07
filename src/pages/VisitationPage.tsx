@@ -151,7 +151,7 @@ export function VisitationPage() {
                     <span><strong>{targetName(visit) ?? 'Cadastro preservado'}</strong><small>{VISIT_REASON_LABELS[version.reason]} · {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(version.startAt))}</small></span>
                     <ChevronRight />
                   </Link>
-                  <Link className="icon-button" to={`/app/visitas/${visit.id}`} aria-label={`Editar visita de ${targetName(visit) ?? 'cadastro preservado'}`}><Edit3 /></Link>
+                  <Link className="icon-button" to={`/app/visitas/${visit.id}/editar`} aria-label={`Editar visita de ${targetName(visit) ?? 'cadastro preservado'}`}><Edit3 /></Link>
                   <button type="button" className="icon-button danger-icon" aria-label={`Excluir visita de ${targetName(visit) ?? 'cadastro preservado'}`} onClick={() => void apagarVisita(visit.id)}><Trash2 /></button>
                 </div> })}</div>
               </section>)}

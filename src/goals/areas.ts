@@ -309,6 +309,51 @@ export function variacaoNoMesmoPeriodo(anterior: readonly number[], atual: reado
   return ((somar(atual) - base) / base) * 100
 }
 
+export interface CrescimentoDaMeta {
+  /** Os pontos percentuais combinados: "aumentar 30%" é 30. */
+  alvo: number
+  /** Quanto se cresceu de fato, no acumulado do ano contra o mesmo período. */
+  alcancado: number | null
+  /** Quantos pontos faltam para o alvo. */
+  falta: number
+  /** Quanto da meta já foi vencido, de 0 a 100, para a barra. */
+  percentDaMeta: number
+  anterior: number
+  atual: number
+  /** Até que mês o ano corrente tem resultado. */
+  ateOMes: number
+}
+
+/**
+ * A meta de dízimos e ofertas medida como ela foi combinada: em porcentagem.
+ *
+ * O cartão mostrava "83% alcançado" para um crescimento real de 8% sobre uma
+ * meta de 30%. Os dois números são verdadeiros e dizem coisas opostas: 83% do
+ * dinheiro, mas menos de um terço do caminho. Quem lê "83%" não vai atrás dos
+ * vinte e dois pontos que faltam.
+ *
+ * O acumulado é do mesmo período nos dois anos. Comparar oito meses com doze
+ * inventaria uma queda que não existe.
+ */
+export function crescimentoDaMeta(area: GoalArea, goals: GoalEntity[], sources: AreaSources, year: number): CrescimentoDaMeta {
+  const meta = goals.find((goal) => goal.churchId === null && goal.year === year && goal.metric === AREA_TARGET_METRIC[area])
+  const alvo = meta?.targetKind === 'percent' ? meta.target : 0
+  const atualPorMes = monthlyResults(area, sources, year)
+  const anteriorPorMes = monthlyResults(area, sources, year - 1)
+
+  let ateOMes = 0
+  atualPorMes.forEach((valor, indice) => { if (valor > 0) ateOMes = indice + 1 })
+  const somar = (valores: number[]) => valores.slice(0, ateOMes).reduce((total, valor) => total + valor, 0)
+  const atual = somar(atualPorMes)
+  const anterior = somar(anteriorPorMes)
+
+  const alcancado = anterior > 0 ? ((atual - anterior) / anterior) * 100 : null
+  const falta = alcancado === null ? alvo : Math.max(0, alvo - alcancado)
+  const percentDaMeta = alvo > 0 && alcancado !== null ? Math.max(0, Math.min(100, Math.round((alcancado / alvo) * 100))) : 0
+
+  return { alvo, alcancado, falta, percentDaMeta, anterior, atual, ateOMes }
+}
+
 export interface ChurchProgress { churchId: string; target: number; result: number; percent: number }
 
 /** Metas e resultados por igreja, sem ordenar por desempenho. */
