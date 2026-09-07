@@ -47,6 +47,8 @@ export interface MemberImportPreview {
 export interface FidelityImportPreview {
   kind: 'fidelity'
   fileHash: string
+  /** O ano que este relatório cobre, escolhido por quem envia. */
+  referenceYear: number
   parsedRows: number
   churchCounts: Record<string, number>
   changes: PlannedPersonChange[]

@@ -48,6 +48,13 @@ export const FIDELITY_CATEGORY_LABELS: Record<FidelityCategory, string> = {
 }
 
 export interface FidelitySnapshot {
+  /**
+   * O ano que o relatório cobre — não o dia em que ele foi importado.
+   *
+   * Opcional porque as leituras gravadas antes desta mudança não o têm; para
+   * elas vale a data de importação. Ver `anoDaLeitura`.
+   */
+  referenceYear?: number
   months: number | null
   rangeMin: number
   rangeMax: number

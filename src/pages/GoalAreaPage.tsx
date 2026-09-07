@@ -411,8 +411,14 @@ export function GoalAreaPage() {
             {doadores.objetivo > 0 && <div><small>Objetivo</small><strong>{doadores.objetivo}</strong></div>}
           </div>
           {doadores.semBaseDeComparacao
-            ? <p className="field__hint">Ainda não há leitura de fidelidade de {year - 1} para comparar. Envie o relatório de fidelidade daquele ano e o objetivo aparece sozinho.</p>
+            ? <p className="field__hint">Ainda não há leitura de fidelidade de {year - 1} para comparar. Envie lá o relatório daquele ano e o objetivo aparece sozinho.</p>
             : metaDeDoadores && <p className="goal-card__percent">Meta: +{metaDeDoadores.target}% sobre {year - 1} · {doadores.percentualAlcancado}% alcançado</p>}
+          {/*
+            Este número não se digita aqui: ele vem do relatório de fidelidade,
+            que se envia noutra tela — um por ano. Sem dizer isso, a meta de
+            porcentagem fica esperando uma base que ninguém sabe onde alimentar.
+          */}
+          <p className="card-copy">Estes números vêm dos relatórios de fidelidade, um por ano. <Link className="text-link" to="/app/fidelidade">Abrir fidelidade</Link> para enviar o de {year} e o de {year - 1}.</p>
           <form className="inline-form" onSubmit={(event) => void salvarMetaDeDoadores(event)}>
             <Field
               label={`Aumento de doadores sobre ${year - 1} (%)`}

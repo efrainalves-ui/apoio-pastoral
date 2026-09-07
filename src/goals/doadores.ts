@@ -1,3 +1,4 @@
+import { anoDaLeitura } from '../people/leiturasDeFidelidade'
 import type { FidelityCategory, FidelitySnapshot } from '../people/types'
 
 /**
@@ -22,9 +23,7 @@ function ehDoador(categoria: FidelityCategory | undefined): boolean {
   return categoria === 'tither' || categoria === 'non_systematic_tither'
 }
 
-function anoDe(snapshot: FidelitySnapshot): number {
-  return new Date(snapshot.importedAt || snapshot.updatedAt).getFullYear()
-}
+const anoDe = anoDaLeitura
 
 /**
  * A situação da pessoa no fim de um ano: a leitura mais recente feita **até**

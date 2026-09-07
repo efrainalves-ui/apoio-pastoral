@@ -5,6 +5,7 @@ import { VaultRepository, type EncryptedMutation } from '../db/repository'
 import { type ChurchEntity } from '../district/types'
 import { type FamilyData } from '../families/types'
 import { fidelityCategory, FIDELITY_CATEGORY_LABELS, IMPORT_STATUS_LABELS, type FidelityCategory, type FidelitySnapshot, type PersonData, type PersonEntity, type PersonHistoryEntry } from '../people/types'
+import { leituraDoAno, mesclarFidelidade } from '../people/leiturasDeFidelidade'
 import { normalizePersonName } from '../people/validation'
 import type { FidelityImportPreview, ImportApplyResult, ImportBatchData, ImportBatchEntity, ImportIssue, MemberImportPreview, ParsedFidelityRow, ParsedMemberRow, PlannedPersonChange } from './types'
 
@@ -33,11 +34,11 @@ function rowCategory(row: ParsedFidelityRow): FidelityCategory {
   return fidelityCategory(row.months ?? 0)
 }
 
-function fidelitySnapshot(row: ParsedFidelityRow, category: FidelityCategory, now: string): FidelitySnapshot {
+function fidelitySnapshot(row: ParsedFidelityRow, category: FidelityCategory, now: string, referenceYear: number): FidelitySnapshot {
   const exact = typeof row.months === 'number'
   const rangeMin = exact ? row.months! : row.range === '8-12' ? 8 : row.range === '1-7' ? 1 : category === 'tither' ? 8 : category === 'non_systematic_tither' ? 1 : 0
   const rangeMax = exact ? row.months! : row.range === '8-12' ? 12 : row.range === '1-7' ? 7 : category === 'tither' ? 12 : category === 'non_systematic_tither' ? 7 : 0
-  return { months: exact ? row.months : null, rangeMin, rangeMax, category, precision: exact ? 'exact' : row.range ? 'range' : 'category_only', updatedAt: now, importedAt: now, source: 'PDF local de fidelidade', importBatchId: '' }
+  return { referenceYear, months: exact ? row.months : null, rangeMin, rangeMax, category, precision: exact ? 'exact' : row.range ? 'range' : 'category_only', updatedAt: now, importedAt: now, source: `PDF local de fidelidade ${referenceYear}`, importBatchId: '' }
 }
 
 function sameFidelity(left: FidelitySnapshot | null, right: FidelitySnapshot): boolean {
@@ -100,7 +101,7 @@ export class ImportService {
     return { kind: 'members', fileHash, parsedRows: rows.length, churchCounts, newPeople, updatedPeople, missingPeople, unchanged, issues, alreadyImported }
   }
 
-  async previewFidelity(accountId: string, masterKey: CryptoKey, fileHash: string, rows: ParsedFidelityRow[], people: PersonEntity[], churches: ChurchEntity[]): Promise<FidelityImportPreview> {
+  async previewFidelity(accountId: string, masterKey: CryptoKey, fileHash: string, rows: ParsedFidelityRow[], people: PersonEntity[], churches: ChurchEntity[], referenceYear: number): Promise<FidelityImportPreview> {
     const alreadyImported = (await this.listBatches(accountId, masterKey, 'fidelity')).some((batch) => batch.fileHash === fileHash && batch.status === 'applied' && (batch.modelVersion ?? 1) >= 3)
     const churchMap = churchByName(churches); const issues: ImportIssue[] = []; const churchCounts: Record<string, number> = {}; const changes: PlannedPersonChange[] = []; const seen = new Set<string>(); let unchanged = 0
     const categories = { tither: 0, nonSystematicTither: 0, nonTither: 0 }; const associatedCategories = { tither: 0, nonSystematicTither: 0, nonTither: 0 }; const now = new Date().toISOString()
@@ -121,12 +122,14 @@ export class ImportService {
       if (matches.length > 1) { issues.push(issue('ambiguous_person', row.churchName, row.name, 'Mais de uma pessoa possui este nome no distrito.', row)); continue }
       const person = matches[0]!; const previousData = storedPerson(person)
       if (category === 'tither') associatedCategories.tither += 1; else if (category === 'non_systematic_tither') associatedCategories.nonSystematicTither += 1; else associatedCategories.nonTither += 1
-      const snapshot = fidelitySnapshot(row, category, now)
-      if (sameFidelity(person.fidelity, snapshot)) { unchanged += 1; continue }
-      const history: PersonHistoryEntry[] = [...person.history, { id: crypto.randomUUID(), at: now, event: 'fidelity_updated', from: person.fidelity ? FIDELITY_CATEGORY_LABELS[person.fidelity.category] : 'Sem informação', to: FIDELITY_CATEGORY_LABELS[category], source: 'Importação de fidelidade' }]
-      changes.push({ personId: person.id, previousData, nextData: { ...previousData, fidelity: snapshot, fidelityHistory: person.fidelity ? [...person.fidelityHistory, person.fidelity] : person.fidelityHistory, history, updatedAt: now }, churchName: churches.find((item) => item.id === person.currentChurchId)?.name ?? 'Igreja' })
+      const snapshot = fidelitySnapshot(row, category, now, referenceYear)
+      // Compara com a leitura daquele mesmo ano, não com a mais recente: mandar
+      // 2025 quando 2026 já existe é acrescentar história, não repeti-la.
+      if (sameFidelity(leituraDoAno(person, referenceYear), snapshot)) { unchanged += 1; continue }
+      const history: PersonHistoryEntry[] = [...person.history, { id: crypto.randomUUID(), at: now, event: 'fidelity_updated', from: person.fidelity ? FIDELITY_CATEGORY_LABELS[person.fidelity.category] : 'Sem informação', to: FIDELITY_CATEGORY_LABELS[category], source: `Importação de fidelidade ${referenceYear}` }]
+      changes.push({ personId: person.id, previousData, nextData: { ...previousData, ...mesclarFidelidade(person, snapshot), history, updatedAt: now }, churchName: churches.find((item) => item.id === person.currentChurchId)?.name ?? 'Igreja' })
     }
-    return { kind: 'fidelity', fileHash, parsedRows: rows.length, churchCounts, changes, unchanged, issues, alreadyImported, categories, associatedCategories }
+    return { kind: 'fidelity', fileHash, referenceYear, parsedRows: rows.length, churchCounts, changes, unchanged, issues, alreadyImported, categories, associatedCategories }
   }
 
   resolveFidelityIssue(preview: FidelityImportPreview, issueId: string, personId: string, people: PersonEntity[], churches: ChurchEntity[], automatic = false): FidelityImportPreview {
@@ -136,9 +139,9 @@ export class ImportService {
     const church = churches.find(({ id }) => id === person.currentChurchId)
     if (!church) throw new Error('Selecione uma pessoa vinculada a uma igreja.')
     if (preview.changes.some((change) => change.personId === person.id)) throw new Error('Esta pessoa já possui uma correspondência preparada neste lote.')
-    const category = rowCategory(row); const now = new Date().toISOString(); const previousData = storedPerson(person); const snapshot = fidelitySnapshot(row, category, now)
-    const history: PersonHistoryEntry[] = [...person.history, { id: crypto.randomUUID(), at: now, event: 'fidelity_updated', from: person.fidelity ? FIDELITY_CATEGORY_LABELS[person.fidelity.category] : 'Sem informação', to: FIDELITY_CATEGORY_LABELS[category], source: 'Revisão manual da importação de fidelidade' }]
-    const change: PlannedPersonChange = { personId: person.id, previousData, nextData: { ...previousData, fidelity: snapshot, fidelityHistory: person.fidelity ? [...person.fidelityHistory, person.fidelity] : person.fidelityHistory, history, updatedAt: now }, churchName: church.name }
+    const category = rowCategory(row); const now = new Date().toISOString(); const previousData = storedPerson(person); const snapshot = fidelitySnapshot(row, category, now, preview.referenceYear)
+    const history: PersonHistoryEntry[] = [...person.history, { id: crypto.randomUUID(), at: now, event: 'fidelity_updated', from: person.fidelity ? FIDELITY_CATEGORY_LABELS[person.fidelity.category] : 'Sem informação', to: FIDELITY_CATEGORY_LABELS[category], source: `Revisão manual da importação de fidelidade ${preview.referenceYear}` }]
+    const change: PlannedPersonChange = { personId: person.id, previousData, nextData: { ...previousData, ...mesclarFidelidade(person, snapshot), history, updatedAt: now }, churchName: church.name }
     const associatedCategories = { ...preview.associatedCategories }
     if (category === 'tither') associatedCategories.tither += 1; else if (category === 'non_systematic_tither') associatedCategories.nonSystematicTither += 1; else associatedCategories.nonTither += 1
     return { ...preview, changes: [...preview.changes, change], issues: preview.issues.filter(({ id }) => id !== issueId), associatedCategories, resolvedIssues: [...(preview.resolvedIssues ?? []), { issue: currentIssue, personId, automatic }] }
