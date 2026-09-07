@@ -102,7 +102,12 @@ export class ImportService {
   }
 
   async previewFidelity(accountId: string, masterKey: CryptoKey, fileHash: string, rows: ParsedFidelityRow[], people: PersonEntity[], churches: ChurchEntity[], referenceYear: number): Promise<FidelityImportPreview> {
-    const alreadyImported = (await this.listBatches(accountId, masterKey, 'fidelity')).some((batch) => batch.fileHash === fileHash && batch.status === 'applied' && (batch.modelVersion ?? 1) >= 3)
+    // O mesmo arquivo enviado para outro ano é outra importação. Comparar só o
+    // arquivo trancava o pastor: as leituras aplicadas antes de existir a
+    // pergunta do ano contavam pela data da importação, e não havia como
+    // reenviá-las dizendo de que ano eram.
+    const alreadyImported = (await this.listBatches(accountId, masterKey, 'fidelity')).some((batch) =>
+      batch.fileHash === fileHash && batch.referenceYear === referenceYear && batch.status === 'applied' && (batch.modelVersion ?? 1) >= 3)
     const churchMap = churchByName(churches); const issues: ImportIssue[] = []; const churchCounts: Record<string, number> = {}; const changes: PlannedPersonChange[] = []; const seen = new Set<string>(); let unchanged = 0
     const categories = { tither: 0, nonSystematicTither: 0, nonTither: 0 }; const associatedCategories = { tither: 0, nonSystematicTither: 0, nonTither: 0 }; const now = new Date().toISOString()
     for (const row of rows) {
@@ -174,7 +179,7 @@ export class ImportService {
     const changes = preview.kind === 'members' ? [...preview.newPeople, ...preview.updatedPeople, ...preview.missingPeople] : preview.changes
     const prepared = changes.map((change) => ({ ...change, nextData: { ...change.nextData, updatedAt: appliedAt, ...(preview.kind === 'fidelity' && change.nextData.fidelity ? { fidelity: { ...change.nextData.fidelity, updatedAt: appliedAt, importBatchId: batchId } } : {}) } }))
     const summary = { parsedRows: preview.parsedRows, created: prepared.filter(({ previousData }) => !previousData).length, updated: preview.kind === 'members' ? preview.updatedPeople.length : preview.changes.length, missing: preview.kind === 'members' ? preview.missingPeople.length : 0, unchanged: preview.unchanged, issues: preview.issues.length }
-    const batchData: ImportBatchData = { kind: preview.kind, modelVersion: preview.kind === 'fidelity' ? 3 : 1, fileHash: preview.fileHash, source: preview.kind === 'members' ? 'PDF local de membros' : 'PDF local de fidelidade', status: 'applied', createdAt: appliedAt, appliedAt, summary, churchCounts: preview.churchCounts, issues: preview.issues, undo: { createdPersonIds: prepared.filter(({ previousData }) => !previousData).map(({ personId }) => personId), previousPeople: prepared.filter(({ previousData }) => previousData).map(({ personId, previousData }) => ({ id: personId, data: previousData! })) } }
+    const batchData: ImportBatchData = { kind: preview.kind, modelVersion: preview.kind === 'fidelity' ? 3 : 1, fileHash: preview.fileHash, ...(preview.kind === 'fidelity' ? { referenceYear: preview.referenceYear } : {}), source: preview.kind === 'members' ? 'PDF local de membros' : `PDF local de fidelidade ${preview.referenceYear}`, status: 'applied', createdAt: appliedAt, appliedAt, summary, churchCounts: preview.churchCounts, issues: preview.issues, undo: { createdPersonIds: prepared.filter(({ previousData }) => !previousData).map(({ personId }) => personId), previousPeople: prepared.filter(({ previousData }) => previousData).map(({ personId, previousData }) => ({ id: personId, data: previousData! })) } }
     const mutations: EncryptedMutation[] = await Promise.all(prepared.map(async ({ personId, nextData }) => ({ recordId: personId, recordType: 'person' as const, envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: 'person', data: nextData }, personId) })))
     mutations.push({ recordId: batchId, recordType: 'import_batch', envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: 'import_batch', data: batchData }, batchId) })
     await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)

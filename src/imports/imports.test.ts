@@ -112,6 +112,32 @@ describe('importadores locais e idempotentes', () => {
     expect(JSON.stringify(updated)).not.toContain('nome da mãe')
   })
 
+  it('o mesmo arquivo pode ser aplicado a outro ano', async () => {
+    // Sem isto o pastor ficava trancado: as leituras aplicadas antes de existir
+    // a pergunta do ano contavam pela data da importação, e reenviar o arquivo
+    // dizendo de que ano ele era voltava recusado como repetido.
+    const { masterKey, accountId, people, imports } = await fixture()
+    const person = await people.createPerson(accountId, masterKey, { ...emptyPersonInput(), name: 'Pessoa Dois Anos Fictícia', birthDate: '1985-03-20', currentChurchId: 'church-a' })
+    const rows = parseFidelityText('IGREJA: Igreja Aurora Fictícia\nPessoa Dois Anos Fictícia | 9')
+
+    const de2025 = await imports.previewFidelity(accountId, masterKey, 'hash-dois-anos', rows, [person], churches, 2025)
+    expect(de2025.alreadyImported).toBe(false)
+    await imports.applyPreview(accountId, masterKey, de2025)
+
+    const guardada = (await people.getPerson(accountId, masterKey, person.id))!
+    const repetido = await imports.previewFidelity(accountId, masterKey, 'hash-dois-anos', rows, [guardada], churches, 2025)
+    expect(repetido.alreadyImported).toBe(true)
+
+    const de2026 = await imports.previewFidelity(accountId, masterKey, 'hash-dois-anos', rows, [guardada], churches, 2026)
+    expect(de2026.alreadyImported).toBe(false)
+    expect(de2026.changes).toHaveLength(1)
+    await imports.applyPreview(accountId, masterKey, de2026)
+
+    const comDoisAnos = (await people.getPerson(accountId, masterKey, person.id))!
+    expect(comDoisAnos.fidelity?.referenceYear).toBe(2026)
+    expect(comDoisAnos.fidelityHistory.map(({ referenceYear }) => referenceYear)).toEqual([2025])
+  })
+
   it('preserva a faixa sem inventar quantidade exata', async () => {
     const { masterKey, accountId, people, imports } = await fixture()
     const person = await people.createPerson(accountId, masterKey, { ...emptyPersonInput(), name: 'Pessoa Faixa Fictícia', birthDate: '1988-04-12', currentChurchId: 'church-a' })

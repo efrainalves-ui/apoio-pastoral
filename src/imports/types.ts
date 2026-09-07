@@ -75,6 +75,14 @@ export interface ImportBatchData {
   kind: ImportKind
   modelVersion?: number
   fileHash: string
+  /**
+   * O ano do relatório de fidelidade aplicado neste lote.
+   *
+   * Ausente nos lotes antigos, aplicados antes de existir a pergunta do ano —
+   * e é isso que permite reenviar aqueles arquivos para dizer de que ano eles
+   * eram.
+   */
+  referenceYear?: number
   source: string
   status: 'applied' | 'undone'
   createdAt: string
