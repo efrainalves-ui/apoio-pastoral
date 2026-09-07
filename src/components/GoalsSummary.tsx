@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom'
 import { GOAL_AREAS, GOAL_AREA_SHORT, areaComparison } from '../goals/areas'
 import { formatGoalValue } from '../goals/format'
 import { useGoalSources } from '../goals/useGoalSources'
+import { useQuadroDeGrupos } from '../missionary/useQuadroDeGrupos'
 import { Card } from './ui/Card'
 
-/** Resumo compacto das quatro metas, com acesso à área completa. */
+/** Resumo compacto das metas do ano, com acesso à área completa. */
 export function GoalsSummary() {
   const { goals, sources, ready } = useGoalSources()
+  const { quadro } = useQuadroDeGrupos()
   const year = new Date().getFullYear()
   if (!ready) return null
 
@@ -26,6 +28,12 @@ export function GoalsSummary() {
             </Link>
           )
         })}
+        <Link to="/app/metas/uapg" className="goal-summary__item">
+          <span className="goal-summary__name">Escola Sabatina</span>
+          <span className="goal-summary__percent">{quadro.distrito.meta > 0 ? `${Math.min(100, Math.round((quadro.distrito.escolaSabatina / quadro.distrito.meta) * 100))}%` : '—'}</span>
+          <span className="goal-bar"><span style={{ width: `${quadro.distrito.meta > 0 ? Math.min(100, Math.round((quadro.distrito.escolaSabatina / quadro.distrito.meta) * 100)) : 0}%` }} /></span>
+          <small>{quadro.distrito.escolaSabatina} unidade(s) · {quadro.distrito.pequenosGrupos} PG · meta {quadro.distrito.meta}</small>
+        </Link>
       </div>
       <Link className="text-link" to="/app/metas">Abrir metas</Link>
     </Card>

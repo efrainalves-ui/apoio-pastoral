@@ -2,6 +2,7 @@ import { FileText, Flag, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/ui/Card'
 import { GOAL_AREAS, GOAL_AREA_LABELS, areaComparison } from '../goals/areas'
+import { useQuadroDeGrupos } from '../missionary/useQuadroDeGrupos'
 import { useGoalSources } from '../goals/useGoalSources'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { MissionaryService } from '../missionary/service'
@@ -15,6 +16,7 @@ const missionary = new MissionaryService()
 export function GoalsPage() {
   const { account, masterKey } = useAuthVault()
   const { goals, sources, ready } = useGoalSources()
+  const { quadro } = useQuadroDeGrupos()
   const year = new Date().getFullYear()
 
   async function relatorio() {
@@ -43,6 +45,24 @@ export function GoalsPage() {
         <div className="page-actions"><Button variant="secondary" icon={<FileText />} onClick={() => void relatorio()}>Relatório</Button><Flag /></div>
       </header>
       <div className="goal-cards">
+        {/*
+          A Escola Sabatina é meta como as outras e fica com elas — só a página
+          por trás é diferente, porque a meta dela se calcula em vez de se
+          combinar. Tirá-la daqui escondeu-a de quem abre "Metas" para ver
+          tudo.
+        */}
+        <Card title={GOAL_AREA_LABELS.uapg}>
+          <div className="goal-card">
+            <div className="goal-card__numbers">
+              <div><small>Meta</small><strong>{quadro.distrito.meta}</strong></div>
+              <div><small>Escola Sabatina</small><strong className={quadro.distrito.escolaSabatina >= quadro.distrito.meta ? 'quadro--alcancado' : 'quadro--falta'}>{quadro.distrito.escolaSabatina}</strong></div>
+              <div><small>Pequenos Grupos</small><strong className={quadro.distrito.pequenosGrupos >= quadro.distrito.meta ? 'quadro--alcancado' : 'quadro--falta'}>{quadro.distrito.pequenosGrupos}</strong></div>
+              <div><small>Integração</small><strong className={quadro.distrito.integracoes >= quadro.distrito.meta ? 'quadro--alcancado' : 'quadro--falta'}>{quadro.distrito.integracoes}</strong></div>
+            </div>
+            <p className="goal-card__percent">Um de cada para cada 12 membros · {quadro.distrito.membros} no distrito</p>
+            <Link className="button button--secondary" to="/app/metas/uapg">Acompanhar</Link>
+          </div>
+        </Card>
         {GOAL_AREAS.map((area) => {
           const progresso = areaComparison(area, goals, sources, year)
           return (
