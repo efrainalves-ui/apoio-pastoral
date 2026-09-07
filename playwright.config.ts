@@ -9,7 +9,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:4173',
     storageState: { cookies: [], origins: [] },
-    trace: 'retain-on-failure',
+    // Só na repetição: em CI todo teste que falha repete, então a evidência
+    // continua existindo — uma vez em vez de duas.
+    trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     serviceWorkers: 'allow',
   },

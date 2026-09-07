@@ -102,8 +102,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: playwright-evidencias
-          path: |
-            playwright-report
-            test-results
+          # Só o relatório: ele já embute os traces e as capturas, e
+          # `test-results` era a mesma evidência em cru. Enviar os dois dobrava
+          # cada falha e enchia a franquia de armazenamento da conta.
+          path: playwright-report
           if-no-files-found: ignore
-          retention-days: 7
+          compression-level: 9
+          retention-days: 3
