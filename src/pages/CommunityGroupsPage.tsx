@@ -9,9 +9,11 @@ import { Field } from '../components/ui/Field'
 import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
 import { MissionaryService } from '../missionary/service'
+import { MEMBROS_POR_GRUPO, quadroDeGrupos } from '../missionary/metasDeGrupos'
 import { AGE_GROUP_LABELS, type AgeGroup, type SabbathClassData, type SabbathClassEntity, type SmallGroupData, type SmallGroupEntity, type UapgData, type UapgEntity } from '../missionary/types'
 import { extractPdfText, validatePdfFile } from '../imports/pdf'
 import { parseClassesDaEscolaSabatina, ehRelatorioDeClasses } from '../imports/escolaSabatina'
+import { ehClasseInfantil } from '../imports/classesInfantis'
 import { normalizePersonName } from '../people/validation'
 import { PeopleService } from '../people/service'
 import type { PersonEntity } from '../people/types'
@@ -23,7 +25,7 @@ const peopleService = new PeopleService()
 type ClassDraft = Omit<SabbathClassData, 'createdAt' | 'updatedAt'>
 type GroupDraft = Omit<SmallGroupData, 'createdAt' | 'updatedAt'>
 type UapgDraft = Omit<UapgData, 'createdAt' | 'updatedAt'>
-interface UnidadeConferida { nome: string; encontrados: string[]; ausentes: string[] }
+interface UnidadeConferida { nome: string; encontrados: string[]; visitantes: string[]; criarInteressados: boolean }
 interface PreviaDeClasses { igrejaDoArquivo: string; unidades: UnidadeConferida[] }
 
 type Editor = { type: 'class'; id: string; draft: ClassDraft } | { type: 'group'; id: string; draft: GroupDraft } | { type: 'uapg'; id: string; draft: UapgDraft }
@@ -114,12 +116,14 @@ export function CommunityGroupsPage({ embutida = false }: { embutida?: boolean }
       setImportPrevia({
         igrejaDoArquivo: lido.igreja,
         unidades: lido.unidades.map((unidade) => {
-          const encontrados: string[] = []; const ausentes: string[] = []
+          const encontrados: string[] = []; const visitantes: string[] = []
           for (const nome of unidade.membros) {
             const pessoa = daIgreja.find((candidato) => normalizePersonName(candidato.name) === normalizePersonName(nome))
-            if (pessoa) encontrados.push(pessoa.id); else ausentes.push(nome)
+            if (pessoa) encontrados.push(pessoa.id); else visitantes.push(nome)
           }
-          return { nome: unidade.nome, encontrados, ausentes }
+          // Quem não é membro fica na unidade e vira interessado — menos nas
+          // classes de crianças, onde a decisão não é dela.
+          return { nome: unidade.nome, encontrados, visitantes, criarInteressados: !ehClasseInfantil(unidade.nome) }
         }),
       })
     } catch (reason) {
@@ -131,9 +135,20 @@ export function CommunityGroupsPage({ embutida = false }: { embutida?: boolean }
     if (!account || !masterKey || !importPrevia) return
     setImportBusy(true); clearMessage()
     try {
-      const resultado = await service.importarClasses(account.id, masterKey, importIgreja, importPrevia.unidades.map(({ nome, encontrados }) => ({ nome, participantIds: encontrados })))
+      const resultado = await service.importarClasses(account.id, masterKey, importIgreja, importPrevia.unidades.map(({ nome, encontrados, visitantes }) => ({ nome, participantIds: encontrados, visitors: visitantes })))
+      const jaInteressados = (await service.listInterests(account.id, masterKey)).filter(({ churchId }) => churchId === importIgreja)
+      let novos = 0
+      for (const unidade of importPrevia.unidades) {
+        if (!unidade.criarInteressados) continue
+        for (const nome of unidade.visitantes) {
+          if (jaInteressados.some((item) => normalizePersonName(item.name) === normalizePersonName(nome))) continue
+          await service.saveInterest(account.id, masterKey, { churchId: importIgreja, name: nome, contact: '', notes: `Participa da unidade ${unidade.nome} da Escola Sabatina.`, status: 'waiting_study' })
+          jaInteressados.push({ id: '', churchId: importIgreja, name: nome, contact: '', notes: '', status: 'waiting_study', createdAt: '', updatedAt: '' })
+          novos += 1
+        }
+      }
       setImportPrevia(null)
-      setNotice(`${resultado.criadas} unidade(s) criada(s) e ${resultado.atualizadas} atualizada(s).`)
+      setNotice(`${resultado.criadas} unidade(s) criada(s), ${resultado.atualizadas} atualizada(s) e ${novos} interessado(s) cadastrado(s).`)
       await load()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível aplicar o relatório.')
@@ -164,15 +179,29 @@ export function CommunityGroupsPage({ embutida = false }: { embutida?: boolean }
     return <div className="entity-row missionary-record" key={id}><span className="avatar" aria-hidden="true">{icon}</span><span><strong>{title}</strong><small>{detail}</small></span><Button variant="secondary" icon={<Edit3 />} onClick={edit}>Editar</Button><Button variant="danger" icon={<Trash2 />} onClick={() => void remove(id, title)}>Remover</Button></div>
   }
 
+  const quadro = quadroDeGrupos(churches, people, classes, groups, uapgs)
+  const celula = (alcancado: number, meta: number) => <td className={alcancado >= meta ? 'quadro--alcancado' : 'quadro--falta'}>{alcancado}<small>/{meta}</small></td>
+
   const editorTitle = editor?.type === 'class' ? 'Editar classe da Escola Sabatina' : editor?.type === 'group' ? 'Editar Pequeno Grupo' : 'Editar integração Unidade de Ação e PG'
 
-  return <div className="page-stack">{!embutida && <><Link className="text-link back-link" to="/app/metas"><ArrowLeft />Voltar às metas</Link><header className="page-hero"><div><p className="eyebrow">Missão e discipulado</p><h1>Escola Sabatina e Pequenos Grupos</h1></div><UsersRound /></header></>}{error && <div className="alert alert--error" role="alert">{error}</div>}{notice && <div className="alert alert--success" role="status">{notice}</div>}<Card title="Importar classes do ACMS" eyebrow="Relatório de Classes ES, uma igreja por vez">
+  return <div className="page-stack">{!embutida && <><Link className="text-link back-link" to="/app/metas"><ArrowLeft />Voltar às metas</Link><header className="page-hero"><div><p className="eyebrow">Missão e discipulado</p><h1>Escola Sabatina e Pequenos Grupos</h1></div><UsersRound /></header></>}{error && <div className="alert alert--error" role="alert">{error}</div>}{notice && <div className="alert alert--success" role="status">{notice}</div>}<Card title="Metas por igreja" eyebrow={`Um grupo para cada ${MEMBROS_POR_GRUPO} membros`}>
+    <div className="tabela-rolavel"><table className="quadro-grupos">
+      <thead><tr><th scope="col">Igreja</th><th scope="col">Membros</th><th scope="col">Meta</th><th scope="col">Escola Sabatina</th><th scope="col">Pequenos Grupos</th><th scope="col">Integração</th></tr></thead>
+      <tbody>{quadro.igrejas.map((linha) => <tr key={linha.churchId}>
+        <th scope="row">{linha.nome}</th><td>{linha.membros}</td><td>{linha.meta}</td>
+        {celula(linha.escolaSabatina, linha.meta)}{celula(linha.pequenosGrupos, linha.meta)}{celula(linha.integracoes, linha.meta)}
+      </tr>)}</tbody>
+      <tfoot><tr><th scope="row">Distrito</th><td>{quadro.distrito.membros}</td><td>{quadro.distrito.meta}</td>
+        {celula(quadro.distrito.escolaSabatina, quadro.distrito.meta)}{celula(quadro.distrito.pequenosGrupos, quadro.distrito.meta)}{celula(quadro.distrito.integracoes, quadro.distrito.meta)}
+      </tr></tfoot>
+    </table></div>
+  </Card><Card title="Importar classes do ACMS" eyebrow="Relatório de Classes ES, uma igreja por vez">
     <div className="form-grid">{churchField(importIgreja, (churchId) => { setImportIgreja(churchId); setImportPrevia(null) })}</div>
     <label className="file-picker"><FileUp /><span><strong>{importBusy ? 'Lendo o relatório…' : 'Escolher PDF'}</strong></span><input type="file" accept="application/pdf,.pdf" disabled={importBusy || !importIgreja} onChange={(event) => { void lerRelatorioDeClasses(event.target.files?.[0]); event.currentTarget.value = '' }} /></label>
     {importPrevia && <>
-      <div className="import-metrics"><div><small>Igreja no arquivo</small><strong>{importPrevia.igrejaDoArquivo || '—'}</strong></div><div><small>Unidades</small><strong>{importPrevia.unidades.length}</strong></div><div><small>Membros associados</small><strong>{importPrevia.unidades.reduce((total, unidade) => total + unidade.encontrados.length, 0)}</strong></div><div><small>Não encontrados</small><strong>{importPrevia.unidades.reduce((total, unidade) => total + unidade.ausentes.length, 0)}</strong></div></div>
-      <div className="entity-list">{importPrevia.unidades.map((unidade) => <div className="entity-row" key={unidade.nome}><span><strong>{unidade.nome}</strong><small>{unidade.encontrados.length} associado(s){unidade.ausentes.length ? ` · não encontrados: ${unidade.ausentes.join(', ')}` : ''}</small></span></div>)}</div>
+      <div className="import-metrics"><div><small>Igreja no arquivo</small><strong>{importPrevia.igrejaDoArquivo || '—'}</strong></div><div><small>Unidades</small><strong>{importPrevia.unidades.length}</strong></div><div><small>Membros associados</small><strong>{importPrevia.unidades.reduce((total, unidade) => total + unidade.encontrados.length, 0)}</strong></div><div><small>Não são membros</small><strong>{importPrevia.unidades.reduce((total, unidade) => total + unidade.visitantes.length, 0)}</strong></div></div>
+      <div className="entity-list">{importPrevia.unidades.map((unidade) => <div className="entity-row" key={unidade.nome}><span><strong>{unidade.nome}</strong><small>{unidade.encontrados.length} membro(s){unidade.visitantes.length ? ` · ${unidade.visitantes.map((nome) => `*${nome}`).join(', ')}` : ''}</small></span>{unidade.visitantes.length > 0 && <label className="confirmation-check"><input type="checkbox" checked={unidade.criarInteressados} onChange={(event) => setImportPrevia((atual) => atual && ({ ...atual, unidades: atual.unidades.map((item) => item.nome === unidade.nome ? { ...item, criarInteressados: event.target.checked } : item) }))} /><span>Cadastrar como interessados</span></label>}</div>)}</div>
       <Button disabled={importBusy} icon={<CheckCircle2 />} onClick={() => void aplicarRelatorioDeClasses()}>Aplicar às classes desta igreja</Button>
     </>}
-  </Card><div className="missionary-create-grid"><Card title="Escola Sabatina" eyebrow="Nova classe"><form onSubmit={(event) => void createClass(event)}>{classFields(classDraft, setClassDraft)}<Button type="submit" disabled={!classDraft.churchId || !classDraft.teacherId} icon={<Plus />}>Cadastrar classe</Button></form></Card><Card title="Pequeno Grupo" eyebrow="Novo PG"><form onSubmit={(event) => void createGroup(event)}>{groupFields(groupDraft, setGroupDraft)}<Button type="submit" disabled={!groupDraft.churchId || !groupDraft.name.trim() || !groupDraft.leaderId} icon={<Plus />}>Cadastrar PG</Button></form></Card></div><Card title="Integração Unidade de Ação e PG" eyebrow="Novo registro"><form onSubmit={(event) => void createUapg(event)}>{uapgFields(uapgDraft, setUapgDraft)}<Button type="submit" disabled={!uapgDraft.churchId || !uapgDraft.name.trim()} icon={<Plus />}>Cadastrar integração</Button></form></Card><Card title="Registros missionários" eyebrow={`${classes.length + groups.length + uapgs.length} registro(s)`}>{classes.length + groups.length + uapgs.length === 0 ? <div className="empty-state compact-empty"><UsersRound /><strong>Nenhum registro cadastrado</strong><span>Cadastre uma classe, um PG ou uma integração.</span></div> : <div className="missionary-record-groups"><section><h3>Escola Sabatina</h3><div className="entity-list">{classes.length ? classes.map((item) => row('ES', item.name?.trim() || `Classe ${AGE_GROUP_LABELS[item.ageGroup]}`, `${churchName(item.churchId)} · Professor: ${item.teacherId ? personName(item.teacherId) : 'A definir'} · ${item.participantIds.length} participante(s)`, item.id, () => setEditor({ type: 'class', id: item.id, draft: { name: item.name ?? '', churchId: item.churchId, teacherId: item.teacherId, assistantId: item.assistantId, ageGroup: item.ageGroup, participantIds: [...item.participantIds] } }))) : <p className="muted">Nenhuma classe cadastrada.</p>}</div></section><section><h3>Pequenos Grupos</h3><div className="entity-list">{groups.length ? groups.map((item) => row('PG', item.name, `${churchName(item.churchId)} · Líder: ${personName(item.leaderId)} · ${item.day || 'Dia não informado'}${item.time ? ` às ${item.time}` : ''}`, item.id, () => setEditor({ type: 'group', id: item.id, draft: { name: item.name, churchId: item.churchId, leaderId: item.leaderId, associateId: item.associateId, host: item.host, address: item.address, day: item.day, time: item.time, participantIds: [...item.participantIds], active: item.active } }))) : <p className="muted">Nenhum PG cadastrado.</p>}</div></section><section><h3>Integração Unidade de Ação e PG</h3><div className="entity-list">{uapgs.length ? uapgs.map((item) => row('UA', item.name, `${churchName(item.churchId)} · ${linkedGroupName(item.smallGroupId)}`, item.id, () => setEditor({ type: 'uapg', id: item.id, draft: { name: item.name, churchId: item.churchId, smallGroupId: item.smallGroupId, notes: item.notes, active: item.active } }))) : <p className="muted">Nenhuma integração cadastrada.</p>}</div></section></div>}</Card>{editor && <Card title={editorTitle} eyebrow="Dados atuais preenchidos"><form className="missionary-edit-form" onSubmit={(event) => void saveEdit(event)}>{editor.type === 'class' && classFields(editor.draft, (draft) => setEditor({ ...editor, draft }))}{editor.type === 'group' && groupFields(editor.draft, (draft) => setEditor({ ...editor, draft }))}{editor.type === 'uapg' && uapgFields(editor.draft, (draft) => setEditor({ ...editor, draft }))}<div className="form-actions"><Button type="submit" icon={<Save />}>Salvar alterações</Button><Button type="button" variant="secondary" icon={<X />} onClick={() => setEditor(null)}>Cancelar</Button></div></form></Card>}</div>
+  </Card><div className="missionary-create-grid"><Card title="Escola Sabatina" eyebrow="Nova classe"><form onSubmit={(event) => void createClass(event)}>{classFields(classDraft, setClassDraft)}<Button type="submit" disabled={!classDraft.churchId || !classDraft.teacherId} icon={<Plus />}>Cadastrar classe</Button></form></Card><Card title="Pequeno Grupo" eyebrow="Novo PG"><form onSubmit={(event) => void createGroup(event)}>{groupFields(groupDraft, setGroupDraft)}<Button type="submit" disabled={!groupDraft.churchId || !groupDraft.name.trim() || !groupDraft.leaderId} icon={<Plus />}>Cadastrar PG</Button></form></Card></div><Card title="Integração Unidade de Ação e PG" eyebrow="Novo registro"><form onSubmit={(event) => void createUapg(event)}>{uapgFields(uapgDraft, setUapgDraft)}<Button type="submit" disabled={!uapgDraft.churchId || !uapgDraft.name.trim()} icon={<Plus />}>Cadastrar integração</Button></form></Card><Card title="Registros missionários" eyebrow={`${classes.length + groups.length + uapgs.length} registro(s)`}>{classes.length + groups.length + uapgs.length === 0 ? <div className="empty-state compact-empty"><UsersRound /><strong>Nenhum registro cadastrado</strong><span>Cadastre uma classe, um PG ou uma integração.</span></div> : <div className="missionary-record-groups"><section><h3>Escola Sabatina</h3><div className="entity-list">{classes.length ? classes.map((item) => row('ES', item.name?.trim() || `Classe ${AGE_GROUP_LABELS[item.ageGroup]}`, `${churchName(item.churchId)} · Professor: ${item.teacherId ? personName(item.teacherId) : 'A definir'} · ${item.participantIds.length} membro(s)${item.visitors?.length ? ` · ${item.visitors.map((nome) => `*${nome}`).join(', ')}` : ''}`, item.id, () => setEditor({ type: 'class', id: item.id, draft: { name: item.name ?? '', churchId: item.churchId, teacherId: item.teacherId, assistantId: item.assistantId, ageGroup: item.ageGroup, participantIds: [...item.participantIds] } }))) : <p className="muted">Nenhuma classe cadastrada.</p>}</div></section><section><h3>Pequenos Grupos</h3><div className="entity-list">{groups.length ? groups.map((item) => row('PG', item.name, `${churchName(item.churchId)} · Líder: ${personName(item.leaderId)} · ${item.day || 'Dia não informado'}${item.time ? ` às ${item.time}` : ''}`, item.id, () => setEditor({ type: 'group', id: item.id, draft: { name: item.name, churchId: item.churchId, leaderId: item.leaderId, associateId: item.associateId, host: item.host, address: item.address, day: item.day, time: item.time, participantIds: [...item.participantIds], active: item.active } }))) : <p className="muted">Nenhum PG cadastrado.</p>}</div></section><section><h3>Integração Unidade de Ação e PG</h3><div className="entity-list">{uapgs.length ? uapgs.map((item) => row('UA', item.name, `${churchName(item.churchId)} · ${linkedGroupName(item.smallGroupId)}`, item.id, () => setEditor({ type: 'uapg', id: item.id, draft: { name: item.name, churchId: item.churchId, smallGroupId: item.smallGroupId, notes: item.notes, active: item.active } }))) : <p className="muted">Nenhuma integração cadastrada.</p>}</div></section></div>}</Card>{editor && <Card title={editorTitle} eyebrow="Dados atuais preenchidos"><form className="missionary-edit-form" onSubmit={(event) => void saveEdit(event)}>{editor.type === 'class' && classFields(editor.draft, (draft) => setEditor({ ...editor, draft }))}{editor.type === 'group' && groupFields(editor.draft, (draft) => setEditor({ ...editor, draft }))}{editor.type === 'uapg' && uapgFields(editor.draft, (draft) => setEditor({ ...editor, draft }))}<div className="form-actions"><Button type="submit" icon={<Save />}>Salvar alterações</Button><Button type="button" variant="secondary" icon={<X />} onClick={() => setEditor(null)}>Cancelar</Button></div></form></Card>}</div>
 }

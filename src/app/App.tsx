@@ -24,6 +24,7 @@ import { FamilyFormPage } from '../pages/FamilyFormPage'
 import { HomePage } from '../pages/HomePage'
 import { MorePage } from '../pages/MorePage'
 import { PrivacyPage } from '../pages/PrivacyPage'
+import { CommunityGroupsPage } from '../pages/CommunityGroupsPage'
 import { CloseDistrictPage } from '../pages/CloseDistrictPage'
 import { PeoplePage } from '../pages/PeoplePage'
 import { PersonDetailPage } from '../pages/PersonDetailPage'
@@ -255,6 +256,7 @@ export function App() {
         <Route path="metas/missao/estudos" element={<Navigate to="/app/metas/bible_studies" replace />} />
         <Route path="metas/missao/duplas" element={<MissionaryPairsPage />} />
         <Route path="metas/missao/grupos" element={<Navigate to="/app/metas/uapg" replace />} />
+        <Route path="metas/uapg" element={<CommunityGroupsPage />} />
         <Route path="missionario" element={<Navigate to="/app/metas/missao/estudos" replace />} />
         <Route path="missionario/duplas" element={<Navigate to="/app/metas/missao/duplas" replace />} />
         <Route path="missionario/grupos" element={<Navigate to="/app/metas/missao/grupos" replace />} />

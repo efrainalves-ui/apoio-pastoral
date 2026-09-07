@@ -10,7 +10,15 @@ import type { GoalTargetKind, GoalEntity, GoalEntryEntity, GoalHistoryEntity, Go
  */
 export type GoalArea = 'tithes' | 'offerings' | 'baptisms' | 'bible_studies' | 'uapg'
 
-export const GOAL_AREAS: GoalArea[] = ['tithes', 'offerings', 'baptisms', 'bible_studies', 'uapg']
+/**
+ * As áreas que ganham cartão e página de meta genérica.
+ *
+ * A Escola Sabatina fica de fora de propósito: a meta dela não se combina, ela
+ * se calcula — um grupo para cada doze membros —, e a página é um quadro por
+ * igreja, não um gráfico mês a mês. `uapg` continua sendo área para o que já
+ * dependia disso; o que muda é onde ela aparece.
+ */
+export const GOAL_AREAS: GoalArea[] = ['tithes', 'offerings', 'baptisms', 'bible_studies']
 
 export const GOAL_AREA_LABELS: Record<GoalArea, string> = {
   tithes: 'Dízimos',

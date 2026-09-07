@@ -239,8 +239,6 @@ button.entity-row { width: 100%; background: none; border-top: 0; border-inline:
 */
 .fidelidade--nao strong { color: #b3261e; }
 .fidelidade--parcial strong { color: #8a6300; }
-:root:not([data-tema='claro']) .fidelidade--nao strong, :root[data-tema='escuro'] .fidelidade--nao strong { color: #f19289; }
-:root:not([data-tema='claro']) .fidelidade--parcial strong, :root[data-tema='escuro'] .fidelidade--parcial strong { color: #e8c477; }
 /* Fidelidade ano a ano: uma coluna por ano, empilhada pelas três classificações. */
 .fidelidade-anos { display: flex; gap: 18px; align-items: flex-end; margin: 0; padding: 0; list-style: none; }
 .fidelidade-anos li { display: grid; gap: 6px; justify-items: center; }
@@ -1284,6 +1282,10 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   diferença entre seguir o sistema e ficar preso ao tema do momento da escolha.
 */
 @media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) .fidelidade--nao strong { color: #f19289; }
+  :root:not([data-tema='claro']) .fidelidade--parcial strong { color: #e8c477; }
+  :root:not([data-tema='claro']) .quadro--alcancado { color: #7fd1b0; }
+  :root:not([data-tema='claro']) .quadro--falta { color: #f19289; }
   :root:not([data-tema='claro']) { color: #e4ece8; background: #0e1714; --cream: #0e1714; --paper: #16211d; --ink: #e4ece8; --muted: #a6b4ae; --line: #2d3a35; --green-50: #213a31; }
   :root:not([data-tema='claro']) .field__input { color: var(--ink); background: #111b17; border-color: #415049; }
   :root:not([data-tema='claro']) .search-input { background: #111b17; border-color: #415049; }
@@ -1447,3 +1449,24 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   .acms-bar { grid-template-columns: minmax(0, 1fr) auto; }
   .acms-bar__track { grid-column: 1 / -1; }
 }
+
+.tabela-rolavel { overflow-x: auto; }
+.quadro-grupos { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.quadro-grupos th, .quadro-grupos td { padding: 8px 10px; text-align: right; white-space: nowrap; }
+.quadro-grupos thead th { font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+.quadro-grupos th[scope='row'] { text-align: left; font-weight: 600; }
+.quadro-grupos tbody tr + tr th, .quadro-grupos tbody tr + tr td { border-top: 1px solid var(--border); }
+.quadro-grupos tfoot th, .quadro-grupos tfoot td { border-top: 2px solid var(--border); font-weight: 700; }
+.quadro-grupos td small { color: var(--muted); font-weight: 400; }
+.quadro--alcancado { color: var(--green-700); font-weight: 700; }
+.quadro--falta { color: #b3261e; font-weight: 700; }
+
+/*
+  A escolha à mão vence a do sistema, nas duas direções. Estas regras estavam
+  fora do bloco do tema escuro, e por isso pintavam de rosa-claro um texto que,
+  no tema claro, fica sobre fundo branco.
+*/
+:root[data-tema='escuro'] .fidelidade--nao strong { color: #f19289; }
+:root[data-tema='escuro'] .fidelidade--parcial strong { color: #e8c477; }
+:root[data-tema='escuro'] .quadro--alcancado { color: #7fd1b0; }
+:root[data-tema='escuro'] .quadro--falta { color: #f19289; }

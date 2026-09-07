@@ -33,7 +33,7 @@ export class MissionaryService {
    * Casa pelo nome dentro da igreja: reenviar o relatório atualiza a unidade em
    * vez de criar outra igual ao lado.
    */
-  async importarClasses(accountId: string, key: CryptoKey, churchId: string, unidades: ReadonlyArray<{ nome: string; participantIds: string[] }>) {
+  async importarClasses(accountId: string, key: CryptoKey, churchId: string, unidades: ReadonlyArray<{ nome: string; participantIds: string[]; visitors: string[] }>) {
     if (!churchId) throw new Error('Escolha a igreja deste relatório.')
     const existentes = (await this.listClasses(accountId, key)).filter((item) => item.churchId === churchId)
     const chave = (valor: string) => valor.normalize('NFD').replace(/[\u0300-\u036f]/gu, '').toLocaleLowerCase('pt-BR').replace(/\s+/gu, ' ').trim()
@@ -42,11 +42,11 @@ export class MissionaryService {
       const atual = existentes.find((item) => chave(item.name ?? '') === chave(unidade.nome))
       const now = new Date().toISOString()
       if (atual) {
-        const stored: SabbathClassData = { ...atual, name: unidade.nome, participantIds: unidade.participantIds, createdAt: atual.createdAt, updatedAt: now }
+        const stored: SabbathClassData = { ...atual, name: unidade.nome, participantIds: unidade.participantIds, visitors: unidade.visitors, createdAt: atual.createdAt, updatedAt: now }
         await this.replace(accountId, key, atual.id, 'sabbath_class', stored)
         atualizadas += 1
       } else {
-        await this.save(accountId, key, 'sabbath_class', { name: unidade.nome, churchId, teacherId: '', assistantId: null, ageGroup: 'other', participantIds: unidade.participantIds, createdAt: now, updatedAt: now })
+        await this.save(accountId, key, 'sabbath_class', { name: unidade.nome, churchId, teacherId: '', assistantId: null, ageGroup: 'other', participantIds: unidade.participantIds, visitors: unidade.visitors, createdAt: now, updatedAt: now })
         criadas += 1
       }
     }

@@ -15,6 +15,14 @@ export interface SabbathClassData {
    * vale a faixa etária, que era tudo o que existia.
    */
   name?: string
+  /**
+   * Quem participa da unidade sem estar no cadastro da igreja.
+   *
+   * A Escola Sabatina recebe quem não é membro, e o relatório do ACMS os traz.
+   * Descartá-los faria a unidade parecer menor do que é e apagaria justamente
+   * quem o distrito quer acompanhar. Ficam pelo nome, marcados com asterisco.
+   */
+  visitors?: string[]
   churchId: string; teacherId: string; assistantId: string | null; ageGroup: AgeGroup; participantIds: string[]; createdAt: string; updatedAt: string }
 export interface SabbathClassEntity extends SabbathClassData { id: string }
 export interface SmallGroupData { name: string; churchId: string; leaderId: string; associateId: string | null; host: string; address: string; day: string; time: string; participantIds: string[]; active: boolean; createdAt: string; updatedAt: string }

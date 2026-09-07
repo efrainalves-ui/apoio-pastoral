@@ -11,6 +11,9 @@ import { Card } from '../components/ui/Card'
 import { DistrictService } from '../district/service'
 import { FamilyService } from '../families/service'
 import type { FamilyEntity } from '../families/types'
+import { MissionaryService } from '../missionary/service'
+import { metaDeGrupos } from '../missionary/metasDeGrupos'
+import type { SabbathClassEntity, SmallGroupEntity, UapgEntity } from '../missionary/types'
 import { calculateAge } from '../people/dates'
 import { PeopleService } from '../people/service'
 import { PASTORAL_STATUS_LABELS, type PersonEntity } from '../people/types'
@@ -27,6 +30,7 @@ const service = new DistrictService()
 const agenda = new AgendaService()
 const peopleService = new PeopleService()
 const familyService = new FamilyService()
+const missionary = new MissionaryService()
 const careService = new CareService()
 
 const TABS = [
@@ -55,6 +59,9 @@ export function ChurchDetailPage() {
   const [districtName, setDistrictName] = useState('')
   const [members, setMembers] = useState<PersonEntity[]>([])
   const [families, setFamilies] = useState<FamilyEntity[]>([])
+  const [classes, setClasses] = useState<SabbathClassEntity[]>([])
+  const [smallGroups, setSmallGroups] = useState<SmallGroupEntity[]>([])
+  const [integracoes, setIntegracoes] = useState<UapgEntity[]>([])
   const [events, setEvents] = useState<AgendaEventEntity[]>([])
   const [visitCount, setVisitCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -80,6 +87,12 @@ export function ChurchDetailPage() {
       setDistrictName(district?.name ?? 'Distrito')
       setMembers(people.filter((person) => person.currentChurchId === churchId && person.importStatus !== 'archived').sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')))
       setFamilies(nextFamilies.filter(({ primaryChurchId }) => primaryChurchId === churchId))
+      const [nextClasses, nextGroups, nextIntegracoes] = await Promise.all([
+        missionary.listClasses(account.id, masterKey), missionary.listSmallGroups(account.id, masterKey), missionary.listUapgs(account.id, masterKey),
+      ])
+      setClasses(nextClasses.filter((item) => item.churchId === churchId))
+      setSmallGroups(nextGroups.filter((item) => item.churchId === churchId && item.active))
+      setIntegracoes(nextIntegracoes.filter((item) => item.churchId === churchId && item.active))
       setEvents(nextEvents.filter((event) => event.churchId === churchId).sort((a, b) => b.startAt.localeCompare(a.startAt)))
       setVisitCount(visits.filter((visit) => visit.churchId === churchId).length)
     } catch (loadError) {
@@ -204,6 +217,21 @@ export function ChurchDetailPage() {
             </Link>)}</div>}
         </Card>
       </>}
+
+      {tab === 'visao' && (() => {
+        // O mesmo quadro que a página de Escola Sabatina mostra do distrito
+        // inteiro, recortado nesta igreja: aqui é onde o pastor está quando
+        // pergunta se esta igreja já tem os grupos que devia ter.
+        const meta = metaDeGrupos(members.length)
+        const linha = (rotulo: string, alcancado: number) => <div key={rotulo}><small>{rotulo}</small><strong className={alcancado >= meta ? 'quadro--alcancado' : 'quadro--falta'}>{alcancado}<small>/{meta}</small></strong></div>
+        return <Card title="Escola Sabatina e Pequenos Grupos" eyebrow={`Meta de ${meta} para ${members.length} membro(s)`} action={<Link className="text-link" to="/app/metas/uapg">Abrir</Link>}>
+          <div className="private-summary">
+            {linha('Unidades da Escola Sabatina', classes.length)}
+            {linha('Pequenos Grupos', smallGroups.length)}
+            {linha('Integração', integracoes.length)}
+          </div>
+        </Card>
+      })()}
 
       {tab === 'indicadores' && <section className="district-metrics" aria-label="Indicadores da igreja">
         <div><small>Membros</small><strong>{members.length}</strong></div>

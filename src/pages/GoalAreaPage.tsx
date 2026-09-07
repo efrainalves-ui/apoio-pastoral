@@ -17,7 +17,6 @@ import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
 import { AREA_PDF_DOCUMENT, ehFinanceira, ANOS_DE_HISTORICO, PERCENT_TARGET_AREAS, anosComResultado, comparacaoMensal, resumoPorAno, resumoPorIgrejaEAno } from '../goals/areas'
 import { previaDeBatismos, previaFinanceira, type PreviaDeRelatorio } from '../goals/importacaoAcms'
 import { comparativoDeDoadores } from '../goals/doadores'
-import { CommunityGroupsPage } from './CommunityGroupsPage'
 import { MissionaryPage } from './MissionaryPage'
 import { PeopleService } from '../people/service'
 import type { PersonEntity } from '../people/types'
@@ -503,7 +502,6 @@ export function GoalAreaPage() {
         meta conta — depois voltar para ver se o número mexeu.
       */}
       {area === 'bible_studies' && <MissionaryPage embutida />}
-      {area === 'uapg' && <CommunityGroupsPage embutida />}
     </div>
   )
 }
