@@ -17,6 +17,8 @@ import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
 import { AREA_PDF_DOCUMENT, ehFinanceira, ANOS_DE_HISTORICO, PERCENT_TARGET_AREAS, anosComResultado, comparacaoMensal, resumoPorAno, resumoPorIgrejaEAno } from '../goals/areas'
 import { previaDeBatismos, previaFinanceira, type PreviaDeRelatorio } from '../goals/importacaoAcms'
 import { comparativoDeDoadores } from '../goals/doadores'
+import { CommunityGroupsPage } from './CommunityGroupsPage'
+import { MissionaryPage } from './MissionaryPage'
 import { PeopleService } from '../people/service'
 import type { PersonEntity } from '../people/types'
 import { useReloadOnSync } from '../sync/useReloadOnSync'
@@ -495,14 +497,13 @@ export function GoalAreaPage() {
         </Card>
       )}
 
-      {!AREA_USES_PDF[area] && (
-        <Card title="De onde vêm os números">
-          <p className="card-copy">{area === 'bible_studies'
-            ? 'Os estudos bíblicos já cadastrados no aplicativo contam automaticamente. Não é preciso lançar de novo.'
-            : 'As UAPG já cadastradas contam automaticamente. Não é preciso lançar de novo.'}</p>
-          <Link className="text-link" to={area === 'bible_studies' ? '/app/missionario' : '/app/missionario/grupos'}>Abrir os cadastros</Link>
-        </Card>
-      )}
+      {/*
+        O cadastro fica na mesma página da meta que ele alimenta. Estavam em
+        telas separadas, e o pastor tinha de sair da meta para lançar o que a
+        meta conta — depois voltar para ver se o número mexeu.
+      */}
+      {area === 'bible_studies' && <MissionaryPage embutida />}
+      {area === 'uapg' && <CommunityGroupsPage embutida />}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { BookHeart, FileText, Flag, UsersRound } from 'lucide-react'
+import { FileText, Flag, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/ui/Card'
 import { GOAL_AREAS, GOAL_AREA_LABELS, areaComparison } from '../goals/areas'
@@ -66,9 +66,7 @@ export function GoalsPage() {
 
       <Card title="Missão e discipulado">
         <div className="entity-list">
-          <Link className="entity-row entity-row--link" to="/app/metas/missao/estudos"><BookHeart aria-hidden="true" /><span><strong>Estudos bíblicos e interessados</strong><small>Acompanhe cada pessoa; os estudos contam na meta de Estudos Bíblicos.</small></span><span>Abrir</span></Link>
-          <Link className="entity-row entity-row--link" to="/app/metas/missao/duplas"><UsersRound aria-hidden="true" /><span><strong>Duplas missionárias</strong><small>Organize as duplas por igreja.</small></span><span>Abrir</span></Link>
-          <Link className="entity-row entity-row--link" to="/app/metas/missao/grupos"><UsersRound aria-hidden="true" /><span><strong>Escola Sabatina, PG e UAPG</strong><small>Classes e grupos; as UAPG contam na meta de UAPG.</small></span><span>Abrir</span></Link>
+          <Link className="entity-row entity-row--link" to="/app/metas/missao/duplas"><UsersRound aria-hidden="true" /><span><strong>Duplas missionárias</strong></span><span>Abrir</span></Link>
         </div>
       </Card>
     </div>

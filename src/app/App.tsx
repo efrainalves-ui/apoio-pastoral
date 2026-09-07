@@ -37,9 +37,7 @@ import { SermonFormPage } from '../pages/SermonFormPage'
 import { SermonReadingPage } from '../pages/SermonReadingPage'
 import { SermonDetailPage } from '../pages/SermonDetailPage'
 import { GoalsPage } from '../pages/GoalsPage'
-import { MissionaryPage } from '../pages/MissionaryPage'
 import { MissionaryPairsPage } from '../pages/MissionaryPairsPage'
-import { CommunityGroupsPage } from '../pages/CommunityGroupsPage'
 import { GoalAreaPage } from '../pages/GoalAreaPage'
 import { BackupPage } from '../pages/BackupPage'
 import { CommissionsPage } from '../pages/CommissionsPage'
@@ -254,9 +252,9 @@ export function App() {
         <Route path="evangelismo" element={<EvangelismPage />} />
         <Route path="evangelismo/nova" element={<CampaignPage />} />
         <Route path="evangelismo/:campaignId" element={<CampaignPage />} />
-        <Route path="metas/missao/estudos" element={<MissionaryPage />} />
+        <Route path="metas/missao/estudos" element={<Navigate to="/app/metas/bible_studies" replace />} />
         <Route path="metas/missao/duplas" element={<MissionaryPairsPage />} />
-        <Route path="metas/missao/grupos" element={<CommunityGroupsPage />} />
+        <Route path="metas/missao/grupos" element={<Navigate to="/app/metas/uapg" replace />} />
         <Route path="missionario" element={<Navigate to="/app/metas/missao/estudos" replace />} />
         <Route path="missionario/duplas" element={<Navigate to="/app/metas/missao/duplas" replace />} />
         <Route path="missionario/grupos" element={<Navigate to="/app/metas/missao/grupos" replace />} />
