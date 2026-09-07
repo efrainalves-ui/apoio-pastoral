@@ -14,7 +14,7 @@ import { GoalsService, parseGoalsPdf } from '../goals/service'
 import { HISTORY_AREAS, type GoalHistoryData, type GoalImportPreview } from '../goals/types'
 import { useGoalSources } from '../goals/useGoalSources'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
-import { AREA_PDF_DOCUMENT, ehFinanceira, ANOS_DE_HISTORICO, PERCENT_TARGET_AREAS, anosComResultado, comparacaoMensal, resumoPorAno, resumoPorIgrejaEAno } from '../goals/areas'
+import { AREA_PDF_DOCUMENT, ehFinanceira, variacaoNoMesmoPeriodo, ANOS_DE_HISTORICO, PERCENT_TARGET_AREAS, anosComResultado, comparacaoMensal, resumoPorAno, resumoPorIgrejaEAno } from '../goals/areas'
 import { previaDeBatismos, previaFinanceira, type PreviaDeRelatorio } from '../goals/importacaoAcms'
 import { comparativoDeDoadores } from '../goals/doadores'
 import { MissionaryPage } from './MissionaryPage'
@@ -247,14 +247,21 @@ export function GoalAreaPage() {
         <div className="goal-months-scroll">
           <table className="goal-anos">
             <thead>
-              <tr><th scope="col">Ano</th>{MONTH_LABELS.map((mes) => <th scope="col" key={mes}>{mes}</th>)}<th scope="col">Total</th></tr>
+              <tr><th scope="col">Ano</th>{MONTH_LABELS.map((mes) => <th scope="col" key={mes}>{mes}</th>)}<th scope="col">Total</th><th scope="col">Variação</th></tr>
             </thead>
             <tbody>
-              {anosResumidos.map(({ ano, meses, total }) => <tr key={ano}>
-                <th scope="row">{ano}</th>
-                {meses.map((valor, indice) => <td key={indice} className={valor === 0 ? 'goal-anos__vazio' : ''}>{valor === 0 ? '—' : formatGoalValue(area, valor)}</td>)}
-                <td className="goal-anos__total">{formatGoalValue(area, total)}</td>
-              </tr>)}
+              {anosResumidos.map(({ ano, meses, total }, indiceDoAno) => {
+                // Contra o ano de cima, no mesmo período: doze meses contra
+                // oito parecem uma queda enorme e podem ser um crescimento.
+                const anterior = anosResumidos[indiceDoAno - 1]
+                const variacao = anterior ? variacaoNoMesmoPeriodo(anterior.meses, meses) : null
+                return <tr key={ano}>
+                  <th scope="row">{ano}</th>
+                  {meses.map((valor, indice) => <td key={indice} className={valor === 0 ? 'goal-anos__vazio' : ''}>{valor === 0 ? '—' : formatGoalValue(area, valor)}</td>)}
+                  <td className="goal-anos__total">{formatGoalValue(area, total)}</td>
+                  <td className={variacao === null ? 'goal-anos__vazio' : variacao < 0 ? 'quadro--falta' : 'quadro--alcancado'}>{variacao === null ? '—' : `${variacao >= 0 ? '+' : '−'}${Math.abs(variacao).toFixed(1)}%`}</td>
+                </tr>
+              })}
             </tbody>
           </table>
         </div>
@@ -264,16 +271,24 @@ export function GoalAreaPage() {
         <div className="goal-months-scroll">
           <table className="goal-anos">
             <thead>
-              <tr><th scope="col">Igreja</th>{anosResumidos.map(({ ano }) => <th scope="col" key={ano}>{ano}</th>)}</tr>
+              <tr><th scope="col">Igreja</th>{anosResumidos.map(({ ano }) => <th scope="col" key={ano}>{ano}</th>)}<th scope="col">Variação</th></tr>
             </thead>
             <tbody>
-              {igrejasPorAno.map(({ churchId, totais }) => <tr key={churchId}>
-                <th scope="row" className="goal-anos__igreja">{nomeIgreja(churchId)}</th>
-                {anosResumidos.map(({ ano }) => {
-                  const valor = totais.get(ano) ?? 0
-                  return <td key={ano} className={valor === 0 ? 'goal-anos__vazio' : ''}>{valor === 0 ? '—' : formatGoalValue(area, valor)}</td>
-                })}
-              </tr>)}
+              {igrejasPorAno.map(({ churchId, totais, meses }) => {
+                const ultimo = anosResumidos[anosResumidos.length - 1]
+                const penultimo = anosResumidos[anosResumidos.length - 2]
+                const variacao = ultimo && penultimo
+                  ? variacaoNoMesmoPeriodo(meses.get(penultimo.ano) ?? [], meses.get(ultimo.ano) ?? [])
+                  : null
+                return <tr key={churchId}>
+                  <th scope="row" className="goal-anos__igreja">{nomeIgreja(churchId)}</th>
+                  {anosResumidos.map(({ ano }) => {
+                    const valor = totais.get(ano) ?? 0
+                    return <td key={ano} className={valor === 0 ? 'goal-anos__vazio' : ''}>{valor === 0 ? '—' : formatGoalValue(area, valor)}</td>
+                  })}
+                  <td className={variacao === null ? 'goal-anos__vazio' : variacao < 0 ? 'quadro--falta' : 'quadro--alcancado'}>{variacao === null ? '—' : `${variacao >= 0 ? '+' : '−'}${Math.abs(variacao).toFixed(1)}%`}</td>
+                </tr>
+              })}
             </tbody>
           </table>
         </div>

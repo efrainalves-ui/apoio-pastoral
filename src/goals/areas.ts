@@ -262,7 +262,7 @@ export function resumoPorAno(area: GoalArea, sources: AreaSources, year: number,
   return anos
 }
 
-export interface IgrejaPorAno { churchId: string; totais: Map<number, number>; total: number }
+export interface IgrejaPorAno { churchId: string; totais: Map<number, number>; meses: Map<number, number[]>; total: number }
 
 /**
  * Quanto cada igreja fez, em cada ano.
@@ -273,16 +273,40 @@ export interface IgrejaPorAno { churchId: string; totais: Map<number, number>; t
 export function resumoPorIgrejaEAno(area: GoalArea, sources: AreaSources, anos: readonly number[], churchIds: readonly string[]): IgrejaPorAno[] {
   return churchIds.map((churchId) => {
     const totais = new Map<number, number>()
+    const meses = new Map<number, number[]>()
     let total = 0
     for (const ano of anos) {
-      const doAno = areaResults(area, sources, ano)
-        .filter((item) => item.churchId === churchId)
-        .reduce((soma, item) => soma + item.amount, 0)
+      const porMes = Array<number>(12).fill(0)
+      for (const item of areaResults(area, sources, ano).filter((valor) => valor.churchId === churchId)) {
+        const indice = Number(item.date.slice(5, 7)) - 1
+        if (indice >= 0 && indice < 12) porMes[indice] = (porMes[indice] ?? 0) + item.amount
+      }
+      const doAno = porMes.reduce((soma, valor) => soma + valor, 0)
       totais.set(ano, doAno)
+      meses.set(ano, porMes)
       total += doAno
     }
-    return { churchId, totais, total }
+    return { churchId, totais, meses, total }
   }).filter(({ total }) => total > 0)
+}
+
+/**
+ * Quanto cresceu ou caiu de um ano para o outro, no **mesmo período**.
+ *
+ * Comparar o ano fechado com o ano em andamento é a conta que mente: doze meses
+ * contra oito parecem uma queda enorme e podem ser um crescimento. Aqui o
+ * período é o do ano mais novo, e o mais velho é cortado no mesmo mês.
+ *
+ * Devolve `null` quando não há base: crescer sobre nada não é porcentagem.
+ */
+export function variacaoNoMesmoPeriodo(anterior: readonly number[], atual: readonly number[]): number | null {
+  let ateOMes = 0
+  atual.forEach((valor, indice) => { if (valor > 0) ateOMes = indice + 1 })
+  if (ateOMes === 0) return null
+  const somar = (valores: readonly number[]) => valores.slice(0, ateOMes).reduce((total, valor) => total + valor, 0)
+  const base = somar(anterior)
+  if (base <= 0) return null
+  return ((somar(atual) - base) / base) * 100
 }
 
 export interface ChurchProgress { churchId: string; target: number; result: number; percent: number }

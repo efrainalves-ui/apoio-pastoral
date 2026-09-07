@@ -164,6 +164,41 @@ export function FidelityPage() {
     {error && <div className="alert alert--error" role="alert">{error}</div>}
     <section className="district-metrics fidelity-metrics"><div><small>Não dizimistas</small><strong>{nonTither} · {percent(nonTither, total)}</strong></div><div><small>Dizimistas não sistemáticos</small><strong>{nonSystematicTither} · {percent(nonSystematicTither, total)}</strong></div><div><small>Dizimistas</small><strong>{tither} · {percent(tither, total)}</strong></div></section>
     <Card eyebrow={churchId ? churchName(churchId) : 'Distrito'} title="Fidelidade da igreja"><div className="private-summary"><div><span>Fiéis</span><strong>{careSummary.faithful}</strong></div><div><span>Em acompanhamento</span><strong>{careSummary.followingUp}</strong></div><button type="button" onClick={() => setAssessmentOpen(true)}><span>A avaliar</span><strong>{careSummary.toEvaluate}</strong></button></div><p className="field__hint">Fiéis reúne dizimistas, pessoas sem renda e pessoas de até 15 anos. A partir de 16 anos, quem não for dizimista sistemático entra na avaliação normal.</p></Card>
+    {(() => {
+      const anos = fidelidadePorAno(people, new Date().getFullYear())
+      if (!anos.length) return null
+      const teto = Math.max(1, ...anos.map(({ total }) => total))
+      return <Card title="Fidelidade ano a ano" eyebrow={`Até ${ANOS_DE_FIDELIDADE} anos de histórico`}>
+        {/*
+          O financeiro e os batismos comparam mês a mês porque são eventos
+          datados. A fidelidade não é evento: é uma classificação que vale até a
+          próxima leitura. Por isso aqui a comparação é anual — e é ela que
+          mostra o movimento que importa, gente saindo de "não dizimista" para
+          "dizimista", ou o contrário.
+        */}
+        <p className="card-copy">Envie os relatórios de anos anteriores — até {ANOS_DE_FIDELIDADE} atrás — para ver a evolução. Serve para escolher liderança e para saber onde a visitação faz mais falta.</p>
+        <div className="goal-months-scroll">
+          <ul className="fidelidade-anos">{anos.map((ano) => <li key={ano.ano}>
+            <span className="fidelidade-anos__barra" title={`${ano.ano}: ${ano.dizimistas} dizimista(s), ${ano.naoSistematicos} não sistemático(s), ${ano.naoDizimistas} não dizimista(s)`}>
+              <span className="fidelidade-anos__nao" style={{ height: `${Math.round((ano.naoDizimistas / teto) * 100)}%` }} />
+              <span className="fidelidade-anos__parcial" style={{ height: `${Math.round((ano.naoSistematicos / teto) * 100)}%` }} />
+              <span className="fidelidade-anos__sim" style={{ height: `${Math.round((ano.dizimistas / teto) * 100)}%` }} />
+            </span>
+            <small>{ano.ano}</small>
+            <small className="fidelidade-anos__valores">
+              <span className="fidelidade-anos__valor--sim">{ano.dizimistas}</span>
+              <span className="fidelidade-anos__valor--parcial">{ano.naoSistematicos}</span>
+              <span className="fidelidade-anos__valor--nao">{ano.naoDizimistas}</span>
+            </small>
+          </li>)}</ul>
+        </div>
+        <p className="goal-months__legenda">
+          <span className="goal-months__amostra fidelidade-amostra--sim" />Dizimistas
+          <span className="goal-months__amostra fidelidade-amostra--parcial" />Não sistemáticos
+          <span className="goal-months__amostra fidelidade-amostra--nao" />Não dizimistas
+        </p>
+      </Card>
+    })()}
     <Card eyebrow="Importação local" title="Selecionar PDF de fidelidade">
       {/*
         O ano vem antes do arquivo porque é ele que diz o que o relatório é. Sem
@@ -224,41 +259,6 @@ export function FidelityPage() {
         {fidelityPeople.length === 0 ? <div className="empty-state"><LockKeyhole /><strong>Nenhuma informação neste filtro</strong></div> : <div className="entity-list">{fidelityPeople.map((person) => <Link className="entity-row" key={person.id} to={`/app/pessoas/${person.id}`}><span className="avatar">{person.name[0]}</span><span><strong>{person.name}</strong><small>{churchName(person.currentChurchId)}</small></span><span className="entity-badge entity-badge--active">{FIDELITY_CATEGORY_LABELS[person.fidelity!.category]}</span><span>{fidelityDetail(person.fidelity!)}</span></Link>)}</div>}
       </>}
     </Card>
-    {(() => {
-      const anos = fidelidadePorAno(people, new Date().getFullYear())
-      if (!anos.length) return null
-      const teto = Math.max(1, ...anos.map(({ total }) => total))
-      return <Card title="Fidelidade ano a ano" eyebrow={`Até ${ANOS_DE_FIDELIDADE} anos de histórico`}>
-        {/*
-          O financeiro e os batismos comparam mês a mês porque são eventos
-          datados. A fidelidade não é evento: é uma classificação que vale até a
-          próxima leitura. Por isso aqui a comparação é anual — e é ela que
-          mostra o movimento que importa, gente saindo de "não dizimista" para
-          "dizimista", ou o contrário.
-        */}
-        <p className="card-copy">Envie os relatórios de anos anteriores — até {ANOS_DE_FIDELIDADE} atrás — para ver a evolução. Serve para escolher liderança e para saber onde a visitação faz mais falta.</p>
-        <div className="goal-months-scroll">
-          <ul className="fidelidade-anos">{anos.map((ano) => <li key={ano.ano}>
-            <span className="fidelidade-anos__barra" title={`${ano.ano}: ${ano.dizimistas} dizimista(s), ${ano.naoSistematicos} não sistemático(s), ${ano.naoDizimistas} não dizimista(s)`}>
-              <span className="fidelidade-anos__nao" style={{ height: `${Math.round((ano.naoDizimistas / teto) * 100)}%` }} />
-              <span className="fidelidade-anos__parcial" style={{ height: `${Math.round((ano.naoSistematicos / teto) * 100)}%` }} />
-              <span className="fidelidade-anos__sim" style={{ height: `${Math.round((ano.dizimistas / teto) * 100)}%` }} />
-            </span>
-            <small>{ano.ano}</small>
-            <small className="fidelidade-anos__valores">
-              <span className="fidelidade-anos__valor--sim">{ano.dizimistas}</span>
-              <span className="fidelidade-anos__valor--parcial">{ano.naoSistematicos}</span>
-              <span className="fidelidade-anos__valor--nao">{ano.naoDizimistas}</span>
-            </small>
-          </li>)}</ul>
-        </div>
-        <p className="goal-months__legenda">
-          <span className="goal-months__amostra fidelidade-amostra--sim" />Dizimistas
-          <span className="goal-months__amostra fidelidade-amostra--parcial" />Não sistemáticos
-          <span className="goal-months__amostra fidelidade-amostra--nao" />Não dizimistas
-        </p>
-      </Card>
-    })()}
     <Card eyebrow="Acompanhamento" title="Pessoas para avaliar"><p className="card-copy">Pessoas com 16 anos ou mais, não dizimistas ou dizimistas não sistemáticos, cuja situação de renda ainda não foi avaliada.</p><div className="filter-bar">{filtroDeIgreja}</div><p className="field__hint">{toEvaluate.length} pessoa(s) a avaliar aqui.</p>{toEvaluate.length === 0 ? <div className="empty-state compact-empty"><CheckCircle2 /><strong>Nenhuma pessoa pendente de avaliação</strong></div> : <div className="entity-list">{toEvaluate.map((person) => <div className="entity-row" key={person.id}><span><strong>{person.name}</strong><small>{churchName(person.currentChurchId)} · {FIDELITY_CATEGORY_LABELS[person.fidelity!.category]} · {calculateAge(person.birthDate)} anos</small></span><Button variant="secondary" onClick={() => { setChurchId(person.currentChurchId); setAssessmentOpen(true) }}>Avaliar</Button></div>)}</div>}</Card>
     <Card eyebrow="Acompanhamento" title="Situação de renda">{incomeCandidates.length === 0 ? <p className="muted">Não há pessoas nesta classificação.</p> : <div className="entity-list">{incomeCandidates.map((person) => <div className="entity-row" key={person.id}><span><strong>{person.name}</strong><small>{churchName(person.currentChurchId)} · {FIDELITY_CATEGORY_LABELS[person.fidelity!.category]}</small></span><label className="field"><span className="field__label">Situação de renda</span><select className="field__input" value={person.incomeStatus} disabled={busy} onChange={(event) => void updateIncome(person, event.target.value as PersonEntity['incomeStatus'])}><option value="unknown">Ainda não avaliada</option><option value="has_income">Tem renda</option><option value="no_income">Não tem renda</option></select></label></div>)}</div>}</Card>
     <Card eyebrow="Histórico" title="Importações de fidelidade" action={batches.some(({ status }) => status === 'applied') ? <Button variant="secondary" onClick={() => void undo()} disabled={busy} icon={<RotateCcw />}>Desfazer última</Button> : null}>{batches.length === 0 ? <div className="empty-state compact-empty"><FileSearch /><strong>Nenhuma importação</strong></div> : <div className="import-history">{batches.map((batch) => <div key={batch.id}><span><strong>{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(batch.appliedAt))}</strong><small>{batch.referenceYear ? `Relatório de ${batch.referenceYear}` : 'Ano não informado'} · {batch.status === 'applied' ? 'aplicada' : 'desfeita'}</small></span><span>{batch.summary.updated} atualizações · {batch.summary.issues} divergências</span></div>)}</div>}</Card>
