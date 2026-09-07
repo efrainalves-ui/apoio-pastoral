@@ -1,3 +1,4 @@
+import { useAvisosDeTarefa } from '../tasks/useAvisosDeTarefa'
 import {
   CalendarDays,
   BookOpen,
@@ -53,6 +54,7 @@ const mobileNav = [
 ]
 
 export function AppShell() {
+  useAvisosDeTarefa()
   const { account, lock, signOut } = useAuthVault()
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()

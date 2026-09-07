@@ -71,6 +71,9 @@ export function HomePage() {
   const nextCampaign = campaigns.filter(({ status, endDate }) => status !== 'completed' && status !== 'cancelled' && endDate >= today).sort((a, b) => a.startDate.localeCompare(b.startDate))[0]
 
   const tasksDueToday = tasks.filter(({ status, dueAt }) => status === 'pending' && dueAt.slice(0, 10) === today)
+  // O que fica para depois também é tarefa: sem esta lista, o que foi anotado
+  // para a semana some da tela até vencer.
+  const outrasTarefas = tasks.filter(({ status, dueAt }) => status === 'pending' && dueAt.slice(0, 10) > today)
   const prayersNeedingCare = prayers.filter((request) => request.status === 'needs_follow_up' || (request.status === 'active' && Boolean(request.reviewAt) && request.reviewAt.slice(0, 10) <= today))
   const interestsWaiting = interests.filter(({ status }) => status === 'waiting_study')
   const studiesInProgress = studies.filter(({ status }) => status === 'in_progress')
@@ -97,10 +100,11 @@ export function HomePage() {
     <Card eyebrow="Distrito" title="Pessoas por igreja">{churches.length === 0 ? <div className="empty-state compact-empty"><UsersRound /><strong>Nenhuma igreja cadastrada</strong><span>Cadastre as igrejas do distrito para organizar as pessoas.</span></div> : <div className="breakdown-list">{churches.map((church) => <div key={church.id}><span>{church.name}</span><strong>{people.filter(({ currentChurchId, importStatus }) => currentChurchId === church.id && importStatus !== 'archived').length}</strong></div>)}</div>}<Link className="text-link" to="/app/distrito">Abrir distrito e igrejas <ChevronRight /></Link></Card>
     <div className="home-grid">
       <Card eyebrow="Hoje" title="Tarefas" action={<SquareCheck className="accent-icon" />}>
-        {!overdueTasks.length && !tasksDueToday.length
-          ? <div className="empty-state compact-empty"><SquareCheck /><strong>Nenhuma tarefa para hoje</strong><span>Você está em dia com o que havia anotado.</span></div>
-          : <div className="private-summary"><div><span>Vencidas</span><strong>{overdueTasks.length}</strong></div><div><span>Para hoje</span><strong>{tasksDueToday.length}</strong></div></div>}
+        {!overdueTasks.length && !tasksDueToday.length && !outrasTarefas.length
+          ? <div className="empty-state compact-empty"><SquareCheck /><strong>Nenhuma tarefa</strong><span>Você está em dia com o que havia anotado.</span></div>
+          : <div className="private-summary"><div><span>Vencidas</span><strong>{overdueTasks.length}</strong></div><div><span>Para hoje</span><strong>{tasksDueToday.length}</strong></div><div><span>Outras</span><strong>{outrasTarefas.length}</strong></div></div>}
         {Boolean(overdueTasks.length || tasksDueToday.length) && <div className="breakdown-list">{[...overdueTasks, ...tasksDueToday].slice(0, 4).map((task) => <div key={task.id}><span>{task.title}</span><strong>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(task.dueAt))}</strong></div>)}</div>}
+        {outrasTarefas.length > 0 && <><p className="field__label">Outras tarefas</p><div className="breakdown-list">{outrasTarefas.slice(0, 4).map((task) => <div key={task.id}><span>{task.title}</span><strong>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(task.dueAt))}</strong></div>)}</div></>}
         <Link className="text-link" to="/app/cuidados#tarefas">Abrir tarefas <ChevronRight /></Link>
       </Card>
 

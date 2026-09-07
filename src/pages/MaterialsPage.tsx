@@ -9,6 +9,7 @@ import { Card } from '../components/ui/Card'
 import { DistrictService } from '../district/service'
 import { CHURCH_TYPE_LABELS, type ChurchEntity } from '../district/types'
 import { distributionPreview, materialStock, materialsSummary } from '../materials/core'
+import { CareService } from '../care/service'
 import { MaterialsService } from '../materials/service'
 import {
   DEFAULT_WEIGHTS, DISTRIBUTION_MODE_LABELS, DISTRIBUTION_STATUS_LABELS, MATERIAL_CATEGORY_LABELS,
@@ -21,6 +22,7 @@ import { PeopleService } from '../people/service'
 import type { PersonEntity } from '../people/types'
 
 const service = new MaterialsService()
+const care = new CareService()
 const districtService = new DistrictService()
 const peopleService = new PeopleService()
 const carimbo = () => new Date().toISOString()
@@ -30,7 +32,7 @@ const abas = { estoque: 'Estoque', distribuicao: 'Distribuição', necessidades:
 type Aba = keyof typeof abas
 
 const vazioMaterial = (): MaterialData => ({ name: '', category: 'literature', quantity: 0, unit: 'un', date: hoje(), notes: '', createdAt: carimbo(), updatedAt: carimbo() })
-const vazioNecessidade = (): MaterialNeedData => ({ item: '', quantity: 1, unit: 'un', priority: 'normal', reason: '', notes: '', status: 'to_request', stockMaterialId: null, createdAt: carimbo(), updatedAt: carimbo() })
+const vazioNecessidade = (): MaterialNeedData => ({ item: '', quantity: 1, unit: 'un', priority: 'normal', reason: '', notes: '', taskId: null, status: 'to_request', stockMaterialId: null, createdAt: carimbo(), updatedAt: carimbo() })
 
 export function MaterialsPage() {
   const { account, masterKey } = useAuthVault()
@@ -98,7 +100,24 @@ export function MaterialsPage() {
   }
   async function salvarNecessidade() {
     if (!account || !masterKey || !needDraft) return
-    try { await service.saveNeed(account.id, masterKey, needDraft, needId || undefined); setNeedDraft(null); setNeedId(''); await pronto('Necessidade registrada.') } catch (motivo) { falhou(motivo) }
+    try {
+      // Prioridade alta é uma promessa de fazer alguma coisa. Ela ficava só
+      // numa lista que o pastor precisava lembrar de abrir; agora vira tarefa,
+      // que é onde o dia é organizado.
+      let taskId = needDraft.taskId ?? null
+      if (needDraft.priority === 'high' && !taskId) {
+        const tarefa = await care.createTask(account.id, masterKey, {
+          title: `Conseguir ${needDraft.item.trim()}`,
+          description: needDraft.reason.trim(),
+          dueAt: new Date().toISOString(),
+          priority: 'high', churchId: null, relatedType: null, relatedId: null, reminderMinutes: null,
+        })
+        taskId = tarefa.id
+      }
+      await service.saveNeed(account.id, masterKey, { ...needDraft, taskId }, needId || undefined)
+      setNeedDraft(null); setNeedId('')
+      await pronto(taskId && !needDraft.taskId ? 'Necessidade registrada e tarefa aberta.' : 'Necessidade registrada.')
+    } catch (motivo) { falhou(motivo) }
   }
   async function confirmarDistribuicao() {
     if (!account || !masterKey || !distribuindo || !previa) return

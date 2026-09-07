@@ -81,6 +81,8 @@ export interface MaterialNeedData {
   status: NeedStatus
   /** Preenchido quando o pedido recebido virou item de estoque. */
   stockMaterialId: string | null
+  /** A tarefa aberta por uma necessidade de prioridade alta. */
+  taskId?: string | null
   createdAt: string
   updatedAt: string
 }

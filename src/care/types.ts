@@ -33,7 +33,7 @@ export const FOLLOW_UP_LABELS: Record<FollowUpKind, string> = { call: 'Ligar', r
 export interface FollowUpData { visitId: string; subjectType: 'family' | 'person'; subjectId: string; churchId: string; kind: FollowUpKind; dueAt: string; status: 'pending' | 'completed' | 'cancelled'; notes: string; createdAt: string; updatedAt: string }
 export interface FollowUpEntity extends FollowUpData { id: string }
 
-export interface TaskData { title: string; description: string; dueAt: string; priority: 'low' | 'normal' | 'high'; status: 'pending' | 'completed' | 'cancelled'; churchId: string | null; relatedType: 'visit' | 'person' | 'family' | 'event' | null; relatedId: string | null; reminderMinutes: number | null; createdAt: string; updatedAt: string }
+export interface TaskData { title: string; description: string; dueAt: string; priority: 'low' | 'normal' | 'high'; status: 'pending' | 'completed' | 'cancelled'; churchId: string | null; relatedType: 'visit' | 'person' | 'family' | 'event' | null; relatedId: string | null; reminderMinutes: number | null; /** Dia e hora do aviso, escolhidos por quem anota. */ remindAt?: string | null; createdAt: string; updatedAt: string }
 export interface TaskEntity extends TaskData { id: string }
 
 export interface VisitRoundData { name: string; churchId: string | null; targetFamilyIds: string[]; visitedFamilyIds: string[]; status: 'active' | 'completed' | 'archived'; startedAt: string; completedAt: string | null; createdAt: string; updatedAt: string }

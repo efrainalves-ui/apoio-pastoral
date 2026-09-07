@@ -2,6 +2,8 @@ import { ArchiveRestore, ChevronRight, Cloud, GitCompare, Link2, LockKeyhole, Se
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { guardarTema, temaGuardado, type Tema } from '../app/tema'
+import { pedirPermissaoDeAviso } from '../tasks/useAvisosDeTarefa'
+import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 
 const groups = [
@@ -23,6 +25,7 @@ const groups = [
 
 export function MorePage() {
   const [tema, setTema] = useState<Tema>(() => temaGuardado())
+  const [avisos, setAvisos] = useState<NotificationPermission>(() => typeof Notification === 'undefined' ? 'denied' : Notification.permission)
   function escolherTema(escolha: Tema) { setTema(escolha); guardarTema(escolha) }
 
   return <div className="page-stack page-narrow"><header className="page-hero"><div><h1>Configurações</h1></div></header>
@@ -38,6 +41,10 @@ export function MorePage() {
       <button type="button" className={tema === 'claro' ? 'active' : ''} aria-pressed={tema === 'claro'} onClick={() => escolherTema('claro')}>Claro</button>
       <button type="button" className={tema === 'escuro' ? 'active' : ''} aria-pressed={tema === 'escuro'} onClick={() => escolherTema('escuro')}>Escuro</button>
     </div>
+  </Card>
+  <Card title="Avisos de tarefa">
+    <div className="private-summary"><div><span>Situação</span><strong>{avisos === 'granted' ? 'Permitidos' : avisos === 'denied' ? 'Bloqueados no aparelho' : 'Ainda não perguntado'}</strong></div></div>
+    {avisos !== 'granted' && <Button variant="secondary" onClick={() => { void pedirPermissaoDeAviso().then(setAvisos) }}>Permitir avisos</Button>}
   </Card>
   <Card title="Onde ficam seus dados">
     <ul className="plain-list">

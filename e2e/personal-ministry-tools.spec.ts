@@ -41,7 +41,7 @@ test('pedidos de oração, leitura e cerimônias são acessíveis no computador 
 
   await openMenuOnMobile(page, testInfo.project.name)
   await mainNavigation(page).getByRole('link', { name: 'Leitura', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Leitura' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Leitura', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Adicionar livro' }).first().click()
   await page.getByLabel('Título').fill('Livro Fictício E2E')
   await page.getByLabel('Autor').fill('Autor Fictício E2E')
