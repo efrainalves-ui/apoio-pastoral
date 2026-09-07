@@ -75,9 +75,13 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   // corrigir o que se escreveu é corrigir, não criar um retrato novo.
   await expect(page.getByRole('heading', { name: 'Pessoa Cuidado Fictícia', level: 1 })).toBeVisible()
   await expect(page.getByText('Retrato imutável')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Editar' }).click()
-  await page.getByLabel('Observações').fill('Ajuste fictício')
-  await page.getByRole('button', { name: 'Salvar', exact: true }).click()
+  // Corrigir abre a própria tela de registro, com o que já foi respondido no
+  // lugar — e não um formulário reduzido só com o que já tinha resposta.
+  await page.getByRole('link', { name: 'Editar' }).click()
+  await expect(page.getByRole('heading', { name: 'Corrigir visita' })).toBeVisible()
+  await expect(question.getByRole('button', { name: 'Sim', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByLabel('Observações pastorais').fill('Ajuste fictício')
+  await page.getByRole('button', { name: 'Salvar correção' }).click()
   await expect(page.getByText('Ajuste fictício')).toBeVisible()
   await navigateInsideApp(page, '/app/visitacao', page.getByText('Rodada Cuidado Fictícia'))
   await expect(page.getByText('Rodada Cuidado Fictícia')).toBeVisible()

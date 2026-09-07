@@ -288,6 +288,7 @@ export function App() {
         <Route path="visitas" element={<Navigate to="/app/visitacao" replace />} />
         <Route path="visitas/nova" element={<VisitFormPage />} />
         <Route path="visitas/:visitId" element={<VisitDetailPage />} />
+        <Route path="visitas/:visitId/editar" element={<VisitFormPage />} />
         <Route path="pedidos-oracao" element={<Navigate to="/app/visitacao?aba=oracao" replace />} />
         <Route path="leitura" element={<ReadingPage />} />
         <Route path="cuidados" element={<Navigate to="/app/visitacao?aba=acompanhamentos" replace />} />
