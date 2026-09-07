@@ -1,5 +1,5 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
-import { ArrowLeft, Edit3, Plus, Save, Trash2, UsersRound, X } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Edit3, FileUp, Plus, Save, Trash2, UsersRound, X } from 'lucide-react'
 import { type FormEvent, useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
@@ -10,6 +10,9 @@ import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
 import { MissionaryService } from '../missionary/service'
 import { AGE_GROUP_LABELS, type AgeGroup, type SabbathClassData, type SabbathClassEntity, type SmallGroupData, type SmallGroupEntity, type UapgData, type UapgEntity } from '../missionary/types'
+import { extractPdfText, validatePdfFile } from '../imports/pdf'
+import { parseClassesDaEscolaSabatina, ehRelatorioDeClasses } from '../imports/escolaSabatina'
+import { normalizePersonName } from '../people/validation'
 import { PeopleService } from '../people/service'
 import type { PersonEntity } from '../people/types'
 
@@ -20,9 +23,12 @@ const peopleService = new PeopleService()
 type ClassDraft = Omit<SabbathClassData, 'createdAt' | 'updatedAt'>
 type GroupDraft = Omit<SmallGroupData, 'createdAt' | 'updatedAt'>
 type UapgDraft = Omit<UapgData, 'createdAt' | 'updatedAt'>
+interface UnidadeConferida { nome: string; encontrados: string[]; ausentes: string[] }
+interface PreviaDeClasses { igrejaDoArquivo: string; unidades: UnidadeConferida[] }
+
 type Editor = { type: 'class'; id: string; draft: ClassDraft } | { type: 'group'; id: string; draft: GroupDraft } | { type: 'uapg'; id: string; draft: UapgDraft }
 
-const emptyClass = (): ClassDraft => ({ churchId: '', teacherId: '', assistantId: null, ageGroup: 'adults', participantIds: [] })
+const emptyClass = (): ClassDraft => ({ name: '', churchId: '', teacherId: '', assistantId: null, ageGroup: 'adults', participantIds: [] })
 const emptyGroup = (): GroupDraft => ({ name: '', churchId: '', leaderId: '', associateId: null, host: '', address: '', day: '', time: '', participantIds: [], active: true })
 const emptyUapg = (): UapgDraft => ({ name: '', churchId: '', smallGroupId: null, notes: '', active: true })
 
@@ -39,6 +45,9 @@ export function CommunityGroupsPage({ embutida = false }: { embutida?: boolean }
   const [editor, setEditor] = useState<Editor | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [importIgreja, setImportIgreja] = useState('')
+  const [importBusy, setImportBusy] = useState(false)
+  const [importPrevia, setImportPrevia] = useState<PreviaDeClasses | null>(null)
 
   const load = useCallback(async () => {
     if (!account || !masterKey) return
@@ -75,7 +84,7 @@ export function CommunityGroupsPage({ embutida = false }: { embutida?: boolean }
   }
 
   function classFields(draft: ClassDraft, update: (next: ClassDraft) => void) {
-    return <><div className="form-grid">{churchField(draft.churchId, (churchId) => update({ ...draft, churchId, teacherId: '', assistantId: null, participantIds: [] }))}{personField('Professor', draft.churchId, draft.teacherId, (teacherId) => update({ ...draft, teacherId }))}{personField('Auxiliar opcional', draft.churchId, draft.assistantId, (assistantId) => update({ ...draft, assistantId: assistantId || null }), true)}<label className="field"><span className="field__label">Faixa etária</span><select className="field__input" value={draft.ageGroup} onChange={(event) => update({ ...draft, ageGroup: event.target.value as AgeGroup })}>{Object.entries(AGE_GROUP_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label></div>{participantField(draft.churchId, draft.participantIds, (participantIds) => update({ ...draft, participantIds }))}</>
+    return <><div className="form-grid">{churchField(draft.churchId, (churchId) => update({ ...draft, churchId, teacherId: '', assistantId: null, participantIds: [] }))}<Field label="Nome da unidade" name={`class-name-${editor?.id ?? 'new'}`} value={draft.name ?? ''} onChange={(event) => update({ ...draft, name: event.target.value })} />{personField('Professor', draft.churchId, draft.teacherId, (teacherId) => update({ ...draft, teacherId }))}{personField('Auxiliar opcional', draft.churchId, draft.assistantId, (assistantId) => update({ ...draft, assistantId: assistantId || null }), true)}<label className="field"><span className="field__label">Faixa etária</span><select className="field__input" value={draft.ageGroup} onChange={(event) => update({ ...draft, ageGroup: event.target.value as AgeGroup })}>{Object.entries(AGE_GROUP_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label></div>{participantField(draft.churchId, draft.participantIds, (participantIds) => update({ ...draft, participantIds }))}</>
   }
 
   function groupFields(draft: GroupDraft, update: (next: GroupDraft) => void) {
@@ -85,6 +94,50 @@ export function CommunityGroupsPage({ embutida = false }: { embutida?: boolean }
   function uapgFields(draft: UapgDraft, update: (next: UapgDraft) => void) {
     const availableGroups = groups.filter((group) => group.churchId === draft.churchId)
     return <div className="form-grid">{churchField(draft.churchId, (churchId) => update({ ...draft, churchId, smallGroupId: null }))}<Field label="Nome" name={`uapg-name-${editor?.id ?? 'new'}`} value={draft.name} onChange={(event) => update({ ...draft, name: event.target.value })} required /><label className="field"><span className="field__label">PG vinculado (opcional)</span><select className="field__input" value={draft.smallGroupId ?? ''} onChange={(event) => update({ ...draft, smallGroupId: event.target.value || null })}><option value="">Sem vínculo</option>{availableGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label><label className="field"><span className="field__label">Observações</span><textarea className="field__input field__textarea" value={draft.notes} onChange={(event) => update({ ...draft, notes: event.target.value })} /></label></div>
+  }
+
+  /**
+   * O relatório de Classes ES do ACMS sai de uma igreja por vez, e é assim que
+   * ele entra. A igreja é escolhida aqui, e não deduzida do cabeçalho: o nome
+   * que o ACMS escreve traz sufixo de distrito e associação, e errar a igreja
+   * levaria as unidades inteiras para o lugar errado.
+   */
+  async function lerRelatorioDeClasses(file: File | undefined) {
+    if (!file || !importIgreja) return
+    setImportBusy(true); clearMessage(); setImportPrevia(null)
+    try {
+      validatePdfFile(file)
+      const texto = await extractPdfText(await file.arrayBuffer())
+      if (!ehRelatorioDeClasses(texto)) throw new Error('Este arquivo não parece o relatório de Classes ES do ACMS.')
+      const lido = parseClassesDaEscolaSabatina(texto)
+      const daIgreja = members(importIgreja)
+      setImportPrevia({
+        igrejaDoArquivo: lido.igreja,
+        unidades: lido.unidades.map((unidade) => {
+          const encontrados: string[] = []; const ausentes: string[] = []
+          for (const nome of unidade.membros) {
+            const pessoa = daIgreja.find((candidato) => normalizePersonName(candidato.name) === normalizePersonName(nome))
+            if (pessoa) encontrados.push(pessoa.id); else ausentes.push(nome)
+          }
+          return { nome: unidade.nome, encontrados, ausentes }
+        }),
+      })
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível ler o relatório.')
+    } finally { setImportBusy(false) }
+  }
+
+  async function aplicarRelatorioDeClasses() {
+    if (!account || !masterKey || !importPrevia) return
+    setImportBusy(true); clearMessage()
+    try {
+      const resultado = await service.importarClasses(account.id, masterKey, importIgreja, importPrevia.unidades.map(({ nome, encontrados }) => ({ nome, participantIds: encontrados })))
+      setImportPrevia(null)
+      setNotice(`${resultado.criadas} unidade(s) criada(s) e ${resultado.atualizadas} atualizada(s).`)
+      await load()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível aplicar o relatório.')
+    } finally { setImportBusy(false) }
   }
 
   async function createClass(event: FormEvent) { event.preventDefault(); if (!account || !masterKey) return; clearMessage(); try { await service.saveClass(account.id, masterKey, classDraft); setClassDraft(emptyClass()); setNotice('Classe cadastrada.'); await load() } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível cadastrar a classe.') } }
@@ -113,5 +166,13 @@ export function CommunityGroupsPage({ embutida = false }: { embutida?: boolean }
 
   const editorTitle = editor?.type === 'class' ? 'Editar classe da Escola Sabatina' : editor?.type === 'group' ? 'Editar Pequeno Grupo' : 'Editar integração Unidade de Ação e PG'
 
-  return <div className="page-stack">{!embutida && <><Link className="text-link back-link" to="/app/metas"><ArrowLeft />Voltar às metas</Link><header className="page-hero"><div><p className="eyebrow">Missão e discipulado</p><h1>Escola Sabatina e Pequenos Grupos</h1></div><UsersRound /></header></>}{error && <div className="alert alert--error" role="alert">{error}</div>}{notice && <div className="alert alert--success" role="status">{notice}</div>}<div className="missionary-create-grid"><Card title="Escola Sabatina" eyebrow="Nova classe"><form onSubmit={(event) => void createClass(event)}>{classFields(classDraft, setClassDraft)}<Button type="submit" disabled={!classDraft.churchId || !classDraft.teacherId} icon={<Plus />}>Cadastrar classe</Button></form></Card><Card title="Pequeno Grupo" eyebrow="Novo PG"><form onSubmit={(event) => void createGroup(event)}>{groupFields(groupDraft, setGroupDraft)}<Button type="submit" disabled={!groupDraft.churchId || !groupDraft.name.trim() || !groupDraft.leaderId} icon={<Plus />}>Cadastrar PG</Button></form></Card><Card title="Integração Unidade de Ação e PG" eyebrow="Novo registro"><form onSubmit={(event) => void createUapg(event)}>{uapgFields(uapgDraft, setUapgDraft)}<Button type="submit" disabled={!uapgDraft.churchId || !uapgDraft.name.trim()} icon={<Plus />}>Cadastrar integração</Button></form></Card></div><Card title="Registros missionários" eyebrow={`${classes.length + groups.length + uapgs.length} registro(s)`}>{classes.length + groups.length + uapgs.length === 0 ? <div className="empty-state compact-empty"><UsersRound /><strong>Nenhum registro cadastrado</strong><span>Cadastre uma classe, um PG ou uma integração.</span></div> : <div className="missionary-record-groups"><section><h3>Escola Sabatina</h3><div className="entity-list">{classes.length ? classes.map((item) => row('ES', `Classe ${AGE_GROUP_LABELS[item.ageGroup]}`, `${churchName(item.churchId)} · Professor: ${personName(item.teacherId)} · ${item.participantIds.length} participante(s)`, item.id, () => setEditor({ type: 'class', id: item.id, draft: { churchId: item.churchId, teacherId: item.teacherId, assistantId: item.assistantId, ageGroup: item.ageGroup, participantIds: [...item.participantIds] } }))) : <p className="muted">Nenhuma classe cadastrada.</p>}</div></section><section><h3>Pequenos Grupos</h3><div className="entity-list">{groups.length ? groups.map((item) => row('PG', item.name, `${churchName(item.churchId)} · Líder: ${personName(item.leaderId)} · ${item.day || 'Dia não informado'}${item.time ? ` às ${item.time}` : ''}`, item.id, () => setEditor({ type: 'group', id: item.id, draft: { name: item.name, churchId: item.churchId, leaderId: item.leaderId, associateId: item.associateId, host: item.host, address: item.address, day: item.day, time: item.time, participantIds: [...item.participantIds], active: item.active } }))) : <p className="muted">Nenhum PG cadastrado.</p>}</div></section><section><h3>Integração Unidade de Ação e PG</h3><div className="entity-list">{uapgs.length ? uapgs.map((item) => row('UA', item.name, `${churchName(item.churchId)} · ${linkedGroupName(item.smallGroupId)}`, item.id, () => setEditor({ type: 'uapg', id: item.id, draft: { name: item.name, churchId: item.churchId, smallGroupId: item.smallGroupId, notes: item.notes, active: item.active } }))) : <p className="muted">Nenhuma integração cadastrada.</p>}</div></section></div>}</Card>{editor && <Card title={editorTitle} eyebrow="Dados atuais preenchidos"><form className="missionary-edit-form" onSubmit={(event) => void saveEdit(event)}>{editor.type === 'class' && classFields(editor.draft, (draft) => setEditor({ ...editor, draft }))}{editor.type === 'group' && groupFields(editor.draft, (draft) => setEditor({ ...editor, draft }))}{editor.type === 'uapg' && uapgFields(editor.draft, (draft) => setEditor({ ...editor, draft }))}<div className="form-actions"><Button type="submit" icon={<Save />}>Salvar alterações</Button><Button type="button" variant="secondary" icon={<X />} onClick={() => setEditor(null)}>Cancelar</Button></div></form></Card>}</div>
+  return <div className="page-stack">{!embutida && <><Link className="text-link back-link" to="/app/metas"><ArrowLeft />Voltar às metas</Link><header className="page-hero"><div><p className="eyebrow">Missão e discipulado</p><h1>Escola Sabatina e Pequenos Grupos</h1></div><UsersRound /></header></>}{error && <div className="alert alert--error" role="alert">{error}</div>}{notice && <div className="alert alert--success" role="status">{notice}</div>}<div className="missionary-create-grid"><Card title="Escola Sabatina" eyebrow="Nova classe"><form onSubmit={(event) => void createClass(event)}>{classFields(classDraft, setClassDraft)}<Button type="submit" disabled={!classDraft.churchId || !classDraft.teacherId} icon={<Plus />}>Cadastrar classe</Button></form></Card><Card title="Pequeno Grupo" eyebrow="Novo PG"><form onSubmit={(event) => void createGroup(event)}>{groupFields(groupDraft, setGroupDraft)}<Button type="submit" disabled={!groupDraft.churchId || !groupDraft.name.trim() || !groupDraft.leaderId} icon={<Plus />}>Cadastrar PG</Button></form></Card><Card title="Integração Unidade de Ação e PG" eyebrow="Novo registro"><form onSubmit={(event) => void createUapg(event)}>{uapgFields(uapgDraft, setUapgDraft)}<Button type="submit" disabled={!uapgDraft.churchId || !uapgDraft.name.trim()} icon={<Plus />}>Cadastrar integração</Button></form></Card></div><Card title="Importar classes do ACMS" eyebrow="Relatório de Classes ES, uma igreja por vez">
+    <div className="form-grid">{churchField(importIgreja, (churchId) => { setImportIgreja(churchId); setImportPrevia(null) })}</div>
+    <label className="file-picker"><FileUp /><span><strong>{importBusy ? 'Lendo o relatório…' : 'Escolher PDF'}</strong></span><input type="file" accept="application/pdf,.pdf" disabled={importBusy || !importIgreja} onChange={(event) => { void lerRelatorioDeClasses(event.target.files?.[0]); event.currentTarget.value = '' }} /></label>
+    {importPrevia && <>
+      <div className="import-metrics"><div><small>Igreja no arquivo</small><strong>{importPrevia.igrejaDoArquivo || '—'}</strong></div><div><small>Unidades</small><strong>{importPrevia.unidades.length}</strong></div><div><small>Membros associados</small><strong>{importPrevia.unidades.reduce((total, unidade) => total + unidade.encontrados.length, 0)}</strong></div><div><small>Não encontrados</small><strong>{importPrevia.unidades.reduce((total, unidade) => total + unidade.ausentes.length, 0)}</strong></div></div>
+      <div className="entity-list">{importPrevia.unidades.map((unidade) => <div className="entity-row" key={unidade.nome}><span><strong>{unidade.nome}</strong><small>{unidade.encontrados.length} associado(s){unidade.ausentes.length ? ` · não encontrados: ${unidade.ausentes.join(', ')}` : ''}</small></span></div>)}</div>
+      <Button disabled={importBusy} icon={<CheckCircle2 />} onClick={() => void aplicarRelatorioDeClasses()}>Aplicar às classes desta igreja</Button>
+    </>}
+  </Card><Card title="Registros missionários" eyebrow={`${classes.length + groups.length + uapgs.length} registro(s)`}>{classes.length + groups.length + uapgs.length === 0 ? <div className="empty-state compact-empty"><UsersRound /><strong>Nenhum registro cadastrado</strong><span>Cadastre uma classe, um PG ou uma integração.</span></div> : <div className="missionary-record-groups"><section><h3>Escola Sabatina</h3><div className="entity-list">{classes.length ? classes.map((item) => row('ES', item.name?.trim() || `Classe ${AGE_GROUP_LABELS[item.ageGroup]}`, `${churchName(item.churchId)} · Professor: ${item.teacherId ? personName(item.teacherId) : 'A definir'} · ${item.participantIds.length} participante(s)`, item.id, () => setEditor({ type: 'class', id: item.id, draft: { name: item.name ?? '', churchId: item.churchId, teacherId: item.teacherId, assistantId: item.assistantId, ageGroup: item.ageGroup, participantIds: [...item.participantIds] } }))) : <p className="muted">Nenhuma classe cadastrada.</p>}</div></section><section><h3>Pequenos Grupos</h3><div className="entity-list">{groups.length ? groups.map((item) => row('PG', item.name, `${churchName(item.churchId)} · Líder: ${personName(item.leaderId)} · ${item.day || 'Dia não informado'}${item.time ? ` às ${item.time}` : ''}`, item.id, () => setEditor({ type: 'group', id: item.id, draft: { name: item.name, churchId: item.churchId, leaderId: item.leaderId, associateId: item.associateId, host: item.host, address: item.address, day: item.day, time: item.time, participantIds: [...item.participantIds], active: item.active } }))) : <p className="muted">Nenhum PG cadastrado.</p>}</div></section><section><h3>Integração Unidade de Ação e PG</h3><div className="entity-list">{uapgs.length ? uapgs.map((item) => row('UA', item.name, `${churchName(item.churchId)} · ${linkedGroupName(item.smallGroupId)}`, item.id, () => setEditor({ type: 'uapg', id: item.id, draft: { name: item.name, churchId: item.churchId, smallGroupId: item.smallGroupId, notes: item.notes, active: item.active } }))) : <p className="muted">Nenhuma integração cadastrada.</p>}</div></section></div>}</Card>{editor && <Card title={editorTitle} eyebrow="Dados atuais preenchidos"><form className="missionary-edit-form" onSubmit={(event) => void saveEdit(event)}>{editor.type === 'class' && classFields(editor.draft, (draft) => setEditor({ ...editor, draft }))}{editor.type === 'group' && groupFields(editor.draft, (draft) => setEditor({ ...editor, draft }))}{editor.type === 'uapg' && uapgFields(editor.draft, (draft) => setEditor({ ...editor, draft }))}<div className="form-actions"><Button type="submit" icon={<Save />}>Salvar alterações</Button><Button type="button" variant="secondary" icon={<X />} onClick={() => setEditor(null)}>Cancelar</Button></div></form></Card>}</div>
 }

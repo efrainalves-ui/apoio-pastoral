@@ -7,7 +7,15 @@ export interface BibleStudyEntity extends BibleStudyData { id: string }
 export interface MissionaryPairData { churchId: string; memberIds: string[]; active: boolean; createdAt: string; updatedAt: string }
 export interface MissionaryPairEntity extends MissionaryPairData { id: string }
 export type AgeGroup = 'adults' | 'young' | 'teenagers' | 'preteenagers' | 'other'
-export interface SabbathClassData { churchId: string; teacherId: string; assistantId: string | null; ageGroup: AgeGroup; participantIds: string[]; createdAt: string; updatedAt: string }
+export interface SabbathClassData {
+  /**
+   * O nome da unidade, como o ACMS a chama — "Maranata", "Rocha Eterna".
+   *
+   * Opcional porque as classes cadastradas antes disto não têm nome: para elas
+   * vale a faixa etária, que era tudo o que existia.
+   */
+  name?: string
+  churchId: string; teacherId: string; assistantId: string | null; ageGroup: AgeGroup; participantIds: string[]; createdAt: string; updatedAt: string }
 export interface SabbathClassEntity extends SabbathClassData { id: string }
 export interface SmallGroupData { name: string; churchId: string; leaderId: string; associateId: string | null; host: string; address: string; day: string; time: string; participantIds: string[]; active: boolean; createdAt: string; updatedAt: string }
 export interface SmallGroupEntity extends SmallGroupData { id: string }

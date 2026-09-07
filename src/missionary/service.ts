@@ -22,6 +22,37 @@ export class MissionaryService {
   private async save<T extends object>(accountId:string,key:CryptoKey,type:'sabbath_class'|'small_group'|'uapg',data:T):Promise<{id:string}&T>{const id=crypto.randomUUID();await this.repo.saveEncrypted(accountId,currentDeviceId(accountId),id,await encryptPayload(key,{schemaVersion:1,type,data},id),type);return {id,...data} }
   async saveClass(accountId:string,key:CryptoKey,data:Omit<SabbathClassData,'createdAt'|'updatedAt'>){if(!data.churchId||!data.teacherId)throw new Error('Informe igreja e professor.');const now=new Date().toISOString();return this.save(accountId,key,'sabbath_class',{...data,createdAt:now,updatedAt:now})}
   async updateClass(accountId:string,key:CryptoKey,id:string,data:Omit<SabbathClassData,'createdAt'|'updatedAt'>){if(!data.churchId||!data.teacherId)throw new Error('Informe igreja e professor.');const current=(await this.listClasses(accountId,key)).find(item=>item.id===id);if(!current)throw new Error('Classe não encontrada.');const stored:SabbathClassData={...data,createdAt:current.createdAt,updatedAt:new Date().toISOString()};await this.replace(accountId,key,id,'sabbath_class',stored);return{id,...stored}}
+  /**
+   * Cria ou atualiza as unidades de uma igreja a partir do relatório do ACMS.
+   *
+   * Não passa por `saveClass` porque o relatório não diz quem é o professor, e
+   * exigi-lo aqui impediria a importação inteira por causa de um dado que o
+   * documento não tem. A classe entra sem professor, e o pastor o escolhe
+   * depois; o que o relatório sabe — nome e quem participa — entra completo.
+   *
+   * Casa pelo nome dentro da igreja: reenviar o relatório atualiza a unidade em
+   * vez de criar outra igual ao lado.
+   */
+  async importarClasses(accountId: string, key: CryptoKey, churchId: string, unidades: ReadonlyArray<{ nome: string; participantIds: string[] }>) {
+    if (!churchId) throw new Error('Escolha a igreja deste relatório.')
+    const existentes = (await this.listClasses(accountId, key)).filter((item) => item.churchId === churchId)
+    const chave = (valor: string) => valor.normalize('NFD').replace(/[\u0300-\u036f]/gu, '').toLocaleLowerCase('pt-BR').replace(/\s+/gu, ' ').trim()
+    let criadas = 0; let atualizadas = 0
+    for (const unidade of unidades) {
+      const atual = existentes.find((item) => chave(item.name ?? '') === chave(unidade.nome))
+      const now = new Date().toISOString()
+      if (atual) {
+        const stored: SabbathClassData = { ...atual, name: unidade.nome, participantIds: unidade.participantIds, createdAt: atual.createdAt, updatedAt: now }
+        await this.replace(accountId, key, atual.id, 'sabbath_class', stored)
+        atualizadas += 1
+      } else {
+        await this.save(accountId, key, 'sabbath_class', { name: unidade.nome, churchId, teacherId: '', assistantId: null, ageGroup: 'other', participantIds: unidade.participantIds, createdAt: now, updatedAt: now })
+        criadas += 1
+      }
+    }
+    return { criadas, atualizadas }
+  }
+
   async saveSmallGroup(accountId:string,key:CryptoKey,data:Omit<SmallGroupData,'createdAt'|'updatedAt'>){if(!data.name.trim()||!data.churchId||!data.leaderId)throw new Error('Informe nome, igreja e líder.');const now=new Date().toISOString();return this.save(accountId,key,'small_group',{...data,name:data.name.trim(),createdAt:now,updatedAt:now})}
   async updateSmallGroup(accountId:string,key:CryptoKey,id:string,data:Omit<SmallGroupData,'createdAt'|'updatedAt'>){if(!data.name.trim()||!data.churchId||!data.leaderId)throw new Error('Informe nome, igreja e líder.');const current=(await this.listSmallGroups(accountId,key)).find(item=>item.id===id);if(!current)throw new Error('PG não encontrado.');const stored:SmallGroupData={...data,name:data.name.trim(),createdAt:current.createdAt,updatedAt:new Date().toISOString()};await this.replace(accountId,key,id,'small_group',stored);return{id,...stored}}
   async saveUapg(accountId:string,key:CryptoKey,data:Omit<UapgData,'createdAt'|'updatedAt'>){if(!data.name.trim()||!data.churchId)throw new Error('Informe nome e igreja.');const now=new Date().toISOString();return this.save(accountId,key,'uapg',{...data,name:data.name.trim(),createdAt:now,updatedAt:now})}
