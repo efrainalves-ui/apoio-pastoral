@@ -7,7 +7,7 @@ const password = 'senha-ficticia-v1-2026'
 async function register(page: Page) {
   await page.goto('/acesso')
   await page.getByLabel('E-mail').fill(email)
-  await page.getByLabel('Senha').fill(password)
+  await page.getByRole('textbox', { name: 'Senha' }).fill(password)
   await page.getByRole('button', { name: 'Criar conta' }).click()
   await page.getByRole('button', { name: 'Já guardei em local seguro' }).click()
   await page.getByLabel('Nome do distrito').fill('Distrito Pessoas Fictício')
@@ -84,7 +84,7 @@ test('pessoas, família, aniversários, busca e importações privadas funcionam
 
   await context.setOffline(true)
   await page.reload()
-  await page.getByLabel('Senha').fill(password)
+  await page.getByRole('textbox', { name: 'Senha' }).fill(password)
   await page.getByRole('button', { name: 'Entrar' }).click()
   await expect(page.getByRole('heading', { name: 'Visão do distrito' })).toBeVisible()
   await navigateInsideApp(page, '/app/pessoas', page.getByRole('heading', { name: 'Pessoas', exact: true }))

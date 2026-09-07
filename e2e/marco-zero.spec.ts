@@ -9,7 +9,7 @@ const password = 'senha-ficticia-segura-2026'
 async function register(page: Page) {
   await page.goto('/acesso')
   await page.getByLabel('E-mail').fill(email)
-  await page.getByLabel('Senha').fill(password)
+  await page.getByRole('textbox', { name: 'Senha' }).fill(password)
   await page.getByRole('button', { name: 'Criar conta' }).click()
   await expect(page.getByRole('heading', { name: 'Guarde sua chave de recuperação' })).toBeVisible()
   await expect(page.getByTestId('recovery-code')).toContainText('APOIO-1-')
@@ -30,7 +30,7 @@ test('jornada básica usa somente dados fictícios', async ({ page }) => {
 test('cria conta, protege rota, bloqueia, entra e recupera acesso', async ({ page }) => {
   await page.goto('/acesso')
   await page.getByLabel('E-mail').fill(email)
-  await page.getByLabel('Senha').fill(password)
+  await page.getByRole('textbox', { name: 'Senha' }).fill(password)
   await page.getByRole('button', { name: 'Criar conta' }).click()
   const recoveryCode = await page.getByTestId('recovery-code').textContent()
   expect(recoveryCode).toMatch(/^APOIO-1-/)
@@ -48,7 +48,7 @@ test('cria conta, protege rota, bloqueia, entra e recupera acesso', async ({ pag
   await expect(page).toHaveURL(/\/acesso$/)
   await expect(page.getByRole('heading', { name: 'Entre na sua conta' })).toBeVisible()
 
-  await page.getByLabel('Senha').fill(password)
+  await page.getByRole('textbox', { name: 'Senha' }).fill(password)
   await page.getByRole('button', { name: 'Entrar' }).click()
   await expect(page.getByRole('heading', { name: 'Visão do distrito' })).toBeVisible()
 
@@ -78,7 +78,7 @@ test('continua disponível offline depois do primeiro carregamento', async ({ pa
   await context.setOffline(true)
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Entre na sua conta' })).toBeVisible()
-  await page.getByLabel('Senha').fill(password)
+  await page.getByRole('textbox', { name: 'Senha' }).fill(password)
   await page.getByRole('button', { name: 'Entrar' }).click()
   await expect(page.getByRole('heading', { name: 'Visão do distrito' })).toBeVisible()
   await navigateInsideApp(page, '/app/agenda', page.getByText('Compromisso Offline Fictício'))

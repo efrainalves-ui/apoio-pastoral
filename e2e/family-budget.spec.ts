@@ -6,7 +6,7 @@ const password = 'senha-ficticia-orcamento-2026'
 async function registerAndEnter(page: Page) {
   await page.goto('/acesso')
   await page.getByLabel('E-mail').fill(email)
-  await page.getByLabel('Senha').fill(password)
+  await page.getByRole('textbox', { name: 'Senha' }).fill(password)
   await page.getByRole('button', { name: 'Criar conta' }).click()
   await page.getByRole('button', { name: 'Já guardei em local seguro' }).click()
   await page.getByLabel('Nome do distrito').fill('Distrito Fictício do Orçamento')

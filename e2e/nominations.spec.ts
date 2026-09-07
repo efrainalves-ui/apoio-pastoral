@@ -18,7 +18,7 @@ async function prepare(page: Page) {
   await page.goto('/acesso')
   await page.getByRole('tab', { name: 'Criar conta' }).click()
   await page.getByLabel('E-mail').fill('nomeacoes.e2e@example.invalid')
-  await page.getByLabel('Senha').fill('senha-ficticia-nomeacoes-2027')
+  await page.getByRole('textbox', { name: 'Senha' }).fill('senha-ficticia-nomeacoes-2027')
   await page.getByRole('button', { name: 'Criar conta' }).click()
   await page.getByRole('button', { name: 'Já guardei em local seguro' }).click()
   await page.getByLabel('Nome do distrito').fill('Distrito Fictício de Nomeações')

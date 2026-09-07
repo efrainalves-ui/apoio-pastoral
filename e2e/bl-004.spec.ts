@@ -7,7 +7,7 @@ const password = 'senha-ficticia-bl004-2026'
 async function register(page: Page) {
   await page.goto('/acesso')
   await page.getByLabel('E-mail').fill(email)
-  await page.getByLabel('Senha').fill(password)
+  await page.getByRole('textbox', { name: 'Senha' }).fill(password)
   await page.getByRole('button', { name: 'Criar conta' }).click()
   await page.getByRole('button', { name: 'Já guardei em local seguro' }).click()
   await page.getByLabel('Nome do distrito').fill('Distrito E2E Fictício')
@@ -56,10 +56,12 @@ test('distrito e igreja continuam disponíveis offline', async ({ page, context 
   await createDistrictAndChurch(page)
   await context.setOffline(true)
   await page.reload()
-  await page.getByLabel('Senha').fill(password)
+  await page.getByRole('textbox', { name: 'Senha' }).fill(password)
   await page.getByRole('button', { name: 'Entrar' }).click()
   await expect(page.getByRole('heading', { name: 'Visão do distrito', exact: true })).toBeVisible()
   await openDistrict(page)
   await expect(page.getByRole('heading', { name: 'Distrito E2E Fictício' })).toBeVisible()
-  await expect(page.getByText('Ponto Modelo Fictício')).toBeVisible()
+  // Pelo título do cartão: o nome da igreja também aparece no seletor do envio
+  // de relatório, que agora mora nesta página.
+  await expect(page.getByRole('heading', { name: 'Ponto Modelo Fictício' })).toBeVisible()
 })

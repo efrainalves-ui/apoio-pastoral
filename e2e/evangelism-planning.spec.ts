@@ -5,7 +5,7 @@ import { navigateInsideApp } from './navigation'
 async function registerWithFictitiousDistrict(page: Page) {
   await page.goto('/acesso')
   await page.getByLabel('E-mail').fill('planejamento.evangelismo.e2e@example.invalid')
-  await page.getByLabel('Senha').fill('senha-ficticia-planejamento-2026')
+  await page.getByRole('textbox', { name: 'Senha' }).fill('senha-ficticia-planejamento-2026')
   await page.getByRole('button', { name: 'Criar conta' }).click()
   await page.getByRole('button', { name: 'Já guardei em local seguro' }).click()
   await page.getByLabel('Nome do distrito').fill('Distrito Fictício do Planejamento')

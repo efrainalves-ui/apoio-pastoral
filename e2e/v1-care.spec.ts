@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { agendaDate, futureDate, isoDate, isoDateTime } from './dates'
+import { agendaDate, isoDateTime } from './dates'
 import { navigateInsideApp } from './navigation'
 
 const email = 'v1.cuidado.e2e@example.invalid'
@@ -8,7 +8,7 @@ const password = 'senha-ficticia-cuidado-2026'
 async function foundation(page: Page) {
   await page.goto('/acesso')
   await page.getByLabel('E-mail').fill(email)
-  await page.getByLabel('Senha').fill(password)
+  await page.getByRole('textbox', { name: 'Senha' }).fill(password)
   await page.getByRole('button', { name: 'Criar conta' }).click()
   await page.getByRole('button', { name: 'Já guardei em local seguro' }).click()
   await page.getByLabel('Nome do distrito').fill('Distrito Cuidado Fictício')
@@ -55,9 +55,12 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   await expect(visitChurch.locator('option', { hasText: 'Igreja Esperança Fictícia' })).toHaveCount(1)
   await visitChurch.selectOption({ label: 'Igreja Esperança Fictícia' })
   await expect(visitChurch).not.toHaveValue('')
-  // As perguntas ficam abertas desde o começo, antes de escolher qualquer membro.
+  // Primeiro se registra quem foi visitado; as perguntas só aparecem depois.
+  await expect(page.locator('.question-card')).toHaveCount(0)
+  // O membro é achado pela busca, como o pastor o procura.
+  await page.getByLabel('Buscar membro').fill('Pessoa Cuidado')
+  await page.locator('.visit-members__results').getByRole('button', { name: 'Pessoa Cuidado Fictícia' }).click()
   await expect(page.locator('.question-card').first()).toBeVisible()
-  await page.getByRole('button', { name: 'Pessoa Cuidado Fictícia', exact: true }).click()
   await page.getByLabel('Agendamento vinculado').selectOption({ label: 'Visita Agendada Fictícia' })
   await page.getByLabel('Rodada').selectOption({ label: 'Rodada Cuidado Fictícia' })
   // A pergunta é achada pelo texto, como o pastor a lê: o código interno não
@@ -67,23 +70,21 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   await question.getByRole('button', { name: 'Sim', exact: true }).click()
   await expect(question.getByRole('button', { name: 'Sim', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await page.getByLabel('Pedido opcional').fill('Pedido de oração inteiramente fictício')
-  await page.getByRole('combobox', { name: 'Acompanhamento', exact: true }).selectOption('call')
-  await page.getByLabel('Prazo do acompanhamento').fill(isoDate(futureDate(2)))
-  await page.getByLabel('Título da tarefa').fill('Tarefa pastoral fictícia')
-  await page.getByLabel('Prazo da tarefa').fill(isoDate(futureDate(3)))
   await page.getByRole('button', { name: 'Finalizar visita' }).click()
-  const visitVersion = page.getByText(/^Retrato imutável · versão \d+$/)
-  await expect(visitVersion).toHaveText('Retrato imutável · versão 1')
-  await page.getByRole('button', { name: 'Registrar correção' }).click()
-  await page.getByLabel('Motivo da correção').fill('Ajuste fictício')
-  await page.getByRole('button', { name: 'Salvar como versão 2' }).click()
-  await expect(visitVersion).toHaveText('Retrato imutável · versão 2')
+  // A visita abre no detalhe, com editar e excluir. A cerimônia de versão saiu:
+  // corrigir o que se escreveu é corrigir, não criar um retrato novo.
+  await expect(page.getByRole('heading', { name: 'Pessoa Cuidado Fictícia', level: 1 })).toBeVisible()
+  await expect(page.getByText('Retrato imutável')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Editar' }).click()
+  await page.getByLabel('Observações').fill('Ajuste fictício')
+  await page.getByRole('button', { name: 'Salvar', exact: true }).click()
+  await expect(page.getByText('Ajuste fictício')).toBeVisible()
   await navigateInsideApp(page, '/app/visitacao', page.getByText('Rodada Cuidado Fictícia'))
   await expect(page.getByText('Rodada Cuidado Fictícia')).toBeVisible()
   await expect(page.getByText('1 de 1 famílias visitadas')).toBeVisible()
   await context.setOffline(true)
   await page.reload()
-  await page.getByLabel('Senha').fill(password)
+  await page.getByRole('textbox', { name: 'Senha' }).fill(password)
   await page.getByRole('button', { name: 'Entrar' }).click()
   // A visita passou a ser registrada por membro, então a lista mostra a pessoa.
   await navigateInsideApp(page, '/app/visitacao', page.getByText('Pessoa Cuidado Fictícia'))
