@@ -1487,3 +1487,12 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 :root[data-tema='escuro'] .fidelidade--parcial strong { color: #e8c477; }
 :root[data-tema='escuro'] .quadro--alcancado { color: #7fd1b0; }
 :root[data-tema='escuro'] .quadro--falta { color: #f19289; }
+
+/*
+  Escolher igrejas numa lista de caixas altas empurrava o formulário inteiro
+  para fora da tela. O nome cabe numa ficha, e as fichas cabem lado a lado.
+*/
+.igreja-fichas { display: flex; flex-wrap: wrap; gap: 8px; }
+.igreja-fichas .ficha { padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: .9rem; cursor: pointer; }
+.igreja-fichas .ficha:hover { border-color: var(--green-700); }
+.igreja-fichas .ficha--escolhida { background: var(--green-800); border-color: var(--green-800); color: #fff; font-weight: 600; }
