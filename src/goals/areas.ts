@@ -322,6 +322,10 @@ export interface CrescimentoDaMeta {
   atual: number
   /** Até que mês o ano corrente tem resultado. */
   ateOMes: number
+  /** O ano anterior inteiro, que é sobre o que a meta do ano foi combinada. */
+  anoAnteriorFechado: number
+  /** O valor que a meta do ano significa em dinheiro. */
+  objetivoAnual: number
 }
 
 /**
@@ -351,7 +355,12 @@ export function crescimentoDaMeta(area: GoalArea, goals: GoalEntity[], sources: 
   const falta = alcancado === null ? alvo : Math.max(0, alvo - alcancado)
   const percentDaMeta = alvo > 0 && alcancado !== null ? Math.max(0, Math.min(100, Math.round((alcancado / alvo) * 100))) : 0
 
-  return { alvo, alcancado, falta, percentDaMeta, anterior, atual, ateOMes }
+  // A meta do ano é sobre o ano anterior inteiro, e não sobre o pedaço já
+  // percorrido: "crescer 30% sobre 2025" quer dizer sobre os doze meses de 2025.
+  const anoAnteriorFechado = previousResult(area, sources, year - 1)
+  const objetivoAnual = alvo > 0 ? anoAnteriorFechado * (1 + alvo / 100) : 0
+
+  return { alvo, alcancado, falta, percentDaMeta, anterior, atual, ateOMes, anoAnteriorFechado, objetivoAnual }
 }
 
 export interface ChurchProgress { churchId: string; target: number; result: number; percent: number }
@@ -370,10 +379,20 @@ export function churchProgress(area: GoalArea, goals: GoalEntity[], sources: Are
  * Resultado de um ano já encerrado. Vale o consolidado que o pastor registrou;
  * sem ele, vale o que estiver lançado naquele ano. Nunca soma os dois.
  */
+/**
+ * O resultado de um ano fechado.
+ *
+ * Os lançamentos vêm antes do consolidado. O consolidado existe para o ano de
+ * que só se sabe o total — digitado à mão, ou vindo de um relatório que trazia
+ * apenas a soma. Quando há lançamentos mês a mês, eles são a verdade mais fina,
+ * e preferi-lo era o que travava o número: o relatório de janeiro a agosto
+ * gravava um consolidado com a soma daqueles oito meses, e importar 2025 inteiro
+ * depois não mudava nada, porque o consolidado velho continuava vencendo.
+ */
 export function previousResult(area: GoalArea, sources: AreaSources, year: number): number {
-  const consolidado = (sources.history ?? []).find((item) => item.area === area && item.year === year)
-  if (consolidado) return consolidado.amount
-  return areaResults(area, sources, year).reduce((soma, item) => soma + item.amount, 0)
+  const lancamentos = areaResults(area, sources, year).reduce((soma, item) => soma + item.amount, 0)
+  if (lancamentos > 0) return lancamentos
+  return (sources.history ?? []).find((item) => item.area === area && item.year === year)?.amount ?? 0
 }
 
 export interface AreaComparison extends AreaProgress {

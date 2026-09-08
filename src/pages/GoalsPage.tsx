@@ -87,6 +87,7 @@ export function GoalsPage() {
                     {crescimento.ateOMes > 0
                       ? <p className="goal-card__percent">Janeiro a {MONTH_LABELS[crescimento.ateOMes - 1]}, nos dois anos: {formatGoalValue(area, crescimento.anterior)} → {formatGoalValue(area, crescimento.atual)}</p>
                       : <p className="goal-card__percent">Envie o Comparativo de Entradas deste ano</p>}
+                    {crescimento.objetivoAnual > 0 && <p className="goal-card__percent">Meta do ano: {formatGoalValue(area, crescimento.objetivoAnual)} · {year - 1} fechou em {formatGoalValue(area, crescimento.anoAnteriorFechado)}</p>}
                   </>
                   : <>
                     <div className="goal-card__numbers">

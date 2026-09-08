@@ -56,3 +56,32 @@ describe('a meta de crescimento medida em porcentagem', () => {
     expect(crescimento.percentDaMeta).toBe(0)
   })
 })
+
+describe('a meta do ano é sobre o ano anterior inteiro', () => {
+  it('usa os doze meses de 2025, não o pedaço já percorrido', () => {
+    // "Crescer 30% sobre 2025" é sobre 2025 inteiro. Medir contra os oito meses
+    // já vividos daria uma meta menor do que a combinada.
+    const anterior = [40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40]
+    const crescimento = crescimentoDaMeta('tithes', meta(30), fontes(anterior, [50, 50]), 2026)
+
+    expect(crescimento.anoAnteriorFechado).toBe(480)
+    expect(crescimento.objetivoAnual).toBeCloseTo(624)
+    // O alcançado continua sendo do mesmo período: 100 contra 80.
+    expect(crescimento.anterior).toBe(80)
+    expect(crescimento.alcancado).toBeCloseTo(25)
+  })
+})
+
+describe('o consolidado velho não trava o ano fechado', () => {
+  it('os lançamentos vencem o consolidado quando existem', () => {
+    // O relatório de janeiro a agosto gravava um consolidado com a soma daqueles
+    // oito meses. Importar 2025 inteiro depois não mudava nada, porque o
+    // consolidado continuava vencendo.
+    const fontesComHistorico = {
+      ...fontes([40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40], [50]),
+      history: [{ id: 'h1', area: 'tithes' as const, year: 2025, amount: 320, source: 'pdf' as const, reference: '', createdAt: '', updatedAt: '' }],
+    }
+
+    expect(crescimentoDaMeta('tithes', meta(30), fontesComHistorico, 2026).anoAnteriorFechado).toBe(480)
+  })
+})

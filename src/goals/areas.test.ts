@@ -126,12 +126,17 @@ describe('comparação com o ano anterior', () => {
     expect(previousResult('baptisms', sources, 2025)).toBe(30)
   })
 
-  // Sem consolidado, vale o que estiver lançado naquele ano — nunca os dois somados.
-  it('cai para os lançamentos do ano quando não há consolidado', () => {
+  // Nunca os dois somados: ou o lançado, ou o consolidado.
+  it('os lançamentos do ano vencem o consolidado', () => {
+    // O consolidado existe para o ano de que só se sabe o total. Quando há
+    // lançamentos mês a mês, eles são a verdade mais fina — e preferir o
+    // consolidado travava o número: o relatório de janeiro a agosto gravava um
+    // consolidado com a soma daqueles oito meses, e importar o ano inteiro
+    // depois não mudava nada.
     const sources: AreaSources = { ...vazio, entries: [lancamento({ date: '2025-04-10', amount: 4 }), lancamento({ date: '2025-06-10', amount: 3 })] }
 
     expect(previousResult('baptisms', sources, 2025)).toBe(7)
-    expect(previousResult('baptisms', { ...sources, history: [historico({ amount: 30 })] }, 2025)).toBe(30)
+    expect(previousResult('baptisms', { ...sources, history: [historico({ amount: 30 })] }, 2025)).toBe(7)
   })
 
   it('não deixa o histórico mexer no resultado do ano corrente', () => {

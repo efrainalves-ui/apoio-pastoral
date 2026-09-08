@@ -983,9 +983,13 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   .sermon-row__where { flex: 1; justify-content: center; }
 }
 
-.goal-cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+/*
+  Cartão estreito quebrava "R$ 620.651" em duas linhas e o número deixava de ser
+  legível de relance. Mais largo cabe inteiro, e a coluna interna acompanha.
+*/
+.goal-cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); }
 .goal-card { display: grid; gap: 10px; }
-.goal-card__numbers { min-width: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 10px; }
+.goal-card__numbers { min-width: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px 14px; }
 /*
   Quebrar em qualquer ponto partia o número no meio — "R$ 620.65" numa linha e
   "1" na outra. O que precisa quebrar é o espaço depois de "R$", e disso cuida
