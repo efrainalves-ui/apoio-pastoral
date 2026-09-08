@@ -108,6 +108,13 @@ export const USEFUL_LINKS: readonly UsefulLink[] = [
     url: 'https://drive.google.com/drive/folders/1-Ax5-YG16e7Xy7gbyjWHUKMGR8GKL9nb',
   },
   {
+    id: 'biblioteca-ministerial',
+    title: 'Livros e treinamentos',
+    description: 'Biblioteca ministerial por tema: comentários, teologia, biografias e material de treinamento.',
+    category: 'estudo',
+    url: 'https://1drv.ms/f/c/7193f87a532d5955/IgBVWS1TeviTIIBx7fsCAAAAAeBULwoe9uQOPRidZIaq7cc',
+  },
+  {
     id: 'ferramentas-biblicas',
     title: 'Ferramentas bíblicas',
     description: 'Recursos de consulta e apoio ao estudo da Bíblia.',
