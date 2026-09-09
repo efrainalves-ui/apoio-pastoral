@@ -1,5 +1,5 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
-import { BookHeart, Cake, CalendarDays, ChevronRight, Church, Heart, HeartHandshake, ListChecks, Megaphone, ShieldCheck, SquareCheck, UsersRound } from 'lucide-react'
+import { BookHeart, Cake, TriangleAlert, CalendarDays, ChevronRight, Church, HeartHandshake, Megaphone, ShieldCheck, SquareCheck, UsersRound } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
@@ -12,6 +12,7 @@ import { GoalsSummary } from '../components/GoalsSummary'
 import { MetaFinanceiraResumo } from '../components/MetaFinanceiraResumo'
 import { VisitAnswersSummary } from '../components/VisitAnswersSummary'
 import { Card } from '../components/ui/Card'
+import { MetricLink } from '../components/ui/MetricLink'
 import { CountUp } from '../components/ui/CountUp'
 import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
@@ -159,25 +160,75 @@ export function HomePage() {
       </Link>
     </section>}
 
-    <div className="home-grid"><Card eyebrow="Hoje" title="Agenda" action={<CalendarDays className="accent-icon" />}>{!todayEvents.length ? <div className="empty-state compact-empty"><CalendarDays /><strong>Nenhum compromisso hoje</strong><span>Reserve um horário para uma visita, reunião ou pregação.</span></div> : <div className="breakdown-list">{todayEvents.map((event) => <div key={event.id}><span>{event.title}</span><strong>{event.allDay ? 'Dia todo' : new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(event.startAt))}</strong></div>)}</div>}<Link className="text-link" to="/app/agenda">Abrir agenda <ChevronRight /></Link></Card><Card eyebrow="Hoje" title="Aniversariantes" action={<Cake className="accent-icon" />}>{todayBirthdays.length === 0 ? <div className="empty-state compact-empty"><Cake /><strong>Nenhum aniversariante hoje</strong></div> : <ul className="tira-pessoas">{todayBirthdays.map(({ person, turningAge }) => <li key={person.id}><Link to={`/app/aniversarios`}><span className="inicial-redonda" aria-hidden="true">{person.name[0]}</span><strong>{primeiroEUltimo(person.name)}</strong><small>{turningAge} anos</small></Link></li>)}</ul>}<Link className="text-link" to="/app/aniversarios">Ver próximos aniversários <ChevronRight /></Link></Card></div>
-    <div className="home-grid"><Card eyebrow="Atenção pastoral" title="Visitas e cuidados" action={<HeartHandshake className="accent-icon" />}><div className="private-summary"><div><span>Tarefas vencidas</span><strong>{overdueTasks.length}</strong></div><div><span>Pedidos em oração</span><strong>{prayersInPrayer.length}</strong></div><div><span>Acompanhamentos</span><strong>{pendingFollowUps.length}</strong></div></div><div className="card-link-row"><Link className="text-link" to="/app/visitacao"><ListChecks />Abrir cuidados</Link><Link className="text-link" to="/app/visitacao?aba=oracao">Abrir pedidos de oração <ChevronRight /></Link></div></Card></div>
+    <div className="home-grid"><Card eyebrow="Hoje" title="Agenda" action={<Link className="icon-button" to="/app/agenda" aria-label="Abrir agenda"><CalendarDays className="accent-icon" /></Link>}>{!todayEvents.length ? <div className="empty-state compact-empty"><CalendarDays /><strong>Nenhum compromisso hoje</strong><span>Reserve um horário para uma visita, reunião ou pregação.</span></div> : <div className="breakdown-list">{todayEvents.map((event) => <div key={event.id}><span>{event.title}</span><strong>{event.allDay ? 'Dia todo' : new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(event.startAt))}</strong></div>)}</div>}</Card><Card eyebrow="Hoje" title="Aniversariantes" action={<Link className="icon-button" to="/app/aniversarios" aria-label="Ver próximos aniversários"><Cake className="accent-icon" /></Link>}>{todayBirthdays.length === 0 ? <div className="empty-state compact-empty"><Cake /><strong>Nenhum aniversariante hoje</strong></div> : <ul className="tira-pessoas">{todayBirthdays.map(({ person, turningAge }) => <li key={person.id}><Link to={`/app/aniversarios`}><span className="inicial-redonda" aria-hidden="true">{person.name[0]}</span><strong>{primeiroEUltimo(person.name)}</strong><small>{turningAge} anos</small></Link></li>)}</ul>}</Card></div>
+    <div className="home-grid"><Card eyebrow="Atenção pastoral" title="Visitas e cuidados" action={<Link className="icon-button" to="/app/visitacao" aria-label="Abrir visitas e cuidados"><HeartHandshake className="accent-icon" /></Link>}>
+      {/*
+        O número é o caminho. Havia os números e, embaixo, uma fileira de links
+        de texto dizendo a mesma coisa. Tarefas saiu daqui porque tem cartão
+        próprio: o mesmo dado em dois lugares faz duvidar de qual é o certo.
+      */}
+      <div className="metrics-link-row">
+        <MetricLink label="Pedidos de oração" value={prayersInPrayer.length} to="/app/visitacao?aba=oracao" />
+        <MetricLink label="Acompanhamentos" value={pendingFollowUps.length} to="/app/visitacao?aba=acompanhamentos" />
+      </div>
+    </Card></div>
     <div className="home-grid">
-      <Card eyebrow="Hoje" title="Tarefas" action={<SquareCheck className="accent-icon" />}>
+      {/*
+        A tarefa de hoje é o que se faz agora, e por isso ela manda no cartão.
+
+        Antes eram três contagens do mesmo tamanho e duas listas parecidas
+        embaixo. Agora cada contagem é um caminho, e só as de hoje e as vencidas
+        aparecem escritas — são elas que pedem decisão antes do fim do dia.
+      */}
+      <Card eyebrow="Hoje" title="Tarefas" action={<Link className="icon-button" to="/app/visitacao?aba=tarefas" aria-label="Abrir tarefas"><SquareCheck className="accent-icon" /></Link>}>
         {!overdueTasks.length && !tasksDueToday.length && !outrasTarefas.length
-          ? <div className="empty-state compact-empty"><SquareCheck /><strong>Nenhuma tarefa</strong><span>Você está em dia com o que havia anotado.</span></div>
-          : <div className="private-summary"><div><span>Vencidas</span><strong>{overdueTasks.length}</strong></div><div><span>Para hoje</span><strong>{tasksDueToday.length}</strong></div><div><span>Outras</span><strong>{outrasTarefas.length}</strong></div></div>}
-        {Boolean(overdueTasks.length || tasksDueToday.length) && <div className="breakdown-list">{[...overdueTasks, ...tasksDueToday].slice(0, 4).map((task) => <div key={task.id}><span>{task.title}</span><strong>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(task.dueAt))}</strong></div>)}</div>}
-        {outrasTarefas.length > 0 && <><p className="field__label">Outras tarefas</p><div className="breakdown-list">{outrasTarefas.slice(0, 4).map((task) => <div key={task.id}><span>{task.title}</span><strong>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(task.dueAt))}</strong></div>)}</div></>}
-        <Link className="text-link" to="/app/visitacao?aba=tarefas">Abrir tarefas <ChevronRight /></Link>
+          ? <div className="empty-state compact-empty"><SquareCheck /><strong>Nenhuma tarefa</strong></div>
+          : <>
+            <div className="metrics-link-row">
+              <MetricLink label="Para hoje" value={tasksDueToday.length} to="/app/visitacao?aba=tarefas" tone={tasksDueToday.length > 0 ? 'ok' : 'neutro'} />
+              <MetricLink label="Vencidas" value={overdueTasks.length} to="/app/visitacao?aba=tarefas" tone={overdueTasks.length > 0 ? 'atencao' : 'neutro'} />
+              <MetricLink label="Depois" value={outrasTarefas.length} to="/app/visitacao?aba=tarefas" />
+            </div>
+            {Boolean(overdueTasks.length || tasksDueToday.length) && <ul className="lista-tarefas">
+              {[...overdueTasks, ...tasksDueToday].slice(0, 4).map((task) => (
+                <li key={task.id} className={task.dueAt.slice(0, 10) < today ? 'lista-tarefas--vencida' : ''}>
+                  <Link to="/app/visitacao?aba=tarefas">
+                    <span className="lista-tarefas__marca" aria-hidden="true" />
+                    <strong>{task.title}</strong>
+                    <small>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(task.dueAt))}</small>
+                  </Link>
+                </li>
+              ))}
+            </ul>}
+          </>}
       </Card>
 
-      <Card eyebrow="Cuidado" title="Pedidos de oração" action={<Heart className="accent-icon" />}>
-        {!prayersNeedingCare.length
-          ? <div className="empty-state compact-empty"><Heart /><strong>Nenhum pedido aguardando retorno</strong><span>Os pedidos ativos estão dentro do prazo combinado.</span></div>
-          : <p className="card-copy">{prayersNeedingCare.length === 1 ? '1 pedido de oração precisa de revisão.' : `${prayersNeedingCare.length} pedidos de oração precisam de revisão.`}</p>}
-        <Link className="text-link" to="/app/visitacao?aba=oracao">Ver pedidos para acompanhar <ChevronRight /></Link>
-      </Card>
+      {/*
+        A igreja que pede atenção precisa parecer diferente da que está em dia.
 
+        Era nome à esquerda e motivo em negrito branco à direita, os dois
+        disputando a linha: lia-se como erro de impressão. Agora o nome manda, o
+        motivo vira etiqueta âmbar com ícone — cor e forma, porque só a cor não
+        serve a quem não a distingue — e a linha inteira leva à igreja.
+      */}
+      <Card eyebrow="Distrito" title="Igrejas que precisam de atenção" action={<Link className="icon-button" to="/app/distrito" aria-label="Ver igrejas do distrito"><Church className="accent-icon" /></Link>}>
+        {!churchesNeedingAttention.length
+          ? <div className="empty-state compact-empty"><Church /><strong>Nenhuma pendência nas igrejas</strong></div>
+          : <ul className="lista-atencao">{churchesNeedingAttention.slice(0, 5).map((church) => (
+              <li key={church.id}>
+                <Link to={`/app/distrito/igrejas/${church.id}`}>
+                  <strong>{church.name}</strong>
+                  <span className="selo-atencao"><TriangleAlert aria-hidden="true" />{church.motivo}</span>
+                </Link>
+              </li>
+            ))}</ul>}
+      </Card>
+    </div>
+    <Card eyebrow="Missão" title="Evangelismo" action={<Megaphone className="accent-icon" />}><div className="private-summary"><div><span>Em preparação</span><strong>{campaignSummary.preparing}</strong></div><div><span>Acontecendo</span><strong>{campaignSummary.happening}</strong></div><div><span>Tarefas urgentes</span><strong>{campaigns.flatMap(({ tasks: campaignTasks }) => campaignTasks).filter((task) => isTaskUrgent(task, today)).length}</strong></div></div>{nextCampaign ? <Link className="entity-row" to={`/app/evangelismo/${nextCampaign.id}`}><span className="avatar"><Megaphone /></span><span><strong>{nextCampaign.name}</strong><small>Próxima ação em {new Intl.DateTimeFormat('pt-BR').format(new Date(`${nextCampaign.startDate}T12:00:00`))}</small></span><ChevronRight /></Link> : <div className="empty-state compact-empty"><Megaphone /><strong>Nenhuma campanha futura</strong><span>Planeje a próxima ação evangelística quando estiver pronto.</span></div>}<Link className="text-link" to="/app/evangelismo">Abrir Evangelismo <ChevronRight /></Link></Card>
+    <section className="dashboard-metrics" aria-label="Resumo do distrito"><Link to="/app/pessoas"><small>Pessoas</small><strong>{people.length}</strong><span>{people.filter(({ pastoralStatus }) => pastoralStatus === 'active').length} ativas</span></Link><Link to="/app/pessoas"><small>Acompanhar</small><strong>{people.filter(({ pastoralStatus }) => pastoralStatus === 'rescue').length}</strong><span>pessoas a resgatar</span></Link><Link to="/app/familias"><small>Famílias</small><strong>{families}</strong><span>laços cadastrados</span></Link><Link to="/app/aniversarios"><small>Aniversários hoje</small><strong>{todayBirthdays.length}</strong><span>ver mensagens</span></Link></section>
+    <MetaFinanceiraResumo />
+    <GoalsSummary />
+    <Card eyebrow="Distrito" title="Fidelidade" action={<ShieldCheck className="accent-icon" />}><div className="private-summary"><div><span>Dizimistas</span><strong>{fidelityCounts.tither}</strong></div><div><span>Dizimistas não sistemáticos</span><strong>{fidelityCounts.nonSystematic}</strong></div><div><span>Não dizimistas</span><strong>{fidelityCounts.nonTither}</strong></div></div><Link className="text-link" to="/app/fidelidade">Abrir Fidelidade <ChevronRight /></Link></Card>
       <Card eyebrow="Missão" title="Interessados e estudos" action={<BookHeart className="accent-icon" />}>
         {!interestsWaiting.length && !studiesInProgress.length
           ? <div className="empty-state compact-empty"><BookHeart /><strong>Nenhum contato pendente</strong><span>Cadastre interessados para acompanhar cada pessoa.</span></div>
@@ -186,20 +237,7 @@ export function HomePage() {
         <Link className="text-link" to="/app/missionario">Abrir interessados e estudos <ChevronRight /></Link>
       </Card>
 
-      <Card eyebrow="Distrito" title="Igrejas que precisam de atenção" action={<Church className="accent-icon" />}>
-        {!churchesNeedingAttention.length
-          ? <div className="empty-state compact-empty"><Church /><strong>Nenhuma pendência nas igrejas</strong><span>Todas têm pessoas cadastradas e compromisso marcado.</span></div>
-          : <div className="breakdown-list">{churchesNeedingAttention.slice(0, 5).map((church) => <div key={church.id}><span>{church.name}</span><strong>{church.motivo}</strong></div>)}</div>}
-        <Link className="text-link" to="/app/distrito">Ver igrejas do distrito <ChevronRight /></Link>
-      </Card>
-    </div>
-
-    <Card eyebrow="Distrito" title="Fidelidade" action={<ShieldCheck className="accent-icon" />}><div className="private-summary"><div><span>Dizimistas</span><strong>{fidelityCounts.tither}</strong></div><div><span>Dizimistas não sistemáticos</span><strong>{fidelityCounts.nonSystematic}</strong></div><div><span>Não dizimistas</span><strong>{fidelityCounts.nonTither}</strong></div></div><Link className="text-link" to="/app/fidelidade">Abrir Fidelidade <ChevronRight /></Link></Card>
-    <Card eyebrow="Missão" title="Evangelismo" action={<Megaphone className="accent-icon" />}><div className="private-summary"><div><span>Em preparação</span><strong>{campaignSummary.preparing}</strong></div><div><span>Acontecendo</span><strong>{campaignSummary.happening}</strong></div><div><span>Tarefas urgentes</span><strong>{campaigns.flatMap(({ tasks: campaignTasks }) => campaignTasks).filter((task) => isTaskUrgent(task, today)).length}</strong></div></div>{nextCampaign ? <Link className="entity-row" to={`/app/evangelismo/${nextCampaign.id}`}><span className="avatar"><Megaphone /></span><span><strong>{nextCampaign.name}</strong><small>Próxima ação em {new Intl.DateTimeFormat('pt-BR').format(new Date(`${nextCampaign.startDate}T12:00:00`))}</small></span><ChevronRight /></Link> : <div className="empty-state compact-empty"><Megaphone /><strong>Nenhuma campanha futura</strong><span>Planeje a próxima ação evangelística quando estiver pronto.</span></div>}<Link className="text-link" to="/app/evangelismo">Abrir Evangelismo <ChevronRight /></Link></Card>
     <Card eyebrow="Distrito" title="Pessoas por igreja">{churches.length === 0 ? <div className="empty-state compact-empty"><UsersRound /><strong>Nenhuma igreja cadastrada</strong><span>Cadastre as igrejas do distrito para organizar as pessoas.</span></div> : <div className="breakdown-list">{churches.map((church) => <div key={church.id}><span>{church.name}</span><strong>{people.filter(({ currentChurchId, importStatus }) => currentChurchId === church.id && importStatus !== 'archived').length}</strong></div>)}</div>}<Link className="text-link" to="/app/distrito">Abrir distrito e igrejas <ChevronRight /></Link></Card>
-    <section className="dashboard-metrics" aria-label="Resumo do distrito"><Link to="/app/pessoas"><small>Pessoas</small><strong>{people.length}</strong><span>{people.filter(({ pastoralStatus }) => pastoralStatus === 'active').length} ativas</span></Link><Link to="/app/pessoas"><small>Acompanhar</small><strong>{people.filter(({ pastoralStatus }) => pastoralStatus === 'rescue').length}</strong><span>pessoas a resgatar</span></Link><Link to="/app/familias"><small>Famílias</small><strong>{families}</strong><span>laços cadastrados</span></Link><Link to="/app/aniversarios"><small>Aniversários hoje</small><strong>{todayBirthdays.length}</strong><span>ver mensagens</span></Link></section>
-    <MetaFinanceiraResumo />
-    <GoalsSummary />
     <VisitAnswersSummary />
 
   </div>

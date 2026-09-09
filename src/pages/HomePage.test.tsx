@@ -27,7 +27,7 @@ describe('painel inicial', () => {
     expect(await screen.findByRole('heading', { name: 'Fidelidade' })).toBeInTheDocument()
     expect(screen.getByText('Dizimistas não sistemáticos')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Abrir Fidelidade/i })).toHaveAttribute('href', '/app/fidelidade')
-    expect(screen.getByText('Pedidos em oração').parentElement).toHaveTextContent('Pedidos em oração1')
+    expect(screen.getByText('Pedidos de oração').parentElement).toHaveTextContent('Pedidos de oração1')
     expect(screen.queryByText('Conteúdo reservado fictício')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Evangelismo' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Abrir Evangelismo/i })).toHaveAttribute('href', '/app/evangelismo')

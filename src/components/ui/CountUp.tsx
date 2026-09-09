@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { desacelerar, movimentoReduzido } from './animacao'
 
 interface CountUpProps {
@@ -19,12 +19,22 @@ interface CountUpProps {
  * ela não pode depender da animação.
  */
 export function CountUp({ value, format = String, durationMs = 700 }: CountUpProps) {
-  const [mostrado, setMostrado] = useState(() => (movimentoReduzido() ? value : 0))
+  /*
+    Começa no valor, e não em zero.
+  
+    Partindo de zero, o número só chegava ao certo se a animação rodasse — e ela
+    não roda em aba de segundo plano, nem onde `requestAnimationFrame` está
+    contido. Quem abrisse assim leria zero pedidos de oração havendo cinco. O
+    dado não pode depender do enfeite: a animação recua para zero e sobe, mas
+    só depois de garantir que vai mesmo correr.
+  */
+  const [mostrado, setMostrado] = useState(value)
   const jaAnimou = useRef(false)
 
-  useEffect(() => {
-    if (movimentoReduzido() || jaAnimou.current) { setMostrado(value); return }
+  useLayoutEffect(() => {
+    if (movimentoReduzido() || jaAnimou.current || typeof requestAnimationFrame !== 'function') { setMostrado(value); return }
     jaAnimou.current = true
+    setMostrado(0)
     let quadro = 0
     const inicio = performance.now()
     const passo = (agora: number) => {

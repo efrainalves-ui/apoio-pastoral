@@ -2006,3 +2006,54 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .sermons-page .sermon-row__icon { background: transparent; }
 .sermons-page .sermon-row__main small { font-size: .84rem; }
 .sermons-page .sermon-row__actions { flex-wrap: wrap; }
+
+/*
+  Número clicável: o próprio dado é o caminho.
+
+  A área de toque é o bloco inteiro, e não só o dígito — no celular, mirar num
+  número de 2rem é mirar em nada.
+*/
+.metric-link { display: grid; gap: 1px; min-width: 0; padding: 14px 12px 14px 0; border-radius: var(--raio-pequeno); color: inherit; text-decoration: none; transition: background var(--tempo-curto) linear, transform var(--tempo-curto) var(--saida); }
+.metric-link:hover { background: var(--green-50); }
+.metric-link:active { transform: scale(.97); }
+.metric-link__label { font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; overflow-wrap: break-word; }
+.metric-link__value { font-family: var(--serifada); font-weight: 400; font-size: 1.9rem; line-height: 1.05; }
+.metric-link--atencao .metric-link__value { color: var(--ambar); }
+.metric-link--ok .metric-link__value { color: var(--acento-dado); }
+.metrics-link-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); border-top: 1px solid var(--line); }
+.metrics-link-row > * + * { padding-left: 14px; border-left: 1px solid var(--line); }
+@media (prefers-reduced-motion: reduce) { .metric-link { transition: none; } .metric-link:active { transform: none; } }
+
+/*
+  Igrejas que pedem atenção.
+
+  Nome e motivo brigavam pela mesma linha, os dois em branco, e o conjunto lia
+  como erro de impressão. O nome passa a mandar; o motivo vira etiqueta âmbar
+  com ícone — cor e forma juntas, porque só a cor não serve a quem não a
+  distingue. A linha inteira é o toque.
+*/
+.lista-atencao { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.lista-atencao a { display: grid; gap: 7px; padding: 13px 12px; border-radius: var(--raio-pequeno); color: inherit; text-decoration: none; transition: background var(--tempo-curto) linear, transform var(--tempo-curto) var(--saida); }
+.lista-atencao a:hover { background: var(--green-50); }
+.lista-atencao a:active { transform: scale(.985); }
+.lista-atencao li + li { border-top: 1px solid var(--line); }
+.lista-atencao strong { font-size: 1rem; font-weight: 600; }
+.selo-atencao { display: inline-flex; align-items: center; gap: 6px; align-self: start; padding: 4px 11px 4px 8px; border-radius: 999px; background: var(--ambar-fraca); color: var(--ambar); font-size: .76rem; font-weight: 600; line-height: 1.3; }
+.selo-atencao svg { width: 14px; height: 14px; flex: none; }
+@media (prefers-reduced-motion: reduce) { .lista-atencao a { transition: none; } .lista-atencao a:active { transform: none; } }
+
+/*
+  A lista de tarefas do dia.
+
+  Cada linha tem uma marca à esquerda que diz, por forma e por cor, se está
+  vencida — e a data continua escrita, porque forma sozinha também não basta.
+*/
+.lista-tarefas { display: grid; gap: 2px; margin: 14px 0 0; padding: 0; list-style: none; }
+.lista-tarefas a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px; border-radius: var(--raio-pequeno); color: inherit; text-decoration: none; transition: background var(--tempo-curto) linear; }
+.lista-tarefas a:hover { background: var(--green-50); }
+.lista-tarefas__marca { width: 8px; height: 8px; border-radius: 50%; background: var(--acento-dado); flex: none; }
+.lista-tarefas--vencida .lista-tarefas__marca { width: 9px; height: 9px; border-radius: 2px; background: var(--ambar); }
+.lista-tarefas strong { font-size: .95rem; font-weight: 500; overflow-wrap: break-word; }
+.lista-tarefas small { font-size: .76rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lista-tarefas--vencida small { color: var(--ambar); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .lista-tarefas a { transition: none; } }
