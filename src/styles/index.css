@@ -1966,3 +1966,9 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .visitation-page .visit-church h3 { display: flex; font-size: .75rem; }
 .visit-church__summary { margin: 8px 0 16px; color: var(--muted); font-size: .84rem; }
 .visit-church__summary strong { font-family: var(--serifada); font-size: 1.9rem; font-weight: 400; color: var(--ink); }
+
+.church-page > *, .church-page .title-with-badge > * { min-width: 0; }
+.church-page .page-hero h1 { overflow-wrap: anywhere; }
+.tab-bar--leve { min-width: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; padding: 0 0 4px; }
+.tab-bar--leve .button { flex-shrink: 0; border-radius: 0; border-bottom: 2px solid transparent; min-height: 44px; }
+.tab-bar--leve .button[aria-current='page'] { border-bottom-color: var(--acento-dado); background: transparent; color: var(--ink); }

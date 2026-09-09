@@ -9,6 +9,7 @@ import { localDateKey } from '../shared/dates'
 import { CareService } from '../care/service'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { CountUp } from '../components/ui/CountUp'
 import { DistrictService } from '../district/service'
 import { FamilyService } from '../families/service'
 import type { FamilyEntity } from '../families/types'
@@ -131,7 +132,7 @@ export function ChurchDetailPage() {
         <div>
           <p className="eyebrow">{districtName}</p>
           <div className="title-with-badge"><h1>{church.name}</h1><span className={`entity-badge entity-badge--${church.status}`}>{CHURCH_STATUS_LABELS[church.status]}</span></div>
-          <p>{CHURCH_TYPE_LABELS[church.type]} · {members.length} membro(s) · {families.length} família(s)</p>
+          <p>{CHURCH_TYPE_LABELS[church.type]}</p>
         </div>
         <div className="page-actions">
           <Link className="button button--secondary" to={`/app/distrito/igrejas/${church.id}/editar`}><Pencil size={17} /><span>Editar</span></Link>
@@ -139,11 +140,21 @@ export function ChurchDetailPage() {
         </div>
       </header>
 
+      <section className="manchete" aria-label="Membros desta igreja">
+        <span className="manchete__num"><CountUp value={members.length} /></span>
+        <p className="manchete__txt">{members.length === 1 ? 'membro nesta igreja' : 'membros nesta igreja'}</p>
+      </section>
+      <dl className="estrato">
+        <div><dt>Famílias</dt><dd>{families.length}</dd></div>
+        <div><dt>Visitas</dt><dd>{visitCount}</dd></div>
+        <div><dt>Pregações</dt><dd>{preachings.length}</dd></div>
+      </dl>
+
       {error && <div className="alert alert--error" role="alert">{error}</div>}
       {confirmDelete && <Card className="danger-card"><h2>Remover esta igreja?</h2><p>A igreja deixará de aparecer no distrito. Os outros aparelhos recebem apenas o aviso da remoção; nome e endereço não saem daqui em texto aberto.</p><div className="form-actions"><Button variant="danger" disabled={busy} onClick={() => void removeChurch()}>{busy ? 'Removendo…' : 'Confirmar remoção'}</Button><Button variant="secondary" onClick={() => setConfirmDelete(false)}>Cancelar</Button></div></Card>}
 
-      <nav className="tab-bar" aria-label="Áreas da igreja">
-        {TABS.map(([value, label]) => <Button key={value} variant={tab === value ? 'primary' : 'secondary'} onClick={() => setSearch(value === 'visao' ? {} : { aba: value })}>{label}</Button>)}
+      <nav className="tab-bar tab-bar--leve" aria-label="Áreas da igreja">
+        {TABS.map(([value, label]) => <Button key={value} aria-current={tab === value ? 'page' : undefined} variant={tab === value ? 'primary' : 'secondary'} onClick={() => setSearch(value === 'visao' ? {} : { aba: value })}>{label}</Button>)}
       </nav>
 
       {tab === 'visao' && <>
