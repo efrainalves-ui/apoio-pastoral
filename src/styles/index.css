@@ -1753,3 +1753,172 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 /* Só a primeira letra: `capitalize` maiusculizava também o "de" de "9 de setembro". */
 .page-hero--dia h1 { font-family: var(--serifada); font-weight: 400; font-size: 1.75rem; letter-spacing: -.01em; }
 .page-hero--dia h1::first-letter { text-transform: uppercase; }
+
+/* ==========================================================================
+   O sistema aplicado ao aplicativo inteiro.
+
+   As regras abaixo reescrevem os blocos que todas as telas usam. Foram
+   colocadas no fim de propósito: elas vencem as originais sem que seja preciso
+   caçar e reescrever quarenta trechos, e ficam juntas, num lugar só, para quem
+   precisar entender o que mudou.
+
+   A ideia que organiza todas: borda, fundo e sombra dizem "objeto separado".
+   Gastá-los em tudo achata a hierarquia — quando cada bloco grita, nenhum é
+   ouvido. Aqui eles são gastos onde há o que separar.
+   ========================================================================== */
+
+/* O cartão perde a borda e ganha ar. O fundo sozinho já o separa da página. */
+.card {
+  border: 0;
+  border-radius: var(--raio-grande);
+  padding: 22px;
+  background: var(--paper);
+  box-shadow: none;
+}
+
+/* Título de cartão em serifada: é o que separa a tela de um formulário. */
+.card__title {
+  font-family: var(--serifada);
+  font-weight: 400;
+  font-size: 1.45rem;
+  letter-spacing: -.01em;
+  line-height: 1.15;
+}
+
+/* A sobrancelha encolhe e afasta as letras: ela situa, não compete. */
+.eyebrow {
+  margin: 0 0 4px;
+  font-size: .66rem;
+  font-weight: 600;
+  letter-spacing: .16em;
+  color: var(--muted);
+}
+
+/* Título de página, também serifado, sem o exagero de tamanho anterior. */
+.page-hero h1 {
+  font-family: var(--serifada);
+  font-weight: 400;
+  font-size: clamp(1.9rem, 6vw, 2.6rem);
+  letter-spacing: -.015em;
+  color: var(--ink);
+}
+
+/* Números de resumo: caixinha some, fio divide, serifada dá o peso. */
+.private-summary {
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+.private-summary > div, .private-summary > button {
+  min-height: 0;
+  padding: 14px 0;
+  border-radius: 0;
+  background: transparent;
+  gap: 1px;
+}
+.private-summary > div + div, .private-summary > button, .private-summary > div + button {
+  padding-left: 14px;
+  border-left: 1px solid var(--line);
+}
+.private-summary span { font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+.private-summary strong { font-family: var(--serifada); font-weight: 400; font-size: 1.9rem; line-height: 1.05; }
+
+/* O mesmo para os indicadores de distrito e igreja. */
+.district-metrics {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
+.district-metrics > div { min-height: 0; padding: 16px 0; border-right: 0; gap: 1px; }
+.district-metrics > div + div { padding-left: 16px; border-left: 1px solid var(--line); }
+.district-metrics small { font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+.district-metrics strong { font-family: var(--serifada); font-weight: 400; font-size: 2rem; line-height: 1.05; color: var(--ink); }
+
+/* Estado vazio mais discreto: ele não é notícia, é ausência de notícia. */
+.empty-state { padding: 30px 12px 14px; }
+.empty-state svg { width: 22px; height: 22px; opacity: .5; }
+.empty-state strong { font-weight: 600; font-size: .95rem; }
+
+/* Linha de entidade: fio mais fino, mais respiro, sem peso desnecessário. */
+.entity-row { min-height: 62px; gap: 12px; }
+.entity-row strong { font-weight: 600; }
+.avatar { font-family: var(--serifada); font-weight: 400; }
+
+/* Botão principal: cantos redondos de verdade e resposta ao toque. */
+.button { border-radius: 999px; font-weight: 600; letter-spacing: .01em; }
+.icon-button { border-radius: 999px; }
+
+/* ==========================================================================
+   A grade do dia vira linha do tempo.
+
+   Era uma tabela com moldura: borda em volta, três colunas com fio entre elas,
+   e cada hora do dia com a mesma altura, cheia ou vazia. Lia-se como planilha.
+
+   Agora um fio vertical corre pelo dia, as horas ficam à esquerda em número
+   tabular e o compromisso pendura no fio. A hora vazia encolhe e cala — o botão
+   de criar continua lá, mas só aparece de verdade quando se chega perto.
+   ========================================================================== */
+.agenda-day { border: 0; border-radius: 0; background: transparent; overflow: visible; }
+.agenda-time-row { min-height: 0; grid-template-columns: 46px 22px minmax(0, 1fr); border-bottom: 0; align-items: start; }
+.agenda-time-row time { padding: 10px 8px 10px 0; text-align: right; font-size: .76rem; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+/* A coluna do meio é o fio do dia — e o ponto onde o compromisso se prende. */
+.agenda-time-slot {
+  position: relative; place-items: stretch; padding: 0;
+  border-left: 0; border-right: 0;
+}
+.agenda-time-slot::before {
+  content: ''; position: absolute; left: 50%; top: 0; bottom: 0;
+  width: 1px; background: var(--line); transform: translateX(-.5px);
+}
+.agenda-time-slot span {
+  position: absolute; top: 15px; left: 50%; transform: translate(-50%, -50%);
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--line); color: transparent;
+  font-size: 0; box-shadow: 0 0 0 4px var(--cream);
+  transition: background var(--tempo-curto) linear, width var(--tempo-curto) var(--saida), height var(--tempo-curto) var(--saida);
+}
+.agenda-time-slot:hover span, .agenda-time-slot:focus-visible span {
+  width: 22px; height: 22px; background: var(--acento-dado); color: #07130e; font-size: .95rem; font-weight: 700;
+  display: grid; place-items: center;
+}
+.agenda-time-events { padding: 6px 0 10px 6px; gap: 6px; }
+
+/* Hora sem nada encolhe: o dia inteiro cabe na tela sem rolar por vazio. */
+.agenda-time-row:has(.agenda-time-events:empty) { min-height: 34px; }
+.agenda-time-row:has(.agenda-time-events:empty) time { opacity: .45; }
+
+.agenda-day > .agenda-category { margin: 10px 0 0 68px; }
+
+@media (prefers-reduced-motion: reduce) { .agenda-time-slot span { transition: none; } }
+
+/* ==========================================================================
+   A igreja vira linha, não cartão de 210 pixels.
+
+   Treze igrejas em cartões altos são cinco telas de rolagem para responder
+   "quais são as minhas igrejas". Em linha, o distrito inteiro cabe numa tela e
+   meia, e comparar uma com a outra passa a ser possível — que é para isso que
+   uma lista existe.
+   ========================================================================== */
+.church-card {
+  min-height: 0;
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'icone nome selo' 'icone detalhe selo';
+  align-items: center;
+  gap: 2px 14px;
+  border: 0;
+  border-radius: var(--raio);
+  background: var(--paper);
+}
+.church-card:hover { transform: none; box-shadow: none; background: var(--green-50); }
+.church-card__top { grid-area: icone; display: contents; }
+.church-card__icon { grid-area: icone; width: 38px; height: 38px; border-radius: 11px; }
+.church-card__top .entity-badge { grid-area: selo; }
+.church-card h3 { grid-area: nome; margin: 0; font-size: 1.02rem; font-weight: 600; }
+.church-card p { grid-area: detalhe; margin: 0; font-size: .78rem; }
+/* O endereço sai da linha: quem procura uma igreja procura pelo nome dela. */
+.church-card__address { display: none; }
