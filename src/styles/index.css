@@ -2076,3 +2076,23 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .goal-summary__item small { font-size: .74rem; line-height: 1.35; }
 .goal-summary .goal-bar { height: 4px; }
 @media (prefers-reduced-motion: reduce) { .goal-summary__item { transition: none; } .goal-summary__item:active { transform: none; } }
+
+/*
+  As metas do ano, uma por anel.
+
+  A barra responde mal a pergunta que se faz aqui: não é "quanto já foi" numa
+  régua, é "quanto falta para fechar o ano". O anel fecha, e um anel pela metade
+  se lê de longe.
+
+  Rolam de lado em vez de empilhar: seis metas empilhadas eram uma tela inteira
+  de rolagem para uma informação que cabe num relance.
+*/
+.aneis { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
+.aneis::-webkit-scrollbar { height: 0; }
+.anel-meta { flex: none; width: 116px; display: grid; gap: 8px; justify-items: center; text-align: center; padding: 12px 6px; border-radius: var(--raio); color: inherit; text-decoration: none; scroll-snap-align: start; transition: background var(--tempo-curto) linear, transform var(--tempo-curto) var(--saida); }
+.anel-meta:hover { background: var(--green-50); }
+.anel-meta:active { transform: scale(.96); }
+.anel-meta strong { font-size: .82rem; font-weight: 600; line-height: 1.2; }
+.anel-meta small { font-size: .7rem; color: var(--muted); line-height: 1.3; }
+.anel-meta .ring__centro { font-size: .95rem; }
+@media (prefers-reduced-motion: reduce) { .anel-meta { transition: none; } .anel-meta:active { transform: none; } }
