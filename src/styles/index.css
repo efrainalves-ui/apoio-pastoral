@@ -2225,17 +2225,21 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   gap: 2px;
 }
 /*
-  Fio embaixo de cada célula, não entre elas.
+  O fio fecha a faixa, não cada célula.
 
-  A primeira tentativa punha um fio à esquerda de cada vizinha. Some seis
-  números num celular e a faixa quebra em duas linhas: o fio da esquerda
-  aparecia no meio da segunda linha, e a linha de baixo colava na de cima sem
-  nada separando. Com o fio embaixo, quebrar linha deixa de ser um problema —
-  cada linha da faixa se fecha sozinha.
+  Duas tentativas erradas antes desta. Fio à esquerda de cada vizinha: quebra
+  a linha no celular e o fio aparece no meio do nada. Fio embaixo de cada
+  célula: a última linha quase nunca é cheia — cinco números em três colunas —
+  e a régua parava no meio da tela, um toco.
+
+  Agora quem desenha os dois fios é a própria faixa, de ponta a ponta. Entre
+  as colunas basta o espaço; entre as linhas, o respiro. Serve para três
+  números ou para nove, cheia ou pela metade.
 */
-.metric-row > div, .budget-metrics > div, .reading-metrics > div,
-.district-metrics > div, .private-summary > div, .private-summary > button {
+.metric-row, .budget-metrics, .reading-metrics, .district-metrics, .private-summary,
+.dashboard-metrics:not(:has(> a)), .import-metrics {
   border-bottom: 1px solid var(--line);
+  row-gap: 4px;
 }
 .metric-row small, .metric-row span, .budget-metrics span, .reading-metrics span,
 .district-metrics small, .private-summary span {
@@ -2305,7 +2309,6 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   min-width: 0;
   padding: 15px 18px 15px 0;
   border: 0;
-  border-bottom: 1px solid var(--line);
   border-radius: 0;
   background: transparent;
   align-content: start;
@@ -2330,3 +2333,31 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 
 /* O título do estado vazio colava nos botões. */
 .budget-empty h2 { margin-bottom: 6px; }
+
+/*
+  A linha do aniversariante ocupava três alturas no celular: o contador, o
+  nome e o botão em baixo, cada um numa faixa. Numa igreja de novecentas
+  pessoas isso é uma tela por punhado de nomes. O botão volta para a direita,
+  como ícone, e a linha volta a ser uma linha.
+*/
+.birthday-list article { min-height: 0; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
+.birthday-list article .button { grid-column: auto; width: auto; min-height: 40px; padding: 0 12px; white-space: nowrap; }
+.birthday-date { display: grid; justify-items: center; min-width: 46px; }
+
+@media (max-width: 460px) {
+  .birthday-list article { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .birthday-list article .button { grid-column: auto; width: auto; padding: 0 10px; font-size: .78rem; }
+}
+
+/*
+  "Excluir distrito" tinha o mesmo peso visual de "Editar distrito", lado a
+  lado no alto da página: dois botões cheios, um deles apagando treze igrejas.
+  Continua no mesmo lugar — mudar de lugar confunde quem já sabe onde está —
+  mas volta a parecer o que é: a saída rara, não a ação do dia.
+*/
+.acao-destrutiva { color: var(--red); background: transparent; border: 1px solid transparent; }
+.acao-destrutiva:hover:not(:disabled) { color: var(--red); background: #fdf0ee; border-color: #f0cfc9; }
+
+/* O botão do cartão espremia o título contra a borda quando os dois eram longos. */
+.card__header { flex-wrap: wrap; }
+.card__header > :first-child { flex: 1 1 12rem; min-width: 0; }

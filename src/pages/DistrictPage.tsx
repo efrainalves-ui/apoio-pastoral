@@ -147,7 +147,7 @@ export function DistrictPage() {
         <div><p className="eyebrow">Distrito</p><h1>{district.name}</h1></div>
         <div className="page-actions">
           <Button variant="secondary" onClick={() => { setName(district.name); setEditing(true); setConfirmDelete(false) }} icon={<Pencil size={17} />}>Editar distrito</Button>
-          <Button variant="danger" onClick={() => { setConfirmDelete(true); setEditing(false) }} icon={<Trash2 size={17} />}>Excluir distrito</Button>
+          <Button variant="quiet" className="acao-destrutiva" onClick={() => { setConfirmDelete(true); setEditing(false) }} icon={<Trash2 size={16} />}>Excluir distrito</Button>
         </div>
       </header>
       {/*
@@ -213,7 +213,7 @@ export function DistrictPage() {
           <div className="church-grid">
             {churches.map((church) => (
               <Link className="church-card" key={church.id} to={`/app/distrito/igrejas/${church.id}`}>
-                <div className="church-card__top"><span className="church-card__icon">{church.status === 'archived' ? <Archive /> : <Church />}</span><span className={`entity-badge entity-badge--${church.status}`}>{CHURCH_STATUS_LABELS[church.status]}</span></div>
+                <div className="church-card__top"><span className="church-card__icon">{church.status === 'archived' ? <Archive /> : <Church />}</span>{church.status !== 'active' && <span className={`entity-badge entity-badge--${church.status}`}>{CHURCH_STATUS_LABELS[church.status]}</span>}</div>
                 <h3>{church.name}</h3>
                 <p>{CHURCH_TYPE_LABELS[church.type]}</p>
                 <span className="church-card__address"><MapPin />{church.address || 'Endereço não informado'}</span>
