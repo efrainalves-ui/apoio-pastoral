@@ -10,6 +10,8 @@ import { CareService } from '../care/service'
 import { FOLLOW_UP_KINDS, FOLLOW_UP_LABELS, VISIT_REASON_LABELS, type FollowUpEntity, type FollowUpKind, type TaskEntity, type VisitEntity, type VisitRoundEntity } from '../care/types'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { CountUp } from '../components/ui/CountUp'
+import { MiniBars } from '../components/ui/MiniBars'
 import { Field } from '../components/ui/Field'
 import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
@@ -136,6 +138,7 @@ export function VisitationPage() {
   }
 
   const agora = today()
+  const agrupado = agruparVisitasPorIgreja(visits, churches)
 
   return <div className="page-stack visitation-page">
     <header className="page-hero"><div><p className="eyebrow">Cuidado pastoral</p><h1>Visitação</h1></div>
@@ -148,15 +151,26 @@ export function VisitationPage() {
     </nav>
 
     {tab === 'visitas' && <>
+      <section className="manchete" aria-label="Pessoas visitadas no distrito">
+        <span className="manchete__num"><CountUp value={agrupado.pessoasNoDistrito} /></span>
+        <p className="manchete__txt">{agrupado.pessoasNoDistrito === 1 ? 'pessoa visitada no distrito' : 'pessoas visitadas no distrito'}</p>
+      </section>
+      <dl className="estrato">
+        <div><dt>Visitas</dt><dd>{visits.length}</dd></div>
+        <div><dt>Igrejas visitadas</dt><dd>{agrupado.igrejas.length}</dd></div>
+        <div><dt>Rodadas</dt><dd>{rounds.length}</dd></div>
+      </dl>
+      {agrupado.igrejas.length > 0 && <section className="faixa visitation-comparison" aria-label="Visitas por igreja">
+        <h2 className="rotulo-secao">Visitas por igreja</h2>
+        <MiniBars valores={agrupado.igrejas.map((igreja) => igreja.visitas.length)} rotulos={agrupado.igrejas.map((igreja) => igreja.nome)} label="Visitas registradas por igreja" />
+      </section>}
       <Card title="Visitas registradas" action={<Button variant="secondary" icon={<FileText />} onClick={() => previewLocalPdf('Relatório de Visitações', visitReportLines(visits, rounds, 'Distrito'))}>Relatório</Button>}>
         {!visits.length
           ? <div className="empty-state"><HeartHandshake /><strong>Nenhuma visita registrada</strong><p>Uma visita espontânea não precisa de agendamento prévio.</p></div>
-          : (() => {
-            const agrupado = agruparVisitasPorIgreja(visits, churches)
-            return <>
-              <p className="visit-total"><strong>{agrupado.pessoasNoDistrito}</strong> pessoa(s) visitada(s) no distrito, em {visits.length} visita(s).</p>
+          : <>
               {agrupado.igrejas.map((igreja) => <section className="visit-church" key={igreja.churchId}>
-                <h3>{igreja.nome}<small>{igreja.pessoas} pessoa(s) · {igreja.visitas.length} visita(s)</small></h3>
+                <h3 className="rotulo-secao">{igreja.nome}</h3>
+                <p className="visit-church__summary"><strong>{igreja.pessoas}</strong> {igreja.pessoas === 1 ? 'pessoa' : 'pessoas'} · {igreja.visitas.length} {igreja.visitas.length === 1 ? 'visita' : 'visitas'}</p>
                 <div className="visit-list">{igreja.visitas.map((visit) => { const version = visit.versions.at(-1)!; return <div className="visit-row" key={visit.id}>
                   <Link to={`/app/visitas/${visit.id}`}>
                     <span className="avatar"><UsersRound /></span>
@@ -167,8 +181,7 @@ export function VisitationPage() {
                   <button type="button" className="icon-button danger-icon" aria-label={`Excluir visita de ${targetName(visit) ?? 'cadastro preservado'}`} onClick={() => void apagarVisita(visit.id)}><Trash2 /></button>
                 </div> })}</div>
               </section>)}
-            </>
-          })()}
+            </>}
       </Card>
       <Card title="Rodadas de visitação">
         <form className="round-form" onSubmit={createRound}>

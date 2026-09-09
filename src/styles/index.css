@@ -1958,3 +1958,11 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .meta-anel__par dt { font-size: .64rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .meta-anel__par dd { margin: 0; font-size: 1.1rem; font-weight: 600; font-variant-numeric: normal; }
 .meta-anel__par dd.falta { color: var(--ambar); }
+
+.visitation-page > *, .visitation-page .visit-church, .visitation-comparison .minibars li { min-width: 0; }
+.visitation-comparison .minibars { overflow-x: auto; padding-bottom: 8px; }
+.visitation-comparison .minibars li { flex: 1 0 72px; }
+.visitation-comparison .minibars small { overflow-wrap: anywhere; font-size: .75rem; }
+.visitation-page .visit-church h3 { display: flex; font-size: .75rem; }
+.visit-church__summary { margin: 8px 0 16px; color: var(--muted); font-size: .84rem; }
+.visit-church__summary strong { font-family: var(--serifada); font-size: 1.9rem; font-weight: 400; color: var(--ink); }
