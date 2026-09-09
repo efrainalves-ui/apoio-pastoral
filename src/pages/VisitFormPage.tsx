@@ -19,11 +19,14 @@ import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
 import { MissionaryService } from '../missionary/service'
 import type { MissionaryPairEntity } from '../missionary/types'
+import { FamilyService } from '../families/service'
+import { FAMILY_ROLES, FAMILY_ROLE_LABELS, nomeDaFamilia, type FamilyRole } from '../families/parentesco'
 import { PeopleService } from '../people/service'
 import type { IncomeStatus, PersonEntity } from '../people/types'
 
 const care = new CareService(); const peopleService = new PeopleService()
-const missionary = new MissionaryService(); const districts = new DistrictService(); const agenda = new AgendaService()
+const missionary = new MissionaryService()
+const families = new FamilyService(); const districts = new DistrictService(); const agenda = new AgendaService()
 /**
  * A visita pastoral não tem hora de término para o pastor preencher: ele anota
  * quando foi, e o registro guarda a duração padrão. O término continua existindo
@@ -63,6 +66,10 @@ export function VisitFormPage() {
   // cadastrar de memória o que a pessoa acabou de dizer.
   const [pares, setPares] = useState<MissionaryPairEntity[]>([])
   const [duplaDe, setDuplaDe] = useState<Record<string, string>>({})
+  // Quem visita uma casa encontra a família na sala e sabe ali quem é casado
+  // com quem e quem é filho de quem. Isso se perdia: a visita guardava os nomes
+  // lado a lado e o cadastro da família continuava vazio.
+  const [papelNaFamilia, setPapelNaFamilia] = useState<Record<string, FamilyRole | ''>>({})
   const editando = Boolean(visitId)
   const load = useCallback(async () => { if (!account || !masterKey) return; const district = await districts.getDistrict(account.id, masterKey); const [nextPeople, nextChurches, nextEvents, nextRounds] = await Promise.all([peopleService.listPeople(account.id, masterKey), district ? districts.listChurches(account.id, masterKey, district.id) : [], agenda.listEvents(account.id, masterKey), care.listRounds(account.id, masterKey)]); setPares(await missionary.listPairs(account.id, masterKey)); const visits = nextEvents.filter(({ category }) => category === 'visit'); setPeople(nextPeople); setChurches(nextChurches); setEvents(visits); setRounds(nextRounds.filter(({ status }) => status === 'active')); const planned = visits.find(({ id }) => id === agendaVisitId); if (planned) { setScheduledEventId(planned.id); setStartAt(planned.startAt.slice(0, 16)); setChurchId(planned.churchId ?? '') }
     if (!visitId) return
@@ -122,6 +129,16 @@ export function VisitFormPage() {
   function addGuest() { if (!guestName.trim()) return; setParticipants((current) => [...current, { id: crypto.randomUUID(), kind: 'guest', guestName: guestName.trim(), present: true }]); setGuestName('') }
   function buildAnswers(): VisitAnswer[] { return OFFICIAL_QUESTIONS.filter((question) => selectedQuestions.has(question.code) && question.code !== 'ORA-01').flatMap((question) => questionTargets().filter((target) => perguntaVisivel(question, (code) => answerValues[`${code}:${target.id}`] ?? '')).map((target) => { const value = answerValues[`${question.code}:${target.id}`] ?? ''; return { id: crypto.randomUUID(), question: { ...question, options: [...question.options] }, subjectId: target.id, value: question.responseType === 'multiple' ? value.split(',').map((item) => item.trim()).filter(Boolean) : value, skipped: !value.trim() } })) }
   /** A dupla dita na visita vira cadastro; a que já existe não vira outra igual. */
+  async function guardarParentesco() {
+    if (!account || !masterKey || !churchId) return
+    const papeis = Object.entries(papelNaFamilia)
+      .filter(([, role]) => role)
+      .map(([personId, role]) => ({ personId, role: role as FamilyRole }))
+    if (papeis.length < 2) return
+    const primeiro = membrosEscolhidos.find(({ id }) => id === papeis[0]!.personId) ?? membrosEscolhidos[0]
+    await families.registrarParentesco(account.id, masterKey, churchId, papeis, nomeDaFamilia(primeiro?.name ?? 'Visitada'))
+  }
+
   async function guardarDuplas() {
     if (!account || !masterKey || !churchId) return
     for (const [personId, parceiroId] of Object.entries(duplaDe)) {
@@ -137,7 +154,7 @@ export function VisitFormPage() {
       setBusy(true); setError('')
       try {
         await care.correctVisit(account.id, masterKey, visitaEmEdicao.id, { participants, answers: mode === 'quick' ? [] : buildAnswers(), reason, startAt, endAt, notes })
-        await guardarDuplas()
+        await guardarDuplas(); await guardarParentesco()
         dirty.current = false
         await navigate(`/app/visitas/${visitaEmEdicao.id}`)
       } catch (motivo) { setError(motivo instanceof Error ? motivo.message : 'Não foi possível salvar a correção.') } finally { setBusy(false) }
@@ -193,6 +210,15 @@ export function VisitFormPage() {
       </div> })}</div></>}</Card>}
     {!editando && incomeCandidates.length > 0 && <Card eyebrow="Pergunta condicional privada" title="Situação de renda">{incomeCandidates.map((person) => <label className="field" key={person.id}><span className="field__label">{person.name}: Você possui alguma fonte de renda atualmente?</span><select className="field__input" value={incomeAnswers[person.id] ?? 'unknown'} onChange={(event) => setIncomeAnswers((current) => ({ ...current, [person.id]: event.target.value as IncomeStatus }))}><option value="unknown">Não informado</option><option value="has_income">Sim</option><option value="no_income">Não</option></select></label>)}</Card>}
     <Card eyebrow="4 · Anotações" title="Resumo opcional"><label className="field" htmlFor="visit-notes"><span className="field__label">Observações pastorais</span><textarea id="visit-notes" className="field__input" rows={4} maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} /></label></Card>
+    {membrosEscolhidos.length > 1 && <Card eyebrow="Opcional" title="Parentesco entre os visitados"><div className="form-grid">
+      {membrosEscolhidos.map((person) => <label className="field" key={person.id}>
+        <span className="field__label">{person.name}</span>
+        <select className="field__input" value={papelNaFamilia[person.id] ?? ''} onChange={(event) => setPapelNaFamilia((atual) => ({ ...atual, [person.id]: event.target.value as FamilyRole | '' }))}>
+          <option value="">Não informar</option>
+          {FAMILY_ROLES.map((role) => <option key={role} value={role}>{FAMILY_ROLE_LABELS[role]}</option>)}
+        </select>
+      </label>)}
+    </div></Card>}
     {!editando && <Card eyebrow="5 · Última etapa" title="Pedido de oração"><label className="field" htmlFor="visit-prayer"><span className="field__label">Pedido opcional</span><textarea id="visit-prayer" className="field__input" rows={3} maxLength={1000} value={prayerText} onChange={(event) => setPrayerText(event.target.value)} /></label><Field label="Revisar em" name="prayer-review" type="date" value={prayerReviewAt} onChange={(event) => setPrayerReviewAt(event.target.value)} /></Card>}
     {!editando && <Card eyebrow="6 · Opcional" title="Qual é o próximo cuidado?"><label className="field"><span className="field__label">Próxima ação</span><select className="field__input" value={nextCareType} onChange={(event) => setNextCareType(event.target.value as typeof nextCareType)}><option value="">Nenhuma por enquanto</option><option value="follow_up">Criar acompanhamento</option><option value="task">Criar tarefa pastoral</option></select></label>{nextCareType === 'follow_up' && <label className="field"><span className="field__label">Tipo de acompanhamento</span><select className="field__input" value={nextCareKind} onChange={(event) => setNextCareKind(event.target.value as FollowUpKind)}>{FOLLOW_UP_KINDS.map((kind) => <option key={kind} value={kind}>{FOLLOW_UP_LABELS[kind]}</option>)}</select></label>}{nextCareType === 'task' && <Field label="Tarefa" name="next-care-title" value={nextCareTitle} onChange={(event) => setNextCareTitle(event.target.value)} required />}{nextCareType && <><Field label="Data" name="next-care-date" type="date" value={nextCareDate} onChange={(event) => setNextCareDate(event.target.value)} required /><label className="field"><span className="field__label">Observação opcional</span><textarea className="field__input" rows={3} maxLength={2000} value={nextCareNotes} onChange={(event) => setNextCareNotes(event.target.value)} /></label></>}</Card>}
     

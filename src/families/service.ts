@@ -5,6 +5,7 @@ import { VaultRepository } from '../db/repository'
 import type { VaultRecord } from '../db/types'
 import { PeopleService } from '../people/service'
 import type { FamilyData, FamilyEntity, FamilyInput } from './types'
+import { familiaDestasPessoas, mesclarPapeis, type PapelNaFamilia } from './parentesco'
 
 function validateFamily(input: FamilyInput): void {
   if (!input.name.trim()) throw new Error('Informe o nome da família.')
@@ -65,6 +66,48 @@ export class FamilyService {
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'family', data }, familyId)
     await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), familyId, envelope, 'family')
     return { id: familyId, ...data }
+  }
+
+  /**
+   * Registra o parentesco visto numa visita.
+   *
+   * Não passa por `createFamily`/`updateFamily` porque aquelas exigem nome,
+   * endereço e uma checagem de nome repetido — perguntas que não cabem na porta
+   * de uma casa. Aqui o que se sabe é quem estava na sala e como se relacionam;
+   * o resto o pastor completa depois, na tela da família.
+   */
+  async registrarParentesco(
+    accountId: string,
+    masterKey: CryptoKey,
+    churchId: string,
+    papeis: ReadonlyArray<PapelNaFamilia>,
+    nomeSugerido: string,
+  ): Promise<FamilyEntity | null> {
+    if (papeis.length < 2 || !churchId) return null
+    const pessoas = papeis.map(({ personId }) => personId)
+    const existente = familiaDestasPessoas(await this.listFamilies(accountId, masterKey), pessoas)
+    const now = new Date().toISOString()
+
+    if (existente) {
+      const memberIds = [...new Set([...existente.memberIds, ...pessoas])]
+      const data: FamilyData = {
+        name: existente.name, primaryChurchId: existente.primaryChurchId, address: existente.address,
+        notes: existente.notes, createdAt: existente.createdAt,
+        memberIds, roles: mesclarPapeis(existente.roles, papeis), updatedAt: now,
+        history: [...existente.history, { id: crypto.randomUUID(), at: now, event: 'members_updated', summary: 'Parentesco registrado numa visita.' }],
+      }
+      await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), existente.id, await encryptPayload(masterKey, { schemaVersion: 1, type: 'family', data }, existente.id), 'family')
+      return { id: existente.id, ...data }
+    }
+
+    const id = crypto.randomUUID()
+    const data: FamilyData = {
+      name: nomeSugerido, primaryChurchId: churchId, memberIds: [...pessoas], address: '', notes: '',
+      roles: [...papeis], createdAt: now, updatedAt: now,
+      history: [{ id: crypto.randomUUID(), at: now, event: 'created', summary: 'Criada a partir de uma visita.' }],
+    }
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, await encryptPayload(masterKey, { schemaVersion: 1, type: 'family', data }, id), 'family')
+    return { id, ...data }
   }
 
   async deleteFamily(accountId: string, masterKey: CryptoKey, familyId: string): Promise<void> {

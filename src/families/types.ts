@@ -1,3 +1,4 @@
+import type { PapelNaFamilia } from './parentesco'
 export interface FamilyHistoryEntry {
   id: string
   at: string
@@ -11,6 +12,8 @@ export interface FamilyData {
   memberIds: string[]
   address: string
   notes: string
+  /** O papel de cada pessoa na família. Ausente nas famílias cadastradas antes. */
+  roles?: PapelNaFamilia[]
   history: FamilyHistoryEntry[]
   createdAt: string
   updatedAt: string
