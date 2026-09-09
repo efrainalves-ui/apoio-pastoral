@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Para poder repetir uma corrida sem precisar de um commit vazio.
+  workflow_dispatch:
 
 permissions:
   contents: read
