@@ -1,3 +1,9 @@
+/*
+  A serifada vem empacotada, não de CDN: o aplicativo precisa abrir sem internet,
+  e uma fonte buscada lá fora deixaria os números caindo na fonte do sistema
+  justamente no interior, que é onde ele mais é usado.
+*/
+import '@fontsource/instrument-serif/400.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'

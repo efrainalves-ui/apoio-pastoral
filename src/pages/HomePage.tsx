@@ -1,6 +1,6 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { BookHeart, Cake, CalendarDays, ChevronRight, Church, Heart, HeartHandshake, ListChecks, Megaphone, ShieldCheck, SquareCheck, UsersRound } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { localDateKey } from '../shared/dates'
@@ -12,7 +12,6 @@ import { GoalsSummary } from '../components/GoalsSummary'
 import { VisitAnswersSummary } from '../components/VisitAnswersSummary'
 import { Card } from '../components/ui/Card'
 import { CountUp } from '../components/ui/CountUp'
-import { Metric } from '../components/ui/Metric'
 import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
 import { FamilyService } from '../families/service'
@@ -93,26 +92,64 @@ export function HomePage() {
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
 
   /*
-    Uma faixa de atenção antes de tudo: o que está vencido, o que é de hoje e
-    quantas igrejas pedem visita. Antes o pastor precisava ler quatro cartões
-    para montar essa conta de cabeça.
+    A tela abre com um número e uma frase.
 
-    O tom acompanha o número, mas nunca sozinho — o rótulo diz o que é, e quem
-    não distingue verde de vermelho lê a mesma informação.
+    É a resposta à pergunta que se faz ao abrir o aplicativo — quem está
+    esperando por mim. Antes eram quatro cartões de mesmo peso, e a conta ficava
+    para o pastor fazer de cabeça.
+
+    O que manda é o retorno vencido: compromisso de hoje a agenda mostra logo
+    abaixo, mas quem espera há dias não aparece em lugar nenhum se ninguém for
+    atrás.
   */
-  const atencaoDeHoje = [
-    { label: 'Vencidas', value: overdueTasks.length, tone: overdueTasks.length > 0 ? 'atencao' as const : 'neutro' as const },
-    { label: 'Para hoje', value: tasksDueToday.length + todayEvents.length, tone: 'neutro' as const },
-    { label: 'Em oração', value: prayersInPrayer.length, tone: 'neutro' as const },
-    { label: 'Igrejas a olhar', value: churchesNeedingAttention.length, tone: churchesNeedingAttention.length > 0 ? 'atencao' as const : 'ok' as const },
-  ]
+  const diaDeHoje = useMemo(() => new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()), [])
+  const esperando = overdueTasks.length + prayersNeedingCare.length
+  // O relógio fica dentro do memo: lido direto no corpo do componente, ele
+  // tornaria a renderização impura e daria um resultado diferente a cada quadro.
+  const { diasParados, proximoDeHoje } = useMemo(() => {
+    const agora = new Date()
+    const maisAntiga = [...overdueTasks].sort((esquerda, direita) => esquerda.dueAt.localeCompare(direita.dueAt))[0]
+    return {
+      diasParados: maisAntiga ? Math.max(1, Math.round((agora.getTime() - new Date(maisAntiga.dueAt).getTime()) / 86_400_000)) : 0,
+      proximoDeHoje: [...todayEvents]
+        .sort((esquerda, direita) => esquerda.startAt.localeCompare(direita.startAt))
+        .find(({ endAt }) => endAt >= agora.toISOString()),
+    }
+  }, [overdueTasks, todayEvents])
 
-  return <div className="page-stack"><header className="page-hero"><div><p className="eyebrow">Hoje</p><h1>Visão do distrito</h1></div></header>
-    <section className="faixa-atencao" aria-label="Atenção de hoje">
-      {atencaoDeHoje.map(({ label, value, tone }) => (
-        <Metric key={label} label={label} tone={tone} size="grande" value={<CountUp value={value} />} />
-      ))}
+  /*
+    O topo mostra a data, e continua se chamando "Visão do distrito".
+
+    Dois títulos brigavam: o da página e o número da manchete. O nome da tela
+    quem já sabe é quem a abriu — a data situa, e deixa o número mandar. Mas
+    quem chega pelo leitor de tela não vê a tela: para ele o título continua
+    dizendo onde está, que é o que uma data sozinha não diz.
+  */
+  return <div className="page-stack"><header className="page-hero page-hero--dia"><div><h1><span className="sr-only">Visão do distrito</span><span aria-hidden="true">{diaDeHoje}</span></h1></div></header>
+
+    <section className="manchete" aria-label="O que exige atenção">
+      <span className={esperando > 0 ? 'manchete__num manchete__num--atencao' : 'manchete__num'}><CountUp value={esperando} /></span>
+      <p className="manchete__txt">{esperando === 0 ? 'nada esperando por você agora' : esperando === 1 ? 'pessoa espera um retorno seu' : 'pessoas esperam um retorno seu'}</p>
+      {diasParados > 0 && <span className="manchete__sub">A mais antiga espera há {diasParados} {diasParados === 1 ? 'dia' : 'dias'}</span>}
     </section>
+
+    <dl className="estrato">
+      <div><dt>Hoje</dt><dd>{tasksDueToday.length + todayEvents.length}</dd></div>
+      <div><dt>Em oração</dt><dd className="viva">{prayersInPrayer.length}</dd></div>
+      <div><dt>Igrejas a olhar</dt><dd className={churchesNeedingAttention.length > 0 ? 'atencao' : ''}>{churchesNeedingAttention.length}</dd></div>
+    </dl>
+
+    {proximoDeHoje && <section className="faixa" aria-label="Próximo compromisso">
+      <p className="rotulo-secao">Agora</p>
+      <Link className="agora" to={`/app/agenda/${proximoDeHoje.id}`}>
+        <span className="agora__hora">{proximoDeHoje.startAt.slice(11, 16)}</span>
+        <span className="agora__corpo">
+          <strong>{proximoDeHoje.title}</strong>
+          <small>{churches.find(({ id }) => id === proximoDeHoje.churchId)?.name ?? 'Sem igreja'}</small>
+        </span>
+      </Link>
+    </section>}
+
     <div className="home-grid"><Card eyebrow="Hoje" title="Agenda" action={<CalendarDays className="accent-icon" />}>{!todayEvents.length ? <div className="empty-state compact-empty"><CalendarDays /><strong>Nenhum compromisso hoje</strong><span>Reserve um horário para uma visita, reunião ou pregação.</span></div> : <div className="breakdown-list">{todayEvents.map((event) => <div key={event.id}><span>{event.title}</span><strong>{event.allDay ? 'Dia todo' : new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(event.startAt))}</strong></div>)}</div>}<Link className="text-link" to="/app/agenda">Abrir agenda <ChevronRight /></Link></Card><Card eyebrow="Hoje" title="Aniversariantes" action={<Cake className="accent-icon" />}>{todayBirthdays.length === 0 ? <div className="empty-state compact-empty"><Cake /><strong>Nenhum aniversariante hoje</strong></div> : <div className="entity-list">{todayBirthdays.map(({ person, turningAge }) => <Link className="entity-row" key={person.id} to={`/app/pessoas/${person.id}`}><span className="avatar">{person.name[0]}</span><span><strong>{person.name}</strong><small>Completa {turningAge} anos</small></span></Link>)}</div>}<Link className="text-link" to="/app/aniversarios">Ver próximos aniversários <ChevronRight /></Link></Card></div>
     <div className="home-grid"><Card eyebrow="Atenção pastoral" title="Visitas e cuidados" action={<HeartHandshake className="accent-icon" />}><div className="private-summary"><div><span>Tarefas vencidas</span><strong>{overdueTasks.length}</strong></div><div><span>Pedidos em oração</span><strong>{prayersInPrayer.length}</strong></div><div><span>Acompanhamentos</span><strong>{pendingFollowUps.length}</strong></div></div><div className="card-link-row"><Link className="text-link" to="/app/visitacao"><ListChecks />Abrir cuidados</Link><Link className="text-link" to="/app/visitacao?aba=oracao">Abrir pedidos de oração <ChevronRight /></Link></div></Card><Card eyebrow="Visitação" title="Rodadas em andamento" action={<UsersRound className="accent-icon" />}>{!rounds.length ? <div className="empty-state compact-empty"><UsersRound /><strong>Nenhuma rodada iniciada</strong><span>Organize uma rodada quando estiver pronto.</span></div> : <div className="round-list">{rounds.slice(0, 4).map((round) => <article key={round.id}><span><strong>{round.name}</strong><small>{round.visitedFamilyIds.length} de {round.targetFamilyIds.length} famílias</small></span><progress value={round.visitedFamilyIds.length} max={round.targetFamilyIds.length} /><span className="entity-badge">{round.status === 'completed' ? 'Concluída' : 'Ativa'}</span></article>)}</div>}<Link className="text-link" to="/app/visitacao">Gerenciar rodadas <ChevronRight /></Link></Card></div>
     <div className="home-grid">

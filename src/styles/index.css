@@ -1299,14 +1299,14 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   diferença entre seguir o sistema e ficar preso ao tema do momento da escolha.
 */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-tema='claro']) { --acento-dado: #7fd1b0; --acento-comparacao: #2d5647; }
+  :root:not([data-tema='claro']) { --acento-dado: #6fe3b0; --acento-comparacao: #2d5647; }
   :root:not([data-tema='claro']) .metric--atencao .metric__value { color: #f19289; }
   :root:not([data-tema='claro']) .ring--atencao .ring__traco { stroke: #f19289; }
   :root:not([data-tema='claro']) .fidelidade--nao strong { color: #f19289; }
   :root:not([data-tema='claro']) .fidelidade--parcial strong { color: #e8c477; }
   :root:not([data-tema='claro']) .quadro--alcancado { color: #7fd1b0; }
   :root:not([data-tema='claro']) .quadro--falta { color: #f19289; }
-  :root:not([data-tema='claro']) { color: #e4ece8; background: #0e1714; --cream: #0e1714; --paper: #16211d; --ink: #e4ece8; --muted: #a6b4ae; --line: #2d3a35; --green-50: #213a31; }
+  :root:not([data-tema='claro']) { color: #eaf2ed; background: #070f0c; --cream: #070f0c; --paper: #0b1512; --ink: #eaf2ed; --muted: #8ba397; --line: #1e332b; --green-50: #16261f; --ambar: #e5a53f; --ambar-fraca: #3a2d13; }
   :root:not([data-tema='claro']) .field__input { color: var(--ink); background: #111b17; border-color: #415049; }
   :root:not([data-tema='claro']) .search-input { background: #111b17; border-color: #415049; }
   :root:not([data-tema='claro']) .field__label { color: #d1ded8; }
@@ -1517,6 +1517,21 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
     dia de hoje na agenda, com texto branco por cima: clareá-lo no escuro para
     servir de traço quebraria aquele contraste.
   */
+  /*
+    A serifada dos números.
+
+    Ela é a decisão que separa a tela de um formulário: número em serifada de
+    alto contraste ao lado de rótulo em grotesca cria hierarquia sem precisar de
+    borda nenhuma. Vem empacotada, para o aplicativo continuar abrindo sem
+    internet.
+  */
+  --serifada: "Instrument Serif", Georgia, "Times New Roman", serif;
+  /*
+    Âmbar é o que está parado, e é escasso de propósito: usado em tudo, deixaria
+    de significar coisa alguma. Nunca vai sozinho — sempre com ícone ou palavra.
+  */
+  --ambar: #9a6410;
+  --ambar-fraca: #f6ecd8;
   --acento-dado: var(--green-700);
   --acento-comparacao: var(--green-100);
   --tempo-curto: 140ms;
@@ -1587,17 +1602,10 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   a barra de comparação saía clara sobre fundo escuro; `--green-700` era escuro
   demais para virar traço sobre o mesmo fundo.
 */
-:root[data-tema='escuro'] { --acento-dado: #7fd1b0; --acento-comparacao: #2d5647; }
+:root[data-tema='escuro'] { color: #eaf2ed; background: #070f0c; --cream: #070f0c; --paper: #0b1512; --ink: #eaf2ed; --muted: #8ba397; --line: #1e332b; --green-50: #16261f; --ambar: #e5a53f; --ambar-fraca: #3a2d13; --acento-dado: #6fe3b0; --acento-comparacao: #2d5647; }
 :root[data-tema='escuro'] .metric--atencao .metric__value { color: #f19289; }
 :root[data-tema='escuro'] .ring--atencao .ring__traco { stroke: #f19289; }
 
-/*
-  A faixa de atenção: quatro números grandes antes de qualquer cartão. É a
-  primeira coisa que o pastor lê ao abrir, e responde "o que é meu hoje" sem
-  precisar somar quatro cartões de cabeça.
-*/
-.faixa-atencao { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 14px 18px; padding: 18px 20px; border-radius: var(--raio-grande); background: var(--paper); box-shadow: var(--shadow); }
-@media (max-width: 520px) { .faixa-atencao { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 16px; } .faixa-atencao .metric--grande .metric__value { font-size: 1.9rem; } }
 
 /* ==========================================================================
    Cabeçalho móvel compacto.
@@ -1689,3 +1697,59 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .sugestao:active { transform: scale(.99); }
 .sugestao small { color: var(--muted); font-size: .78rem; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .sugestao { transition: none; } .sugestao:active { transform: none; } }
+
+/* ==========================================================================
+   A manchete: um número manda na tela.
+
+   Cada tela abre respondendo a pergunta que se faz ao abri-la — quantas pessoas
+   esperam, quantos membros há, quantas visitas houve. O resto fica menor por
+   decisão, e não por falta de espaço.
+   ========================================================================== */
+.manchete { display: grid; gap: 2px; }
+.manchete__num { font-family: var(--serifada); font-size: clamp(4rem, 17vw, 6rem); line-height: .82; letter-spacing: -.04em; font-variant-numeric: lining-nums; }
+.manchete__num--atencao { color: var(--ambar); }
+.manchete__txt { margin: 0; font-size: 1.05rem; line-height: 1.35; max-width: 16rem; }
+.manchete__sub { font-size: .84rem; color: var(--muted); margin-top: 6px; }
+
+/* Três números menores, divididos por risco em vez de caixa. */
+.estrato { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--line); margin: 0; }
+.estrato > div { padding: 14px 0; display: grid; gap: 1px; min-width: 0; }
+.estrato > div + div { padding-left: 14px; border-left: 1px solid var(--line); }
+.estrato dt { font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.estrato dd { margin: 0; font-family: var(--serifada); font-size: 1.9rem; line-height: 1.05; }
+.estrato dd.viva { color: var(--acento-dado); }
+.estrato dd.atencao { color: var(--ambar); }
+
+/* Rótulo de seção que estende um fio até o fim da linha. */
+.rotulo-secao { display: flex; align-items: center; gap: 10px; font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 0; }
+.rotulo-secao::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+/* Um bloco de tela: rótulo, conteúdo, sem borda em volta. */
+.faixa { display: grid; gap: 12px; }
+.faixa + .faixa { margin-top: 26px; }
+
+/* O compromisso de agora, com a hora em destaque. */
+.agora { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start; }
+.agora__hora { font-family: var(--serifada); font-size: 2.5rem; line-height: .9; color: var(--acento-dado); font-variant-numeric: tabular-nums; }
+.agora__corpo { display: grid; gap: 3px; padding-top: 5px; min-width: 0; }
+.agora__corpo strong { font-size: 1.02rem; }
+.agora__corpo small { font-size: .84rem; color: var(--muted); }
+
+/* Tira de pessoas que rola de lado. */
+.tira-pessoas { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; margin: 0; list-style: none; }
+.tira-pessoas li { flex: none; width: 96px; }
+.tira-pessoas a { display: grid; gap: 7px; justify-items: center; text-align: center; color: inherit; text-decoration: none; }
+.inicial-redonda { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-family: var(--serifada); font-size: 1.35rem; background: var(--green-50); color: var(--acento-dado); }
+.tira-pessoas strong { font-size: .78rem; font-weight: 500; line-height: 1.25; }
+.tira-pessoas small { font-size: .7rem; color: var(--muted); }
+
+/*
+  O topo do Início: a data, em serifada, sem sobrancelha.
+
+  O nome da tela quem já sabe é quem a abriu. A data situa e cede o palco ao
+  número da manchete, que é o que se veio ler.
+*/
+.page-hero--dia { margin-bottom: 4px; }
+/* Só a primeira letra: `capitalize` maiusculizava também o "de" de "9 de setembro". */
+.page-hero--dia h1 { font-family: var(--serifada); font-weight: 400; font-size: 1.75rem; letter-spacing: -.01em; }
+.page-hero--dia h1::first-letter { text-transform: uppercase; }
