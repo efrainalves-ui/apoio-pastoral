@@ -1996,3 +1996,13 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .goal-area-page .goal-anos td, .goal-area-page .goal-compare strong { font-variant-numeric: normal; }
 .goal-area-page .minibars { overflow-x: auto; padding-bottom: 8px; }
 .goal-area-page .minibars li { flex: 1 0 28px; }
+
+.sermons-page > *, .sermons-page .sermon-row > * { min-width: 0; }
+.sermons-page .sermons-catalogue { background: transparent; padding-inline: 0; }
+.sermons-catalogue .filter-bar { margin-top: 18px; }
+.sermons-page .sermon-row { padding-block: 24px; gap: 18px; }
+.sermons-page .sermon-row__main { gap: 8px; }
+.sermons-page .sermon-row__main strong { font-family: var(--serifada); font-size: 1.65rem; font-weight: 400; line-height: 1.15; }
+.sermons-page .sermon-row__icon { background: transparent; }
+.sermons-page .sermon-row__main small { font-size: .84rem; }
+.sermons-page .sermon-row__actions { flex-wrap: wrap; }
