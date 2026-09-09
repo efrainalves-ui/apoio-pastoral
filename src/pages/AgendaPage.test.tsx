@@ -67,4 +67,38 @@ describe('agenda visual', () => {
     await user.click(screen.getByRole('button', { name: 'Itinerário' }))
     expect(screen.getByRole('button', { name: 'Baixar itinerário' })).toBeInTheDocument()
   })
+  it('no mês, o dia escolhido em cima abre a lista embaixo, e o compromisso embaixo abre para edição', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter><AgendaPage /></MemoryRouter>)
+
+    await screen.findByRole('tab', { name: 'Semana' })
+    await user.click(screen.getByRole('tab', { name: 'Mês' }))
+
+    const hoje = new Date()
+    const rotulo = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(hoje)
+    const numero = screen.getByRole('button', { name: `${rotulo}, 1 compromisso(s)` })
+    expect(numero.querySelector('.ponto-categoria--visit')).toBeTruthy()
+
+    // A semana corrente já aparece embaixo, sem que seja preciso tocar em nada.
+    const abaixo = screen.getByRole('link', { name: /abrir visita de teste fictícia/i })
+    expect(abaixo).toHaveAttribute('href', '/app/agenda/agenda-evento-ficticio/editar')
+    expect(abaixo.classList.contains('compromisso')).toBe(true)
+
+    // Tocar no número escolhe o dia; tocar de novo solta a escolha.
+    await user.click(numero)
+    expect(numero).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getAllByRole('link', { name: /abrir visita de teste fictícia/i })).toHaveLength(1)
+    await user.click(numero)
+    expect(numero).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('a semana lista os sete dias sem colunas vazias', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter><AgendaPage /></MemoryRouter>)
+
+    await screen.findByRole('tab', { name: 'Semana' })
+    await user.click(screen.getByRole('tab', { name: 'Semana' }))
+    expect(document.querySelectorAll('.dias-abaixo > section')).toHaveLength(7)
+    expect(screen.getAllByRole('link', { name: /^Criar compromisso em / })).toHaveLength(6)
+  })
 })

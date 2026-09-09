@@ -2096,3 +2096,95 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .anel-meta small { font-size: .7rem; color: var(--muted); line-height: 1.3; }
 .anel-meta .ring__centro { font-size: .95rem; }
 @media (prefers-reduced-motion: reduce) { .anel-meta { transition: none; } .anel-meta:active { transform: none; } }
+
+/* ==========================================================================
+   Calendário com pontos, e a lista embaixo.
+
+   A grade de semana era sete colunas altas e quase vazias — uma tela inteira
+   para mostrar cinco compromissos. E o mês trazia os compromissos escritos
+   dentro de cada quadradinho, ilegíveis no celular.
+
+   Agora o mês mostra só pontos coloridos, um por tipo, e o que se lê fica
+   embaixo: a semana corrente por padrão, ou o dia que se tocar. Tocar em cima
+   escolhe o dia; tocar embaixo abre o compromisso. São gestos diferentes para
+   coisas diferentes, que era o que confundia.
+   ========================================================================== */
+.calendario { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.calendario__semana { font-size: .62rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; text-align: center; padding-bottom: 6px; }
+.calendario__dia {
+  min-height: 46px; display: grid; gap: 4px; justify-items: center; align-content: center;
+  padding: 6px 2px; border: 0; border-radius: 12px; background: transparent;
+  color: var(--ink); font: inherit; font-variant-numeric: tabular-nums; cursor: pointer;
+  transition: background var(--tempo-curto) linear;
+}
+.calendario__dia:hover { background: var(--green-50); }
+.calendario__dia--fora { color: var(--muted); opacity: .45; }
+.calendario__dia--hoje { font-weight: 700; box-shadow: inset 0 0 0 1px var(--acento-dado); }
+.calendario__dia--escolhido { background: var(--acento-dado); color: #07130e; font-weight: 700; }
+.calendario__dia--escolhido .ponto-categoria { box-shadow: 0 0 0 1.5px #07130e; }
+.calendario__pontos { display: flex; gap: 3px; min-height: 6px; }
+.ponto-categoria { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); display: block; }
+
+/* Uma cor por tipo de compromisso, na mesma família das etiquetas. */
+.ponto-categoria--visit { background: #35b8c4; }
+.ponto-categoria--preaching { background: #e5a53f; }
+.ponto-categoria--bible_study { background: #7c8cf0; }
+.ponto-categoria--committee, .ponto-categoria--council { background: #b57ac4; }
+.ponto-categoria--meeting, .ponto-categoria--training { background: #64c07a; }
+.ponto-categoria--communion, .ponto-categoria--baptism { background: #e0785f; }
+.ponto-categoria--event, .ponto-categoria--travel { background: #d9a441; }
+.ponto-categoria--pgp { background: #4f9ad8; }
+.ponto-categoria--wedding { background: #dd85c8; }
+.ponto-categoria--child_dedication { background: #d7b356; }
+.ponto-categoria--personal { background: #9aa8a1; }
+
+/* A lista embaixo: o dia como título, os compromissos como linhas tocáveis. */
+.dias-abaixo { display: grid; gap: 22px; margin-top: 22px; }
+.dia-abaixo__topo { display: flex; align-items: baseline; gap: 10px; padding-bottom: 8px; }
+.dia-abaixo__topo strong { font-size: .95rem; font-weight: 600; }
+.dia-abaixo__topo small { font-size: .74rem; color: var(--muted); }
+.dia-abaixo__topo::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.dia-abaixo__lista { display: grid; }
+.compromisso {
+  display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 12px; align-items: center;
+  padding: 13px 10px 13px 0; border-bottom: 1px solid var(--line);
+  color: inherit; text-decoration: none;
+  transition: background var(--tempo-curto) linear;
+}
+.dia-abaixo__lista .compromisso:last-child { border-bottom: 0; }
+.compromisso:hover { background: var(--green-50); }
+.compromisso__hora { font-size: .8rem; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 3.1rem; }
+.compromisso__faixa { width: 3px; align-self: stretch; border-radius: 999px; background: var(--muted); }
+.compromisso__corpo { display: grid; gap: 2px; min-width: 0; }
+.compromisso__corpo strong { font-size: .96rem; font-weight: 600; }
+.compromisso__corpo small { font-size: .78rem; color: var(--muted); }
+.compromisso--passado { opacity: .5; }
+
+@media (prefers-reduced-motion: reduce) { .calendario__dia, .compromisso { transition: none; } }
+
+/* A barra de período cabia numa linha e ocupava um cartão inteiro: três pílulas
+   empilhadas no celular só para dizer o mês. As setas ficam redondas e mudas —
+   o aria-label continua nomeando cada uma para quem lê a tela. */
+.agenda-toolbar { grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 8px; }
+.agenda-toolbar h2 { font-size: 1.05rem; font-weight: 600; text-align: left; text-transform: none; }
+.agenda-toolbar h2::first-letter { text-transform: uppercase; }
+.agenda-toolbar [aria-label='Período anterior'], .agenda-toolbar [aria-label='Próximo período'] { width: 40px; min-width: 40px; height: 40px; min-height: 40px; padding: 0; border-radius: 50%; justify-content: center; }
+.agenda-toolbar [aria-label='Período anterior'] span, .agenda-toolbar [aria-label='Próximo período'] span { display: none; }
+.agenda-today-button { min-height: 40px; padding: 0 14px; }
+
+@media (max-width: 460px) {
+  .agenda-toolbar { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+  .agenda-toolbar h2 { grid-column: auto; grid-row: auto; }
+  .agenda-today-button { grid-column: auto; }
+}
+
+/* O que já passou fica mais leve, sem sumir. */
+.compromisso--passado { opacity: .62; }
+
+/* O dia sem compromisso não merece uma linha inteira: cabe no próprio título. */
+.dia-abaixo__topo::after { content: none; }
+.dia-abaixo__linha { flex: 1; height: 1px; background: var(--line); }
+.dia-abaixo__mais { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--muted); background: var(--green-50); }
+.dia-abaixo__mais:hover { color: var(--green-900); }
+.dia-abaixo__mais svg { width: 15px; height: 15px; }
+.dias-abaixo { gap: 18px; }
