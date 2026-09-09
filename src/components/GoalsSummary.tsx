@@ -14,7 +14,7 @@ export function GoalsSummary() {
   if (!ready) return null
 
   return (
-    <Card title="Metas do ano" eyebrow={String(year)} action={<Flag />}>
+    <Card title="Metas do ano" eyebrow={String(year)} action={<Link className="icon-button" to="/app/metas" aria-label="Abrir metas"><Flag /></Link>}>
       <div className="goal-summary">
         {GOAL_AREAS.map((area) => {
           const progresso = areaComparison(area, goals, sources, year)
@@ -41,7 +41,6 @@ export function GoalsSummary() {
           <small>{quadro.distrito.escolaSabatina} unidade(s) · {quadro.distrito.pequenosGrupos} PG · meta {quadro.distrito.meta}</small>
         </Link>
       </div>
-      <Link className="text-link" to="/app/metas">Abrir metas</Link>
     </Card>
   )
 }

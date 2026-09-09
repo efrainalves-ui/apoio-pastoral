@@ -2057,3 +2057,22 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .lista-tarefas small { font-size: .76rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .lista-tarefas--vencida small { color: var(--ambar); font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .lista-tarefas a { transition: none; } }
+
+/*
+  O resumo de metas.
+
+  Eram seis caixas iguais, cada uma com borda, e a porcentagem do mesmo tamanho
+  do resto: seis blocos gritando, nenhum ouvido. A borda sai — a linha divide —,
+  a porcentagem passa à serifada e cresce, e o nome da área encolhe para o lugar
+  de rótulo. A barra fica fina: ela acompanha o número, não compete com ele.
+*/
+.goal-summary { gap: 0; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 0; border-top: 1px solid var(--line); }
+.goal-summary__item { min-width: 0; gap: 5px; padding: 16px 14px 16px 0; border: 0; border-radius: var(--raio-pequeno); transition: background var(--tempo-curto) linear, transform var(--tempo-curto) var(--saida); }
+.goal-summary__item + .goal-summary__item { padding-left: 14px; border-left: 1px solid var(--line); }
+.goal-summary__item:hover { background: var(--green-50); }
+.goal-summary__item:active { transform: scale(.97); }
+.goal-summary__name { font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+.goal-summary__percent { font-family: var(--serifada); font-weight: 400; font-size: 2rem; line-height: 1.05; }
+.goal-summary__item small { font-size: .74rem; line-height: 1.35; }
+.goal-summary .goal-bar { height: 4px; }
+@media (prefers-reduced-motion: reduce) { .goal-summary__item { transition: none; } .goal-summary__item:active { transform: none; } }
