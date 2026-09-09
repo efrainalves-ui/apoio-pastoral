@@ -1,8 +1,14 @@
 name: Homologação interna (Linux)
 
+# Só quando pedido.
+#
+# Este workflow repete quase inteiro o que o CI já faz — verificações e E2E — e
+# rodava em todo push, de qualquer ramo. Eram duas corridas por envio, e as duas
+# provando a mesma coisa: a franquia de 2.000 minutos acabou em nove dias.
+#
+# O CI cobre `main` e cada PR. Esta homologação continua existindo para quando
+# se quiser prová-la à parte, e aí é o botão "Run workflow" que a chama.
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 
 permissions:

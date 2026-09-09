@@ -1930,3 +1930,31 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .church-card p { grid-area: detalhe; margin: 0; font-size: .78rem; }
 /* O endereço sai da linha: quem procura uma igreja procura pelo nome dela. */
 .church-card__address { display: none; }
+
+/*
+  O gráfico de área: a forma da série, com o último ponto marcado.
+
+  A tabela continua abaixo para quem precisa do valor exato. O que o desenho
+  acrescenta é o que a coluna de números não diz de relance — se está subindo,
+  caindo, ou serrilhado.
+*/
+.area { display: grid; gap: 8px; }
+.area svg { width: 100%; height: 96px; display: block; overflow: visible; }
+.area__linha { stroke: var(--acento-dado); }
+.area__ponta { fill: var(--acento-dado); }
+.area__pe { display: flex; justify-content: space-between; gap: 12px; margin: 0; font-size: .72rem; color: var(--muted); }
+@keyframes traco { from { stroke-dasharray: 1000; stroke-dashoffset: 1000; } to { stroke-dasharray: 1000; stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .area__linha { animation: none !important; } }
+
+/*
+  Anel e valores lado a lado.
+
+  A vírgula decimal fica fora de `tabular-nums`: em modo tabular ela ocupa a
+  largura de um dígito, e "+8,3%" sai escrito "+8 , 3%".
+*/
+.meta-anel { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: center; }
+.meta-anel__lados { display: grid; gap: 10px; margin: 0; }
+.meta-anel__par { display: grid; gap: 1px; }
+.meta-anel__par dt { font-size: .64rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.meta-anel__par dd { margin: 0; font-size: 1.1rem; font-weight: 600; font-variant-numeric: normal; }
+.meta-anel__par dd.falta { color: var(--ambar); }

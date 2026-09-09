@@ -1,0 +1,49 @@
+name: Banco
+
+# Migrations não mudam a cada envio, e provar reversão e RLS custa alguns
+# minutos toda vez. Este workflow acorda quando o SQL muda, e dorme no resto.
+on:
+  push:
+    paths: ['supabase/**', 'scripts/db/**', '.github/workflows/banco.yml']
+  pull_request:
+    paths: ['supabase/**', 'scripts/db/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  banco:
+    name: Migrations, reversão e RLS
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Postgres descartável do próprio runner, com autenticação de confiança:
+    # não existe senha, segredo ou conexão com Supabase nesta verificação.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v7
+      - name: Garantir o cliente psql
+        run: |
+          if ! command -v psql > /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends postgresql-client
+          fi
+          psql --version
+      - name: Aplicar, provar e reverter a migration
+        run: ./scripts/db/test-migrations.sh
