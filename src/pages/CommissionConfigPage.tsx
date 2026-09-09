@@ -138,7 +138,7 @@ export function CommissionConfigPage() {
     </Card>
 
     <Card title="Pessoas responsáveis">
-      <p>Marque os membros que compõem a Comissão Diretiva neste ano.</p>
+      
       <div className="checkbox-grid">{options.map((person) => <label className="choice-card" key={person.id}><input type="checkbox" disabled={loading} checked={members.includes(person.id)} onChange={() => setMembers(members.includes(person.id) ? members.filter((id) => id !== person.id) : [...members, person.id])} /><span>{person.name}</span></label>)}</div>
       <label className="field" htmlFor="commission-secretary"><span className="field__label">Secretário(a)</span><select id="commission-secretary" className="field__input" disabled={loading} value={secretary} onChange={(event) => setSecretary(event.target.value)}><option value="">Selecionar</option>{options.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
       <Button disabled={loading || busy} onClick={() => void save()}>{busy ? 'Salvando…' : 'Salvar configuração'}</Button>

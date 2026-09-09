@@ -1,6 +1,6 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import { FileSpreadsheet, Trash2, Upload } from 'lucide-react'
+import { Trash2, Upload } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
@@ -87,7 +87,7 @@ export function AcmsPage() {
   const maiorTotal = totais ? Math.max(1, ...Object.values(totais.indicators), ...totais.strategicPoints.map(({ value }) => value)) : 1
 
   return <div className="page-stack page-narrow">
-    <header className="page-hero"><div><p className="eyebrow">Missão e discipulado</p><h1>Relatório ACMS</h1></div><FileSpreadsheet /></header>
+    <header className="page-hero"><div><p className="eyebrow">Missão e discipulado</p><h1>Relatório ACMS</h1></div></header>
     {notice && <div className="alert alert--success" role="status">{notice}</div>}
     {error && <div className="alert alert--error" role="alert">{error}</div>}
 

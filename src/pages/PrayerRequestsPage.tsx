@@ -168,7 +168,7 @@ export function PrayerRequestsPage({ embedded = false }: { embedded?: boolean } 
     {cabecalho}
     {notice && <div className="alert alert--success" role="status">{notice}</div>}
     {error && <div className="alert alert--error" role="alert">{error}</div>}
-    <p className="muted">Cadastre seu primeiro pedido de oração.</p>
+    <div className="empty-state"><MessageCircle /><strong>Nenhum pedido de oração</strong></div>
   </div>
 
   return <div className="page-stack prayer-page">

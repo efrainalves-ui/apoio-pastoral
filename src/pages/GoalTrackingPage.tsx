@@ -129,7 +129,7 @@ export function GoalTrackingPage() {
       <div>
         <p className="eyebrow">{PLANNING_AREA_LABELS[goal.area]} · {goal.year}</p>
         <h1>{goal.title}</h1>
-        <p>Meta do distrito. Dividir entre igrejas é opcional.</p>
+        
       </div>
       <div className="page-actions"><Link className="button button--secondary" to={`/app/planejamento/${goal.id}/editar`}><Pencil />Editar meta</Link></div>
     </header>

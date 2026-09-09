@@ -2188,3 +2188,145 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .dia-abaixo__mais:hover { color: var(--green-900); }
 .dia-abaixo__mais svg { width: 15px; height: 15px; }
 .dias-abaixo { gap: 18px; }
+
+/* ==========================================================================
+   Uma faixa de números, não seis caixinhas.
+
+   Materiais, Leitura e Orçamento desenhavam cada número dentro da própria
+   caixa branca com borda e sombra — seis objetos idênticos empilhados,
+   ocupando meia tela para dizer seis zeros. A borda diz "isto é outra coisa",
+   e usá-la em tudo faz nada se destacar de nada.
+
+   Todas viram a mesma faixa: fio em cima, fio entre uma e outra, rótulo
+   miúdo em versalete, número em serifada. É o mesmo bloco que Início e
+   Distrito já usam, agora valendo no aplicativo inteiro.
+   ========================================================================== */
+.metric-row, .budget-metrics, .reading-metrics, .district-metrics, .private-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+.metric-row > div, .budget-metrics > div, .reading-metrics > div,
+.district-metrics > div, .private-summary > div, .private-summary > button {
+  grid-template-columns: none;
+  min-height: 0;
+  min-width: 0;
+  padding: 15px 18px 15px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+}
+/*
+  Fio embaixo de cada célula, não entre elas.
+
+  A primeira tentativa punha um fio à esquerda de cada vizinha. Some seis
+  números num celular e a faixa quebra em duas linhas: o fio da esquerda
+  aparecia no meio da segunda linha, e a linha de baixo colava na de cima sem
+  nada separando. Com o fio embaixo, quebrar linha deixa de ser um problema —
+  cada linha da faixa se fecha sozinha.
+*/
+.metric-row > div, .budget-metrics > div, .reading-metrics > div,
+.district-metrics > div, .private-summary > div, .private-summary > button {
+  border-bottom: 1px solid var(--line);
+}
+.metric-row small, .metric-row span, .budget-metrics span, .reading-metrics span,
+.district-metrics small, .private-summary span {
+  font-size: .64rem;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+  /* Hifenizar um rótulo de duas palavras produzia "NÃO DIZIMIS-TAS". */
+  hyphens: manual;
+  overflow-wrap: break-word;
+}
+.metric-row strong, .budget-metrics strong, .reading-metrics strong,
+.district-metrics strong, .private-summary strong {
+  font-family: var(--serifada);
+  font-weight: 400;
+  font-size: clamp(1.5rem, 5.4vw, 1.95rem);
+  line-height: 1.05;
+  color: var(--ink);
+  overflow-wrap: break-word;
+}
+/* Saldo negativo era uma caixa vermelha inteira; agora é só o número. */
+.budget-metrics .positive, .budget-metrics .negative { border: 0; background: transparent; }
+.budget-metrics .positive strong { color: var(--acento-dado); }
+.budget-metrics .negative strong { color: var(--red); }
+
+/* O nome do mês saía "Setembro De 2026" em toda tela que o escrevia. */
+.budget-month-nav strong, .agenda-week-day header { text-transform: none; }
+.budget-month-nav strong::first-letter { text-transform: uppercase; }
+
+/* A tira de abas cortava a última no celular — "Planejamen", "Conc" — e a
+   rolagem escondida não avisava que havia mais. Passa a quebrar linha: todas
+   as abas ficam à vista, que é o que importa quando são quatro ou cinco. */
+.segmented, .tab-bar, .budget-nav, .reading-nav { max-width: 100%; width: auto; flex-wrap: wrap; overflow: visible; }
+.segmented button, .segmented a, .tab-bar .button, .budget-nav a, .budget-nav button, .reading-nav button { flex: 0 1 auto; white-space: nowrap; }
+
+/* Ações da página lado a lado enquanto couberem, em vez de uma por linha. */
+.page-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.page-actions > * { flex: 0 1 auto; }
+
+/* A porcentagem sai de dentro do número: "0 · 0%" virava um só borrão. */
+.parte-do-todo { font-size: .72rem; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* A navegação de mês do orçamento repete a da agenda: setas redondas, o mês
+   à esquerda, "Mês atual" na mesma linha em vez de ocupar uma inteira. */
+.budget-month-nav { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.budget-month-nav strong { min-width: 0; text-align: left; font-size: 1.05rem; font-weight: 600; }
+.budget-month-nav .button { min-height: 40px; }
+.budget-month-nav [aria-label='Mês anterior'], .budget-month-nav [aria-label='Próximo mês'] { width: 40px; min-width: 40px; padding: 0; border-radius: 50%; justify-content: center; }
+.budget-month-nav .button:last-child { grid-column: auto; width: auto; padding: 0 14px; white-space: nowrap; }
+
+/*
+  `.dashboard-metrics` faz dois trabalhos com a mesma classe.
+
+  No Início cada célula é um link — e aí a borda está certa: ela diz "isto é
+  um objeto que se toca". Em Comissões e nas outras telas são números parados
+  dentro da mesma caixa, e a borda passa a mentir. Só os parados viram faixa.
+*/
+.dashboard-metrics:not(:has(> a)), .import-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 0;
+  margin-bottom: 0;
+  border-top: 1px solid var(--line);
+}
+.dashboard-metrics:not(:has(> a)) > div, .import-metrics > div {
+  min-height: 0;
+  min-width: 0;
+  padding: 15px 18px 15px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  align-content: start;
+  gap: 2px;
+}
+.dashboard-metrics:not(:has(> a)) small, .dashboard-metrics:not(:has(> a)) span,
+.import-metrics small {
+  font-size: .64rem;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+  hyphens: manual;
+}
+.dashboard-metrics:not(:has(> a)) strong, .import-metrics strong {
+  font-family: var(--serifada);
+  font-weight: 400;
+  font-size: clamp(1.5rem, 5.4vw, 1.95rem);
+  line-height: 1.05;
+  color: var(--ink);
+}
+
+/* O título do estado vazio colava nos botões. */
+.budget-empty h2 { margin-bottom: 6px; }

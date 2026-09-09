@@ -1,6 +1,6 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import { Boxes, ClipboardList, PackageCheck, Plus, Split, Trash2 } from 'lucide-react'
+import { ClipboardList, PackageCheck, Plus, Split, Trash2 } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
@@ -153,7 +153,7 @@ export function MaterialsPage() {
   if (loading) return <div className="app-loading" role="status">Abrindo os materiais…</div>
 
   return <div className="page-stack">
-    <header className="page-hero"><div><p className="eyebrow">Distrito</p><h1>Materiais</h1></div><Boxes /></header>
+    <header className="page-hero"><div><p className="eyebrow">Distrito</p><h1>Materiais</h1></div></header>
     <nav className="budget-nav" aria-label="Áreas de Materiais">
       {(Object.keys(abas) as Aba[]).map((chave) => <button className={aba === chave ? 'active' : ''} key={chave} onClick={() => irPara(chave)}>{abas[chave]}</button>)}
     </nav>

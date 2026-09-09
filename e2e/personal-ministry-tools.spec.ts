@@ -30,7 +30,7 @@ test('pedidos de oração, leitura e cerimônias são acessíveis no computador 
   await page.getByRole('button', { name: 'Pedidos de oração' }).click()
 
   // Sem nenhum pedido, a tela mostra só o convite para cadastrar o primeiro.
-  await expect(page.getByText('Cadastre seu primeiro pedido de oração.')).toBeVisible()
+  await expect(page.getByText('Nenhum pedido de oração')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Acompanhamento' })).toHaveCount(0)
   await expect(page.getByLabel('Buscar por nome ou assunto')).toHaveCount(0)
   await expect(page.getByText('Em oração')).toHaveCount(0)

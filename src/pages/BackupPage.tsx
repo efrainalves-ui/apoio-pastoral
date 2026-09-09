@@ -1,4 +1,4 @@
-import { ArchiveRestore, Download, Upload } from 'lucide-react'
+import { Download, Upload } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { BackupService, downloadBackup, pendingBackupRestore, type BackupSummary } from '../backup/service'
@@ -76,7 +76,7 @@ export function BackupPage() {
   }
 
   return <div className="page-stack page-narrow">
-    <header className="page-hero"><div><p className="eyebrow">Proteção dos seus dados</p><h1>Backup seguro</h1><p>Guarde o arquivo e o código de backup em locais seguros e separados. Nada é enviado automaticamente.</p></div><ArchiveRestore /></header>
+    <header className="page-hero"><div><p className="eyebrow">Proteção dos seus dados</p><h1>Backup seguro</h1><p>Guarde o arquivo e o código de backup em locais seguros e separados. Nada é enviado automaticamente.</p></div></header>
     {message && <div className="alert alert--success" role="status">{message}</div>}
     {error && <div className="alert alert--error" role="alert">{error}</div>}
     {pendente && <Card className="danger-card" title="Restauração pela metade">

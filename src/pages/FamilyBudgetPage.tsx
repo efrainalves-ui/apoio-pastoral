@@ -44,7 +44,7 @@ function MoneyInput({ label, value, onChange }: { label: string; value: number; 
 }
 
 function EmptyBudget() {
-  return <Card className="budget-empty"><WalletCards /><h2>Comece com o que já sabe</h2><p>Registre uma entrada e planeje o mês. Você pode completar as outras informações aos poucos.</p><div className="form-actions"><Link className="button button--primary" to="/app/orcamento/entradas?novo=1">Registrar entrada</Link><Link className="button button--secondary" to="/app/orcamento/planejamento">Planejar o mês</Link></div></Card>
+  return <Card className="budget-empty"><WalletCards /><h2>Comece com o que já sabe</h2><div className="form-actions"><Link className="button button--primary" to="/app/orcamento/entradas?novo=1">Registrar entrada</Link><Link className="button button--secondary" to="/app/orcamento/planejamento">Planejar o mês</Link></div></Card>
 }
 
 export function FamilyBudgetPage() {
@@ -115,7 +115,7 @@ export function FamilyBudgetPage() {
   const hasRecords = snapshot.incomes.length + snapshot.expenses.length + snapshot.bills.length + snapshot.debts.length + snapshot.goals.length > 0
 
   return <div className="page-stack family-budget-page">
-    <header className="page-hero budget-hero"><div><p className="eyebrow">Orçamento</p><h1>Pessoal</h1></div><WalletCards /></header>
+    <header className="page-hero budget-hero"><div><p className="eyebrow">Orçamento</p><h1>Pessoal</h1></div></header>
     <BudgetAreaNav area="pessoal" month={month} />
     <BudgetNav section={section} month={month} />
     <div className="budget-month-nav"><Button variant="secondary" aria-label="Mês anterior" icon={<ArrowLeft />} onClick={() => go(section, shiftMonth(month, -1))} /><strong>{monthLabel(month)}</strong><Button variant="secondary" aria-label="Próximo mês" icon={<ArrowRight />} onClick={() => go(section, shiftMonth(month, 1))} /><Button variant="quiet" onClick={() => go(section, monthKey(new Date()))}>Mês atual</Button></div>

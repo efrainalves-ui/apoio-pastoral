@@ -25,13 +25,11 @@ const commissionTypes = [
   {
     kind: 'board' as const,
     title: 'Comissão Diretiva',
-    detail: 'Prepare pautas, analise assuntos e acompanhe as decisões internas da igreja.',
     icon: <Vote />,
   },
   {
     kind: 'administrative' as const,
     title: 'Reunião Administrativa',
-    detail: 'Organize as reuniões e registre as decisões tomadas pela igreja.',
     icon: <ClipboardList />,
   },
 ]
@@ -67,7 +65,6 @@ export function CommissionsPage() {
       <div>
         <p className="eyebrow">Organização</p>
         <h1>Comissões</h1>
-        <p>Prepare pautas, registre decisões e acompanhe encaminhamentos da igreja.</p>
       </div>
       <Link className="button button--secondary" to={`/app/comissoes/configurar?churchId=${encodeURIComponent(churchId)}`}>
         <Settings />Configurar igreja
@@ -102,7 +99,6 @@ export function CommissionsPage() {
           <span className="commission-type-card__icon">{item.icon}</span>
           <span>
             <strong>{item.title}</strong>
-            <small>{item.detail}</small>
           </span>
           <ArrowRight className="commission-type-card__arrow" />
         </Link>
@@ -117,7 +113,6 @@ export function CommissionsPage() {
       </article>)}
 
       <Card title="Comissão de Nomeações" action={<ClipboardCheck />} className="commission-nominations-card">
-        <p>Forme a comissão, organize cargos e indicações, prepare o relatório e acompanhe a votação da igreja.</p>
         <Link className="button button--primary" to="/app/comissoes/nomeacoes">Abrir Nomeações</Link>
       </Card>
     </div>

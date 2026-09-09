@@ -184,7 +184,7 @@ export function CommunityGroupsPage({ embutida = false }: { embutida?: boolean }
 
   const editorTitle = editor?.type === 'class' ? 'Editar classe da Escola Sabatina' : editor?.type === 'group' ? 'Editar Pequeno Grupo' : 'Editar integração Unidade de Ação e PG'
 
-  return <div className="page-stack">{!embutida && <><Link className="text-link back-link" to="/app/metas"><ArrowLeft />Voltar às metas</Link><header className="page-hero"><div><p className="eyebrow">Missão e discipulado</p><h1>Escola Sabatina e Pequenos Grupos</h1></div><UsersRound /></header></>}{error && <div className="alert alert--error" role="alert">{error}</div>}{notice && <div className="alert alert--success" role="status">{notice}</div>}<Card title="Metas por igreja" eyebrow={`Um grupo para cada ${MEMBROS_POR_GRUPO} membros`}>
+  return <div className="page-stack">{!embutida && <><Link className="text-link back-link" to="/app/metas"><ArrowLeft />Voltar às metas</Link><header className="page-hero"><div><p className="eyebrow">Missão e discipulado</p><h1>Escola Sabatina e Pequenos Grupos</h1></div></header></>}{error && <div className="alert alert--error" role="alert">{error}</div>}{notice && <div className="alert alert--success" role="status">{notice}</div>}<Card title="Metas por igreja" eyebrow={`Um grupo para cada ${MEMBROS_POR_GRUPO} membros`}>
     <div className="tabela-rolavel"><table className="quadro-grupos">
       <thead><tr><th scope="col">Igreja</th><th scope="col">Membros</th><th scope="col">Meta</th><th scope="col">Escola Sabatina</th><th scope="col">Pequenos Grupos</th><th scope="col">Integração</th></tr></thead>
       <tbody>{quadro.igrejas.map((linha) => <tr key={linha.churchId}>
