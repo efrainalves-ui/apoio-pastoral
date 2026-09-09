@@ -1972,3 +1972,9 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .tab-bar--leve { min-width: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; padding: 0 0 4px; }
 .tab-bar--leve .button { flex-shrink: 0; border-radius: 0; border-bottom: 2px solid transparent; min-height: 44px; }
 .tab-bar--leve .button[aria-current='page'] { border-bottom-color: var(--acento-dado); background: transparent; color: var(--ink); }
+
+.person-profile > *, .person-profile .page-hero > *, .person-profile .church-detail-grid > * { min-width: 0; }
+.person-profile .page-hero h1 { overflow-wrap: anywhere; }
+.person-profile .page-hero .page-actions { align-self: center; }
+.person-profile .manchete { padding-block: 12px; }
+.person-profile__management { border-top: 1px solid var(--line); padding-top: 20px; }
