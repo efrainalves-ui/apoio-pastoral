@@ -1987,3 +1987,12 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .goals-page .ring__centro { font-variant-numeric: normal; text-align: center; }
 .goals-page .ring__centro small { display: block; font-size: .66rem; color: var(--muted); font-weight: 400; }
 .goals-page .goal-card__percent { font-size: .82rem; }
+
+.goal-area-page > *, .goal-area-page .goal-card__numbers > * { min-width: 0; }
+.goal-area-page .manchete__num { overflow-wrap: anywhere; line-height: 1; }
+.goal-area-page .goal-card__numbers strong { font-family: var(--serifada); font-size: 1.9rem; font-weight: 400; font-variant-numeric: normal; }
+.goal-area-page .goal-card__numbers small { font-size: .66rem; letter-spacing: .08em; text-transform: uppercase; }
+.goal-area-page .area { margin-top: 24px; }
+.goal-area-page .goal-anos td, .goal-area-page .goal-compare strong { font-variant-numeric: normal; }
+.goal-area-page .minibars { overflow-x: auto; padding-bottom: 8px; }
+.goal-area-page .minibars li { flex: 1 0 28px; }

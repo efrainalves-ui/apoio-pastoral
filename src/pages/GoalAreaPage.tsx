@@ -4,6 +4,8 @@ import { Link, useParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { AreaChart } from '../components/ui/AreaChart'
+import { MiniBars } from '../components/ui/MiniBars'
 import { Field } from '../components/ui/Field'
 import {
   AREA_TARGET_METRIC, AREA_USES_PDF, GOAL_AREAS, GOAL_AREA_LABELS,
@@ -207,20 +209,24 @@ export function GoalAreaPage() {
   const nomeIgreja = (id: string) => churches.find((church) => church.id === id)?.name ?? 'Igreja'
 
   return (
-    <div className="page-stack page-narrow">
+    <div className="page-stack page-narrow goal-area-page">
       <Link className="text-link back-link" to="/app/metas"><ArrowLeft />Voltar às metas</Link>
       <header className="page-hero"><div><p className="eyebrow">{year}</p><h1>{GOAL_AREA_LABELS[area]}</h1></div></header>
       {error && <div className="alert alert--error" role="alert">{error}</div>}
       {notice && <div className="alert alert--success" role="status">{notice}</div>}
 
+      <section className="manchete" aria-label="Resultado no ano">
+        <span className="manchete__num">{formatGoalValue(area, progresso.result)}</span>
+        <p className="manchete__txt">resultado em {year}</p>
+      </section>
       <Card title="No ano">
         <div className="goal-card__numbers">
           <div><small>Meta anual</small><strong>{progresso.target > 0 ? formatGoalValue(area, progresso.objective || progresso.target) : 'A definir'}</strong></div>
-          <div><small>Resultado</small><strong>{formatGoalValue(area, progresso.result)}</strong></div>
           <div><small>Falta</small><strong>{progresso.target > 0 ? formatGoalValue(area, progresso.missing) : '—'}</strong></div>
         </div>
         <div className="goal-bar" role="img" aria-label={`${progresso.percent}% da meta`}><span style={{ width: `${progresso.percent}%` }} /></div>
         <p className="goal-card__percent">{progresso.target > 0 ? `${progresso.percent}% alcançado` : 'Defina a meta do ano para acompanhar'}</p>
+        <AreaChart valores={comparacao.meses.map((mes) => mes.atual)} rotulos={comparacao.meses.map((mes) => MONTH_LABELS[mes.mes - 1]!)} label={`Evolução mensal de ${GOAL_AREA_LABELS[area]} em ${year}`} formatar={(valor) => formatGoalValue(area, valor)} />
         {anoTerminou && progresso.target > 0 && <p className="card-copy">{progresso.reached ? 'Meta do ano alcançada.' : `Faltaram ${formatGoalValue(area, progresso.missing)} para a meta do ano.`}</p>}
       </Card>
 
@@ -317,42 +323,19 @@ export function GoalAreaPage() {
           </>}
       </Card>}
 
-      {/*
-        Doze meses com as duas barras lado a lado. No celular a lista rola na
-        horizontal em vez de encolher: barra espremida não deixa comparar nada,
-        que é a única coisa que este gráfico existe para permitir.
-      */}
-      <Card title="Mês a mês" eyebrow={`${anoComparado} e ${year} lado a lado`}>
-        <div className="goal-months-scroll">
-          <ul className="goal-months goal-months--duplo">{comparacao.meses.map(({ mes, atual, anterior }) => {
-            const teto = Math.max(1, ...comparacao.meses.flatMap((item) => [item.atual, item.anterior]))
-            const caiu = anterior > 0 && atual < anterior
-            return <li key={MONTH_LABELS[mes - 1]}>
-              <span className="goal-months__par">
-                <span className="goal-months__bar goal-months__bar--anterior" title={`${MONTH_LABELS[mes - 1]} de ${anoComparado}: ${formatGoalValue(area, anterior)}`}>
-                  <span style={{ height: `${Math.round((anterior / teto) * 100)}%` }} />
-                </span>
-                <span className={`goal-months__bar${caiu ? ' goal-months__bar--queda' : ''}`} title={`${MONTH_LABELS[mes - 1]} de ${year}: ${formatGoalValue(area, atual)}`}>
-                  <span style={{ height: `${Math.round((atual / teto) * 100)}%` }} />
-                </span>
-              </span>
-              <small>{MONTH_LABELS[mes - 1]}</small>
-              {/*
-                O gráfico mostra a forma; o número mostra o tamanho. Sem ele,
-                dois meses parecidos ficam indistinguíveis, e é justamente a
-                diferença entre eles que se foi procurar ali.
-              */}
-              <small className="goal-months__valores">
-                <span className="goal-months__valor--anterior">{formatGoalValue(area, anterior)}</span>
-                <span className={caiu ? 'goal-months__valor--queda' : ''}>{formatGoalValue(area, atual)}</span>
-              </small>
-            </li>
-          })}</ul>
-        </div>
+      <Card title="Mês a mês" eyebrow={`${anoComparado} e ${year}`}>
+        <MiniBars valores={comparacao.meses.map((mes) => mes.atual)} base={comparacao.meses.map((mes) => mes.anterior)} rotulos={comparacao.meses.map((mes) => MONTH_LABELS[mes.mes - 1]!)} label={`Comparação mensal: ${year} e ${anoComparado}`} />
         <p className="goal-months__legenda"><span className="goal-months__amostra goal-months__amostra--anterior" />{anoComparado}<span className="goal-months__amostra" />{year}</p>
+        <div className="goal-months-scroll">
+          <table className="goal-anos">
+            <caption className="sr-only">Valores mensais de {GOAL_AREA_LABELS[area]}</caption>
+            <thead><tr><th scope="col">Mês</th><th scope="col">{anoComparado}</th><th scope="col">{year}</th></tr></thead>
+            <tbody>{comparacao.meses.map((mes) => <tr key={mes.mes}><th scope="row">{MONTH_LABELS[mes.mes - 1]}</th><td>{formatGoalValue(area, mes.anterior)}</td><td>{formatGoalValue(area, mes.atual)}</td></tr>)}</tbody>
+          </table>
+        </div>
       </Card>
 
-      <h2 className="goal-section">Ajustes</h2>
+      <h2 className="rotulo-secao">Ajustes</h2>
 
       <Card title="Meta do distrito">
         {progresso.legacyValueTarget && <div className="alert alert--warning" role="status">
