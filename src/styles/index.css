@@ -1809,13 +1809,21 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   gap: 0;
   border-top: 1px solid var(--line);
 }
+/*
+  `min-width: 0` não é detalhe: sem ele o item da grade se recusa a encolher
+  abaixo do próprio conteúdo, e um rótulo como "TAREFAS VENCIDAS" empurra a
+  página inteira para o lado. O teste de rolagem horizontal pegou isso no Linux,
+  onde a fonte mede um pouco mais larga que no Mac.
+*/
 .private-summary > div, .private-summary > button {
   min-height: 0;
+  min-width: 0;
   padding: 14px 0;
   border-radius: 0;
   background: transparent;
   gap: 1px;
 }
+.private-summary span, .district-metrics small { overflow-wrap: break-word; hyphens: auto; }
 .private-summary > div + div, .private-summary > button, .private-summary > div + button {
   padding-left: 14px;
   border-left: 1px solid var(--line);
@@ -1831,7 +1839,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   background: transparent;
   grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
 }
-.district-metrics > div { min-height: 0; padding: 16px 0; border-right: 0; gap: 1px; }
+.district-metrics > div { min-height: 0; min-width: 0; padding: 16px 0; border-right: 0; gap: 1px; }
 .district-metrics > div + div { padding-left: 16px; border-left: 1px solid var(--line); }
 .district-metrics small { font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
 .district-metrics strong { font-family: var(--serifada); font-weight: 400; font-size: 2rem; line-height: 1.05; color: var(--ink); }
