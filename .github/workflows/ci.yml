@@ -62,7 +62,13 @@ jobs:
           cache: true
           install: false
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      # Sem `--with-deps`: aquilo dispara um `apt-get` a cada corrida, e o espelho
+      # de pacotes do runner falhou duas vezes seguidas com "index files failed
+      # to download" — uma dependência de rede que não é nossa e que derruba a
+      # verificação inteira. A imagem do Ubuntu do GitHub já traz as bibliotecas
+      # que o Chromium precisa; se um dia faltar alguma, o navegador não abre e o
+      # teste falha dizendo isso, em vez de falhar antes de começar.
+      - run: pnpm exec playwright install chromium
       - run: pnpm test:e2e
       - name: Guardar evidências E2E em falha
         if: failure()
