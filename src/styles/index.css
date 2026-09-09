@@ -1676,3 +1676,16 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 @media (max-width: 460px) {
   .app-header__sair { display: none; }
 }
+
+/*
+  As três sugestões de felicitação.
+
+  Cada uma é um alvo de toque inteiro, e não um texto com um link ao lado: o
+  pastor escolhe a frase, e a escolha da frase é a própria ação.
+*/
+.sugestoes-mensagem { display: grid; gap: 10px; }
+.sugestao { display: grid; gap: 6px; padding: 14px 16px; min-height: 48px; text-align: left; border: 1px solid var(--line); border-radius: var(--raio); background: transparent; color: var(--ink); font: inherit; cursor: pointer; transition: border-color var(--tempo-curto) linear, transform var(--tempo-curto) var(--saida); }
+.sugestao:hover { border-color: var(--acento-dado); }
+.sugestao:active { transform: scale(.99); }
+.sugestao small { color: var(--muted); font-size: .78rem; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .sugestao { transition: none; } .sugestao:active { transform: none; } }
