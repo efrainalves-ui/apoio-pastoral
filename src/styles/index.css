@@ -1201,7 +1201,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   .district-metrics > div:last-child { border-bottom: 0; }
   .church-grid { grid-template-columns: 1fr; }
   .church-card { min-height: 185px; }
-  .card__header { align-items: stretch; flex-direction: column; }
+  .card__header { align-items: center; gap: 10px; }
   .card__header .button, .card__header > .button { width: 100%; }
   .form-grid { grid-template-columns: 1fr; }
   .schedule-row { grid-template-columns: 1fr auto; }
@@ -1299,6 +1299,9 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   diferença entre seguir o sistema e ficar preso ao tema do momento da escolha.
 */
 @media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) { --acento-dado: #7fd1b0; --acento-comparacao: #2d5647; }
+  :root:not([data-tema='claro']) .metric--atencao .metric__value { color: #f19289; }
+  :root:not([data-tema='claro']) .ring--atencao .ring__traco { stroke: #f19289; }
   :root:not([data-tema='claro']) .fidelidade--nao strong { color: #f19289; }
   :root:not([data-tema='claro']) .fidelidade--parcial strong { color: #e8c477; }
   :root:not([data-tema='claro']) .quadro--alcancado { color: #7fd1b0; }
@@ -1496,3 +1499,180 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .igreja-fichas .ficha { padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: .9rem; cursor: pointer; }
 .igreja-fichas .ficha:hover { border-color: var(--green-700); }
 .igreja-fichas .ficha--escolhida { background: var(--green-800); border-color: var(--green-800); color: #fff; font-weight: 600; }
+
+/* ==========================================================================
+   Sistema visual: escala, blocos de dado e movimento.
+
+   A regra que organiza tudo aqui: o dado ocupa mais espaço do que o texto que o
+   explica. A tela anterior dava a rótulo e valor o mesmo peso, e os dois
+   disputavam a atenção de quem só queria saber o número.
+   ========================================================================== */
+:root {
+  --passo: 4px;
+  --raio-pequeno: 10px;
+  --raio: 16px;
+  --raio-grande: 22px;
+  /*
+    O acento dos blocos de dado. Existe separado porque `--green-700` é fundo do
+    dia de hoje na agenda, com texto branco por cima: clareá-lo no escuro para
+    servir de traço quebraria aquele contraste.
+  */
+  --acento-dado: var(--green-700);
+  --acento-comparacao: var(--green-100);
+  --tempo-curto: 140ms;
+  --tempo: 260ms;
+  --saida: cubic-bezier(.22, 1, .36, 1);
+}
+
+/* Bloco de dado: rótulo pequeno em cima, número grande embaixo. */
+.metric { display: grid; gap: 2px; min-width: 0; }
+.metric__label { font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.metric__value { font-size: 1.5rem; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; overflow-wrap: break-word; }
+.metric--grande .metric__value { font-size: 2.3rem; }
+.metric__detail { font-size: .82rem; color: var(--muted); }
+.metric--ok .metric__value { color: var(--acento-dado); }
+.metric--atencao .metric__value { color: #b3261e; }
+
+/* Anel de progresso: um por cartão, com o número no meio. */
+.ring { position: relative; display: grid; place-items: center; flex: none; }
+.ring svg { display: block; }
+.ring__trilho { stroke: var(--green-50); }
+.ring__traco { stroke: var(--acento-dado); }
+.ring--ok .ring__traco { stroke: var(--acento-dado); }
+.ring--atencao .ring__traco { stroke: #b3261e; }
+.ring__centro { position: absolute; display: grid; place-items: center; font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* A forma da série, do tamanho de uma linha de texto. */
+.sparkline { width: 100%; height: 30px; display: block; }
+.sparkline polyline { stroke: var(--acento-dado); }
+
+/* Barras curtas, com a série de comparação atrás. */
+.minibars { display: flex; gap: 4px; align-items: flex-end; margin: 0; padding: 0; list-style: none; }
+.minibars li { flex: 1; display: grid; gap: 4px; justify-items: center; min-width: 0; }
+.minibars__coluna { position: relative; display: block; width: 100%; height: 64px; border-radius: var(--raio-pequeno); background: var(--green-50); overflow: hidden; }
+.minibars__base, .minibars__valor { position: absolute; left: 0; right: 0; bottom: 0; border-radius: var(--raio-pequeno); }
+.minibars__base { background: var(--acento-comparacao); }
+.minibars__valor { background: var(--acento-dado); }
+.minibars small { font-size: .65rem; color: var(--muted); }
+
+/* Entrada dos cartões: curta, uma vez, e nenhuma se o aparelho pediu calma. */
+/*
+  A entrada desliza, não desvanece.
+  
+  Com opacidade partindo de zero, o texto passa por um trecho de contraste baixo
+  antes de assentar — e quem lê devagar, ou com pouca luz, lê justamente aí. O
+  verificador de acessibilidade mediu esse instante e reprovou, com razão: a
+  animação estava tornando o conteúdo ilegível por alguns quadros.
+*/
+@keyframes surgir { from { transform: translateY(10px); } to { transform: none; } }
+.page-stack > .card, .home-grid > .card { animation: surgir var(--tempo) var(--saida) both; }
+.home-grid > .card:nth-child(2) { animation-delay: 40ms; }
+.home-grid > .card:nth-child(3) { animation-delay: 80ms; }
+.home-grid > .card:nth-child(4) { animation-delay: 120ms; }
+
+/* Resposta ao toque: o que é clicável afunda um pouco. */
+.card--acionavel { cursor: pointer; transition: transform var(--tempo-curto) var(--saida), box-shadow var(--tempo-curto) var(--saida); }
+.card--acionavel:active { transform: scale(.985); }
+.button:active, .icon-button:active, .entity-row--link:active { transform: scale(.97); }
+.button, .icon-button { transition: transform var(--tempo-curto) var(--saida), background var(--tempo-curto) linear; }
+
+@media (prefers-reduced-motion: reduce) {
+  .page-stack > .card, .home-grid > .card { animation: none; }
+  .card--acionavel, .button, .icon-button, .entity-row--link { transition: none; }
+  .card--acionavel:active, .button:active, .icon-button:active { transform: none; }
+}
+
+/*
+  O tema escuro dos blocos novos. `--green-100` não existia no bloco escuro, e
+  a barra de comparação saía clara sobre fundo escuro; `--green-700` era escuro
+  demais para virar traço sobre o mesmo fundo.
+*/
+:root[data-tema='escuro'] { --acento-dado: #7fd1b0; --acento-comparacao: #2d5647; }
+:root[data-tema='escuro'] .metric--atencao .metric__value { color: #f19289; }
+:root[data-tema='escuro'] .ring--atencao .ring__traco { stroke: #f19289; }
+
+/*
+  A faixa de atenção: quatro números grandes antes de qualquer cartão. É a
+  primeira coisa que o pastor lê ao abrir, e responde "o que é meu hoje" sem
+  precisar somar quatro cartões de cabeça.
+*/
+.faixa-atencao { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 14px 18px; padding: 18px 20px; border-radius: var(--raio-grande); background: var(--paper); box-shadow: var(--shadow); }
+@media (max-width: 520px) { .faixa-atencao { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 16px; } .faixa-atencao .metric--grande .metric__value { font-size: 1.9rem; } }
+
+/* ==========================================================================
+   Cabeçalho móvel compacto.
+
+   Eram três faixas antes de qualquer conteúdo: marca, cinco ícones e busca —
+   perto de um terço da tela de um celular gasto sem dizer nada do distrito.
+   Agora marca e ações dividem a mesma linha, e a busca fica logo abaixo, mais
+   baixa. O que saiu foi altura, não função: os cinco botões continuam ali.
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .app-header { row-gap: 6px; padding-top: calc(env(safe-area-inset-top) + 6px); padding-bottom: 8px; }
+  .app-header__brand { font-size: .98rem; margin-right: auto; }
+  .app-header__env { font-size: .62rem; padding: 2px 7px; }
+  .app-header .icon-button { min-width: 38px; min-height: 38px; }
+  .app-header__actions { margin-left: 0; gap: 4px; }
+  .app-header__search { order: 3; margin-top: 0; }
+  .app-header__search input { min-height: 36px; font-size: .88rem; }
+}
+
+/* ==========================================================================
+   Barra inferior com cápsula no item ativo.
+
+   Antes o ativo se distinguia só pela cor — e cor sozinha não serve a quem não
+   a distingue. A cápsula é forma, e aparece junto do peso da fonte.
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .bottom-nav__item { position: relative; padding: 6px 4px; border-radius: 14px; transition: color var(--tempo-curto) linear; }
+  .bottom-nav__item::before {
+    content: ''; position: absolute; inset: 2px 8px auto; height: 30px; border-radius: 999px;
+    background: var(--green-50); opacity: 0; transform: scale(.8);
+    transition: opacity var(--tempo) var(--saida), transform var(--tempo) var(--saida);
+  }
+  .bottom-nav__item svg, .bottom-nav__item span { position: relative; }
+  .bottom-nav__item--active::before { opacity: 1; transform: none; }
+  .bottom-nav__item--active { font-weight: 700; }
+  .bottom-nav__item:active { transform: scale(.94); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottom-nav__item, .bottom-nav__item::before { transition: none; }
+  .bottom-nav__item:active { transform: none; }
+}
+
+/* O rótulo e a ação do cartão dividem a linha; a ação não cai para baixo. */
+.card__header { align-items: center; }
+.card__header > div { min-width: 0; }
+
+/*
+  Em tela estreita, a etiqueta do ambiente vira um ponto.
+
+  Escrita por extenso, ela sozinha empurrava os cinco ícones para uma terceira
+  faixa. O aviso continua existindo — o ponto tem rótulo para leitor de tela, e
+  a tela de acesso, que é onde o engano seria grave, continua dizendo por
+  extenso que aquilo é homologação.
+*/
+@media (max-width: 460px) {
+  .app-header__env { width: 10px; height: 10px; padding: 0; border-radius: 50%; background: var(--gold); border-color: transparent; overflow: hidden; text-indent: -999px; flex: none; }
+  /*
+    A marca cede espaço antes dos botões: ela é identidade, e eles são o que se
+    usa. Encolhe e corta com reticências em vez de empurrar dois ícones para
+    uma linha só deles.
+  */
+  .app-header__brand { font-size: .88rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .app-header .icon-button { min-width: 32px; min-height: 32px; flex: none; }
+  .app-header .icon-button svg { width: 18px; height: 18px; }
+  .app-header { column-gap: 3px; padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
+}
+
+/*
+  Em tela estreita, "Sair" fica só no menu lateral.
+
+  Era um ícone a mais do que cabia, e sozinho empurrava a barra inteira para uma
+  linha extra. Sair é ação rara e já vive no menu, ao lado da conta; bloquear,
+  que é a do dia a dia, continua no cabeçalho.
+*/
+@media (max-width: 460px) {
+  .app-header__sair { display: none; }
+}

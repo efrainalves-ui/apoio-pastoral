@@ -11,6 +11,8 @@ import type { FollowUpEntity, PrayerRequestEntity, TaskEntity, VisitRoundEntity 
 import { GoalsSummary } from '../components/GoalsSummary'
 import { VisitAnswersSummary } from '../components/VisitAnswersSummary'
 import { Card } from '../components/ui/Card'
+import { CountUp } from '../components/ui/CountUp'
+import { Metric } from '../components/ui/Metric'
 import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
 import { FamilyService } from '../families/service'
@@ -90,7 +92,27 @@ export function HomePage() {
     .filter(({ motivo }) => motivo.length > 0)
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
 
+  /*
+    Uma faixa de atenção antes de tudo: o que está vencido, o que é de hoje e
+    quantas igrejas pedem visita. Antes o pastor precisava ler quatro cartões
+    para montar essa conta de cabeça.
+
+    O tom acompanha o número, mas nunca sozinho — o rótulo diz o que é, e quem
+    não distingue verde de vermelho lê a mesma informação.
+  */
+  const atencaoDeHoje = [
+    { label: 'Vencidas', value: overdueTasks.length, tone: overdueTasks.length > 0 ? 'atencao' as const : 'neutro' as const },
+    { label: 'Para hoje', value: tasksDueToday.length + todayEvents.length, tone: 'neutro' as const },
+    { label: 'Em oração', value: prayersInPrayer.length, tone: 'neutro' as const },
+    { label: 'Igrejas a olhar', value: churchesNeedingAttention.length, tone: churchesNeedingAttention.length > 0 ? 'atencao' as const : 'ok' as const },
+  ]
+
   return <div className="page-stack"><header className="page-hero"><div><p className="eyebrow">Hoje</p><h1>Visão do distrito</h1></div></header>
+    <section className="faixa-atencao" aria-label="Atenção de hoje">
+      {atencaoDeHoje.map(({ label, value, tone }) => (
+        <Metric key={label} label={label} tone={tone} size="grande" value={<CountUp value={value} />} />
+      ))}
+    </section>
     <div className="home-grid"><Card eyebrow="Hoje" title="Agenda" action={<CalendarDays className="accent-icon" />}>{!todayEvents.length ? <div className="empty-state compact-empty"><CalendarDays /><strong>Nenhum compromisso hoje</strong><span>Reserve um horário para uma visita, reunião ou pregação.</span></div> : <div className="breakdown-list">{todayEvents.map((event) => <div key={event.id}><span>{event.title}</span><strong>{event.allDay ? 'Dia todo' : new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(event.startAt))}</strong></div>)}</div>}<Link className="text-link" to="/app/agenda">Abrir agenda <ChevronRight /></Link></Card><Card eyebrow="Hoje" title="Aniversariantes" action={<Cake className="accent-icon" />}>{todayBirthdays.length === 0 ? <div className="empty-state compact-empty"><Cake /><strong>Nenhum aniversariante hoje</strong></div> : <div className="entity-list">{todayBirthdays.map(({ person, turningAge }) => <Link className="entity-row" key={person.id} to={`/app/pessoas/${person.id}`}><span className="avatar">{person.name[0]}</span><span><strong>{person.name}</strong><small>Completa {turningAge} anos</small></span></Link>)}</div>}<Link className="text-link" to="/app/aniversarios">Ver próximos aniversários <ChevronRight /></Link></Card></div>
     <div className="home-grid"><Card eyebrow="Atenção pastoral" title="Visitas e cuidados" action={<HeartHandshake className="accent-icon" />}><div className="private-summary"><div><span>Tarefas vencidas</span><strong>{overdueTasks.length}</strong></div><div><span>Pedidos em oração</span><strong>{prayersInPrayer.length}</strong></div><div><span>Acompanhamentos</span><strong>{pendingFollowUps.length}</strong></div></div><div className="card-link-row"><Link className="text-link" to="/app/visitacao"><ListChecks />Abrir cuidados</Link><Link className="text-link" to="/app/visitacao?aba=oracao">Abrir pedidos de oração <ChevronRight /></Link></div></Card><Card eyebrow="Visitação" title="Rodadas em andamento" action={<UsersRound className="accent-icon" />}>{!rounds.length ? <div className="empty-state compact-empty"><UsersRound /><strong>Nenhuma rodada iniciada</strong><span>Organize uma rodada quando estiver pronto.</span></div> : <div className="round-list">{rounds.slice(0, 4).map((round) => <article key={round.id}><span><strong>{round.name}</strong><small>{round.visitedFamilyIds.length} de {round.targetFamilyIds.length} famílias</small></span><progress value={round.visitedFamilyIds.length} max={round.targetFamilyIds.length} /><span className="entity-badge">{round.status === 'completed' ? 'Concluída' : 'Ativa'}</span></article>)}</div>}<Link className="text-link" to="/app/visitacao">Gerenciar rodadas <ChevronRight /></Link></Card></div>
     <div className="home-grid">

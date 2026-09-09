@@ -21,6 +21,19 @@ async function register(page: Page) {
   await expect(page.getByRole('heading', { name: 'Visão do distrito' })).toBeVisible()
 }
 
+/**
+ * Sair, onde quer que ele esteja.
+ *
+ * No celular o botão saiu do cabeçalho — era um ícone a mais do que cabia na
+ * linha — e ficou só no menu lateral, ao lado da conta. No computador continua
+ * visível direto.
+ */
+async function sair(page: Page) {
+  const menu = page.getByRole('button', { name: 'Abrir menu' })
+  if (await menu.isVisible()) await menu.click()
+  await page.getByRole('button', { name: 'Sair' }).last().click()
+}
+
 test('jornada básica usa somente dados fictícios', async ({ page }) => {
   await register(page)
   await expect(page.getByRole('heading', { name: 'Agenda' })).toBeVisible()
@@ -42,7 +55,7 @@ test('cria conta, protege rota, bloqueia, entra e recupera acesso', async ({ pag
   await expect(page.getByRole('heading', { name: 'Visão do distrito' })).toBeVisible()
 
   page.once('dialog', (dialog) => void dialog.accept())
-  await page.getByRole('button', { name: 'Sair' }).last().click()
+  await sair(page)
   await expect(page.getByRole('heading', { name: 'Entre na sua conta' })).toBeVisible()
   await page.goto('/app/distrito')
   await expect(page).toHaveURL(/\/acesso$/)
@@ -53,7 +66,7 @@ test('cria conta, protege rota, bloqueia, entra e recupera acesso', async ({ pag
   await expect(page.getByRole('heading', { name: 'Visão do distrito' })).toBeVisible()
 
   page.once('dialog', (dialog) => void dialog.accept())
-  await page.getByRole('button', { name: 'Sair' }).last().click()
+  await sair(page)
   await page.getByRole('button', { name: 'Usar chave de recuperação' }).click()
   await expect(page.getByRole('heading', { name: 'Recupere o acesso' })).toBeVisible()
   await page.getByLabel('Chave de recuperação').fill(recoveryCode ?? '')

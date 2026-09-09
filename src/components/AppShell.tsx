@@ -149,7 +149,7 @@ export function AppShell() {
           </div>
           <NavLink className="icon-button app-header__settings" to="/app/configuracoes" aria-label="Configurações"><Settings /></NavLink>
           <button className="icon-button app-header__leave" aria-label="Bloquear cofre" onClick={bloquear}><LockKeyhole /></button>
-          <button className="icon-button app-header__leave" aria-label="Sair" onClick={leave}><LogOut /></button>
+          <button className="icon-button app-header__leave app-header__sair" aria-label="Sair" onClick={leave}><LogOut /></button>
         </header>
         <main id="conteudo" className="content" tabIndex={-1}><Outlet /></main>
         <nav className="bottom-nav" aria-label="Navegação principal móvel">
