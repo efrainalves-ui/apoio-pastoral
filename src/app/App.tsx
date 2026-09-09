@@ -27,6 +27,7 @@ import { PrivacyPage } from '../pages/PrivacyPage'
 import { CommunityGroupsPage } from '../pages/CommunityGroupsPage'
 import { CloseDistrictPage } from '../pages/CloseDistrictPage'
 import { PeoplePage } from '../pages/PeoplePage'
+import { MemberImportPage } from '../pages/MemberImportPage'
 import { PersonDetailPage } from '../pages/PersonDetailPage'
 import { PersonFormPage } from '../pages/PersonFormPage'
 import { SearchPage } from '../pages/SearchPage'
@@ -262,6 +263,7 @@ export function App() {
         <Route path="missionario/grupos" element={<Navigate to="/app/metas/missao/grupos" replace />} />
         <Route path="pessoas" element={<PeoplePage />} />
         <Route path="pessoas/nova" element={<PersonFormPage />} />
+        <Route path="pessoas/importar" element={<MemberImportPage />} />
         <Route path="pessoas/:personId" element={<PersonDetailPage />} />
         <Route path="pessoas/:personId/editar" element={<PersonFormPage />} />
         <Route path="familias" element={<FamiliesPage />} />

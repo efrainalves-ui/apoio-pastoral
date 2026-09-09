@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { ErrorState, LoadingState } from '../components/ui/AsyncState'
 import { ConflictService, type ConflictChoice, type ConflictPreview } from '../sync/conflicts'
 
 const service = new ConflictService()
@@ -32,7 +33,7 @@ function shortDate(value: string): string {
 export function SyncConflictsPage() {
   const { account, masterKey } = useAuthVault()
   const [previews, setPreviews] = useState<ConflictPreview[]>([])
-  const [resolvedCount, setResolvedCount] = useState(0)
+  const [resolvedPreviews, setResolvedPreviews] = useState<ConflictPreview[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -41,10 +42,20 @@ export function SyncConflictsPage() {
   const load = useCallback(async () => {
     if (!account || !masterKey) return
     setLoading(true)
-    const pending = await service.listPending(account.id)
-    setPreviews(await Promise.all(pending.map((conflict) => service.preview(conflict, masterKey))))
-    setResolvedCount((await service.listResolved(account.id)).length)
-    setLoading(false)
+    setError('')
+    try {
+      const [pending, resolved] = await Promise.all([service.listPending(account.id), service.listResolved(account.id)])
+      const [pendingViews, resolvedViews] = await Promise.all([
+        Promise.all(pending.map((conflict) => service.preview(conflict, masterKey))),
+        Promise.all(resolved.sort((a, b) => (b.resolvedAt ?? '').localeCompare(a.resolvedAt ?? '')).slice(0, 20).map((conflict) => service.preview(conflict, masterKey))),
+      ])
+      setPreviews(pendingViews)
+      setResolvedPreviews(resolvedViews)
+    } catch {
+      setError('Não foi possível abrir as revisões guardadas neste aparelho.')
+    } finally {
+      setLoading(false)
+    }
   }, [account, masterKey])
 
   useReloadOnSync(load)
@@ -68,7 +79,7 @@ export function SyncConflictsPage() {
     }
   }
 
-  if (loading) return <div className="app-loading" role="status">Abrindo as revisões…</div>
+  if (loading) return <LoadingState title="Abrindo as revisões…" />
 
   return (
     <div className="page-stack page-narrow">
@@ -81,7 +92,8 @@ export function SyncConflictsPage() {
         </div>
       </header>
 
-      {error && <div className="alert alert--error" role="alert">{error}</div>}
+      {error && previews.length > 0 && <div className="alert alert--error" role="alert">{error}</div>}
+      {error && previews.length === 0 && <ErrorState title="As revisões não puderam ser abertas" detail={error} retry={() => void load()} />}
       {notice && <div className="alert alert--success" role="status">{notice}</div>}
 
       {previews.length === 0
@@ -137,11 +149,14 @@ export function SyncConflictsPage() {
           </Card>
         ))}
 
-      {resolvedCount > 0 && (
+      {resolvedPreviews.length > 0 && (
         <Card title="Histórico de revisões">
           <p className="card-copy">
-            {resolvedCount === 1 ? '1 revisão já resolvida.' : `${resolvedCount} revisões já resolvidas.`} As versões preteridas continuam guardadas e protegidas neste aparelho.
+            {resolvedPreviews.length === 1 ? '1 revisão já resolvida.' : `${resolvedPreviews.length} revisões recentes.`} As duas versões continuam guardadas e protegidas neste aparelho.
           </p>
+          <div className="settings-list">
+            {resolvedPreviews.map((preview) => <details key={preview.id}><summary><strong>{preview.kind}</strong> · {shortDate(preview.resolvedAt ?? preview.createdAt)}</summary><p>{preview.choice ? choiceLabels[preview.choice] : 'Revisão concluída'}.</p><div className="conflict-sides"><article><h3><Laptop aria-hidden="true" />Neste aparelho</h3><p className="preserved-text">{preview.local.summary}</p></article><article><h3><Smartphone aria-hidden="true" />No outro aparelho</h3><p className="preserved-text">{preview.remote.summary}</p></article></div></details>)}
+          </div>
         </Card>
       )}
     </div>

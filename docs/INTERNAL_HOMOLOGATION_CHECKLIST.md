@@ -126,7 +126,7 @@ Esta lista organiza uma homologação local do Apoio Pastoral. Ela não autoriza
 - [ ] Confirmar que a restauração exige arquivo selecionado e botão explícito de confirmação.
 - [ ] Confirmar o aviso de possível substituição e marcar a confirmação antes de restaurar.
 - [ ] Tentar restaurar o backup na segunda conta fictícia e confirmar que a mistura é recusada.
-- [ ] Confirmar que o backup pastoral não inclui o Orçamento Familiar e exportar o orçamento fictício separadamente na própria área.
+- [ ] Confirmar que o backup inclui os registros pastorais, a Leitura e o Orçamento Familiar, todos cifrados, e que continua excluindo qualquer arquivo original importado.
 - [ ] Remover o arquivo de backup fictício do dispositivo ao concluir a rodada.
 
 ## 13. Comportamento offline

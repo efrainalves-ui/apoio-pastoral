@@ -109,7 +109,8 @@ describe('revisão de alterações concorrentes', () => {
 
     const tipo = preview.differences.find(({ field }) => field === 'Tipo')
     expect(tipo).toBeDefined()
-    expect(tipo?.local).toBeNull()
+    expect(tipo?.local).toBe('Igreja organizada')
+    expect(tipo?.remote).toBe('Ponto de pregação')
     expect(JSON.stringify(preview)).not.toContain('organized_church')
     expect(JSON.stringify(preview)).not.toContain('preaching_point')
   })

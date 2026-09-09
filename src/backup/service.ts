@@ -9,13 +9,14 @@ import { readingDb, type ReadingDatabase } from '../reading/database'
 import { familyBudgetDb, type FamilyBudgetDatabase } from '../family-budget/database'
 
 export interface BackupSummary { createdAt: string; recordCount: number; personalCount: number; size: number; skippedCount: number }
-export interface BackupFile { format: 'apoio-pastoral-backup'; version: 4; salt: string; iv: string; ciphertext: string }
+export interface BackupFile { format: 'apoio-pastoral-backup'; version: 3 | 4; salt: string; iv: string; ciphertext: string }
 type Portable = { id: string; recordType: VaultRecord['recordType']; type: string; data: unknown }
 /** Registro pessoal viaja como está: já é envelope cifrado com a mesma chave. */
 type PortablePersonal = { area: 'leitura' | 'orcamento'; id: string; recordType: string; createdAt: string; updatedAt: string; ciphertext: string; iv: string; aad: string; keyVersion: number; algorithm: 'AES-GCM-256' }
 type BackupContents = { accountId: string; records: Portable[]; personal: PortablePersonal[] }
 
-const BACKUP_AAD = 'apoio-pastoral:backup:v4'
+const BACKUP_VERSION = 4
+const backupAad = (version: BackupFile['version']) => `apoio-pastoral:backup:v${version}`
 /** Um arquivo bem maior que isto não é backup deste aplicativo. */
 const MAX_BACKUP_BYTES = 64 * 1024 * 1024
 const MAX_RECORDS = 200_000
@@ -68,7 +69,7 @@ function validBackupFile(file: unknown): file is BackupFile {
   if (!file || typeof file !== 'object') return false
   const candidate = file as Partial<BackupFile> & { version?: unknown }
   if (candidate.format !== 'apoio-pastoral-backup') return false
-  if (candidate.version !== 4) throw new Error('formato-antigo')
+  if (candidate.version !== 3 && candidate.version !== 4) throw new Error('formato-incompativel')
   return typeof candidate.salt === 'string' && candidate.salt.length > 0
     && typeof candidate.iv === 'string' && candidate.iv.length > 0
     && typeof candidate.ciphertext === 'string' && candidate.ciphertext.length > 0
@@ -110,16 +111,16 @@ export class BackupService {
     for (const { record, payload } of opened) {
       records.push({ id: record.id, recordType: record.recordType, type: payload.type, data: payload.data })
     }
-    // Leitura e Orçamento Familiar entram no mesmo arquivo: são dados do
-    // pastor e ficavam de fora, então um aparelho perdido levava junto tudo o
-    // que não estava no cofre do distrito.
     const personal = await this.personalRecords(accountId)
+    if (records.length + personal.length > MAX_RECORDS) throw new Error('Há registros demais para criar um backup recuperável neste navegador.')
     const salt = randomBytes(16); const iv = randomBytes(12)
     const plaintext = utf8(JSON.stringify({ accountId, records, personal } satisfies BackupContents))
+    if (plaintext.byteLength > MAX_BACKUP_BYTES) throw new Error('Os dados são grandes demais para criar um backup recuperável neste navegador.')
     const wrappingKey = await deriveBackupKey(code, salt)
-    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: utf8(BACKUP_AAD) }, wrappingKey, plaintext)
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: utf8(backupAad(BACKUP_VERSION)) }, wrappingKey, plaintext)
     plaintext.fill(0)
-    const file: BackupFile = { format: 'apoio-pastoral-backup', version: 4, salt: toBase64Url(salt), iv: toBase64Url(iv), ciphertext: toBase64Url(ciphertext) }
+    const file: BackupFile = { format: 'apoio-pastoral-backup', version: BACKUP_VERSION, salt: toBase64Url(salt), iv: toBase64Url(iv), ciphertext: toBase64Url(ciphertext) }
+    if (new Blob([JSON.stringify(file)]).size > MAX_BACKUP_BYTES) throw new Error('Os dados são grandes demais para criar um backup recuperável neste navegador.')
     return { file, summary: { createdAt: new Date().toISOString(), recordCount: records.length, personalCount: personal.length, size: new Blob([JSON.stringify(file)]).size, skippedCount: skipped.length } }
   }
 
@@ -138,7 +139,7 @@ export class BackupService {
       if (!validBackupFile(file)) throw new Error('invalid-backup')
       if (JSON.stringify(file).length > MAX_BACKUP_BYTES) throw new Error('grande-demais')
       const wrappingKey = await deriveBackupKey(code, fromBase64Url(file.salt))
-      const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64Url(file.iv), additionalData: utf8(BACKUP_AAD) }, wrappingKey, fromBase64Url(file.ciphertext))
+      const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64Url(file.iv), additionalData: utf8(backupAad(file.version)) }, wrappingKey, fromBase64Url(file.ciphertext))
       const contents = JSON.parse(fromUtf8(plaintext)) as Partial<BackupContents>
       if (contents.accountId !== accountId) throw new Error('account-mismatch')
       if (!Array.isArray(contents.records) || !contents.records.every(validPortable)) throw new Error('invalid-backup')
@@ -147,10 +148,11 @@ export class BackupService {
       const personal = contents.personal ?? []
       if (!Array.isArray(personal) || !personal.every(validPersonal)) throw new Error('invalid-backup')
       if (new Set(personal.map(({ id }) => id)).size !== personal.length) throw new Error('invalid-backup')
+      if (contents.records.length + personal.length > MAX_RECORDS) throw new Error('grande-demais')
       return { records: contents.records, personal }
     } catch (reason) {
       if (reason instanceof Error && reason.message === 'account-mismatch') throw new Error('Este backup pertence a outra conta e não pode ser misturado com os dados atuais.', { cause: reason })
-      if (reason instanceof Error && reason.message === 'formato-antigo') throw new Error('Este arquivo foi criado por outra versão do aplicativo e não pode ser restaurado aqui.', { cause: reason })
+      if (reason instanceof Error && reason.message === 'formato-incompativel') throw new Error('Este arquivo foi criado por outra versão do aplicativo e não é compatível com esta versão.', { cause: reason })
       if (reason instanceof Error && reason.message === 'grande-demais') throw new Error('Este arquivo é grande demais para ser um backup deste aplicativo.', { cause: reason })
       throw new Error('Não foi possível abrir o backup. Verifique o arquivo e o código.', { cause: reason })
     }
@@ -163,6 +165,7 @@ export class BackupService {
    */
   async restore(accountId: string, masterKey: CryptoKey, code: string, file: unknown): Promise<RestoreResult> {
     const { records, personal } = await this.openContents(accountId, code, file)
+    if (await this.database.pendingActions.get(pendingActionId(accountId, 'restore_backup'))) throw new Error('Já existe uma restauração em andamento. Conclua-a antes de iniciar outra.')
     const marca: PendingActionRecord = {
       id: pendingActionId(accountId, 'restore_backup'),
       accountId,
@@ -198,6 +201,26 @@ export class BackupService {
     const jaPessoais = new Set(marca.restore?.appliedPersonalIds ?? [])
     const deviceId = currentDeviceId(accountId)
 
+    if (marca.restore?.inProgressRecords) {
+      const { items } = marca.restore.inProgressRecords
+      const current = await this.database.vaultRecords.bulkGet(items.map(({ id: recordId }) => recordId))
+      if (current.every((record, index) => {
+        const expected = items[index]!
+        return record?.accountId === accountId
+          && record.version === expected.baseVersion + 1
+          && record.ciphertext === expected.envelope.ciphertext
+          && record.iv === expected.envelope.iv
+          && record.aad === expected.envelope.aad
+      })) items.forEach(({ id: recordId }) => jaGravados.add(recordId))
+    }
+    if (marca.restore?.inProgressPersonal) {
+      const { area, id: personalId } = marca.restore.inProgressPersonal
+      const target = area === 'leitura' ? this.leitura : this.orcamento
+      const current = await target.records.get(personalId)
+      const source = personal.find((record) => record.area === area && record.id === personalId)
+      if (current && source && current.ciphertext === source.ciphertext && current.iv === source.iv && current.aad === source.aad) jaPessoais.add(personalId)
+    }
+
     await this.database.pendingActions.update(id, { stage: 'restoring_pastoral' })
     const pendentes = records.filter(({ id: recordId }) => !jaGravados.has(recordId))
     for (let inicio = 0; inicio < pendentes.length; inicio += RESTORE_BATCH) {
@@ -207,9 +230,11 @@ export class BackupService {
         recordType: record.recordType,
         envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: record.type, data: record.data }, record.id),
       })))
+      const existing = await this.database.vaultRecords.bulkGet(lote.map(({ id: recordId }) => recordId))
+      await this.database.pendingActions.update(id, { restore: { ...marca.restore!, appliedRecordIds: [...jaGravados], appliedPersonalIds: [...jaPessoais], inProgressRecords: { items: mutations.map((mutation, index) => ({ id: mutation.recordId, baseVersion: existing[index]?.version ?? 0, envelope: mutation.envelope })) } } })
       await this.repo.applyEncryptedMutations(accountId, deviceId, mutations)
       for (const { id: recordId } of lote) jaGravados.add(recordId)
-      await this.database.pendingActions.update(id, { restore: { ...marca.restore!, appliedRecordIds: [...jaGravados], appliedPersonalIds: [...jaPessoais] } })
+      await this.database.pendingActions.update(id, { restore: { ...marca.restore!, appliedRecordIds: [...jaGravados], appliedPersonalIds: [...jaPessoais], inProgressRecords: undefined } })
     }
 
     await this.database.pendingActions.update(id, { stage: 'restoring_personal' })
@@ -217,9 +242,10 @@ export class BackupService {
       if (jaPessoais.has(registro.id)) continue
       const { area, ...linha } = registro
       const alvo = area === 'leitura' ? this.leitura : this.orcamento
+      await this.database.pendingActions.update(id, { restore: { ...marca.restore!, appliedRecordIds: [...jaGravados], appliedPersonalIds: [...jaPessoais], inProgressPersonal: { area, id: registro.id } } })
       await alvo.records.put({ ...linha, accountId } as never)
       jaPessoais.add(registro.id)
-      await this.database.pendingActions.update(id, { restore: { ...marca.restore!, appliedRecordIds: [...jaGravados], appliedPersonalIds: [...jaPessoais] } })
+      await this.database.pendingActions.update(id, { restore: { ...marca.restore!, appliedRecordIds: [...jaGravados], appliedPersonalIds: [...jaPessoais], inProgressPersonal: undefined } })
     }
 
     await this.database.pendingActions.delete(id)

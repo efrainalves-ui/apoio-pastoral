@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { AgendaService } from '../agenda/service'
 import type { AgendaEventEntity } from '../agenda/types'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { localDateKey } from '../shared/dates'
 import { CareService } from '../care/service'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -93,7 +94,7 @@ export function ChurchDetailPage() {
       setClasses(nextClasses.filter((item) => item.churchId === churchId))
       setSmallGroups(nextGroups.filter((item) => item.churchId === churchId && item.active))
       setIntegracoes(nextIntegracoes.filter((item) => item.churchId === churchId && item.active))
-      setEvents(nextEvents.filter((event) => event.churchId === churchId).sort((a, b) => b.startAt.localeCompare(a.startAt)))
+      setEvents(nextEvents.filter((event) => event.churchId === churchId).sort((a, b) => a.startAt.localeCompare(b.startAt)))
       setVisitCount(visits.filter((visit) => visit.churchId === churchId).length)
     } catch (loadError) {
       setError(messageFrom(loadError))
@@ -121,7 +122,7 @@ export function ChurchDetailPage() {
   if (!church) return <div className="page-stack page-narrow"><div className="alert alert--error" role="alert">{error}</div><Link className="text-link" to="/app/distrito"><ArrowLeft />Voltar ao distrito</Link></div>
 
   const preachings = events.filter((event) => event.category === 'preaching')
-  const proximos = events.filter((event) => event.startAt.slice(0, 10) >= new Date().toISOString().slice(0, 10)).slice(0, 8)
+  const proximos = events.filter((event) => event.endAt.slice(0, 10) >= localDateKey()).slice(0, 8)
 
   return (
     <div className="page-stack church-page">

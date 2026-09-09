@@ -8,11 +8,12 @@ import { currency } from '../family-budget/core'
 import { FamilyBudgetService } from '../family-budget/service'
 import { ShoppingListService } from '../shopping/service'
 import { frequentItems, itemTotal, shoppingTotals, SHOPPING_UNIT_LABELS, type ShoppingItemData, type ShoppingItemEntity, type ShoppingUnit } from '../shopping/types'
+import { localDateKey } from '../shared/dates'
 
 const service = new ShoppingListService()
 const budget = new FamilyBudgetService()
 const carimbo = () => new Date().toISOString()
-const hoje = () => new Date().toISOString().slice(0, 10)
+const hoje = () => localDateKey()
 
 const vazio = (): ShoppingItemData => ({ name: '', quantity: 1, unit: 'un', unitPrice: 0, confirmed: false, notes: '', createdAt: carimbo(), updatedAt: carimbo() })
 

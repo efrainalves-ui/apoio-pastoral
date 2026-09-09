@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 
 /**
  * Sincronizou e a tela continuou igual.
@@ -29,7 +29,14 @@ export function notificarDadosSincronizados(): void {
  * gancho substitui: quem a monta com `useCallback` continua controlando quando
  * ela muda.
  */
-export function useReloadOnSync(carregar: () => void | Promise<void>): void {
+export function useReloadOnSync(carregar: () => void | Promise<void>, hasUnsavedChanges?: () => boolean, onReloadBlocked?: () => void): void {
+  const dirtyCheck = useRef(hasUnsavedChanges)
+  const blockedHandler = useRef(onReloadBlocked)
+  useLayoutEffect(() => {
+    dirtyCheck.current = hasUnsavedChanges
+    blockedHandler.current = onReloadBlocked
+  }, [hasUnsavedChanges, onReloadBlocked])
+
   useEffect(() => {
     /*
       Uma falha ao carregar não pode virar rejeição sem dono.
@@ -38,9 +45,26 @@ export function useReloadOnSync(carregar: () => void | Promise<void>): void {
       falha em si já é da conta de cada tela, que guarda o próprio aviso de
       erro; o que não serve a ninguém é o estouro solto no console.
     */
-    const tentar = () => { void Promise.resolve(carregar()).catch(() => undefined) }
-    tentar()
-    window.addEventListener(EVENTO_DADOS_SINCRONIZADOS, tentar)
-    return () => { window.removeEventListener(EVENTO_DADOS_SINCRONIZADOS, tentar) }
+    const carregarSemFalhaSolta = () => { void Promise.resolve(carregar()).catch(() => undefined) }
+    const aoSincronizar = () => {
+      if (dirtyCheck.current?.()) {
+        blockedHandler.current?.()
+        return
+      }
+      carregarSemFalhaSolta()
+    }
+    carregarSemFalhaSolta()
+    window.addEventListener(EVENTO_DADOS_SINCRONIZADOS, aoSincronizar)
+    return () => { window.removeEventListener(EVENTO_DADOS_SINCRONIZADOS, aoSincronizar) }
   }, [carregar])
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges()) return
+      event.preventDefault()
+    }
+    window.addEventListener('beforeunload', beforeUnload)
+    return () => { window.removeEventListener('beforeunload', beforeUnload) }
+  }, [hasUnsavedChanges])
 }

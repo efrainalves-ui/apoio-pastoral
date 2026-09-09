@@ -5,11 +5,12 @@ import { VaultRepository, type EncryptedMutation } from '../db/repository'
 import type { VaultRecord } from '../db/types'
 import type { AgendaConflict, AgendaEventData, AgendaEventEntity } from '../agenda/types'
 import { findAgendaConflicts } from '../agenda/service'
+import { localDateKey } from '../shared/dates'
 import { DEFAULT_CAMPAIGN_CHECKLIST, type AnnualGoalData, type AnnualGoalEntity, type AnnualGoalInput, type EvangelismCampaignData, type EvangelismCampaignEntity, type EvangelismCampaignInput, type HistoryEntry, type PointSchedule } from './types'
 
 const timestamp = () => new Date().toISOString()
 const localDateTime = (date: string, time: string) => `${date}T${time}`
-const addDays = (date: string, days: number) => { const next = new Date(`${date}T12:00:00`); next.setDate(next.getDate() + days); return next.toISOString().slice(0, 10) }
+const addDays = (date: string, days: number) => { const next = new Date(`${date}T12:00:00`); next.setDate(next.getDate() + days); return localDateKey(next) }
 const isMonday = (date: string) => new Date(`${date}T12:00:00`).getDay() === 1
 const history = (message: string): HistoryEntry => ({ id: crypto.randomUUID(), at: timestamp(), message })
 

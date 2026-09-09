@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Car, HandCoins, Plus, ReceiptText, Trash2 } from
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { localDateKey } from '../shared/dates'
 import { BudgetAreaNav } from '../components/BudgetAreaNav'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -21,7 +22,7 @@ import {
 const service = new WorkBudgetService()
 const districtService = new DistrictService()
 const carimbo = () => new Date().toISOString()
-const hoje = () => new Date().toISOString().slice(0, 10)
+const hoje = localDateKey
 
 const sectionLabels = { resumo: 'Visão do mês', auxilios: 'Auxílios', despesas: 'Despesas', quilometragem: 'Quilometragem' } as const
 type WorkSection = keyof typeof sectionLabels

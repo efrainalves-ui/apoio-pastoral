@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgendaEventEntity } from '../agenda/types'
+import { notificarDadosSincronizados } from '../sync/useReloadOnSync'
 import { AgendaFormPage } from './AgendaFormPage'
 
 const estado = vi.hoisted(() => ({
@@ -81,5 +82,19 @@ describe('excluir compromisso pela tela de edição', () => {
 
     expect(await screen.findByRole('heading', { name: 'Novo compromisso' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Excluir compromisso/i })).not.toBeInTheDocument()
+  })
+
+  it('não substitui um campo digitado quando chegam alterações sincronizadas', async () => {
+    const user = userEvent.setup()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render(<MemoryRouter><AgendaFormPage /></MemoryRouter>)
+    const reminder = await screen.findByRole('spinbutton', { name: 'Lembrete em minutos' })
+    await user.clear(reminder)
+    await user.type(reminder, '45')
+
+    notificarDadosSincronizados()
+
+    expect(confirm).toHaveBeenCalled()
+    expect(reminder).toHaveValue(45)
   })
 })

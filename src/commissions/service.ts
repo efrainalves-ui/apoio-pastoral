@@ -7,6 +7,7 @@ import type { EncryptedMutation } from '../db/repository'
 import type { VaultRecord } from '../db/types'
 import { DistrictService } from '../district/service'
 import { freeList, freeText } from '../reports/redaction'
+import { localDateKey } from '../shared/dates'
 import { agendaText, canDeliberate, elderPresidencyAllowed, meetingPresidentName, minutesText, presidentMayBreakTie, tieBreakNote, voteNumber, voteResult } from './core'
 import type { CommissionAgendaItem, CommissionConfigData, CommissionEntity, CommissionMeetingData, CommissionTaskData, TaskStatus, PresidentTieBreak } from './types'
 
@@ -188,7 +189,7 @@ export class CommissionService {
     const task = (await this.tasks(accountId, masterKey)).find((item) => item.id === taskId)
     if (!task) throw new Error('Pendência não encontrada.')
     if (task.agendaEventId) return task
-    const date = task.dueDate || new Date().toISOString().slice(0, 10)
+    const date = task.dueDate || localDateKey()
     const event = await this.agenda.createEvent(accountId, masterKey, {
       title: task.title, category: 'committee', churchId: task.churchId, location: '', address: '', visitTarget: 'none', sermonId: null, sermonSnapshot: null,
       startAt: `${date}T08:00`, endAt: `${date}T09:30`, allDay: false, reminderMinutes: 60, notes: 'Pendência de reunião da igreja.', includeInItinerary: true, mondayException: true,

@@ -156,7 +156,7 @@ export function AuthPage() {
               />
               {mode === 'unlock' && <label className="confirmation-check auth-keep">
                 <input type="checkbox" checked={permanecerConectado} onChange={(event) => setPermanecerConectado(event.target.checked)} />
-                <span>Permanecer conectado<small>Recarregar a página não pede a senha de novo. Fechar a aba, sim — e o cofre continua se trancando sozinho depois de um tempo parado.</small></span>
+                <span>Permanecer conectado<small>Recarregar mantém o acesso por até 8 horas. Fechar a aba, bloquear, sair ou ficar inativo encerra o acesso.</small></span>
               </label>}
               {sessionLostMessage && <div className="alert alert--error" role="alert">{sessionLostMessage}</div>}
               {error && <div className="alert alert--error" role="alert">{error}</div>}

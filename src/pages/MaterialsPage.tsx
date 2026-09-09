@@ -4,6 +4,7 @@ import { Boxes, ClipboardList, PackageCheck, Plus, Split, Trash2 } from 'lucide-
 import { useCallback, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { localDateKey } from '../shared/dates'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DistrictService } from '../district/service'
@@ -26,7 +27,7 @@ const care = new CareService()
 const districtService = new DistrictService()
 const peopleService = new PeopleService()
 const carimbo = () => new Date().toISOString()
-const hoje = () => new Date().toISOString().slice(0, 10)
+const hoje = localDateKey
 
 const abas = { estoque: 'Estoque', distribuicao: 'Distribuição', necessidades: 'Necessidades' } as const
 type Aba = keyof typeof abas

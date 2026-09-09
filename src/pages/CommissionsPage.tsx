@@ -9,6 +9,7 @@ import { CommissionService } from '../commissions/service'
 import type { CommissionKind } from '../commissions/types'
 import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
+import { localDateKey } from '../shared/dates'
 
 const service = new CommissionService()
 const districts = new DistrictService()
@@ -84,7 +85,7 @@ export function CommissionsPage() {
     </label>
 
     <section className="dashboard-metrics" aria-label="Resumo de reuniões">
-      <div><small>Próximas reuniões</small><strong>{meetings.filter((meeting) => meeting.date >= new Date().toISOString().slice(0, 10)).length}</strong></div>
+      <div><small>Próximas reuniões</small><strong>{meetings.filter((meeting) => meeting.date >= localDateKey()).length}</strong></div>
       <div><small>Rascunhos em andamento</small><strong>{pending}</strong></div>
       <div><small>Aguardam ata</small><strong>{meetings.filter((meeting) => meeting.agenda.some((item) => item.vote) && !meeting.finalizedAt).length}</strong></div>
     </section>

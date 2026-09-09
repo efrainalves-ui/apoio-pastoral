@@ -1,6 +1,6 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, CheckCircle2, LockKeyhole, Plus, X } from 'lucide-react'
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { AgendaService } from '../agenda/service'
 import type { AgendaEventEntity } from '../agenda/types'
@@ -9,7 +9,8 @@ import { useAuthVault } from '../auth/AuthVaultContext'
 import { CareService } from '../care/service'
 import { perguntaVisivel } from '../care/perguntasCondicionais'
 import { OFFICIAL_QUESTIONS } from '../care/questionnaire'
-import { VISIT_REASONS, VISIT_REASON_LABELS, type VisitAnswer, type VisitCompletionInput, type VisitEntity, type VisitParticipant, type VisitRoundEntity } from '../care/types'
+import { FOLLOW_UP_KINDS, FOLLOW_UP_LABELS, VISIT_REASONS, VISIT_REASON_LABELS, type FollowUpKind, type VisitAnswer, type VisitCompletionInput, type VisitEntity, type VisitParticipant, type VisitRoundEntity } from '../care/types'
+import { localDateKey, localDateTimeKey } from '../shared/dates'
 import { QuestionCard } from '../components/QuestionCard'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -30,34 +31,33 @@ const missionary = new MissionaryService(); const districts = new DistrictServic
  */
 export const VISIT_DURATION_MINUTES = 30
 
-/** Prazo sugerido do lembrete, para o pastor não precisar calcular a data. */
 export const FOLLOW_UP_DEFAULT_DAYS = 7
 
 export function followUpDefaultDate(from: Date = new Date()): string {
   const prazo = new Date(from)
   prazo.setDate(prazo.getDate() + FOLLOW_UP_DEFAULT_DAYS)
-  prazo.setMinutes(prazo.getMinutes() - prazo.getTimezoneOffset())
-  return prazo.toISOString().slice(0, 10)
+  return localDateKey(prazo)
 }
 
 export function visitEndFrom(startAt: string, minutes = VISIT_DURATION_MINUTES): string {
   const inicio = new Date(startAt)
   if (Number.isNaN(inicio.getTime())) return startAt
   const fim = new Date(inicio.getTime() + minutes * 60_000)
-  fim.setMinutes(fim.getMinutes() - fim.getTimezoneOffset())
-  return fim.toISOString().slice(0, 16)
+  return localDateTimeKey(fim)
 }
 
-function localDateTime(offsetMinutes = 0): string { const value = new Date(Date.now() + offsetMinutes * 60_000); value.setMinutes(value.getMinutes() - value.getTimezoneOffset()); return value.toISOString().slice(0, 16) }
-function reviewDate(): string { const date = new Date(); date.setDate(date.getDate() + 180); return date.toISOString().slice(0, 10) }
+function localDateTime(offsetMinutes = 0): string { return localDateTimeKey(new Date(Date.now() + offsetMinutes * 60_000)) }
+function reviewDate(): string { const date = new Date(); date.setDate(date.getDate() + 180); return localDateKey(date) }
 
 export function VisitFormPage() {
   const { account, masterKey } = useAuthVault(); const navigate = useNavigate(); const { visitId } = useParams(); const [searchParams] = useSearchParams(); const agendaVisitId = searchParams.get('agenda'); const [people, setPeople] = useState<PersonEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [events, setEvents] = useState<AgendaEventEntity[]>([]); const [rounds, setRounds] = useState<VisitRoundEntity[]>([]); const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]); const [churchId, setChurchId] = useState(''); const [selectionNotice, setSelectionNotice] = useState(''); const [buscaMembro, setBuscaMembro] = useState(''); const [participants, setParticipants] = useState<VisitParticipant[]>([]); const [guestName, setGuestName] = useState(''); const [reason, setReason] = useState<VisitCompletionInput['reason']>('routine'); const [startAt, setStartAt] = useState(localDateTime()); const endAt = visitEndFrom(startAt); const [scheduledEventId, setScheduledEventId] = useState(''); const [roundId, setRoundId] = useState(''); const [mode, setMode] = useState<'full' | 'quick'>('full'); const [notes, setNotes] = useState(''); const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set()); const [answerValues, setAnswerValues] = useState<Record<string, string>>({}); const [incomeAnswers, setIncomeAnswers] = useState<Record<string, IncomeStatus>>({}); const [prayerText, setPrayerText] = useState(''); const [prayerReviewAt, setPrayerReviewAt] = useState(reviewDate()); const [busy, setBusy] = useState(false); const [error, setError] = useState('')
-  // Corrigir é a mesma tela de registrar, com o que já foi respondido no lugar.
-  // A tela separada mostrava as respostas como campos de texto soltos, sem as
-  // opções e sem as perguntas que ficaram em branco — quem quisesse responder
-  // uma que passou não tinha onde.
   const [visitaEmEdicao, setVisitaEmEdicao] = useState<VisitEntity | null>(null)
+  const dirty = useRef(false)
+  const [nextCareType, setNextCareType] = useState<'' | 'follow_up' | 'task'>('')
+  const [nextCareKind, setNextCareKind] = useState<FollowUpKind>('revisit')
+  const [nextCareDate, setNextCareDate] = useState(followUpDefaultDate())
+  const [nextCareTitle, setNextCareTitle] = useState('')
+  const [nextCareNotes, setNextCareNotes] = useState('')
   // "Participa de uma dupla missionária?" sempre teve uma segunda metade: com
   // quem. Ela ficava por responder, e depois alguém teria de abrir outra tela e
   // cadastrar de memória o que a pessoa acabou de dizer.
@@ -70,6 +70,7 @@ export function VisitFormPage() {
     if (!visita) { setError('Visita não encontrada.'); return }
     const ultima = visita.versions[visita.versions.length - 1]!
     setVisitaEmEdicao(visita)
+    if (dirty.current) return
     setChurchId(visita.churchId); setScheduledEventId(visita.scheduledEventId ?? ''); setMode(visita.mode)
     setReason(ultima.reason); setStartAt(ultima.startAt.slice(0, 16)); setNotes(ultima.notes)
     setSelectedMemberIds(ultima.participants.filter(({ kind, personId }) => kind === 'person' && personId).map(({ personId }) => personId!))
@@ -81,7 +82,14 @@ export function VisitFormPage() {
     }
     setAnswerValues(valores); setSelectedQuestions(respondidas)
   }, [account, agendaVisitId, masterKey, visitId])
-  useReloadOnSync(load)
+  const hasUnsavedChanges = useCallback(() => dirty.current, [])
+  useReloadOnSync(load, hasUnsavedChanges, () => { if (window.confirm('Chegaram alterações de outro aparelho. Seu registro de visita foi preservado. Deseja descartá-lo e carregar a versão sincronizada?')) { dirty.current = false; void load() } })
+  useEffect(() => {
+    const markDirty = (event: Event) => { if ((event.target as Element | null)?.closest('.visit-form')) dirty.current = true }
+    document.addEventListener('input', markDirty, true)
+    document.addEventListener('change', markDirty, true)
+    return () => { document.removeEventListener('input', markDirty, true); document.removeEventListener('change', markDirty, true) }
+  }, [])
   const primaryTargetId = selectedMemberIds[0] ?? ''
   const churchPeople = useMemo(() => people.filter((person) => person.currentChurchId === churchId).sort((left, right) => left.name.localeCompare(right.name, 'pt-BR')), [people, churchId])
   /**
@@ -130,6 +138,7 @@ export function VisitFormPage() {
       try {
         await care.correctVisit(account.id, masterKey, visitaEmEdicao.id, { participants, answers: mode === 'quick' ? [] : buildAnswers(), reason, startAt, endAt, notes })
         await guardarDuplas()
+        dirty.current = false
         await navigate(`/app/visitas/${visitaEmEdicao.id}`)
       } catch (motivo) { setError(motivo instanceof Error ? motivo.message : 'Não foi possível salvar a correção.') } finally { setBusy(false) }
       return
@@ -137,7 +146,7 @@ export function VisitFormPage() {
     return submitNovo()
   }
 
-  async function submitNovo() { if (!account || !masterKey) return; setBusy(true); setError(''); try { const input: VisitCompletionInput = { targetType: 'person', targetId: primaryTargetId, churchId, scheduledEventId: scheduledEventId || null, mode, participants, reason, startAt, endAt, notes, answers: mode === 'quick' ? [] : buildAnswers(), prayerText, prayerReviewAt, followUp: null, task: null, incomeAnswers: Object.entries(incomeAnswers).map(([personId, status]) => ({ personId, status })), roundId: roundId || null }; const visit = await care.completeVisit(account.id, masterKey, input); await guardarDuplas(); await navigate(`/app/visitas/${visit.id}`) } catch (reasonValue) { setError(reasonValue instanceof Error ? reasonValue.message : 'Não foi possível finalizar a visita.') } finally { setBusy(false) } }
+  async function submitNovo() { if (!account || !masterKey) return; setBusy(true); setError(''); try { const input: VisitCompletionInput = { targetType: 'person', targetId: primaryTargetId, churchId, scheduledEventId: scheduledEventId || null, mode, participants, reason, startAt, endAt, notes, answers: mode === 'quick' ? [] : buildAnswers(), prayerText, prayerReviewAt, followUp: nextCareType === 'follow_up' ? { kind: nextCareKind, dueAt: nextCareDate, notes: nextCareNotes } : null, task: nextCareType === 'task' ? { title: nextCareTitle, description: nextCareNotes, dueAt: nextCareDate, priority: 'normal' } : null, incomeAnswers: Object.entries(incomeAnswers).map(([personId, status]) => ({ personId, status })), roundId: roundId || null }; const visit = await care.completeVisit(account.id, masterKey, input); await guardarDuplas(); dirty.current = false; await navigate(`/app/visitas/${visit.id}`) } catch (reasonValue) { setError(reasonValue instanceof Error ? reasonValue.message : 'Não foi possível finalizar a visita.') } finally { setBusy(false) } }
   return <div className="page-stack"><Link className="text-link back-link" to="/app/visitas"><ArrowLeft />Voltar às visitas</Link><header className="page-hero"><div><h1>{editando ? 'Corrigir visita' : 'Registrar visita pastoral'}</h1></div><LockKeyhole /></header>{error && <div className="alert alert--error" role="alert">{error}</div>}<form onSubmit={(event) => void submit(event)} className="visit-form">
     <Card eyebrow="1 · Contexto" title="Igreja e quem você visitou"><div className="form-grid"><label className="field"><span className="field__label">Igreja</span><select className="field__input" value={churchId} disabled={editando} onChange={(event) => changeChurch(event.target.value)}><option value="">Selecionar…</option>{churches.map((church) => <option key={church.id} value={church.id}>{church.name}</option>)}</select></label><label className="field"><span className="field__label">Motivo</span><select className="field__input" value={reason} onChange={(event) => setReason(event.target.value as VisitCompletionInput['reason'])}>{VISIT_REASONS.map((item) => <option key={item} value={item}>{VISIT_REASON_LABELS[item]}</option>)}</select></label><Field label="Horário da visita" name="visit-start" type="datetime-local" hint={`Duração de ${VISIT_DURATION_MINUTES} minutos, contada a partir daqui.`} value={startAt} onChange={(event) => setStartAt(event.target.value)} /></div>
       <div className="visit-members"><span className="field__label">Membros visitados</span>{!churchId ? <p className="field__hint">Escolha a igreja para ver os membros.</p> : churchPeople.length === 0 ? <p className="field__hint">Esta igreja ainda não tem pessoas cadastradas.</p> : <>
@@ -147,8 +156,8 @@ export function VisitFormPage() {
           ? <p className="field__hint">Ninguém encontrado com esse nome nesta igreja.</p>
           : <ul className="visit-members__results">{membrosEncontrados.map((person) => <li key={person.id}><button type="button" onClick={() => { setSelectedMemberIds((atual) => [...atual, person.id]); setBuscaMembro('') }}>{person.name}<Plus /></button></li>)}</ul>)}
       </>}</div>{selectionNotice && <div className="alert alert--success">{selectionNotice}</div>}
-      <div className="segmented"><button type="button" className={mode === 'full' ? 'active' : ''} onClick={() => setMode('full')}>Entrevista escolhida</button><button type="button" className={mode === 'quick' ? 'active' : ''} onClick={() => setMode('quick')}>Registro rápido</button></div></Card>
-    <Card eyebrow="2 · Opcional" title="Vínculos e convidado"><div className="form-grid"><label className="field"><span className="field__label">Agendamento vinculado</span><select className="field__input" value={scheduledEventId} onChange={(event) => setScheduledEventId(event.target.value)}><option value="">Visita espontânea</option>{events.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><label className="field"><span className="field__label">Rodada</span><select className="field__input" value={roundId} onChange={(event) => setRoundId(event.target.value)}><option value="">Fora de rodada</option>{rounds.filter(({ status }) => status === 'active').map((round) => <option key={round.id} value={round.id}>{round.name}</option>)}</select></label></div><div className="inline-form"><Field label="Nome" name="guest-name" value={guestName} onChange={(event) => setGuestName(event.target.value)} /><Button type="button" variant="secondary" onClick={addGuest}>Adicionar</Button></div>{guests.length > 0 && <div className="participant-grid">{guests.map((guest) => <label key={guest.id}><input type="checkbox" checked readOnly /><span>{guest.guestName}<small>Convidado não cadastrado</small></span></label>)}</div>}</Card>
+      {!editando && <div className="segmented"><button type="button" className={mode === 'full' ? 'active' : ''} onClick={() => setMode('full')}>Entrevista escolhida</button><button type="button" className={mode === 'quick' ? 'active' : ''} onClick={() => setMode('quick')}>Registro rápido</button></div>}</Card>
+    {!editando && <Card eyebrow="2 · Opcional" title="Vínculos e convidado"><div className="form-grid"><label className="field"><span className="field__label">Agendamento vinculado</span><select className="field__input" value={scheduledEventId} onChange={(event) => setScheduledEventId(event.target.value)}><option value="">Visita espontânea</option>{events.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><label className="field"><span className="field__label">Rodada</span><select className="field__input" value={roundId} onChange={(event) => setRoundId(event.target.value)}><option value="">Fora de rodada</option>{rounds.filter(({ status }) => status === 'active').map((round) => <option key={round.id} value={round.id}>{round.name}</option>)}</select></label></div><div className="inline-form"><Field label="Nome" name="guest-name" value={guestName} onChange={(event) => setGuestName(event.target.value)} /><Button type="button" variant="secondary" onClick={addGuest}>Adicionar</Button></div>{guests.length > 0 && <div className="participant-grid">{guests.map((guest) => <label key={guest.id}><input type="checkbox" checked readOnly /><span>{guest.guestName}<small>Convidado não cadastrado</small></span></label>)}</div>}</Card>}
     {mode === 'full' && <Card eyebrow="3 · Perguntas opcionais" title="Perguntas">{questionTargets().length === 0
       ? <p className="field__hint">Escolha antes o cadastro visitado e marque quem estava presente. As perguntas aparecem em seguida.</p>
       : <>
@@ -182,9 +191,10 @@ export function VisitFormPage() {
           </label>
         ))}
       </div> })}</div></>}</Card>}
-    {incomeCandidates.length > 0 && <Card eyebrow="Pergunta condicional privada" title="Situação de renda">{incomeCandidates.map((person) => <label className="field" key={person.id}><span className="field__label">{person.name}: Você possui alguma fonte de renda atualmente?</span><select className="field__input" value={incomeAnswers[person.id] ?? 'unknown'} onChange={(event) => setIncomeAnswers((current) => ({ ...current, [person.id]: event.target.value as IncomeStatus }))}><option value="unknown">Não informado</option><option value="has_income">Sim</option><option value="no_income">Não</option></select></label>)}</Card>}
+    {!editando && incomeCandidates.length > 0 && <Card eyebrow="Pergunta condicional privada" title="Situação de renda">{incomeCandidates.map((person) => <label className="field" key={person.id}><span className="field__label">{person.name}: Você possui alguma fonte de renda atualmente?</span><select className="field__input" value={incomeAnswers[person.id] ?? 'unknown'} onChange={(event) => setIncomeAnswers((current) => ({ ...current, [person.id]: event.target.value as IncomeStatus }))}><option value="unknown">Não informado</option><option value="has_income">Sim</option><option value="no_income">Não</option></select></label>)}</Card>}
     <Card eyebrow="4 · Anotações" title="Resumo opcional"><label className="field" htmlFor="visit-notes"><span className="field__label">Observações pastorais</span><textarea id="visit-notes" className="field__input" rows={4} maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} /></label></Card>
-    <Card eyebrow="5 · Última etapa" title="Pedido de oração"><label className="field" htmlFor="visit-prayer"><span className="field__label">Pedido opcional</span><textarea id="visit-prayer" className="field__input" rows={3} maxLength={1000} value={prayerText} onChange={(event) => setPrayerText(event.target.value)} /></label><Field label="Revisar em" name="prayer-review" type="date" value={prayerReviewAt} onChange={(event) => setPrayerReviewAt(event.target.value)} /></Card>
+    {!editando && <Card eyebrow="5 · Última etapa" title="Pedido de oração"><label className="field" htmlFor="visit-prayer"><span className="field__label">Pedido opcional</span><textarea id="visit-prayer" className="field__input" rows={3} maxLength={1000} value={prayerText} onChange={(event) => setPrayerText(event.target.value)} /></label><Field label="Revisar em" name="prayer-review" type="date" value={prayerReviewAt} onChange={(event) => setPrayerReviewAt(event.target.value)} /></Card>}
+    {!editando && <Card eyebrow="6 · Opcional" title="Qual é o próximo cuidado?"><label className="field"><span className="field__label">Próxima ação</span><select className="field__input" value={nextCareType} onChange={(event) => setNextCareType(event.target.value as typeof nextCareType)}><option value="">Nenhuma por enquanto</option><option value="follow_up">Criar acompanhamento</option><option value="task">Criar tarefa pastoral</option></select></label>{nextCareType === 'follow_up' && <label className="field"><span className="field__label">Tipo de acompanhamento</span><select className="field__input" value={nextCareKind} onChange={(event) => setNextCareKind(event.target.value as FollowUpKind)}>{FOLLOW_UP_KINDS.map((kind) => <option key={kind} value={kind}>{FOLLOW_UP_LABELS[kind]}</option>)}</select></label>}{nextCareType === 'task' && <Field label="Tarefa" name="next-care-title" value={nextCareTitle} onChange={(event) => setNextCareTitle(event.target.value)} required />}{nextCareType && <><Field label="Data" name="next-care-date" type="date" value={nextCareDate} onChange={(event) => setNextCareDate(event.target.value)} required /><label className="field"><span className="field__label">Observação opcional</span><textarea className="field__input" rows={3} maxLength={2000} value={nextCareNotes} onChange={(event) => setNextCareNotes(event.target.value)} /></label></>}</Card>}
     
     <div className="form-actions form-actions--sticky"><Link className="button button--secondary" to={editando ? `/app/visitas/${visitId}` : '/app/visitas'}>Cancelar</Link><Button type="submit" disabled={busy} icon={<CheckCircle2 />}>{busy ? 'Cifrando visita…' : editando ? 'Salvar correção' : 'Finalizar visita'}</Button></div></form></div>
 }

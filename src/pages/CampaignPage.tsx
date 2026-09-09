@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarDays, CheckCircle2, ClipboardCheck, DollarSign, File
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { localDateKey } from '../shared/dates'
 import { CareService } from '../care/service'
 import type { PrayerRequestEntity, VisitEntity } from '../care/types'
 import { Button } from '../components/ui/Button'
@@ -23,7 +24,7 @@ import type { BibleStudyEntity, InterestEntity, MissionaryPairEntity, SabbathCla
 import { PeopleService } from '../people/service'
 import type { PersonEntity } from '../people/types'
 
-const service = new EvangelismPlanningService(); const districtService = new DistrictService(); const peopleService = new PeopleService(); const missionaryService = new MissionaryService(); const careService = new CareService(); const today = () => new Date().toISOString().slice(0, 10)
+const service = new EvangelismPlanningService(); const districtService = new DistrictService(); const peopleService = new PeopleService(); const missionaryService = new MissionaryService(); const careService = new CareService(); const today = localDateKey
 const campaignInput = (campaign: EvangelismCampaignEntity): EvangelismCampaignInput => { const { id: _id, mainAgendaEventId: _main, additionalAgendaEventIds: _additional, history: _history, createdAt: _created, updatedAt: _updated, ...input } = campaign; void _id; void _main; void _additional; void _history; void _created; void _updated; return input }
 const emptyCampaign = (goalId: string | null): EvangelismCampaignInput => ({ name: '', objective: 'bible_series', churchIds: [], startDate: today(), endDate: today(), location: '', address: '', responsibleGeneral: '', mainSpeaker: '', team: [], status: 'planning', description: '', notes: '', goalId, planningAreas: ['discipleship'], additionalSchedule: 'none', points: [], tasks: [], checklist: defaultCampaignChecklist(), plannedBudget: 0, budgetItems: [], followUps: [], learnings: '' })
 const emptyGoal = (year: number): AnnualGoalInput => ({ title: '', description: '', area: 'discipleship', year, churchIds: [], responsible: '', dueDate: `${year}-12-31`, priority: 'normal', status: 'planned', notes: '', references: [] })

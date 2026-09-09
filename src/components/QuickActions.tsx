@@ -8,7 +8,7 @@ const actions = [
   { to: '/app/pessoas/nova', label: 'Nova pessoa', icon: UserRound },
   { to: '/app/familias/nova', label: 'Nova família', icon: UsersRound },
   { to: '/app/visitacao?aba=oracao', label: 'Novo pedido de oração', icon: Heart },
-  { to: '/app/visitacao?aba=acompanhamentos', label: 'Novo acompanhamento', icon: RotateCcw },
+  { to: '/app/visitacao?aba=acompanhamentos&novo=1', label: 'Novo acompanhamento', icon: RotateCcw },
   { to: '/app/visitacao?aba=tarefas', label: 'Nova tarefa', icon: SquareCheck },
   { to: '/app/sermoes/novo', label: 'Novo sermão', icon: BookOpen },
   { to: '/app/evangelismo/nova', label: 'Nova campanha', icon: Megaphone },

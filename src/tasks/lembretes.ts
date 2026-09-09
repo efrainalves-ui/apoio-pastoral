@@ -30,8 +30,15 @@ export function lembretesVencidos(
   })
 }
 
-/** O texto do aviso, sem nome de ninguém: a notificação aparece na tela travada. */
+/**
+ * O texto do aviso, sem nada do que a tarefa diz.
+ *
+ * A notificação aparece na tela travada, à vista de quem estiver perto. O
+ * título de uma tarefa pastoral é justamente o que não pode aparecer ali:
+ * "Conversar com Fulano sobre a separação" resolve-se abrindo o aplicativo, e
+ * não por cima do ombro de quem carrega o celular.
+ */
 export function textoDoAviso(tarefas: readonly TarefaComLembrete[]): { titulo: string; corpo: string } {
-  if (tarefas.length === 1) return { titulo: 'Apoio Pastoral', corpo: tarefas[0]!.title }
-  return { titulo: 'Apoio Pastoral', corpo: `${tarefas.length} tarefas para fazer` }
+  if (tarefas.length === 1) return { titulo: 'Apoio Pastoral', corpo: 'Você tem uma tarefa pastoral pendente.' }
+  return { titulo: 'Apoio Pastoral', corpo: `Você tem ${tarefas.length} tarefas pastorais pendentes.` }
 }

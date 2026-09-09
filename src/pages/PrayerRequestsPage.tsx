@@ -4,6 +4,7 @@ import { ArrowLeft, Church, MessageCircle, Pencil, Plus, Trash2, UserRound } fro
 import { type FormEvent, useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { localDateKey } from '../shared/dates'
 import { CareService } from '../care/service'
 import { anonymousPrayers, normalizePrayerSearch, peopleForPrayerChurch, prayerChurchGroups, prayerCounters, prayerPeopleGroups, unregisteredPrayerGroups } from '../care/prayer'
 import type { PrayerRequestEntity, PrayerRequestInput, PrayerSubjectKind } from '../care/types'
@@ -16,7 +17,7 @@ import { PeopleService } from '../people/service'
 import type { PersonEntity } from '../people/types'
 
 const care = new CareService(); const districts = new DistrictService(); const peopleService = new PeopleService()
-const today = () => new Date().toISOString().slice(0, 10)
+const today = localDateKey
 const emptyInput = (): PrayerRequestInput => ({ churchId: '', kind: 'member', personId: null, personName: '', subject: '', description: '', requestedAt: today(), privateNotes: '' })
 const STATUS_LABELS: Record<PrayerRequestEntity['status'], string> = { active: 'Em oração', answered: 'Respondido', closed: 'Encerrado', needs_follow_up: 'Em oração', archived: 'Encerrado' }
 const dataCurta = (valor: string) => new Intl.DateTimeFormat('pt-BR').format(new Date(`${valor.slice(0, 10)}T12:00:00`))

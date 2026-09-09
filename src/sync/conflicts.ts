@@ -46,6 +46,8 @@ export interface ConflictPreview {
   differences: ConflictDifference[]
   /** Diferenças em campos que o pastor não edita diretamente. */
   hiddenDifferences: number
+  choice?: ConflictChoice
+  resolvedAt?: string
 }
 
 const FIELD_LABELS: Record<string, string> = {
@@ -57,23 +59,46 @@ const FIELD_LABELS: Record<string, string> = {
   allDay: 'Dia inteiro', date: 'Data', deadline: 'Prazo', responsible: 'Responsável',
   amount: 'Valor', value: 'Valor', reason: 'Motivo', quorum: 'Quórum', author: 'Autor',
   pages: 'Páginas', theme: 'Tema', passage: 'Passagem', role: 'Cargo', label: 'Identificação',
+  participants: 'Participantes', answers: 'Respostas da visita', mainText: 'Texto principal',
+  objective: 'Objetivo', introduction: 'Introdução', content: 'Conteúdo', conclusion: 'Conclusão', appeal: 'Apelo',
 }
 
-/**
- * Campos cujo conteúdo é um código interno. O nome do campo é mostrado, o valor
- * não: exibi-lo colocaria vocabulário técnico na frente do pastor.
- */
-const CODED_FIELDS = new Set(['status', 'type', 'category', 'pastoralStatus', 'incomeStatus', 'role', 'visitTarget', 'mode', 'kind', 'operation', 'importStatus'])
+const CODE_LABELS: Record<string, string> = {
+  active: 'Ativo', archived: 'Arquivado', pending: 'Pendente', completed: 'Concluído', cancelled: 'Cancelado',
+  draft: 'Rascunho', ready: 'Pronto', rescue: 'A resgatar', visitor: 'Visitante', interested: 'Interessado',
+  full: 'Completa', quick: 'Rápida', routine: 'Rotina', leadership: 'Liderança', crisis: 'Crise', illness: 'Enfermidade',
+  mourning: 'Luto', newly_baptized: 'Recém-batizado', family: 'Família', other: 'Outro', person: 'Pessoa',
+  call: 'Ligar', revisit: 'Visitar novamente', send_material: 'Enviar material', bring_lesson: 'Levar lição',
+  talk_family: 'Conversar com familiar', talk_leader: 'Falar com líder', schedule_study: 'Agendar estudo',
+  follow_decision: 'Acompanhar decisão', follow_prayer: 'Acompanhar pedido de oração', refer_help: 'Encaminhar para ajuda',
+  visit: 'Visita', preaching: 'Pregação', committee: 'Comissão', meeting: 'Reunião', bible_study: 'Estudo bíblico',
+  baptism: 'Batismo', communion: 'Santa Ceia', wedding: 'Casamento', training: 'Treinamento', event: 'Evento',
+  travel: 'Viagem', council: 'Concílio', personal: 'Pessoal', low: 'Baixa', normal: 'Normal', high: 'Alta',
+  organized_church: 'Igreja organizada', preaching_point: 'Ponto de pregação',
+}
+const CODED_FIELDS = new Set(['status', 'type', 'category', 'pastoralStatus', 'incomeStatus', 'role', 'visitTarget', 'mode', 'kind', 'operation', 'importStatus', 'reason'])
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?$/u
 
 /** Deixa um valor pronto para leitura, ou devolve null quando não deve aparecer. */
 function readableValue(field: string, value: unknown): string | null {
   if (value === null || value === undefined || value === '') return 'não informado'
-  if (CODED_FIELDS.has(field)) return null
   if (typeof value === 'boolean') return value ? 'Sim' : 'Não'
   if (typeof value === 'number') return String(value)
+  if (Array.isArray(value)) {
+    if (field === 'answers') {
+      const answers = value as Array<{ question?: { text?: string }; value?: unknown; skipped?: boolean }>
+      const visible = answers.filter(({ skipped }) => !skipped).slice(0, 4).map(({ question, value: answer }) => {
+        const text = Array.isArray(answer) ? answer.join(', ') : typeof answer === 'string' || typeof answer === 'number' || typeof answer === 'boolean' ? String(answer) : 'não informado'
+        return `${question?.text ?? 'Resposta'}: ${text}`
+      })
+      return visible.length ? visible.join(' · ') : 'Nenhuma resposta'
+    }
+    return `${value.length} item(ns)`
+  }
   if (typeof value !== 'string') return null
+  if (CODED_FIELDS.has(field)) return CODE_LABELS[value] ?? null
+  if (CODE_LABELS[value]) return CODE_LABELS[value]
   if (ISO_DATE.test(value)) {
     const data = new Date(value)
     if (!Number.isNaN(data.getTime())) {
@@ -81,6 +106,20 @@ function readableValue(field: string, value: unknown): string | null {
     }
   }
   return value.length > 80 ? `${value.slice(0, 80)}…` : value
+}
+
+function comparableData(data: unknown): unknown {
+  if (!data || typeof data !== 'object') return data
+  const source = data as Record<string, unknown>
+  if (!Array.isArray(source.versions)) return data
+  const versions = source.versions as Array<Record<string, unknown>>
+  const currentVersion = typeof source.currentVersion === 'number' ? source.currentVersion : versions.length
+  const current = versions.find(({ version }) => version === currentVersion) ?? versions.at(-1)
+  if (!current) return data
+  const base = { ...source }
+  delete base.versions
+  delete base.currentVersion
+  return { ...base, ...current }
 }
 
 function sameValue(left: unknown, right: unknown): boolean {
@@ -152,6 +191,7 @@ export class ConflictService {
   /** Prepara as duas versões para leitura, sem alterar nada. */
   async preview(conflict: SyncConflictRecord, masterKey: CryptoKey): Promise<ConflictPreview> {
     const localRecord = await this.database.vaultRecords.get(conflict.recordId)
+    const localSource = conflict.status === 'resolved' && conflict.localPayload ? conflict.localPayload : localRecord
     let kind = 'Registro'
     let localSummary = 'Este registro não existe mais neste aparelho'
     let localAvailable = false
@@ -160,14 +200,20 @@ export class ConflictService {
     let localData: unknown = null
     let remoteData: unknown = null
 
+    let localIsDeletion = Boolean(localRecord?.deletedAt)
     if (localRecord?.deletedAt) localSummary = 'Você apagou este registro neste aparelho'
-    if (localRecord && !localRecord.deletedAt) {
+    if (localSource && !localIsDeletion) {
       try {
-        const payload = await decryptPayload(masterKey, localRecord)
-        kind = label(payload.type)
-        localSummary = summarize(payload.data)
-        localData = payload.data
-        localAvailable = true
+        const payload = await decryptPayload(masterKey, localSource)
+        if (payload.type === 'tombstone') {
+          localIsDeletion = true
+          localSummary = 'Esta versão apagou o registro'
+        } else {
+          kind = label(payload.type)
+          localSummary = summarize(payload.data)
+          localData = comparableData(payload.data)
+          localAvailable = true
+        }
       } catch { localSummary = 'Conteúdo não pôde ser aberto' }
     }
 
@@ -178,7 +224,7 @@ export class ConflictService {
         const payload = await decryptPayload(masterKey, conflict.remotePayload)
         if (kind === 'Registro') kind = label(payload.type)
         remoteSummary = summarize(payload.data)
-        remoteData = payload.data
+        remoteData = comparableData(payload.data)
         remoteAvailable = true
       } catch { remoteSummary = 'Conteúdo não pôde ser aberto' }
     }
@@ -191,11 +237,13 @@ export class ConflictService {
       kind,
       createdAt: conflict.createdAt,
       remoteIsDeletion: conflict.remoteOperation === 'delete',
-      localIsDeletion: Boolean(localRecord?.deletedAt),
+      localIsDeletion,
       local: { version: conflict.localVersion, summary: localSummary, available: localAvailable },
       remote: { version: conflict.remoteVersion, summary: remoteSummary, available: remoteAvailable },
       differences: mudancas.visible,
       hiddenDifferences: mudancas.hidden,
+      ...(conflict.choice ? { choice: conflict.choice } : {}),
+      ...(conflict.resolvedAt ? { resolvedAt: conflict.resolvedAt } : {}),
     }
   }
 

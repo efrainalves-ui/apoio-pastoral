@@ -1,11 +1,11 @@
 import 'fake-indexeddb/auto'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { generateVaultKeys } from '../crypto/vault'
-import { esquecerSessaoAberta, manterSessaoAberta, retomarSessaoAberta } from './sessaoAberta'
+import { esquecerSessaoAberta, manterSessaoAberta, retomarSessaoAberta, SESSION_MAX_MS } from './sessaoAberta'
 
 const CONTA = 'conta-ficticia-sessao'
 
-afterEach(async () => { await esquecerSessaoAberta(); sessionStorage.clear() })
+afterEach(async () => { vi.restoreAllMocks(); await esquecerSessaoAberta(); sessionStorage.clear() })
 
 describe('manter o cofre aberto entre recarregamentos', () => {
   it('devolve chaves que abrem o que as originais fecharam', async () => {
@@ -38,6 +38,14 @@ describe('manter o cofre aberto entre recarregamentos', () => {
     const chaves = await generateVaultKeys()
     await manterSessaoAberta(CONTA, chaves)
     sessionStorage.clear()
+
+    expect(await retomarSessaoAberta(CONTA)).toBeNull()
+  })
+
+  it('expira mesmo que a aba permaneça aberta', async () => {
+    const chaves = await generateVaultKeys()
+    await manterSessaoAberta(CONTA, chaves)
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + SESSION_MAX_MS + 1)
 
     expect(await retomarSessaoAberta(CONTA)).toBeNull()
   })

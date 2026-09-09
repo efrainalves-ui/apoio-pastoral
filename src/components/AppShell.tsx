@@ -19,13 +19,14 @@ import {
   Megaphone,
   X,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { isHomologationEnvironment } from '../sync/config'
 import { QuickActions } from './QuickActions'
 import { SyncNowButton } from './SyncNowButton'
 import { Button } from './ui/Button'
+import { GlobalSearchField } from './GlobalSearchField'
 
 const primaryNav = [
   { to: '/app', label: 'Início', icon: Home, end: true },
@@ -58,10 +59,43 @@ export function AppShell() {
   const { account, lock, signOut } = useAuthVault()
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
+  const sidebarRef = useRef<HTMLElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    setOpen(false)
   }, [pathname])
+
+  useEffect(() => {
+    const sidebar = sidebarRef.current
+    if (!sidebar) return
+    const mobile = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 980px)').matches
+    sidebar.inert = mobile && !open
+    if (!mobile || !open) return
+
+    closeButtonRef.current?.focus()
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        menuButtonRef.current?.focus()
+        return
+      }
+      if (event.key !== 'Tab' || !sidebar) return
+      const focusable = [...sidebar.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+      const first = focusable[0]
+      const last = focusable.at(-1)
+      if (!first || !last) return
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      sidebar.inert = false
+    }
+  }, [open])
 
   /**
    * Sair encerra a sessão no serviço, não só fecha o cofre. Sem isso, o
@@ -80,11 +114,11 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
-      <aside className={`sidebar ${open ? 'sidebar--open' : ''}`} aria-label="Navegação principal">
+      <aside ref={sidebarRef} className={`sidebar ${open ? 'sidebar--open' : ''}`} aria-label="Navegação principal">
         <div className="brand">
           <div className="brand__mark" aria-hidden="true"><ShieldCheck /></div>
           <div><strong>Apoio Pastoral</strong></div>
-          <button className="icon-button sidebar__close" onClick={() => setOpen(false)} aria-label="Fechar menu"><X /></button>
+          <button ref={closeButtonRef} className="icon-button sidebar__close" onClick={() => { setOpen(false); menuButtonRef.current?.focus() }} aria-label="Fechar menu"><X /></button>
         </div>
         <nav className="sidebar__nav">
           {primaryNav.map(({ to, label, icon: Icon, end, personal }) => (
@@ -105,9 +139,10 @@ export function AppShell() {
       {open && <button className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setOpen(false)} />}
       <div className="app-main">
         <header className="app-header">
-          <button className="icon-button app-header__menu" aria-label="Abrir menu" onClick={() => setOpen(true)}><Menu /></button>
+          <button ref={menuButtonRef} className="icon-button app-header__menu" aria-label="Abrir menu" aria-expanded={open} onClick={() => setOpen(true)}><Menu /></button>
           <span className="app-header__brand">Apoio Pastoral</span>
           {isHomologationEnvironment && <span className="app-header__env" title="Ambiente de testes com dados fictícios">Homologação</span>}
+          <GlobalSearchField />
           <div className="app-header__actions">
             <QuickActions />
             <SyncNowButton compact />
@@ -119,7 +154,7 @@ export function AppShell() {
         <main id="conteudo" className="content" tabIndex={-1}><Outlet /></main>
         <nav className="bottom-nav" aria-label="Navegação principal móvel">
           {mobileNav.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} {...(end ? { end: true } : {})} className={({ isActive }) => `bottom-nav__item ${isActive ? 'bottom-nav__item--active' : ''}`}>
+            <NavLink key={to} to={to} {...(end ? { end: true } : {})} className={({ isActive }) => `bottom-nav__item ${isActive || (to === '/app/distrito' && ['/app/distrito', '/app/pessoas', '/app/familias'].some((section) => pathname.startsWith(section))) || (to === '/app/visitacao' && ['/app/visitacao', '/app/visitas'].some((section) => pathname.startsWith(section))) ? 'bottom-nav__item--active' : ''}`}>
               <Icon aria-hidden="true" /><span>{label}</span>
             </NavLink>
           ))}

@@ -8,7 +8,7 @@ const auth = vi.hoisted(() => ({ account: { email: 'menu-ficticio@example.invali
 
 vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => auth }))
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); auth.lock.mockReset(); auth.signOut.mockReset() })
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); auth.lock.mockReset(); auth.signOut.mockReset() })
 
 function renderShell() {
   render(<MemoryRouter initialEntries={['/app']}><Routes><Route path="/app" element={<AppShell />}><Route index element={<div>Início</div>} /></Route></Routes></MemoryRouter>)
@@ -30,6 +30,7 @@ describe('menu do aplicativo', () => {
     expect(screen.queryByText('Mais')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Trocar conta' })).not.toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Configurações' }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('searchbox', { name: /Buscar pessoa, família, igreja ou compromisso/ })).toBeVisible()
   })
 
   it('pede confirmação antes de sair e encerra a sessão no serviço', async () => {
@@ -56,5 +57,22 @@ describe('menu do aplicativo', () => {
     await user.click(botao)
     expect(auth.lock).toHaveBeenCalledOnce()
     expect(auth.signOut).not.toHaveBeenCalled()
+  })
+
+  it('retira o menu móvel fechado do foco e devolve o foco ao fechar com Escape', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
+    const user = userEvent.setup()
+    renderShell()
+    const sidebar = document.querySelector<HTMLElement>('.sidebar')!
+    expect(sidebar.inert).toBe(true)
+
+    const open = screen.getByRole('button', { name: 'Abrir menu' })
+    await user.click(open)
+    expect(sidebar.inert).toBe(false)
+    expect(screen.getAllByRole('button', { name: 'Fechar menu' })[0]).toHaveFocus()
+
+    await user.keyboard('{Escape}')
+    expect(open).toHaveFocus()
+    expect(sidebar.inert).toBe(true)
   })
 })

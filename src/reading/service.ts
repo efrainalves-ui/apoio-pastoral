@@ -1,6 +1,7 @@
 import { decryptRecord, encryptPayload } from '../crypto/vault'
 import { readingDb, type ReadingDatabase } from './database'
 import type { ReadingBookData, ReadingDataByType, ReadingEntity, ReadingGoalData, ReadingRecordType, ReadingSessionData, ReadingStoredRecord } from './types'
+import { localDateKey } from '../shared/dates'
 
 const now = () => new Date().toISOString()
 export class ReadingService {
@@ -12,7 +13,7 @@ export class ReadingService {
   async books(accountId: string, key: CryptoKey) { return (await this.list(accountId, key, 'book')).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) }
   async sessions(accountId: string, key: CryptoKey) { return (await this.list(accountId, key, 'session')).sort((a, b) => b.date.localeCompare(a.date)) }
   async goals(accountId: string, key: CryptoKey) { return this.list(accountId, key, 'goal') }
-  async saveBook(accountId: string, key: CryptoKey, input: ReadingBookData, id?: string) { if (!input.title.trim() || !input.author.trim()) throw new Error('Informe o título e o autor do livro.'); if (input.totalPages !== null && input.totalPages <= 0) throw new Error('Informe uma quantidade válida de páginas.'); const completedDate = input.status === 'completed' ? input.completedDate ?? new Date().toISOString().slice(0, 10) : null; return this.save(accountId, key, 'book', { ...input, title: input.title.trim(), author: input.author.trim(), notes: input.notes.trim(), completedDate }, id) }
+  async saveBook(accountId: string, key: CryptoKey, input: ReadingBookData, id?: string) { if (!input.title.trim() || !input.author.trim()) throw new Error('Informe o título e o autor do livro.'); if (input.totalPages !== null && input.totalPages <= 0) throw new Error('Informe uma quantidade válida de páginas.'); const completedDate = input.status === 'completed' ? input.completedDate ?? localDateKey() : null; return this.save(accountId, key, 'book', { ...input, title: input.title.trim(), author: input.author.trim(), notes: input.notes.trim(), completedDate }, id) }
   async addSession(accountId: string, key: CryptoKey, input: Omit<ReadingSessionData, 'createdAt' | 'updatedAt'>): Promise<ReadingEntity<ReadingSessionData>> {
     if (!input.bookId || !input.date || (input.pages <= 0 && input.minutes <= 0)) throw new Error('Escolha o livro e informe páginas ou minutos de leitura.')
     const book = (await this.books(accountId, key)).find(({ id }) => id === input.bookId); if (!book) throw new Error('Livro não encontrado.')

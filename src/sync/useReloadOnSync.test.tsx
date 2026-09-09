@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { useCallback, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { notificarDadosSincronizados, useReloadOnSync } from './useReloadOnSync'
@@ -9,6 +9,14 @@ function TelaFicticia({ buscar }: { buscar: () => Promise<string> }) {
   const [texto, setTexto] = useState('vazio')
   const carregar = useCallback(async () => { setTexto(await buscar()) }, [buscar])
   useReloadOnSync(carregar)
+  return <p>{texto}</p>
+}
+
+function FormularioFicticio({ buscar, bloqueado }: { buscar: () => Promise<string>; bloqueado: () => void }) {
+  const [texto, setTexto] = useState('carregando')
+  const carregar = useCallback(async () => { setTexto(await buscar()) }, [buscar])
+  const alterado = useCallback(() => true, [])
+  useReloadOnSync(carregar, alterado, bloqueado)
   return <p>{texto}</p>
 }
 
@@ -42,5 +50,17 @@ describe('a tela se refaz quando a sincronização traz novidade', () => {
     notificarDadosSincronizados()
 
     expect(buscar).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserva o conteúdo digitado quando a sincronização avisa sobre dados externos', async () => {
+    const buscar = vi.fn(() => Promise.resolve('conteúdo do banco'))
+    const bloqueado = vi.fn()
+    render(<FormularioFicticio buscar={buscar} bloqueado={bloqueado} />)
+    await screen.findByText('conteúdo do banco')
+
+    notificarDadosSincronizados()
+
+    await waitFor(() => expect(bloqueado).toHaveBeenCalledOnce())
+    expect(buscar).toHaveBeenCalledOnce()
   })
 })

@@ -20,7 +20,7 @@ Aplicativo local-first com Distrito, Pessoas, Agenda, Planejamento Anual, Evange
 - importação local de PDFs textuais de membros, com prévia, divergências, aplicação atômica, idempotência e reversão segura;
 - famílias manuais entre igrejas, com prevenção de duplicidade e estrutura futura para convidados ocasionais;
 - aniversários, mensagens por faixa etária editáveis e cópia local sem envio automático;
-- busca global local por pessoa, família, igreja e WhatsApp;
+- busca global local por pessoa, família, igreja, compromisso e WhatsApp;
 - importação e visão privada de fidelidade pelas categorias Não dizimista, Dizimista não sistemático e Dizimista, com quantidade exata opcional, faixa preservada e sem valores, ranking ou decisão automatizada;
 - painel parcial com membros, situação pastoral, famílias, aniversários, fidelidade e alertas de importação;
 - agenda, itinerário local, visitas, entrevista versionada, tarefas, retornos e rodadas;
@@ -46,11 +46,12 @@ pnpm dev
 
 Abra `http://localhost:5173`. Sem `.env`, o aplicativo usa somente o transporte local de desenvolvimento e deve receber exclusivamente dados fictícios.
 
-Para uma homologação estritamente local, defina `VITE_DISABLE_SYNC=true` em `.env.local`. Nesse modo, autenticação remota, transporte e fila de saída ficam desativados; gravações continuam cifradas no IndexedDB.
+Para uma validação estritamente local, use `VITE_APP_ENV=desenvolvimento` e `VITE_DISABLE_SYNC=true` em `.env.local`. Nesse modo, autenticação remota, transporte e fila de saída ficam desativados; gravações continuam cifradas no IndexedDB. A homologação oficial usa `VITE_APP_ENV=homologacao` e um projeto Supabase exclusivo de testes.
 
 Para usar Supabase, copie `.env.example` para `.env.local`, preencha URL, chave anônima e `VITE_SUPABASE_PROJECT_REF`, e aplique as migrations **nesta ordem**:
 
 ```
+0000_plataforma_fechada_up.sql
 0001_marco_zero_up.sql
 0002_password_key_envelopes_up.sql
 0003_device_sessions_up.sql
@@ -59,6 +60,7 @@ Para usar Supabase, copie `.env.example` para `.env.local`, preencha URL, chave 
 0006_expurgo_de_historico_up.sql
 0007_funcao_nova_fechada_up.sql
 0008_revogacao_idempotente_up.sql
+0009_sessoes_fora_de_alcance_up.sql
 ```
 
 Depois, declare uma única vez o que aquele banco é — sem esta linha o aplicativo se recusa a sincronizar, de propósito:
@@ -67,7 +69,7 @@ Depois, declare uma única vez o que aquele banco é — sem esta linha o aplica
 insert into public.service_environment (environment) values ('homologacao');
 ```
 
-A versão de esquema esperada por esta build é **8** (`public.app_schema_version()`). O cadastro por e-mail pode exigir confirmação conforme a configuração do Auth. Reversão: aplique os arquivos `*_down.sql` na ordem inversa.
+A versão de esquema esperada por esta build é **9** (`public.app_schema_version()`). O cadastro por e-mail pode exigir confirmação conforme a configuração do Auth. Reversão: aplique os arquivos `*_down.sql` na ordem inversa.
 
 ## Verificações
 
@@ -87,7 +89,7 @@ O Playwright cobre Chromium desktop (1440 × 1000), viewport móvel Pixel 7, ins
 - Não adicione mensagens livres a logs. A telemetria aceita somente códigos técnicos e metadados allowlisted.
 - Não adicione colunas de conteúdo pastoral às tabelas remotas. O contrato remoto é ciphertext + IV + AAD + versões e identificadores aleatórios.
 - PDFs são lidos no dispositivo e descartados; a aplicação aceita somente formatos textuais reconhecidos e exige prévia e confirmação.
-- Sincronização não substitui backup; backup `.apoio` pertence à V1.
+- Sincronização não substitui backup; o formato atual é `.apb`, versão 4, e a restauração mantém compatibilidade com arquivos da versão 3.
 
 Documentos técnicos e decisões estão em `docs/`. O estado de continuidade está em `docs/CONTINUITY.md`.
 

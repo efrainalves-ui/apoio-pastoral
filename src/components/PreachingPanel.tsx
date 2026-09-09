@@ -7,6 +7,7 @@ import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
 import { OUTRA_IGREJA, findExistingPreaching, formatPreachingDate, listPreachings } from '../sermons/preachings'
 import type { SermonEntity } from '../sermons/types'
+import { localDateKey } from '../shared/dates'
 import { Button } from './ui/Button'
 import { Field } from './ui/Field'
 
@@ -26,7 +27,7 @@ export function PreachingPanel({ sermon, onClose }: { sermon: SermonEntity; onCl
   const [churches, setChurches] = useState<ChurchEntity[]>([])
   const [churchId, setChurchId] = useState('')
   const [outroLugar, setOutroLugar] = useState('')
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(() => localDateKey())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')

@@ -116,7 +116,7 @@ O cliente deixou de decidir se um aparelho está autorizado.
 ## Conta, backup e separação financeira
 
 - cada instalação do navegador mantém uma única conta local, evitando colisões dos envelopes locais de senha e recuperação;
-- o backup pastoral é cifrado, vinculado à conta de origem e restaurado em um único lote; outra conta é recusada e uma falha não deve deixar aplicação parcial;
+- o backup pastoral é cifrado, vinculado à conta de origem e restaurado em lotes retomáveis; outra conta é recusada e uma interrupção deixa uma marca local para continuar com segurança;
 - criar e restaurar dependem de ações explícitas; o arquivo não é enviado automaticamente;
 - **Sair** encerra a sessão **deste** aparelho (`scope: 'local'`) e fecha o
   cofre. Sair no celular não derruba o computador: quem quer tirar outro
@@ -124,11 +124,11 @@ O cliente deixou de decidir se um aparelho está autorizado.
   envelope de chave daquele aparelho.
   **Bloquear cofre** apenas fecha o cofre e mantém a sessão. O cofre também se
   fecha sozinho após 15 minutos sem uso ou 5 minutos em segundo plano;
+- a opção de permanecer conectado mantém chaves não exportáveis somente para a mesma aba, expira em no máximo 8 horas e é apagada ao bloquear ou sair. Código executado na mesma origem ainda pode usar uma chave enquanto essa sessão estiver válida;
 - o Orçamento Familiar e a Leitura usam bancos locais separados e não entram na
   sincronização pastoral, mas **entram no backup** (versão 4 do arquivo), no
   mesmo envelope cifrado pelo código que o titular escolhe;
-- a restauração recusa arquivo de outra conta, de outra versão, truncado,
-  malformado ou grande demais, antes de tentar abrir.
+- a restauração aceita os formatos 3 e 4 e recusa arquivo de outra conta, formato não suportado, conteúdo truncado, malformado ou grande demais antes da primeira gravação.
 
 Pessoas, famílias, WhatsApp, nascimento, histórico, divergências de importação e fidelidade vivem dentro dos mesmos envelopes cifrados. O tipo técnico do registro pode indicar `person`, `family` ou `import_batch`, mas não revela o conteúdo, nome, igreja, categoria ou quantidade de meses. A busca não cria índice aberto e não sincroniza os termos.
 

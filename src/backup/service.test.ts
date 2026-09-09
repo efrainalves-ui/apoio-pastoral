@@ -94,7 +94,7 @@ describe('backup diante de arquivo ruim', () => {
   it('recusa um arquivo de versão diferente sem tentar abrir', async () => {
     const { servico } = ambiente('versao')
     await expect(servico.restore('conta-ficticia-a', await generateMasterKey(), 'codigo-ficticio-123', {
-      format: 'apoio-pastoral-backup', version: 3, salt: 'x', iv: 'x', ciphertext: 'x',
+      format: 'apoio-pastoral-backup', version: 2, salt: 'x', iv: 'x', ciphertext: 'x',
     })).rejects.toThrow('outra versão do aplicativo')
   })
 
@@ -199,6 +199,24 @@ describe('restauração validada, atômica e retomável', () => {
     expect(fila).toHaveLength(0)
   })
 
+  it('reconhece o lote gravado quando o navegador fecha antes de atualizar o progresso', async () => {
+    const destino = new ApoioDatabase(`restauro-janela-${crypto.randomUUID()}`); databases.push(destino)
+    const { file } = await arquivoFicticio(1)
+    const chave = await generateMasterKey()
+    const envelope = await encryptPayload(chave, { schemaVersion: 1, type: 'district', data: { name: 'Distrito Fictício 0' } }, 'registro-ficticio-0')
+    await destino.vaultRecords.put({ id: 'registro-ficticio-0', accountId: CONTA, recordType: 'district', version: 1, createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z', ...envelope })
+    await destino.pendingActions.put({
+      id: `${CONTA}:restore_backup`, accountId: CONTA, kind: 'restore_backup',
+      createdAt: new Date().toISOString(), stage: 'restoring_pastoral',
+      restore: { file, appliedRecordIds: [], appliedPersonalIds: [], totalRecords: 1, totalPersonal: 0, inProgressRecords: { items: [{ id: 'registro-ficticio-0', baseVersion: 0, envelope }] } },
+    })
+
+    await new BackupService(destino).resume(CONTA, chave, CODIGO)
+
+    expect(await destino.outbox.count()).toBe(0)
+    expect(await pendingBackupRestore(CONTA, destino)).toBeNull()
+  })
+
   it('a retomada exige o mesmo código: o arquivo guardado continua cifrado', async () => {
     const destino = new ApoioDatabase(`restauro-codigo-${crypto.randomUUID()}`); databases.push(destino)
     const { file } = await arquivoFicticio(2)
@@ -217,6 +235,19 @@ describe('restauração validada, atômica e retomável', () => {
   it('recusa retomar o que não começou', async () => {
     const destino = new ApoioDatabase(`restauro-sem-pendencia-${crypto.randomUUID()}`); databases.push(destino)
     await expect(new BackupService(destino).resume(CONTA, await generateMasterKey(), CODIGO)).rejects.toThrow('Não há restauração pendente')
+  })
+
+  it('impede iniciar outra restauração enquanto existe uma pendente', async () => {
+    const destino = new ApoioDatabase(`restauro-concorrente-${crypto.randomUUID()}`); databases.push(destino)
+    const { file } = await arquivoFicticio(2)
+    await destino.pendingActions.put({
+      id: `${CONTA}:restore_backup`, accountId: CONTA, kind: 'restore_backup',
+      createdAt: new Date().toISOString(), stage: 'intent',
+      restore: { file, appliedRecordIds: [], appliedPersonalIds: [], totalRecords: 2, totalPersonal: 0 },
+    })
+
+    await expect(new BackupService(destino).restore(CONTA, await generateMasterKey(), CODIGO, file)).rejects.toThrow('restauração em andamento')
+    expect(await destino.pendingActions.count()).toBe(1)
   })
 
   it('recusa um backup de outra conta antes de gravar e sem deixar pendência', async () => {

@@ -9,10 +9,10 @@ import type { VaultKeys } from '../crypto/vault'
  * senha por causa dele ensina a escolher senha curta.
  *
  * O guardado aqui é o **objeto** da chave, não o segredo dela. As chaves do
- * cofre são criadas como não exportáveis: o IndexedDB consegue guardá-las
- * inteiras, e nem este código nem um script hostil consegue tirar os bytes de
- * dentro. Guardar o segredo em `sessionStorage` seria bem pior — ali ele
- * estaria legível.
+ * cofre são criadas como não exportáveis, o que impede exportar seus bytes.
+ * Código executado nesta mesma origem ainda poderia pedir que a chave cifrasse
+ * ou decifrasse dados; por isso a sessão tem prazo absoluto e continua sendo
+ * apagada ao bloquear, sair ou abrir outra aba.
  *
  * O que decide se a chave volta é uma marca em `sessionStorage`, que existe
  * enquanto a aba existe. Recarregar mantém a marca; fechar a aba a leva embora,
@@ -23,8 +23,9 @@ const BANCO = 'apoio-pastoral-sessao'
 const DEPOSITO = 'chaves'
 const MARCA = 'apoio-pastoral:sessao-aberta'
 const REGISTRO = 'atual'
+export const SESSION_MAX_MS = 8 * 60 * 60 * 1000
 
-interface SessaoGuardada { accountId: string; master: CryptoKey; sync: CryptoKey }
+interface SessaoGuardada { accountId: string; master: CryptoKey; sync: CryptoKey; expiresAt: number }
 
 function abrir(): Promise<IDBDatabase | null> {
   return new Promise((resolve) => {
@@ -69,7 +70,7 @@ function abaAindaAberta(): boolean {
 /** Guarda as chaves para sobreviverem a um recarregamento desta aba. */
 export async function manterSessaoAberta(accountId: string, keys: VaultKeys): Promise<void> {
   marcarAbaAberta()
-  await comDeposito('readwrite', (deposito) => deposito.put({ accountId, master: keys.master, sync: keys.sync } satisfies SessaoGuardada, REGISTRO))
+  await comDeposito('readwrite', (deposito) => deposito.put({ accountId, master: keys.master, sync: keys.sync, expiresAt: Date.now() + SESSION_MAX_MS } satisfies SessaoGuardada, REGISTRO))
 }
 
 /** Apaga o que estiver guardado. Chamado ao bloquear, sair e trocar de conta. */
@@ -92,6 +93,10 @@ export async function retomarSessaoAberta(accountId: string): Promise<VaultKeys 
   }
   const guardada = await comDeposito<SessaoGuardada>('readonly', (deposito) => deposito.get(REGISTRO))
   if (!guardada || guardada.accountId !== accountId) return null
+  if (!Number.isFinite(guardada.expiresAt) || guardada.expiresAt <= Date.now()) {
+    await esquecerSessaoAberta()
+    return null
+  }
   if (!(guardada.master instanceof CryptoKey) || !(guardada.sync instanceof CryptoKey)) return null
   return { master: guardada.master, sync: guardada.sync }
 }

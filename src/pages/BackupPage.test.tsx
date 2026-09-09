@@ -14,6 +14,7 @@ describe('confirmação visual da restauração', () => {
     const button = screen.getByRole('button', { name: 'Restaurar este backup' })
     expect(button).toBeDisabled()
     fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.change(screen.getByLabelText(/Código de backup/), { target: { value: 'codigo-ficticio-123' } })
     expect(button).toBeEnabled()
   })
 })

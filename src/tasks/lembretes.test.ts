@@ -34,12 +34,17 @@ describe('quais tarefas já pedem aviso', () => {
 })
 
 describe('o texto do aviso', () => {
-  it('com uma tarefa, mostra o título', () => {
-    expect(textoDoAviso([tarefa('a', '2026-09-08T08:00:00.000Z')]).corpo).toBe('Tarefa a')
+  it('nunca diz o que a tarefa é', () => {
+    // A notificação aparece na tela travada, à vista de quem estiver perto.
+    const aviso = textoDoAviso([tarefa('a', '2026-09-08T08:00:00.000Z')])
+
+    expect(aviso.corpo).not.toContain('Tarefa a')
+    expect(aviso.corpo).toBe('Você tem uma tarefa pastoral pendente.')
   })
 
-  it('com várias, mostra só a contagem', () => {
-    // A notificação aparece na tela travada, à vista de quem estiver perto.
-    expect(textoDoAviso([tarefa('a', null), tarefa('b', null)]).corpo).toBe('2 tarefas para fazer')
+  it('com várias, diz a contagem e mais nada', () => {
+    const aviso = textoDoAviso([tarefa('a', null), tarefa('b', null)])
+
+    expect(aviso.corpo).toBe('Você tem 2 tarefas pastorais pendentes.')
   })
 })

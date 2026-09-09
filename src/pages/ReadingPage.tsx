@@ -3,6 +3,7 @@ import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { BookCheck, BookOpen, Clock3, Goal, Pencil, Plus, Trash2 } from 'lucide-react'
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { localDateKey } from '../shared/dates'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Field } from '../components/ui/Field'
@@ -10,7 +11,7 @@ import { bookProgress, readingMonth, readingSummary } from '../reading/core'
 import { ReadingService } from '../reading/service'
 import { BOOK_CATEGORIES, BOOK_CATEGORY_LABELS, BOOK_STATUSES, BOOK_STATUS_LABELS, type BookCategory, type BookStatus, type ReadingBookData, type ReadingEntity, type ReadingGoalData, type ReadingSessionData } from '../reading/types'
 
-const service = new ReadingService(); const timestamp = () => new Date().toISOString(); const today = () => new Date().toISOString().slice(0, 10)
+const service = new ReadingService(); const timestamp = () => new Date().toISOString(); const today = localDateKey
 const emptyBook = (): ReadingBookData => ({ title: '', author: '', category: 'theology', totalPages: null, pagesRead: 0, startDate: today(), completedDate: null, status: 'want_to_read', notes: '', createdAt: timestamp(), updatedAt: timestamp() })
 type ReadingView = 'all' | 'want_to_read' | 'reading' | 'completed' | 'history' | 'goals'
 const VIEW_LABELS: Record<ReadingView, string> = { all: 'Todos os livros', want_to_read: 'Quero ler', reading: 'Lendo', completed: 'Concluídos', history: 'Histórico de leituras', goals: 'Metas' }

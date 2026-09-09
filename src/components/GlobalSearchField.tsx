@@ -18,8 +18,8 @@ export function GlobalSearchField() {
       <Search aria-hidden="true" />
       <input
         type="search"
-        aria-label="Buscar pessoa, família ou igreja"
-        placeholder="Buscar pessoa, família ou igreja"
+        aria-label="Buscar pessoa, família, igreja ou compromisso"
+        placeholder="Buscar pessoa, família, igreja ou compromisso"
         value={term}
         onChange={(event) => setTerm(event.target.value)}
       />

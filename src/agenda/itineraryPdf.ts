@@ -1,4 +1,5 @@
 import { freeText } from '../reports/redaction'
+import { localDateKey } from '../shared/dates'
 import { AGENDA_CATEGORY_LABELS, type AgendaEventEntity, type ItineraryItem } from './types'
 import { mondayRestItems } from './service'
 
@@ -57,6 +58,6 @@ export function buildItineraryPdf(items: ItineraryItem[], heading: string, inclu
 export function downloadItineraryPdf(items: ItineraryItem[], heading: string, includeNames = false): void {
   const bytes = buildItineraryPdf(items, heading, includeNames)
   const url = URL.createObjectURL(new Blob([new Uint8Array(bytes).buffer], { type: 'application/pdf' }))
-  const anchor = document.createElement('a'); anchor.href = url; anchor.download = `itinerario-${new Date().toISOString().slice(0, 10)}.pdf`; anchor.click()
+  const anchor = document.createElement('a'); anchor.href = url; anchor.download = `itinerario-${localDateKey()}.pdf`; anchor.click()
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000)
 }

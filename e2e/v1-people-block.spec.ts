@@ -72,7 +72,7 @@ test('pessoas, família, aniversários, busca e importações privadas funcionam
   await expect(page.getByLabel('Mensagem')).toHaveValue(/Pessoa/)
 
   await navigateInsideApp(page, '/app/busca', page.getByRole('heading', { name: 'Busca global' }))
-  await page.getByLabel(/Pessoa, família, igreja ou WhatsApp/).fill('Família Sol')
+  await page.getByLabel(/Pessoa, família, igreja/).fill('Família Sol')
   await expect(page.getByText('Família Sol Fictícia')).toBeVisible()
 
   await navigateInsideApp(page, '/app/fidelidade', page.getByRole('heading', { name: 'Fidelidade nos dízimos' }))

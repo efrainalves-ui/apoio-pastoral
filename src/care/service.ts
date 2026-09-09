@@ -95,6 +95,17 @@ export class CareService {
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'task', data }, id); await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'task'); return { id, ...data }
   }
 
+  async createFollowUp(accountId: string, masterKey: CryptoKey, input: Omit<FollowUpData, 'status' | 'createdAt' | 'updatedAt'>): Promise<FollowUpEntity> {
+    if (!input.subjectId || !input.churchId || !input.dueAt) throw new Error('Informe a pessoa ou família, a igreja e a data do acompanhamento.')
+    if (input.notes.length > 2_000) throw new Error('Revise o tamanho da observação do acompanhamento.')
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
+    const data: FollowUpData = { ...input, notes: input.notes.trim(), status: 'pending', createdAt: now, updatedAt: now }
+    const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'follow_up', data }, id)
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'follow_up')
+    return { id, ...data }
+  }
+
   async savePrayerRequest(accountId: string, masterKey: CryptoKey, input: PrayerRequestInput, prayerId?: string): Promise<PrayerRequestEntity> {
     if (!input.churchId) throw new Error('Escolha a igreja do pedido.')
     if (input.kind === 'member' && !input.personId) throw new Error('Escolha o membro da igreja.')

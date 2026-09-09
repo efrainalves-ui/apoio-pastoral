@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Banknote, CalendarClock, Check, CheckCircle2, Ch
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { localDateKey } from '../shared/dates'
 import { BudgetAreaNav } from '../components/BudgetAreaNav'
 import { ShoppingListView } from './ShoppingListView'
 import { Button } from '../components/ui/Button'
@@ -16,7 +17,7 @@ import { DEBT_STATUS_LABELS, DEBT_TYPE_LABELS, EXPENSE_CATEGORIES, EXPENSE_CATEG
 
 const service = new FamilyBudgetService()
 const timestamp = () => new Date().toISOString()
-const today = () => new Date().toISOString().slice(0, 10)
+const today = localDateKey
 const sectionLabels = { resumo: 'Visão do mês', entradas: 'Entradas', despesas: 'Despesas', planejamento: 'Planejamento', contas: 'Contas', dividas: 'Dívidas', metas: 'Metas', compras: 'Lista de compras', relatorios: 'Relatórios' } as const
 type BudgetSection = keyof typeof sectionLabels
 

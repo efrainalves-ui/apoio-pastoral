@@ -217,6 +217,8 @@ export interface PendingActionRecord {
     appliedPersonalIds: string[]
     totalRecords: number
     totalPersonal: number
+    inProgressRecords?: { items: Array<{ id: string; baseVersion: number; envelope: CipherEnvelope }> } | undefined
+    inProgressPersonal?: { area: 'leitura' | 'orcamento'; id: string } | undefined
   }
 }
 

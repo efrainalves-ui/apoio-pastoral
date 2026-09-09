@@ -32,7 +32,7 @@ test('barra inferior, atalhos do topo e botão de criar funcionam', async ({ pag
   }
 
   // O topo tem só dois atalhos, os dois em ícone.
-  await expect(page.getByRole('searchbox', { name: 'Buscar pessoa, família ou igreja' })).toHaveCount(0)
+  await expect(page.getByRole('searchbox', { name: 'Buscar pessoa, família, igreja ou compromisso' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Nova visita' })).toHaveCount(0)
 
   // As configurações só têm o ícone e não repetem o menu principal.
@@ -75,7 +75,7 @@ test('o início mostra os blocos práticos do dia sem classificar ninguém', asy
   await expect(page.getByRole('heading', { name: 'Interessados e estudos', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Igrejas que precisam de atenção', exact: true })).toBeVisible()
 
-  await expect(page.getByRole('link', { name: /Abrir tarefas/ })).toHaveAttribute('href', '/app/cuidados#tarefas')
+  await expect(page.getByRole('link', { name: /Abrir tarefas/ })).toHaveAttribute('href', '/app/visitacao?aba=tarefas')
   await expect(page.getByRole('link', { name: /Ver pedidos para acompanhar/ })).toHaveAttribute('href', '/app/visitacao?aba=oracao')
   await expect(page.getByRole('link', { name: /Abrir interessados e estudos/ })).toHaveAttribute('href', '/app/missionario')
 

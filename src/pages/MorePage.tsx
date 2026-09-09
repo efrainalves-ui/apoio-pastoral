@@ -1,10 +1,11 @@
 import { ArchiveRestore, ChevronRight, Cloud, GitCompare, Link2, LockKeyhole, Search, ShieldCheck, TriangleAlert } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { guardarTema, temaGuardado, type Tema } from '../app/tema'
 import { pedirPermissaoDeAviso } from '../tasks/useAvisosDeTarefa'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { formatStorage, requestPersistentStorage, storageStatus, type StorageStatus } from '../storage/persistence'
 
 const groups = [
   { title: 'Privacidade e dados', links: [
@@ -26,7 +27,9 @@ const groups = [
 export function MorePage() {
   const [tema, setTema] = useState<Tema>(() => temaGuardado())
   const [avisos, setAvisos] = useState<NotificationPermission>(() => typeof Notification === 'undefined' ? 'denied' : Notification.permission)
+  const [armazenamento, setArmazenamento] = useState<StorageStatus | null>(null)
   function escolherTema(escolha: Tema) { setTema(escolha); guardarTema(escolha) }
+  useEffect(() => { void storageStatus().then(setArmazenamento) }, [])
 
   return <div className="page-stack page-narrow"><header className="page-hero"><div><h1>Configurações</h1></div></header>
   {/*
@@ -52,5 +55,7 @@ export function MorePage() {
       <li>O backup é um arquivo cifrado que só você guarda e restaura.</li>
       <li>Com a sincronização ligada, o serviço recebe apenas conteúdo cifrado — ele não lê nomes, visitas nem anotações.</li>
     </ul>
+    {armazenamento && <div className="private-summary"><div><span>Uso local</span><strong>{formatStorage(armazenamento.usage)}</strong></div><div><span>Espaço disponível</span><strong>{armazenamento.quota === null || armazenamento.usage === null ? 'Não informado' : formatStorage(Math.max(0, armazenamento.quota - armazenamento.usage))}</strong></div><div><span>Proteção contra limpeza automática</span><strong>{armazenamento.persisted ? 'Ativada' : armazenamento.supported ? 'Disponível' : 'Não oferecida neste navegador'}</strong></div></div>}
+    {armazenamento?.supported && !armazenamento.persisted && <Button variant="secondary" onClick={() => { void requestPersistentStorage().then(setArmazenamento) }}>Proteger armazenamento neste aparelho</Button>}
   </Card>{groups.map((group) => <Card key={group.title} title={group.title}><div className="settings-list">{group.links.map(({ to, icon: Icon, title, detail }) => <Link to={to} key={to}><span><Icon /></span><div><strong>{title}</strong><small>{detail}</small></div><ChevronRight /></Link>)}</div></Card>)}</div>
 }

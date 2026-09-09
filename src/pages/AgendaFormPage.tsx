@@ -1,6 +1,6 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, CalendarPlus, Trash2, TriangleAlert } from 'lucide-react'
-import { type FormEvent, useCallback, useMemo, useState } from 'react'
+import { type FormEvent, useCallback, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { categoryForm, resolveTitle } from '../agenda/categoryForm'
 import { AgendaService, findAgendaConflicts, isMonday } from '../agenda/service'
@@ -28,18 +28,21 @@ function durationMinutes(input: AgendaEventInput): number { return Math.max(0, M
 
 export function AgendaFormPage() {
   const { account, masterKey } = useAuthVault(); const { eventId } = useParams(); const [searchParams] = useSearchParams(); const navigate = useNavigate(); const [input, setInput] = useState(() => initialInput(searchParams.get('inicio') ?? undefined)); const [events, setEvents] = useState<AgendaEventEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [sermons, setSermons] = useState<SermonEntity[]>([]); const [people, setPeople] = useState<PersonEntity[]>([]); const [error, setError] = useState(''); const [outraIgreja, setOutraIgreja] = useState(false); const [busy, setBusy] = useState(false)
-  const load = useCallback(async () => { if (!account || !masterKey) return; const district = await districts.getDistrict(account.id, masterKey); const [nextEvents, nextChurches, current, nextSermons, nextPeople] = await Promise.all([agenda.listEvents(account.id, masterKey), district ? districts.listChurches(account.id, masterKey, district.id) : [], eventId ? agenda.getEvent(account.id, masterKey, eventId) : null, sermonsService.list(account.id, masterKey), peopleService.listPeople(account.id, masterKey)]); setEvents(nextEvents); setChurches(nextChurches); setSermons(nextSermons); setPeople(nextPeople); if (current) { const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...data } = current; setInput(data); void _id; void _createdAt; void _updatedAt } }, [account, eventId, masterKey])
-  useReloadOnSync(load); const conflicts = useMemo(() => { try { return findAgendaConflicts(input, events, eventId) } catch { return [] } }, [eventId, events, input])
-  function set<K extends keyof AgendaEventInput>(key: K, value: AgendaEventInput[K]) { setInput((current) => ({ ...current, [key]: value })) }
+  const dirty = useRef(false)
+  const load = useCallback(async () => { if (!account || !masterKey) return; const district = await districts.getDistrict(account.id, masterKey); const [nextEvents, nextChurches, current, nextSermons, nextPeople] = await Promise.all([agenda.listEvents(account.id, masterKey), district ? districts.listChurches(account.id, masterKey, district.id) : [], eventId ? agenda.getEvent(account.id, masterKey, eventId) : null, sermonsService.list(account.id, masterKey), peopleService.listPeople(account.id, masterKey)]); setEvents(nextEvents); setChurches(nextChurches); setSermons(nextSermons); setPeople(nextPeople); if (current && !dirty.current) { const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...data } = current; setInput(data); void _id; void _createdAt; void _updatedAt } }, [account, eventId, masterKey])
+  const hasUnsavedChanges = useCallback(() => dirty.current, [])
+  useReloadOnSync(load, hasUnsavedChanges, () => { if (window.confirm('Chegaram alterações de outro aparelho. Seu preenchimento foi preservado. Deseja descartá-lo e carregar a versão sincronizada?')) { dirty.current = false; void load() } }); const conflicts = useMemo(() => { try { return findAgendaConflicts(input, events, eventId) } catch { return [] } }, [eventId, events, input])
+  function set<K extends keyof AgendaEventInput>(key: K, value: AgendaEventInput[K]) { dirty.current = true; setInput((current) => ({ ...current, [key]: value })) }
   /** Mudar o início leva o término junto, preservando a duração escolhida. */
   function changeStart(novoInicio: string) {
+    dirty.current = true
     setInput((current) => ({ ...current, startAt: novoInicio, endAt: endFollowingStart(current.startAt, current.endAt, novoInicio) }))
   }
 
-  function changeCategory(category: AgendaCategory) { setInput((current) => ({ ...current, category, ...categoryDefaults(category, new Date(current.startAt)), sermonId: category === 'preaching' ? current.sermonId : null, sermonSnapshot: category === 'preaching' ? current.sermonSnapshot : null, ceremonyDetails: isCeremonyCategory(category) ? emptyCeremonyDetails(category) : null })) }
-  function setCeremony(patch: Partial<CeremonyDetails>) { const category = input.category; if (!isCeremonyCategory(category)) return; const empty = emptyCeremonyDetails(category); setInput((current) => ({ ...current, ceremonyDetails: { ...(current.ceremonyDetails ?? empty), ...patch } })) }
+  function changeCategory(category: AgendaCategory) { dirty.current = true; setInput((current) => ({ ...current, category, ...categoryDefaults(category, new Date(current.startAt)), sermonId: category === 'preaching' ? current.sermonId : null, sermonSnapshot: category === 'preaching' ? current.sermonSnapshot : null, ceremonyDetails: isCeremonyCategory(category) ? emptyCeremonyDetails(category) : null })) }
+  function setCeremony(patch: Partial<CeremonyDetails>) { const category = input.category; if (!isCeremonyCategory(category)) return; dirty.current = true; const empty = emptyCeremonyDetails(category); setInput((current) => ({ ...current, ceremonyDetails: { ...(current.ceremonyDetails ?? empty), ...patch } })) }
   function toggleCeremonyPerson(field: 'involvedPersonIds' | 'parentPersonIds', personId: string, checked: boolean) { const ceremony = input.ceremonyDetails; if (!ceremony) return; const next = new Set(ceremony[field]); if (checked) next.add(personId); else next.delete(personId); setCeremony({ [field]: [...next] }) }
-  function chooseSermon(id: string) { const sermon = sermons.find((item) => item.id === id); setInput((current) => ({ ...current, sermonId: sermon?.id ?? null, sermonSnapshot: sermon ? { id: sermon.id, title: sermon.title, theme: sermon.theme, mainText: sermon.mainText } : null })) }
+  function chooseSermon(id: string) { dirty.current = true; const sermon = sermons.find((item) => item.id === id); setInput((current) => ({ ...current, sermonId: sermon?.id ?? null, sermonSnapshot: sermon ? { id: sermon.id, title: sermon.title, theme: sermon.theme, mainText: sermon.mainText } : null })) }
   /**
    * Excluir também aqui, e não só na lista.
    *
@@ -62,7 +65,7 @@ export function AgendaFormPage() {
     }
   }
 
-  async function submit(event: FormEvent) { event.preventDefault(); if (!account || !masterKey) return; setBusy(true); setError(''); try { const igreja = churches.find(({ id }) => id === input.churchId)?.name ?? input.location; const paraGravar = { ...input, title: resolveTitle(input.category, input.title, igreja) }; const saved = eventId ? await agenda.updateEvent(account.id, masterKey, eventId, paraGravar) : await agenda.createEvent(account.id, masterKey, paraGravar); if (saved.linkedSource) await evangelism.syncFromAgendaEvent(account.id, masterKey, saved); await navigate('/app/agenda') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível salvar o compromisso.') } finally { setBusy(false) } }
+  async function submit(event: FormEvent) { event.preventDefault(); if (!account || !masterKey) return; setBusy(true); setError(''); try { const igreja = churches.find(({ id }) => id === input.churchId)?.name ?? input.location; const paraGravar = { ...input, title: resolveTitle(input.category, input.title, igreja) }; const saved = eventId ? await agenda.updateEvent(account.id, masterKey, eventId, paraGravar) : await agenda.createEvent(account.id, masterKey, paraGravar); if (saved.linkedSource) await evangelism.syncFromAgendaEvent(account.id, masterKey, saved); dirty.current = false; await navigate('/app/agenda') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível salvar o compromisso.') } finally { setBusy(false) } }
   const ceremonyCategory = isCeremonyCategory(input.category) ? input.category : null
   const ceremony = ceremonyCategory ? input.ceremonyDetails ?? emptyCeremonyDetails(ceremonyCategory) : null
   const ceremonyPeople = people.filter((person) => !input.churchId || person.currentChurchId === input.churchId)
