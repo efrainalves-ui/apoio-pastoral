@@ -1978,3 +1978,12 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .person-profile .page-hero .page-actions { align-self: center; }
 .person-profile .manchete { padding-block: 12px; }
 .person-profile__management { border-top: 1px solid var(--line); padding-top: 20px; }
+
+.goals-page .goal-cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); }
+.goals-page > *, .goals-page .meta-anel > * { min-width: 0; }
+.goals-page .goal-card__numbers { grid-template-columns: repeat(auto-fit, minmax(min(100%, 118px), 1fr)); }
+.goals-page .goal-card__numbers small { font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; }
+.goals-page .goal-card__numbers strong { font-family: var(--serifada); font-size: 1.9rem; font-weight: 400; font-variant-numeric: normal; }
+.goals-page .ring__centro { font-variant-numeric: normal; text-align: center; }
+.goals-page .ring__centro small { display: block; font-size: .66rem; color: var(--muted); font-weight: 400; }
+.goals-page .goal-card__percent { font-size: .82rem; }

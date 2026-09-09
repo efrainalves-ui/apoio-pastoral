@@ -1,6 +1,8 @@
 import { FileText, Flag, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/ui/Card'
+import { CountUp } from '../components/ui/CountUp'
+import { ProgressRing } from '../components/ui/ProgressRing'
 import { GOAL_AREAS, GOAL_AREA_LABELS, PERCENT_TARGET_AREAS, areaComparison, crescimentoDaMeta } from '../goals/areas'
 import { MONTH_LABELS } from '../goals/format'
 import { useQuadroDeGrupos } from '../missionary/useQuadroDeGrupos'
@@ -40,11 +42,16 @@ export function GoalsPage() {
   if (!ready) return <div className="app-loading" role="status">Abrindo as metas…</div>
 
   return (
-    <div className="page-stack">
+    <div className="page-stack goals-page">
       <header className="page-hero">
         <div><p className="eyebrow">{year}</p><h1>Metas</h1></div>
         <div className="page-actions"><Button variant="secondary" icon={<FileText />} onClick={() => void relatorio()}>Relatório</Button><Flag /></div>
       </header>
+      <section className="manchete" aria-label="Áreas de acompanhamento">
+        <span className="manchete__num"><CountUp value={GOAL_AREAS.length + 1} /></span>
+        <p className="manchete__txt">áreas para acompanhar</p>
+      </section>
+      <h2 className="rotulo-secao">Metas do distrito</h2>
       <div className="goal-cards">
         {/*
           A Escola Sabatina é meta como as outras e fica com elas — só a página
@@ -78,24 +85,28 @@ export function GoalsPage() {
               <div className="goal-card">
                 {crescimento
                   ? <>
+                    <div className={crescimento.alvo > 0 ? 'meta-anel' : undefined}>
+                      {crescimento.alvo > 0 && <ProgressRing percent={crescimento.percentDaMeta} label={`Progresso da meta de ${GOAL_AREA_LABELS[area]}`}><span>{crescimento.percentDaMeta}%<small>da meta</small></span></ProgressRing>}
                     <div className="goal-card__numbers">
                       <div><small>Alvo</small><strong>{crescimento.alvo > 0 ? `+${crescimento.alvo}%` : 'A definir'}</strong></div>
                       <div><small>Alcançado</small><strong className={crescimento.alcancado === null ? '' : crescimento.alcancado < 0 ? 'quadro--falta' : 'quadro--alcancado'}>{crescimento.alcancado === null ? '—' : ponto(crescimento.alcancado)}</strong></div>
                       <div><small>Falta</small><strong>{crescimento.alvo > 0 ? `${crescimento.falta.toFixed(1).replace('.', ',')} p.p.` : '—'}</strong></div>
                     </div>
-                    <div className="goal-bar" role="img" aria-label={`${crescimento.percentDaMeta}% da meta`}><span style={{ width: `${crescimento.percentDaMeta}%` }} /></div>
+                    </div>
                     {crescimento.ateOMes > 0
                       ? <p className="goal-card__percent">Janeiro a {MONTH_LABELS[crescimento.ateOMes - 1]}, nos dois anos: {formatGoalValue(area, crescimento.anterior)} → {formatGoalValue(area, crescimento.atual)}</p>
                       : <p className="goal-card__percent">Envie o Comparativo de Entradas deste ano</p>}
                     {crescimento.objetivoAnual > 0 && <p className="goal-card__percent">Meta do ano: {formatGoalValue(area, crescimento.objetivoAnual)} · {year - 1} fechou em {formatGoalValue(area, crescimento.anoAnteriorFechado)}</p>}
                   </>
                   : <>
+                    <div className={progresso.objective > 0 ? 'meta-anel' : undefined}>
+                      {progresso.objective > 0 && <ProgressRing percent={progresso.percent} label={`Progresso da meta de ${GOAL_AREA_LABELS[area]}`}><span>{progresso.percent}%<small>da meta</small></span></ProgressRing>}
                     <div className="goal-card__numbers">
                       <div><small>Meta anual</small><strong>{progresso.objective > 0 ? formatGoalValue(area, progresso.objective) : 'A definir'}</strong></div>
                       <div><small>Resultado</small><strong>{formatGoalValue(area, progresso.result)}</strong></div>
                       <div><small>Falta</small><strong>{progresso.target > 0 ? formatGoalValue(area, progresso.missing) : '—'}</strong></div>
                     </div>
-                    <div className="goal-bar" role="img" aria-label={`${progresso.percent}% da meta`}><span style={{ width: `${progresso.percent}%` }} /></div>
+                    </div>
                     <p className="goal-card__percent">{progresso.objective > 0 ? `${progresso.percent}% alcançado` : 'Defina a meta do ano para acompanhar'}</p>
                     {progresso.hasPrevious && <p className="goal-card__percent">{year - 1}: {formatGoalValue(area, progresso.previous)}</p>}
                   </>}
