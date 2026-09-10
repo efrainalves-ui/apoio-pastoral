@@ -1,11 +1,12 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
-import { ArrowLeft, BookOpenCheck, Copy, Edit3 } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, Copy, Edit3, Trash2 } from 'lucide-react'
 import { useCallback, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AgendaService } from '../agenda/service'
 import type { AgendaEventEntity } from '../agenda/types'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { PreachingPanel } from '../components/PreachingPanel'
+import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
@@ -13,9 +14,18 @@ import { formatPreachingDate, listPreachings } from '../sermons/preachings'
 import { SermonService } from '../sermons/service'
 import type { SermonEntity } from '../sermons/types'
 const service = new SermonService(); const agenda = new AgendaService(); const district = new DistrictService()
-export function SermonDetailPage() { const { account, masterKey } = useAuthVault(); const { sermonId = '' } = useParams(); const [sermon, setSermon] = useState<SermonEntity | null>(null); const [events, setEvents] = useState<AgendaEventEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [referenceTime] = useState(() => Date.now()); const [panelOpen, setPanelOpen] = useState(false); const load = useCallback(async () => { if (!account || !masterKey) return; const root = await district.getDistrict(account.id, masterKey); const [nextSermon, nextEvents, nextChurches] = await Promise.all([service.get(account.id, masterKey, sermonId), agenda.listEvents(account.id, masterKey), root ? district.listChurches(account.id, masterKey, root.id) : []]); setSermon(nextSermon); setEvents(nextEvents.filter((event) => event.sermonId === sermonId || event.sermonSnapshot?.id === sermonId)); setChurches(nextChurches) }, [account, masterKey, sermonId]); useReloadOnSync(load);
-if (!sermon) return <div className="page-stack"><p>Carregando sermão…</p></div>; const pregacoes = listPreachings(events, churches, sermonId);
-  const recent = events.filter((event) => event.churchId && new Date(event.startAt).getTime() > referenceTime - 90 * 86_400_000); return <div className="page-stack"><Link className="text-link back-link" to="/app/sermoes"><ArrowLeft />Voltar</Link><header className="page-hero"><div><p className="eyebrow">{sermon.mainText}</p><h1>{sermon.title}</h1><p>{sermon.theme}</p></div><div className="page-actions"><Link className="button button--secondary" to={`/app/sermoes/${sermon.id}/pregar`}><BookOpenCheck />Pregar</Link><Link className="button button--secondary" to={`/app/sermoes/novo?duplicar=${sermon.id}`}><Copy />Duplicar</Link><Link className="button" to={`/app/sermoes/${sermon.id}/editar`}><Edit3 />Editar</Link></div></header>{recent.length > 0 && <div className="alert alert--success">Este sermão aparece em pregação recente em {recent.length} compromisso(s). Verifique o histórico abaixo.</div>}<Card title="Esboço"><dl className="detail-list"><div><dt>Textos complementares</dt><dd>{sermon.complementaryTexts || '—'}</dd></div><div><dt>Objetivo</dt><dd>{sermon.objective || '—'}</dd></div></dl>{[['Introdução', sermon.introduction], ['Conteúdo', sermon.content], ['Conclusão', sermon.conclusion], ['Apelo', sermon.appeal], ['Observações', sermon.notes]].map(([label, value]) => <section key={label}><h3>{label}</h3><p className="preserved-text">{value || '—'}</p></section>)}</Card><Card title="Onde foi pregado" eyebrow={pregacoes.length > 1 ? `${pregacoes.length} pregações` : 'Resumo'}>
+export function SermonDetailPage() { const { account, masterKey } = useAuthVault(); const { sermonId = '' } = useParams(); const navigate = useNavigate(); const [erroAoApagar, setErroAoApagar] = useState(''); const [sermon, setSermon] = useState<SermonEntity | null>(null); const [events, setEvents] = useState<AgendaEventEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [referenceTime] = useState(() => Date.now()); const [panelOpen, setPanelOpen] = useState(false); const load = useCallback(async () => { if (!account || !masterKey) return; const root = await district.getDistrict(account.id, masterKey); const [nextSermon, nextEvents, nextChurches] = await Promise.all([service.get(account.id, masterKey, sermonId), agenda.listEvents(account.id, masterKey), root ? district.listChurches(account.id, masterKey, root.id) : []]); setSermon(nextSermon); setEvents(nextEvents.filter((event) => event.sermonId === sermonId || event.sermonSnapshot?.id === sermonId)); setChurches(nextChurches) }, [account, masterKey, sermonId]); useReloadOnSync(load);
+  async function apagar() {
+    if (!account || !masterKey || !window.confirm('Remover este sermão? O histórico de pregações continuará preservado na agenda.')) return
+    try {
+      await service.remove(account.id, masterKey, sermonId)
+      void navigate('/app/sermoes')
+    } catch {
+      setErroAoApagar('Não foi possível remover o sermão.')
+    }
+  }
+  if (!sermon) return <div className="page-stack"><p>Carregando sermão…</p></div>; const pregacoes = listPreachings(events, churches, sermonId);
+  const recent = events.filter((event) => event.churchId && new Date(event.startAt).getTime() > referenceTime - 90 * 86_400_000); return <div className="page-stack"><Link className="text-link back-link" to="/app/sermoes"><ArrowLeft />Voltar</Link><header className="page-hero"><div><p className="eyebrow">{sermon.mainText}</p><h1>{sermon.title}</h1><p>{sermon.theme}</p></div><div className="page-actions"><Link className="button button--secondary" to={`/app/sermoes/${sermon.id}/pregar`}><BookOpenCheck />Pregar</Link><Link className="button button--secondary" to={`/app/sermoes/novo?duplicar=${sermon.id}`}><Copy />Duplicar</Link><Link className="button" to={`/app/sermoes/${sermon.id}/editar`}><Edit3 />Editar</Link><Button variant="quiet" className="acao-destrutiva" icon={<Trash2 size={16} />} onClick={() => void apagar()}>Excluir</Button></div></header>{erroAoApagar && <div className="alert alert--error" role="alert">{erroAoApagar}</div>}{recent.length > 0 && <div className="alert alert--success">Este sermão aparece em pregação recente em {recent.length} compromisso(s). Verifique o histórico abaixo.</div>}<Card title="Esboço"><dl className="detail-list"><div><dt>Textos complementares</dt><dd>{sermon.complementaryTexts || '—'}</dd></div><div><dt>Objetivo</dt><dd>{sermon.objective || '—'}</dd></div></dl>{[['Introdução', sermon.introduction], ['Conteúdo', sermon.content], ['Conclusão', sermon.conclusion], ['Apelo', sermon.appeal], ['Observações', sermon.notes]].map(([label, value]) => <section key={label}><h3>{label}</h3><p className="preserved-text">{value || '—'}</p></section>)}</Card><Card title="Onde foi pregado" eyebrow={pregacoes.length > 1 ? `${pregacoes.length} pregações` : 'Resumo'}>
     {/*
       Um sermão bom é pregado no distrito inteiro. Mostrar só a última resposta
       esconde justamente o que o pastor quer saber ao reabrir o esboço: onde ele

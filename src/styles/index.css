@@ -2277,7 +2277,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 /* A tira de abas cortava a última no celular — "Planejamen", "Conc" — e a
    rolagem escondida não avisava que havia mais. Passa a quebrar linha: todas
    as abas ficam à vista, que é o que importa quando são quatro ou cinco. */
-.segmented, .tab-bar, .budget-nav, .reading-nav { max-width: 100%; width: auto; flex-wrap: wrap; overflow: visible; }
+.segmented, .tab-bar, .budget-nav, .reading-nav { max-width: 100%; width: fit-content; flex-wrap: wrap; overflow: visible; }
 .segmented button, .segmented a, .tab-bar .button, .budget-nav a, .budget-nav button, .reading-nav button { flex: 0 1 auto; white-space: nowrap; }
 
 /* Ações da página lado a lado enquanto couberem, em vez de uma por linha. */
@@ -2470,3 +2470,87 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 @media (prefers-reduced-motion: reduce) {
   .chip-filtro, .linha-visita, .igreja-visitada__topo svg { transition: none; }
 }
+
+/* ==========================================================================
+   A biblioteca de sermões.
+
+   A lista repetia o mesmo ícone de livro cinquenta vezes e pendurava dois
+   botões em cada linha — "Onde pregou" e a lixeira. Cinquenta ícones iguais
+   não distinguem nada, e a ação destrutiva exposta em toda linha é um risco
+   sem contrapartida.
+
+   No lugar: a sigla do livro, que identifica o esboço de relance, e o
+   histórico como texto — "Pregado 2x · Central · 23/08" ou "Nunca pregado".
+   Editar, duplicar, pregar e excluir moram no sermão aberto.
+   ========================================================================== */
+.acervo { font-size: .82rem; color: var(--muted); }
+
+.chip-filtro__conta {
+  margin-left: 7px; padding: 1px 7px; border-radius: 999px;
+  background: var(--green-50); color: var(--green-900);
+  font-size: .72rem; font-variant-numeric: tabular-nums;
+}
+.chip-filtro--ativo .chip-filtro__conta { background: var(--paper); }
+
+.ordenar-biblioteca { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.ordenar-biblioteca .field { margin-bottom: 0; }
+.ordenar-biblioteca__campo {
+  min-height: 40px; padding: 0 6px 0 2px; border: 0; border-radius: 8px;
+  color: var(--ink); background: transparent; font: inherit; font-size: .86rem; font-weight: 600; cursor: pointer;
+}
+.ordenar-biblioteca__conta { margin-left: auto; font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.lista-sermoes { display: grid; }
+.cartao-sermao {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 13px; align-items: center;
+  padding: 13px 2px; border-bottom: 1px solid var(--line);
+  color: inherit; text-decoration: none;
+  transition: background var(--tempo-curto) linear;
+}
+.lista-sermoes .cartao-sermao:last-child { border-bottom: 0; }
+.cartao-sermao:hover { background: var(--green-50); }
+.cartao-sermao__livro {
+  width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; flex: none;
+  background: var(--green-50); color: var(--green-900);
+  font-family: var(--serifada); font-size: .92rem; letter-spacing: .01em;
+}
+.cartao-sermao__livro svg { width: 19px; height: 19px; opacity: .55; }
+.cartao-sermao__corpo { display: grid; gap: 2px; min-width: 0; }
+/* Título comprido quebra em duas linhas; encolher a fonte para caber é pior. */
+.cartao-sermao__corpo strong {
+  font-size: .95rem; font-weight: 600; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.cartao-sermao__corpo small { font-size: .78rem; color: var(--muted); overflow-wrap: break-word; }
+.cartao-sermao__historico { display: flex; align-items: center; gap: 5px; }
+.cartao-sermao__historico svg { width: 13px; height: 13px; flex: none; }
+.cartao-sermao__seta { width: 16px; height: 16px; color: var(--muted); flex: none; }
+
+/* A palavra escrita informa; a cor só reforça. */
+.selo-sermao {
+  align-self: start; padding: 4px 11px; border-radius: 999px;
+  font-size: .74rem; font-weight: 600; white-space: nowrap;
+}
+.selo-sermao--ready { color: var(--green-900); background: var(--green-50); }
+.selo-sermao--draft { color: var(--ambar); background: var(--ambar-fraca); }
+.selo-sermao--archived { color: var(--muted); background: var(--line); }
+
+@media (max-width: 460px) {
+  .cartao-sermao { grid-template-columns: auto minmax(0, 1fr) auto; row-gap: 6px; }
+  .cartao-sermao__seta { display: none; }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) .cartao-sermao__livro { background: rgb(255 255 255 / 8%); color: var(--ink); }
+  :root:not([data-tema='claro']) .chip-filtro__conta { background: rgb(255 255 255 / 10%); color: var(--ink); }
+  :root:not([data-tema='claro']) .selo-sermao--archived { color: var(--muted); background: rgb(255 255 255 / 8%); }
+}
+:root[data-tema='escuro'] .cartao-sermao__livro { background: rgb(255 255 255 / 8%); color: var(--ink); }
+:root[data-tema='escuro'] .chip-filtro__conta { background: rgb(255 255 255 / 10%); color: var(--ink); }
+:root[data-tema='escuro'] .selo-sermao--archived { color: var(--muted); background: rgb(255 255 255 / 8%); }
+
+@media (prefers-reduced-motion: reduce) { .cartao-sermao { transition: none; } }
+
+/* Entre a tira de abas e a busca sobrava meia tela de nada. */
+.sermons-page .segmented { margin-bottom: 0; }
+.sermons-page .sermons-catalogue { margin-top: 0; }
