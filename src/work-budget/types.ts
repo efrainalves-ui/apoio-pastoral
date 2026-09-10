@@ -1,3 +1,7 @@
+import type { ConfiguracaoDoTrabalhoData, DependenteData } from './configuracao'
+import type { LancamentoDoTrabalhoData } from './lancamento'
+import type { AquisicaoLetraData, ItemDoCatalogoLetra, OrcamentoLetraData } from './letra'
+
 /**
  * Orçamento do trabalho: o dinheiro do ministério, separado do da família.
  *
@@ -106,3 +110,34 @@ export interface WorkBudgetSnapshot {
   expenses: WorkExpenseEntity[]
   mileage: MileageEntity[]
 }
+
+/*
+  Os tipos abaixo entraram depois, e por isso entram somando.
+
+  Auxílios, despesas e quilometragem continuam gravados e lidos exatamente como
+  antes: registro já cifrado no aparelho do pastor não se converte por conta de
+  uma versão nova do aplicativo. O modelo novo convive com o antigo em vez de
+  substituí-lo.
+*/
+
+export type WorkBudgetExtraRecordType =
+  | 'work_config' | 'work_dependent' | 'work_entry'
+  | 'letra_budget' | 'letra_item' | 'letra_acquisition'
+
+export type WorkBudgetAnyRecordType = WorkBudgetRecordType | WorkBudgetExtraRecordType
+
+export type WorkExtraDataByType = {
+  work_config: ConfiguracaoDoTrabalhoData
+  work_dependent: DependenteData
+  work_entry: LancamentoDoTrabalhoData
+  letra_budget: OrcamentoLetraData
+  /*
+    O item do catálogo LETRA guarda tudo menos o próprio `id`: o identificador é
+    o do registro no cofre, e duplicá-lo dentro do payload abriria espaço para
+    os dois divergirem.
+  */
+  letra_item: Omit<ItemDoCatalogoLetra, 'id'> & WorkTimestamps
+  letra_acquisition: AquisicaoLetraData
+}
+
+export type WorkAnyDataByType = WorkDataByType & WorkExtraDataByType

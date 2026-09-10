@@ -10,11 +10,26 @@ import type { VaultPayload } from '../crypto/types'
 import { pendingActionId, type PendingActionRecord, type PendingActionStage, type VaultRecord } from '../db/types'
 
 /**
- * O que fica é o que não pertence ao distrito: leitura e orçamento familiar
- * vivem em bancos próprios e nem são tocados aqui; da agenda, permanecem os
- * compromissos marcados como pessoais e sem igreja. Todo o resto é distrital.
+ * O que segue o pastor quando ele troca de distrito.
+ *
+ * Os parâmetros do obreiro e o histórico do LETRA são dele, não do lugar: o FPE
+ * e o Percentual de Audit continuam sendo os mesmos depois da mudança, os
+ * dependentes continuam sendo os mesmos, e um item adquirido ano passado não
+ * volta a ser elegível só porque o pastor mudou de cidade — que é exatamente o
+ * erro que o intervalo de renovação existe para impedir.
+ *
+ * Os lançamentos do ministério ficam com o distrito, junto com os auxílios e a
+ * quilometragem: eles descrevem o trabalho feito ali.
+ *
+ * Leitura e orçamento familiar vivem em bancos próprios e nem são tocados aqui;
+ * da agenda, permanecem os compromissos marcados como pessoais e sem igreja.
  */
+const TIPOS_DO_OBREIRO = new Set([
+  'work_config', 'work_dependent', 'letra_budget', 'letra_item', 'letra_acquisition',
+])
+
 export function isPersonalRecord(payload: VaultPayload): boolean {
+  if (TIPOS_DO_OBREIRO.has(payload.type)) return true
   if (payload.type !== 'agenda_event') return false
   const dados = payload.data as { category?: string; churchId?: string | null }
   return dados.category === 'personal' && !dados.churchId
@@ -35,6 +50,7 @@ const TYPE_LABELS: Record<string, string> = {
   // ficam no banco pessoal e não passam por aqui.
   work_allowance: 'Auxílios do ministério', work_expense: 'Despesas do ministério',
   mileage: 'Quilometragem',
+  work_entry: 'Lançamentos do ministério',
   material: 'Materiais', material_distribution: 'Distribuições de material',
   material_need: 'Necessidades e pedidos', acms_report: 'Relatórios ACMS importados',
 }

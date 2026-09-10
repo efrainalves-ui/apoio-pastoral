@@ -95,6 +95,27 @@ describe('encerrar distrito', () => {
     expect(isPersonalRecord({ schemaVersion: 1, type: 'person', data: { name: 'Pessoa Fictícia' } })).toBe(false)
   })
 
+  /*
+    O FPE do obreiro continua o mesmo depois da mudança, e um item do LETRA
+    adquirido ano passado não volta a ser elegível só porque o pastor trocou de
+    cidade. Apagar esse histórico com o distrito zeraria o intervalo de
+    renovação sem ninguém pedir.
+  */
+  it('os parâmetros do obreiro e o histórico do LETRA seguem o pastor', () => {
+    expect(isPersonalRecord({ schemaVersion: 1, type: 'work_config', data: {} })).toBe(true)
+    expect(isPersonalRecord({ schemaVersion: 1, type: 'work_dependent', data: {} })).toBe(true)
+    expect(isPersonalRecord({ schemaVersion: 1, type: 'letra_budget', data: {} })).toBe(true)
+    expect(isPersonalRecord({ schemaVersion: 1, type: 'letra_item', data: {} })).toBe(true)
+    expect(isPersonalRecord({ schemaVersion: 1, type: 'letra_acquisition', data: {} })).toBe(true)
+  })
+
+  /* O trabalho feito no distrito fica com o distrito. */
+  it('os lançamentos do ministério são do distrito', () => {
+    expect(isPersonalRecord({ schemaVersion: 1, type: 'work_entry', data: {} })).toBe(false)
+    expect(isPersonalRecord({ schemaVersion: 1, type: 'work_expense', data: {} })).toBe(false)
+    expect(isPersonalRecord({ schemaVersion: 1, type: 'mileage', data: {} })).toBe(false)
+  })
+
   it('mostra antes o que será apagado e o que fica', async () => {
     const banco = novoBanco(); const chave = await generateMasterKey()
     await distritoFicticio(banco, chave)
