@@ -129,24 +129,6 @@ export function configuracaoVazia(): ConfiguracaoDoTrabalhoData {
   }
 }
 
-/**
- * Copia a configuração para um novo ano.
- *
- * O que se repete vem junto — Campo, função, regras da casa. O que precisa ser
- * confirmado a cada ano não vem: FPE e Percentual de Audit ficam com o
- * histórico, e o novo valor é informado com a vigência dele.
- */
-export function copiarConfiguracao(origem: ConfiguracaoDoTrabalhoData): ConfiguracaoDoTrabalhoData {
-  return {
-    ...origem,
-    regrasPorItem: Object.fromEntries(Object.entries(origem.regrasPorItem).map(([chave, regra]) => [chave, { ...regra }])),
-    limitesConjuntos: origem.limitesConjuntos.map((limite) => ({ ...limite })),
-    fpe: [...origem.fpe],
-    percentualDeAudit: [...origem.percentualDeAudit],
-    createdAt: '', updatedAt: '',
-  }
-}
-
 export const VINCULOS_DE_DEPENDENTE = ['filho', 'conjuge', 'outro'] as const
 export type VinculoDeDependente = (typeof VINCULOS_DE_DEPENDENTE)[number]
 

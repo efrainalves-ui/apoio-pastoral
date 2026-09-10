@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emCentavos } from '../family-budget/dinheiro'
-import { configuracaoVazia, copiarConfiguracao, quotaPais, regraDeItemVazia } from './configuracao'
+import { configuracaoVazia, quotaPais, regraDeItemVazia } from './configuracao'
 import { subsistenciaBasica, vigenteEm } from './parametros'
 
 describe('configuração vazia', () => {
@@ -21,43 +20,6 @@ describe('configuração vazia', () => {
 
   it('a regra de item começa por conta do pastor, sem reembolso presumido', () => {
     expect(regraDeItemVazia()).toMatchObject({ responsabilidade: 'do_pastor', percentual: null, teto: null })
-  })
-})
-
-describe('cópia para o novo ano', () => {
-  const origem = {
-    ...configuracaoVazia(),
-    campo: 'Campo exemplo',
-    tipoDeMoradia: 'casa_pastoral' as const,
-    regrasPorItem: { energia: { ...regraDeItemVazia(), responsabilidade: 'reembolso_parcial' as const, percentual: 30 } },
-    limitesConjuntos: [{ chave: 'comunicacao', nome: 'Internet e telefone', teto: emCentavos(150), tetoPercentual: null, tetoBase: null, referencia: '', vigenciaInicio: '2026-01-01' }],
-    fpe: [{ valor: emCentavos(7000), inicio: '2026-01-01', fim: '', referencia: '', observacao: '' }],
-    createdAt: '2026-01-05T00:00:00.000Z',
-    updatedAt: '2026-06-05T00:00:00.000Z',
-  }
-
-  it('leva o que se repete', () => {
-    const copia = copiarConfiguracao(origem)
-    expect(copia.campo).toBe('Campo exemplo')
-    expect(copia.tipoDeMoradia).toBe('casa_pastoral')
-    expect(copia.regrasPorItem.energia?.percentual).toBe(30)
-    expect(copia.limitesConjuntos[0]?.teto).toBe(emCentavos(150))
-  })
-
-  /*
-    Cópia rasa deixaria as duas configurações compartilhando o mesmo objeto de
-    regra: mexer no ano novo mudaria o ano passado sem ninguém pedir.
-  */
-  it('não compartilha objetos com a origem', () => {
-    const copia = copiarConfiguracao(origem)
-    copia.regrasPorItem.energia!.percentual = 50
-    copia.limitesConjuntos[0]!.teto = emCentavos(200)
-    expect(origem.regrasPorItem.energia?.percentual).toBe(30)
-    expect(origem.limitesConjuntos[0]?.teto).toBe(emCentavos(150))
-  })
-
-  it('as datas do registro anterior não vêm junto', () => {
-    expect(copiarConfiguracao(origem)).toMatchObject({ createdAt: '', updatedAt: '' })
   })
 })
 
