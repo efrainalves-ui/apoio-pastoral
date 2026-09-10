@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Card } from '../components/ui/Card'
 import { FormularioDeLancamento, lancamentoVazio } from '../components/orcamento/FormularioDeLancamento'
@@ -65,6 +65,9 @@ export function FinancasPessoaisPage({ area, mes }: FinancasPessoaisPageProps) {
   const [aviso, setAviso] = useState('')
 
   const hoje = localDateKey()
+
+  /* O aviso pertence à ação que o gerou; trocar de área o descarta. */
+  useEffect(() => { setAviso('') }, [area, mes])
 
   const carregar = useCallback(async () => {
     if (!account || !masterKey) return

@@ -37,10 +37,15 @@ describe('interface do orçamento pessoal', () => {
     }
   })
 
+  /*
+    Quem tem um atalho salvo em /app/orcamento/dividas precisa continuar
+    chegando: o endereço não some, ele passa a abrir Saídas — que é onde a
+    dívida mora agora.
+  */
   it('o endereço antigo continua chegando, agora dentro da área que o contém', async () => {
     renderBudget('/app/orcamento/dividas?mes=2026-08')
     expect(await screen.findByRole('link', { name: 'Saídas' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('link', { name: 'Dívidas' })).toHaveAttribute('aria-current', 'page')
+    expect(await screen.findByRole('button', { name: 'Nova saída' })).toBeInTheDocument()
   })
 
   it('as duas áreas do Orçamento ficam visíveis o tempo todo', async () => {

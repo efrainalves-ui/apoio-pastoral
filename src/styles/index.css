@@ -2939,3 +2939,6 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   .item-compra__subtotal { grid-column: 2; text-align: left; }
   .item-compra > button:last-child { grid-row: 1; grid-column: 3; }
 }
+
+/* A renda familiar usava a manchete da tela inicial e não cabia no cartão. */
+.renda-total { margin: 0 0 10px; font-family: var(--serifada); font-size: clamp(1.6rem, 7vw, 2.1rem); line-height: 1.05; }

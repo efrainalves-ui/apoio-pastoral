@@ -93,7 +93,7 @@ export function VisaoGeral({ mes, doMes, doMesAnterior, todos, integrantes, plan
 
     {renda.size > 0 && <section className="faixa" aria-label="Renda familiar">
       <h2 className="rotulo-secao">Renda familiar</h2>
-      <p className="manchete__num">{formatar(resumo.recebido)}</p>
+      <p className="renda-total">{formatar(resumo.recebido)}</p>
       <dl className="lista-renda">
         {[...renda.entries()]
           .sort(([, esquerda], [, direita]) => direita - esquerda)

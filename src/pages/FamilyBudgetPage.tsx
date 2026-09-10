@@ -27,11 +27,6 @@ const AREAS = {
 } as const
 type BudgetArea = keyof typeof AREAS
 
-/** O recorte dentro de uma área, quando ela tem mais de um. */
-const RECORTES: Partial<Record<BudgetArea, ReadonlyArray<readonly [string, string]>>> = {
-  saidas: [['despesas', 'Despesas'], ['contas', 'Contas'], ['dividas', 'Dívidas']],
-  metas: [['planejamento', 'Planejamento'], ['metas', 'Metas e sonhos']],
-}
 
 /** Endereço antigo para a área que hoje o contém. */
 const AREA_DO_ENDERECO: Record<string, { area: BudgetArea; recorte: string }> = {
@@ -60,7 +55,6 @@ type BudgetSection = keyof typeof sectionLabels
 
 function BudgetNav({ section, month }: { section: BudgetSection; month: string }) {
   const atual = AREA_DO_ENDERECO[section] ?? AREA_DO_ENDERECO.resumo!
-  const recortes = RECORTES[atual.area]
   return <>
     <nav className="tira-abas" aria-label="Áreas do orçamento pessoal">
       {(Object.keys(AREAS) as BudgetArea[]).map((chave) => <Link
@@ -70,14 +64,7 @@ function BudgetNav({ section, month }: { section: BudgetSection; month: string }
         to={`/app/orcamento/${chave === 'saidas' ? 'despesas' : chave === 'metas' ? 'planejamento' : chave}?mes=${month}`}
       >{AREAS[chave]}</Link>)}
     </nav>
-    {recortes && <nav className="tira-recortes" aria-label={`Recortes de ${AREAS[atual.area]}`}>
-      {recortes.map(([chave, rotulo]) => <Link
-        key={chave}
-        className={`chip-recorte ${atual.recorte === chave ? 'chip-recorte--ativo' : ''}`}
-        aria-current={atual.recorte === chave ? 'page' : undefined}
-        to={`/app/orcamento/${chave}?mes=${month}`}
-      >{rotulo}</Link>)}
-    </nav>}
+
   </>
 }
 
