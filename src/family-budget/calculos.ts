@@ -42,7 +42,7 @@ export interface ResumoDoMes {
 export function resumoDoMes(lancamentos: readonly Lancamento[]): ResumoDoMes {
   const recebido = somar(valores(entradas(lancamentos).filter(({ situacao }) => situacao === 'recebida')))
   const aReceber = somar(valores(entradas(lancamentos).filter(({ situacao }) => situacao === 'prevista')))
-  const pago = somar(valores(saidas(lancamentos).filter(({ situacao }) => situacao === 'paga')))
+  const pago = somar(valores(saidas(lancamentos).filter(({ situacao, descontadoNaFonte }) => situacao === 'paga' && !descontadoNaFonte)))
   const comprometido = somar(valores(saidas(lancamentos).filter(({ situacao }) => situacao === 'pendente')))
   return { recebido, aReceber, pago, comprometido, saldo: recebido - pago, livre: recebido - pago - comprometido }
 }

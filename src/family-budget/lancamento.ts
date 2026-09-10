@@ -97,6 +97,15 @@ export interface LancamentoData {
   /** Identificador comum às ocorrências da mesma série recorrente. */
   serieId: string | null
   parcelamento: Parcelamento | null
+  /**
+   * Dízimo que já saiu do salário antes de ele cair na conta.
+   *
+   * Ele precisa aparecer no acompanhamento — é dízimo devolvido, e o pastor
+   * quer ver o total do ano. Mas não pode diminuir o disponível de novo: o
+   * dinheiro nunca chegou à conta, e descontá-lo outra vez faria a família
+   * parecer ter menos do que tem.
+   */
+  descontadoNaFonte: boolean
   observacao: string
   createdAt: string
   updatedAt: string

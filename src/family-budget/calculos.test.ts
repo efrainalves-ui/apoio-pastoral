@@ -13,7 +13,7 @@ function lancamento(overrides: Partial<Lancamento> = {}): Lancamento {
     id: crypto.randomUUID(), natureza: 'saida', descricao: 'Lançamento fictício', valor: emCentavos(100),
     subcategoria: 'alimentacao.supermercado', data: '2026-09-05', competencia: '2026-09', vencimento: '2026-09-05',
     situacao: 'paga', tipo: 'variavel', formaDePagamento: 'pix', contaId: null, cartaoId: null,
-    integranteId: null, referenteA: null, recorrencia: 'nenhuma', serieId: null, parcelamento: null,
+    integranteId: null, referenteA: null, recorrencia: 'nenhuma', serieId: null, parcelamento: null, descontadoNaFonte: false,
     observacao: '', createdAt: '2026-09-05T10:00:00.000Z', updatedAt: '2026-09-05T10:00:00.000Z', ...overrides,
   }
 }
@@ -47,6 +47,31 @@ describe('resumo do mês', () => {
     const resumo = resumoDoMes([entrada({ valor: emCentavos(3000) }), lancamento({ valor: emCentavos(1200), situacao: 'pendente' })])
     expect(resumo.saldo).toBe(emCentavos(3000))
     expect(resumo.livre).toBe(emCentavos(1800))
+  })
+
+  /*
+    Dízimo descontado na folha aparece no acompanhamento, mas não desconta de
+    novo: o dinheiro nunca chegou à conta, e tirá-lo outra vez faria a família
+    parecer ter menos do que tem.
+  */
+  it('dízimo descontado na fonte não diminui o disponível outra vez', () => {
+    const semDesconto = resumoDoMes([
+      entrada({ valor: emCentavos(5000) }),
+      lancamento({ valor: emCentavos(500), subcategoria: 'generosidade.dizimo' }),
+    ])
+    const comDesconto = resumoDoMes([
+      entrada({ valor: emCentavos(5000) }),
+      lancamento({ valor: emCentavos(500), subcategoria: 'generosidade.dizimo', descontadoNaFonte: true }),
+    ])
+
+    expect(semDesconto.pago).toBe(emCentavos(500))
+    expect(comDesconto.pago).toBe(0)
+    expect(comDesconto.livre).toBe(emCentavos(5000))
+  })
+
+  it('mas continua contando no acompanhamento por categoria', () => {
+    const fatias = paraOndeFoi([lancamento({ valor: emCentavos(500), subcategoria: 'generosidade.dizimo', descontadoNaFonte: true })])
+    expect(fatias[0]).toMatchObject({ nome: 'Dízimos, ofertas e generosidade', valor: emCentavos(500) })
   })
 
   it('mês sem nada devolve zero em tudo', () => {

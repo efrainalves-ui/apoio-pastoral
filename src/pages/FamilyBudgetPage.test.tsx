@@ -1,5 +1,4 @@
 import { cleanup, render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FamilyBudgetPage } from './FamilyBudgetPage'
@@ -31,7 +30,7 @@ describe('interface do orçamento pessoal', () => {
   it('mostra estado vazio acolhedor e as seis áreas do módulo', async () => {
     renderBudget('/app/orcamento/resumo?mes=2026-08')
     expect(await screen.findByRole('heading', { name: 'Pessoal' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Comece com o que já sabe' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Saldo do mês')).toBeInTheDocument()
     for (const label of ['Visão geral', 'Entradas', 'Saídas', 'Metas e Planejamento', 'Lista de compras', 'Relatórios']) {
       expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
     }
@@ -52,17 +51,4 @@ describe('interface do orçamento pessoal', () => {
     expect(within(areas).getByRole('link', { name: 'Trabalho' })).toHaveAttribute('href', expect.stringContaining('/app/orcamento/trabalho/resumo'))
   })
 
-  it('explica e registra o dízimo somente como acompanhamento', async () => {
-    const user = userEvent.setup()
-    renderBudget('/app/orcamento/despesas?mes=2026-08&novo=1')
-    await screen.findByRole('heading', { name: 'Nova despesa' })
-    await user.selectOptions(screen.getAllByLabelText('Categoria')[0]!, 'tithe')
-    expect(screen.getByText('O dízimo já foi descontado do salário?')).toBeInTheDocument()
-    await user.click(screen.getByLabelText('Sim, apenas registrar'))
-    expect(screen.getByText('O valor será acompanhado, mas não diminuirá novamente o disponível.')).toBeInTheDocument()
-    await user.type(screen.getByLabelText('Descrição'), 'Dízimo Fictício')
-    await user.type(screen.getByLabelText('Valor'), '300')
-    await user.click(screen.getByRole('button', { name: 'Salvar despesa' }))
-    expect(calls.saveExpense).toHaveBeenCalledWith('conta-orcamento-ficticia', auth.masterKey, expect.objectContaining({ category: 'tithe', titheDeducted: true, amount: 300 }), undefined)
-  })
 })

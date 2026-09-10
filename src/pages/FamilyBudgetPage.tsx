@@ -1,19 +1,19 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import { ArrowLeft, ArrowRight, Banknote, CalendarClock, Check, CheckCircle2, ChevronRight, CircleDollarSign, Copy, CreditCard, Download, FileBarChart, HandCoins, LayoutDashboard, OctagonAlert, Plus, ReceiptText, Trash2, TriangleAlert, WalletCards } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CircleDollarSign, Copy, Download, HandCoins, Plus, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { localDateKey } from '../shared/dates'
 import { BudgetAreaNav } from '../components/BudgetAreaNav'
 import { ShoppingListView } from './ShoppingListView'
+import { FinancasPessoaisPage } from './FinancasPessoaisPage'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
-import { budgetTips, categoryShares, flowBars, monthOutlook } from '../family-budget/monthInsight'
-import { categorySpending, currency, debtEndEstimate, debtPlan, debtProgress, effectivePaymentStatus, forecastSummary, monthKey, monthLabel, monthlySummary, planTotals, shiftMonth, upcomingBills } from '../family-budget/core'
+import { categorySpending, currency, debtEndEstimate, debtPlan, debtProgress, effectivePaymentStatus, forecastSummary, monthKey, monthLabel, monthlySummary, shiftMonth } from '../family-budget/core'
 import { downloadBudgetCsv, downloadBudgetPdf } from '../family-budget/export'
 import { FamilyBudgetService } from '../family-budget/service'
-import { DEBT_STATUS_LABELS, DEBT_TYPE_LABELS, EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS, GOAL_CATEGORY_LABELS, INCOME_CATEGORY_LABELS, PAYMENT_STATUS_LABELS, type BudgetBillData, type BudgetDebtData, type BudgetExpenseData, type BudgetGoalData, type BudgetIncomeData, type BudgetPlanData, type BudgetSnapshot, type DebtStatus, type DebtType, type ExpenseCategory, type GoalCategory, type IncomeCategory, type PaymentStatus } from '../family-budget/types'
+import { DEBT_STATUS_LABELS, DEBT_TYPE_LABELS, EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS, GOAL_CATEGORY_LABELS, INCOME_CATEGORY_LABELS, PAYMENT_STATUS_LABELS, type BudgetBillData, type BudgetDebtData, type BudgetGoalData, type BudgetPlanData, type BudgetSnapshot, type DebtStatus, type DebtType, type ExpenseCategory, type GoalCategory, type PaymentStatus } from '../family-budget/types'
 
 const service = new FamilyBudgetService()
 const timestamp = () => new Date().toISOString()
@@ -64,8 +64,6 @@ const sectionLabels = { resumo: 'Visão geral', entradas: 'Entradas', despesas: 
 
 type BudgetSection = keyof typeof sectionLabels
 
-const emptyIncome = (): BudgetIncomeData => ({ category: 'salary', description: '', amount: 0, date: today(), responsible: '', notes: '', recurring: false, createdAt: timestamp(), updatedAt: timestamp() })
-const emptyExpense = (): BudgetExpenseData => ({ category: 'housing', description: '', amount: 0, date: today(), status: 'pending', fixed: false, installment: false, installmentsTotal: 0, installmentNumber: 0, notes: '', titheDeducted: false, createdAt: timestamp(), updatedAt: timestamp() })
 const emptyBill = (): BudgetBillData => ({ name: '', category: 'utilities', amount: 0, dueDate: today(), recurring: false, status: 'pending', notes: '', createdAt: timestamp(), updatedAt: timestamp() })
 const emptyDebt = (): BudgetDebtData => ({ name: '', type: 'card', initialAmount: 0, currentBalance: 0, installmentAmount: 0, totalInstallments: 0, paidInstallments: 0, dueDay: 1, interestRate: null, status: 'current', notes: '', payments: [], createdAt: timestamp(), updatedAt: timestamp() })
 const emptyGoal = (): BudgetGoalData => ({ name: '', targetAmount: 0, reservedAmount: 0, targetDate: '', category: 'emergency', monthlyContribution: 0, notes: '', deposits: [], createdAt: timestamp(), updatedAt: timestamp() })
@@ -74,7 +72,6 @@ const dateInMonth = (month: string, day: number | string) => {
   const lastDay = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()
   return `${month}-${String(Math.min(requested, lastDay)).padStart(2, '0')}`
 }
-const withSelectedMonth = <T extends { date: string }>(draft: T, month: string): T => ({ ...draft, date: dateInMonth(month, draft.date.slice(8, 10)) })
 
 function BudgetNav({ section, month }: { section: BudgetSection; month: string }) {
   const atual = AREA_DO_ENDERECO[section] ?? AREA_DO_ENDERECO.resumo!
@@ -103,9 +100,6 @@ function MoneyInput({ label, value, onChange }: { label: string; value: number; 
   return <label className="field"><span className="field__label">{label}</span><input className="field__input" type="number" min="0" step="0.01" value={value || ''} onChange={(event) => onChange(Number(event.target.value))} /></label>
 }
 
-function EmptyBudget() {
-  return <Card className="budget-empty"><WalletCards /><h2>Comece com o que já sabe</h2><div className="form-actions"><Link className="button button--primary" to="/app/orcamento/entradas?novo=1">Registrar entrada</Link><Link className="button button--secondary" to="/app/orcamento/planejamento">Planejar o mês</Link></div></Card>
-}
 
 export function FamilyBudgetPage() {
   const { account, masterKey } = useAuthVault()
@@ -121,18 +115,12 @@ export function FamilyBudgetPage() {
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
-  const [incomeDraft, setIncomeDraft] = useState<BudgetIncomeData | null>(null)
-  const [incomeId, setIncomeId] = useState('')
-  const [expenseDraft, setExpenseDraft] = useState<BudgetExpenseData | null>(null)
-  const [expenseId, setExpenseId] = useState('')
   const [billDraft, setBillDraft] = useState<BudgetBillData | null>(null)
   const [billId, setBillId] = useState('')
   const [debtDraft, setDebtDraft] = useState<BudgetDebtData | null>(null)
   const [debtId, setDebtId] = useState('')
   const [goalDraft, setGoalDraft] = useState<BudgetGoalData | null>(null)
   const [goalId, setGoalId] = useState('')
-  const [expenseCategory, setExpenseCategory] = useState<'all' | ExpenseCategory>('all')
-  const [expenseStatus, setExpenseStatus] = useState<'all' | PaymentStatus>('all')
   const [debtMode, setDebtMode] = useState<'smallest' | 'interest'>('smallest')
 
   const load = useCallback(async () => {
@@ -147,8 +135,6 @@ export function FamilyBudgetPage() {
   useReloadOnSync(load)
   useEffect(() => {
     if (!newRequested) return
-    if (section === 'entradas') setIncomeDraft(withSelectedMonth(emptyIncome(), month))
-    if (section === 'despesas') setExpenseDraft(withSelectedMonth(emptyExpense(), month))
     if (section === 'contas') setBillDraft({ ...emptyBill(), dueDate: `${month}-01` })
     if (section === 'dividas') setDebtDraft(emptyDebt())
     if (section === 'metas') setGoalDraft(emptyGoal())
@@ -159,20 +145,12 @@ export function FamilyBudgetPage() {
   function fail(reason: unknown) { setError(reason instanceof Error ? reason.message : 'Não foi possível concluir esta ação.'); setNotice('') }
   async function remove(id: string, label: string) { if (!account || !window.confirm(`Deseja excluir ${label}?`)) return; try { await service.remove(account.id, id); done('Registro excluído.') } catch (reason) { fail(reason) } }
 
-  const saveIncome = async () => { if (!account || !masterKey || !incomeDraft) return; if (!(incomeDraft.amount > 0) || !incomeDraft.date) return fail(new Error('Informe o valor e a data da entrada.')); try { await service.saveIncome(account.id, masterKey, incomeDraft, incomeId || undefined); setIncomeDraft(null); setIncomeId(''); done('Entrada salva.') } catch (reason) { fail(reason) } }
-  const saveExpense = async () => { if (!account || !masterKey || !expenseDraft) return; if (!(expenseDraft.amount > 0) || !expenseDraft.description.trim()) return fail(new Error('Informe a descrição e o valor da despesa.')); try { await service.saveExpense(account.id, masterKey, expenseDraft, expenseId || undefined); setExpenseDraft(null); setExpenseId(''); done('Despesa salva.') } catch (reason) { fail(reason) } }
   const saveBill = async () => { if (!account || !masterKey || !billDraft) return; if (!(billDraft.amount > 0) || !billDraft.name.trim()) return fail(new Error('Informe o nome e o valor da conta.')); try { await service.saveBill(account.id, masterKey, billDraft, billId || undefined); setBillDraft(null); setBillId(''); done('Conta salva.') } catch (reason) { fail(reason) } }
   const saveDebt = async () => { if (!account || !masterKey || !debtDraft) return; if (!(debtDraft.initialAmount > 0) || !debtDraft.name.trim()) return fail(new Error('Informe o nome e o valor inicial da dívida.')); try { await service.saveDebt(account.id, masterKey, { ...debtDraft, currentBalance: debtId ? debtDraft.currentBalance : debtDraft.currentBalance || debtDraft.initialAmount }, debtId || undefined); setDebtDraft(null); setDebtId(''); done('Dívida salva.') } catch (reason) { fail(reason) } }
   const saveGoal = async () => { if (!account || !masterKey || !goalDraft) return; if (!(goalDraft.targetAmount > 0) || !goalDraft.name.trim()) return fail(new Error('Informe o nome e o valor desejado da meta.')); try { await service.saveGoal(account.id, masterKey, goalDraft, goalId || undefined); setGoalDraft(null); setGoalId(''); done('Meta salva.') } catch (reason) { fail(reason) } }
 
   if (loading || !snapshot) return <div className="app-loading" role="status">Abrindo Orçamento Familiar…</div>
   const summary = monthlySummary(snapshot)
-  const planned = planTotals(snapshot.plan, snapshot.expenses, snapshot.bills)
-  const dueSoon = upcomingBills(snapshot.bills, month === monthKey(new Date()) ? new Date() : new Date(`${month}-01T12:00:00`))
-  const outlook = monthOutlook(summary.available, snapshot)
-  const tips = budgetTips(snapshot, outlook)
-  const shares = categoryShares(snapshot)
-  const hasRecords = snapshot.incomes.length + snapshot.expenses.length + snapshot.bills.length + snapshot.debts.length + snapshot.goals.length > 0
 
   return <div className="page-stack family-budget-page">
     <header className="page-hero budget-hero"><div><p className="eyebrow">Orçamento</p><h1>Pessoal</h1></div></header>
@@ -182,55 +160,15 @@ export function FamilyBudgetPage() {
     {notice && <div className="alert alert--success" role="status">{notice}</div>}
     {error && <div className="alert alert--error" role="alert">{error}</div>}
 
-    {section === 'resumo' && <>
-      {!hasRecords ? <EmptyBudget /> : <>
-        <section className="budget-metrics" aria-label="Resumo financeiro do mês">
-          <div><span>Entradas</span><strong>{currency(summary.income)}</strong></div><div><span>Saídas</span><strong>{currency(summary.outflow)}</strong></div><div className={summary.available < 0 ? 'negative' : 'positive'}><span>Disponível</span><strong>{currency(summary.available)}</strong></div><div><span>Reservado para metas</span><strong>{currency(summary.reserved)}</strong></div><div><span>Total das dívidas</span><strong>{currency(summary.debtTotal)}</strong></div><div><span>Vencem em 7 dias</span><strong>{dueSoon.length}</strong></div>
-        </section>
-        <div className="home-grid">
-          <Card title="Entradas e saídas" eyebrow="No mês">
-            <div className="budget-flow">{flowBars(summary.income, summary.outflow).map((barra) => <div key={barra.label} className={`budget-flow__row budget-flow__row--${barra.tone}`}>
-              <span>{barra.label}</span>
-              <span className="budget-flow__bar" aria-hidden="true"><span style={{ width: `${barra.percent}%` }} /></span>
-              <strong>{currency(barra.amount)}</strong>
-            </div>)}</div>
-            <div className={`budget-outlook budget-outlook--${outlook.tone}`}>
-              <p><strong>Disponível agora:</strong> {currency(outlook.available)}</p>
-              <p><strong>Projeção até o fim do mês:</strong> {currency(outlook.projected)}</p>
-              <small>Considera {currency(outlook.expectedIncome)} de entradas previstas e {currency(outlook.planned)} de compromissos em aberto.</small>
-            </div>
-            <ul className="budget-tips">{tips.map((dica) => <li key={dica.id} className={`budget-tips__item budget-tips__item--${dica.tone}`}>
-              {dica.tone === 'ok' ? <CheckCircle2 aria-hidden="true" /> : dica.tone === 'atencao' ? <TriangleAlert aria-hidden="true" /> : <OctagonAlert aria-hidden="true" />}
-              <span>{dica.text}</span>
-            </li>)}</ul>
-          </Card>
-          <Card title="Despesas por categoria" eyebrow="No mês">
-            {shares.length ? <div className="budget-shares">{shares.map((fatia) => <div key={fatia.category}>
-              <span>{fatia.label}<strong>{currency(fatia.amount)} · {fatia.percent}%</strong></span>
-              <span className="budget-flow__bar" aria-hidden="true"><span style={{ width: `${fatia.percent}%` }} /></span>
-            </div>)}</div> : <p className="muted">Nenhuma despesa registrada neste mês.</p>}
-          </Card>
-        </div>
-        <div className="home-grid">
-          <Card title="Situação do mês" eyebrow="Resumo"><p className="budget-summary-text">{summary.available >= 0 ? `Depois dos compromissos registrados, restam ${currency(summary.available)} no mês.` : `Os compromissos registrados ultrapassam as entradas em ${currency(Math.abs(summary.available))}. Revise o planejamento.`}</p><div className="budget-plan-compare"><span>Planejado<strong>{currency(planned.planned)}</strong></span><span>Gasto registrado<strong>{currency(planned.spent)}</strong></span><progress max={Math.max(planned.planned, planned.spent, 1)} value={planned.spent} /></div>{(summary.titheRecorded > 0 || summary.titheToReturn > 0) && <div className="budget-tithe-note"><strong>Dízimo</strong>{summary.titheRecorded > 0 && <span>{currency(summary.titheRecorded)} somente registrado, sem descontar novamente.</span>}{summary.titheToReturn > 0 && <span>{currency(summary.titheToReturn)} ainda precisa ser devolvido.</span>}</div>}</Card>
-          <Card title="Metas da família" eyebrow="Progresso">{snapshot.goals.length ? <div className="budget-goal-mini">{snapshot.goals.slice(0, 3).map((goal) => <div key={goal.id}><span><strong>{goal.name}</strong><small>{currency(goal.reservedAmount)} de {currency(goal.targetAmount)}</small></span><progress max={goal.targetAmount || 1} value={goal.reservedAmount} /></div>)}</div> : <p className="muted">Nenhuma meta cadastrada.</p>}<Link className="text-link" to={`/app/orcamento/metas?mes=${month}`}>Ver metas <ChevronRight /></Link></Card>
-        </div>
-        <Card title="Contas próximas" action={<CalendarClock />}>{dueSoon.length ? <div className="entity-list">{dueSoon.map((bill) => <div className="entity-row" key={bill.id}><span><strong>{bill.name}</strong><small>Vence em {new Intl.DateTimeFormat('pt-BR').format(new Date(`${bill.dueDate}T12:00:00`))}</small></span><strong>{currency(bill.amount)}</strong></div>)}</div> : <p className="muted">Nenhuma conta pendente vence nos próximos 7 dias.</p>}</Card>
-      </>}
-      <section className="budget-quick-actions" aria-label="Ações rápidas"><button onClick={() => go('entradas', month, true)}><Banknote /><span>Registrar entrada</span></button><button onClick={() => go('despesas', month, true)}><ReceiptText /><span>Registrar despesa</span></button><button onClick={() => go('contas', month, true)}><CalendarClock /><span>Registrar conta</span></button><button onClick={() => go('dividas')}><CreditCard /><span>Ver dívidas</span></button><button onClick={() => go('planejamento')}><LayoutDashboard /><span>Planejar mês</span></button><button onClick={() => go('relatorios')}><FileBarChart /><span>Ver relatório</span></button></section>
-    </>}
-
-    {section === 'entradas' && <>
-      <div className="page-actions"><Button icon={<Plus />} onClick={() => { setIncomeId(''); setIncomeDraft(withSelectedMonth(emptyIncome(), month)) }}>Nova entrada</Button></div>
-      {incomeDraft && <Card title={incomeId ? 'Editar entrada' : 'Nova entrada'}><div className="form-grid"><label className="field"><span className="field__label">Categoria</span><select className="field__input" value={incomeDraft.category} onChange={(event) => setIncomeDraft({ ...incomeDraft, category: event.target.value as IncomeCategory })}>{Object.entries(INCOME_CATEGORY_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><MoneyInput label="Valor" value={incomeDraft.amount} onChange={(amount) => setIncomeDraft({ ...incomeDraft, amount })} /><label className="field"><span className="field__label">Data</span><input className="field__input" type="date" value={incomeDraft.date} onChange={(event) => setIncomeDraft({ ...incomeDraft, date: event.target.value })} /></label><label className="field"><span className="field__label">Pessoa responsável (opcional)</span><input className="field__input" value={incomeDraft.responsible} onChange={(event) => setIncomeDraft({ ...incomeDraft, responsible: event.target.value })} /></label></div><label className="field"><span className="field__label">Descrição (opcional)</span><input className="field__input" value={incomeDraft.description} onChange={(event) => setIncomeDraft({ ...incomeDraft, description: event.target.value })} /></label><label className="field"><span className="field__label">Observação (opcional)</span><textarea className="field__input field__textarea" value={incomeDraft.notes} onChange={(event) => setIncomeDraft({ ...incomeDraft, notes: event.target.value })} /></label><label className="confirmation-check"><input type="checkbox" checked={incomeDraft.recurring} onChange={(event) => setIncomeDraft({ ...incomeDraft, recurring: event.target.checked })} /><span><strong>Repetir mensalmente</strong><small>A próxima aparecerá como prevista para confirmação.</small></span></label><div className="form-actions"><Button icon={<Check />} onClick={() => void saveIncome()}>Salvar entrada</Button><Button variant="secondary" onClick={() => setIncomeDraft(null)}>Cancelar</Button></div></Card>}
-      <Card title="Entradas do mês">{snapshot.incomes.length ? <div className="budget-list">{snapshot.incomes.map((item) => <article key={item.id}><span><strong>{INCOME_CATEGORY_LABELS[item.category]}{item.description ? ` · ${item.description}` : ''}</strong><small>{item.date}{item.responsible ? ` · ${item.responsible}` : ''}{item.projected ? ' · Prevista' : ''}</small></span><strong>{currency(item.amount)}</strong><div className="form-actions">{item.projected ? <><Button variant="secondary" onClick={async () => { if (!account || !masterKey) return; try { await service.confirmIncome(account.id, masterKey, item); done('Entrada prevista confirmada.') } catch (reason) { fail(reason) } }}>Confirmar</Button><Button variant="quiet" onClick={() => { setIncomeId(''); setIncomeDraft({ ...item }) }}>Editar</Button><Button variant="quiet" onClick={async () => { if (!account || !masterKey || !item.recurrenceId) return; await service.skipProjection(account.id, masterKey, 'income', item.recurrenceId, month); done('Previsão removida deste mês.') }}>Remover</Button></> : <><Button variant="quiet" onClick={() => { setIncomeId(item.id); setIncomeDraft({ ...item }) }}>Editar</Button><Button variant="danger" icon={<Trash2 />} aria-label={`Excluir entrada ${item.description || INCOME_CATEGORY_LABELS[item.category]}`} onClick={() => void remove(item.id, 'esta entrada')} /></>}</div></article>)}</div> : <p className="muted">Nenhuma entrada neste mês.</p>}</Card>
-    </>}
-
-    {section === 'despesas' && <>
-      <div className="page-actions"><Button icon={<Plus />} onClick={() => { setExpenseId(''); setExpenseDraft(withSelectedMonth(emptyExpense(), month)) }}>Nova despesa</Button></div>
-      {expenseDraft && <Card title={expenseId ? 'Editar despesa' : 'Nova despesa'}><div className="form-grid"><label className="field"><span className="field__label">Categoria</span><select className="field__input" value={expenseDraft.category} onChange={(event) => setExpenseDraft({ ...expenseDraft, category: event.target.value as ExpenseCategory, ...(event.target.value !== 'tithe' ? { titheDeducted: false } : {}) })}>{Object.entries(EXPENSE_CATEGORY_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><label className="field"><span className="field__label">Descrição</span><input className="field__input" value={expenseDraft.description} onChange={(event) => setExpenseDraft({ ...expenseDraft, description: event.target.value })} /></label><MoneyInput label="Valor" value={expenseDraft.amount} onChange={(amount) => setExpenseDraft({ ...expenseDraft, amount })} /><label className="field"><span className="field__label">Data ou vencimento</span><input className="field__input" type="date" value={expenseDraft.date} onChange={(event) => setExpenseDraft({ ...expenseDraft, date: event.target.value })} /></label><label className="field"><span className="field__label">Situação</span><select className="field__input" value={expenseDraft.status} onChange={(event) => setExpenseDraft({ ...expenseDraft, status: event.target.value as PaymentStatus })}>{Object.entries(PAYMENT_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>{expenseDraft.category === 'tithe' && <fieldset className="budget-tithe-choice"><legend>O dízimo já foi descontado do salário?</legend><label><input type="radio" name="tithe" checked={expenseDraft.titheDeducted} onChange={() => setExpenseDraft({ ...expenseDraft, titheDeducted: true })} />Sim, apenas registrar</label><label><input type="radio" name="tithe" checked={!expenseDraft.titheDeducted} onChange={() => setExpenseDraft({ ...expenseDraft, titheDeducted: false })} />Não, preciso devolver</label><small>{expenseDraft.titheDeducted ? 'O valor será acompanhado, mas não diminuirá novamente o disponível.' : 'O valor será considerado no planejamento e no disponível.'}</small></fieldset>}<div className="form-grid"><label className="confirmation-check"><input type="checkbox" checked={expenseDraft.fixed} onChange={(event) => setExpenseDraft({ ...expenseDraft, fixed: event.target.checked })} /><span>Despesa fixa mensal</span></label><label className="confirmation-check"><input type="checkbox" checked={expenseDraft.installment} onChange={(event) => setExpenseDraft({ ...expenseDraft, installment: event.target.checked })} /><span>Despesa parcelada</span></label>{expenseDraft.installment && <><label className="field"><span className="field__label">Quantidade de parcelas</span><input className="field__input" type="number" min="1" value={expenseDraft.installmentsTotal || ''} onChange={(event) => setExpenseDraft({ ...expenseDraft, installmentsTotal: Number(event.target.value) })} /></label><label className="field"><span className="field__label">Parcela atual</span><input className="field__input" type="number" min="1" value={expenseDraft.installmentNumber || ''} onChange={(event) => setExpenseDraft({ ...expenseDraft, installmentNumber: Number(event.target.value) })} /></label></>}</div><label className="field"><span className="field__label">Observação (opcional)</span><textarea className="field__input field__textarea" value={expenseDraft.notes} onChange={(event) => setExpenseDraft({ ...expenseDraft, notes: event.target.value })} /></label><div className="form-actions"><Button onClick={() => void saveExpense()}>Salvar despesa</Button><Button variant="secondary" onClick={() => setExpenseDraft(null)}>Cancelar</Button></div></Card>}
-      <Card title="Despesas do mês"><div className="budget-filters"><label className="field"><span className="field__label">Categoria</span><select className="field__input" value={expenseCategory} onChange={(event) => setExpenseCategory(event.target.value as 'all' | ExpenseCategory)}><option value="all">Todas</option>{Object.entries(EXPENSE_CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="field"><span className="field__label">Situação</span><select className="field__input" value={expenseStatus} onChange={(event) => setExpenseStatus(event.target.value as 'all' | PaymentStatus)}><option value="all">Todas</option>{Object.entries(PAYMENT_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div><div className="budget-list">{snapshot.expenses.filter((item) => (expenseCategory === 'all' || item.category === expenseCategory) && (expenseStatus === 'all' || effectivePaymentStatus(item.status, item.date) === expenseStatus)).map((item) => <article key={item.id}><span><strong>{item.description}</strong><small>{EXPENSE_CATEGORY_LABELS[item.category]} · {PAYMENT_STATUS_LABELS[effectivePaymentStatus(item.status, item.date)]}{item.projected ? ' · Prevista' : ''}{item.category === 'tithe' && item.titheDeducted ? ' · Somente registrado' : ''}</small></span><strong>{currency(item.amount)}</strong><div className="form-actions">{item.projected ? <><Button variant="secondary" onClick={async () => { if (!account || !masterKey) return; await service.confirmExpense(account.id, masterKey, item); done('Despesa prevista confirmada.') }}>Confirmar</Button><Button variant="quiet" onClick={() => { setExpenseId(''); setExpenseDraft({ ...item }) }}>Editar</Button><Button variant="quiet" onClick={async () => { if (!account || !masterKey || !item.recurrenceId) return; await service.skipProjection(account.id, masterKey, 'expense', item.recurrenceId, month); done('Previsão removida deste mês.') }}>Remover</Button></> : <><Button variant="quiet" onClick={() => { setExpenseId(item.id); setExpenseDraft({ ...item }) }}>Editar</Button><Button variant="danger" icon={<Trash2 />} aria-label={`Excluir despesa ${item.description}`} onClick={() => void remove(item.id, 'esta despesa')} /></>}</div></article>)}</div></Card>
-    </>}
+    {/*
+      Visão geral, Entradas e Saídas passam a ser servidas pelo modelo novo.
+      As outras áreas continuam no antigo até serem reconstruídas — e o que já
+      estava gravado aparece nas três novas por leitura, sem ser convertido.
+    */}
+    {(section === 'resumo' || section === 'entradas' || section === 'despesas') && <FinancasPessoaisPage
+      area={section === 'resumo' ? 'resumo' : section === 'entradas' ? 'entradas' : 'saidas'}
+      mes={month}
+    />}
 
     {section === 'planejamento' && <PlanningView snapshot={snapshot} previous={previous} next={next} accountId={account?.id ?? ''} masterKey={masterKey} onDone={done} onFail={fail} />}
     {section === 'contas' && <BillsView snapshot={snapshot} draft={billDraft} setDraft={setBillDraft} editId={billId} setEditId={setBillId} save={() => void saveBill()} remove={(id) => void remove(id, 'esta conta')} accountId={account?.id ?? ''} masterKey={masterKey} month={month} done={done} fail={fail} />}

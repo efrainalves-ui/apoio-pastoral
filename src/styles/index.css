@@ -2744,3 +2744,141 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 }
 .chip-recorte:hover { color: var(--ink); background: var(--green-50); }
 .chip-recorte--ativo { color: var(--green-900); background: var(--green-50); }
+
+/* ==========================================================================
+   Orçamento pessoal: o lançamento, a folha de categorias e o painel.
+   ========================================================================== */
+
+/* A escolha da categoria em duas etapas, no lugar de um select de 250 itens. */
+.escolha-categoria {
+  width: 100%; min-height: 49px; padding: 0 14px; display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--line); border-radius: 11px;
+  color: var(--ink); background: var(--paper); font: inherit; text-align: left; cursor: pointer;
+}
+.escolha-categoria span { flex: 1; min-width: 0; overflow-wrap: break-word; }
+.escolha-categoria svg { width: 17px; height: 17px; flex: none; color: var(--muted); }
+.escolha-categoria--vazia span { color: var(--muted); }
+.escolha-categoria:hover { border-color: var(--acento-dado); }
+
+.folha { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+.folha__fundo { position: absolute; inset: 0; background: rgb(6 18 14 / 55%); }
+.folha__corpo {
+  position: relative; width: min(560px, 100%); max-height: 86vh; display: flex; flex-direction: column;
+  border-radius: 20px 20px 0 0; background: var(--paper);
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 40px rgb(6 18 14 / 28%);
+}
+.folha__topo { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.folha__topo strong { flex: 1; text-align: center; font-size: .96rem; }
+.folha__espaco { width: 42px; flex: none; }
+.folha__busca { margin-bottom: 10px; }
+.folha__lista { flex: 1; overflow-y: auto; display: grid; }
+.folha__item {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 12px;
+  min-height: 52px; padding: 10px 4px; border: 0; border-bottom: 1px solid var(--line);
+  background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.folha__item:last-child { border-bottom: 0; }
+.folha__item:hover { background: var(--green-50); }
+.folha__item strong { font-size: .92rem; font-weight: 600; }
+.folha__item small { grid-column: 1; font-size: .76rem; color: var(--muted); }
+.folha__item svg { width: 16px; height: 16px; grid-row: 1 / span 2; color: var(--muted); }
+.folha__item--escolhido { background: var(--green-50); }
+.folha__vazio { padding: 20px 4px; color: var(--muted); font-size: .86rem; }
+
+.escolha-situacao { margin: 0 0 14px; padding: 0; border: 0; display: flex; flex-wrap: wrap; gap: 7px; }
+.escolha-situacao legend { margin-bottom: 6px; }
+.detalhes-lancamento { padding-top: 10px; border-top: 1px solid var(--line); margin-top: 6px; }
+
+.marca-dizimo {
+  display: flex; gap: 11px; align-items: flex-start; margin-bottom: 14px; padding: 12px;
+  border-radius: var(--raio); background: var(--green-50); cursor: pointer;
+}
+.marca-dizimo input { width: 20px; height: 20px; margin-top: 2px; flex: none; accent-color: var(--green-700); }
+.marca-dizimo span { display: grid; gap: 2px; }
+.marca-dizimo strong { font-size: .88rem; font-weight: 600; }
+.marca-dizimo small { font-size: .78rem; color: var(--muted); }
+
+/* A lista do mês. */
+.lista-lancamentos { display: grid; }
+.linha-lancamento {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 11px; align-items: center;
+  padding: 12px 2px; border-bottom: 1px solid var(--line);
+}
+.lista-lancamentos .linha-lancamento:last-child { border-bottom: 0; }
+.linha-lancamento__marca { border: 0; background: transparent; color: var(--acento-dado); cursor: pointer; padding: 0; }
+.linha-lancamento__marca:disabled { color: var(--line); cursor: default; }
+.linha-lancamento__marca svg { width: 21px; height: 21px; }
+.linha-lancamento__corpo { display: grid; gap: 2px; min-width: 0; }
+.linha-lancamento__corpo strong { font-size: .93rem; font-weight: 600; overflow-wrap: break-word; }
+.linha-lancamento__corpo small { font-size: .76rem; color: var(--muted); overflow-wrap: break-word; }
+.linha-lancamento__valor { display: grid; gap: 3px; justify-items: end; }
+.linha-lancamento__valor strong { font-family: var(--serifada); font-size: 1.05rem; white-space: nowrap; }
+.linha-lancamento__repete { width: 13px; height: 13px; color: var(--muted); }
+.linha-lancamento__acoes { display: flex; gap: 2px; }
+.linha-lancamento--feito .linha-lancamento__corpo strong { color: var(--muted); }
+.valor-entrada { color: var(--green-800); }
+.valor-atencao { color: var(--ambar); }
+.valor-negativo { color: var(--red); }
+
+/* O painel do mês. */
+.painel-financeiro { display: grid; gap: 22px; }
+.cartao-saldo { padding: 18px; border-radius: var(--raio); background: var(--green-50); display: grid; gap: 10px; }
+.cartao-saldo__rotulo { margin: 0; font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; color: var(--muted); }
+.cartao-saldo__num { margin: 0; font-family: var(--serifada); font-size: clamp(2rem, 9vw, 2.8rem); line-height: 1; }
+.cartao-saldo__linhas { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 0; }
+.cartao-saldo__linhas dt { font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; color: var(--muted); }
+.cartao-saldo__linhas dd { margin: 0; font-size: 1.05rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cartao-saldo__linhas--destaque { padding-top: 10px; border-top: 1px solid rgb(0 0 0 / 8%); }
+
+.aviso-atraso { display: flex; gap: 12px; padding: 14px; border-radius: var(--raio); background: #fdecea; color: #7d2b1f; }
+.aviso-atraso svg { width: 20px; height: 20px; flex: none; }
+.aviso-atraso strong { display: block; font-size: .92rem; margin-bottom: 4px; }
+.aviso-atraso ul { margin: 0; padding-left: 16px; font-size: .82rem; }
+
+.orcamento-usado { display: flex; align-items: center; gap: 16px; }
+.orcamento-usado p { margin: 0; font-size: .9rem; color: var(--muted); }
+
+.lista-renda, .lista-vencimentos, .lista-fatias { display: grid; margin: 0; }
+.lista-renda > div, .lista-fatias > div {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--line);
+}
+.lista-renda > div:last-child, .lista-fatias > div:last-child { border-bottom: 0; }
+.lista-renda dt, .lista-fatias dt { font-size: .88rem; display: flex; align-items: center; gap: 8px; }
+.lista-renda dd, .lista-fatias dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.lista-fatias dd small { margin-left: 8px; color: var(--muted); font-weight: 400; }
+.ponto-fatia { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+.barra-fatias { display: flex; height: 12px; border-radius: 999px; overflow: hidden; margin-bottom: 14px; background: var(--line); }
+.barra-fatias span { min-width: 2px; }
+
+.tabela-orcamento { display: grid; gap: 12px; }
+.tabela-orcamento > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
+.tabela-orcamento__nome { font-size: .88rem; font-weight: 600; }
+.tabela-orcamento__valores { font-size: .82rem; font-variant-numeric: tabular-nums; text-align: right; }
+.tabela-orcamento__valores small { display: block; color: var(--muted); }
+.tabela-orcamento__barra { grid-column: 1 / -1; height: 7px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.tabela-orcamento__barra span { display: block; height: 100%; background: var(--acento-dado); }
+.tabela-orcamento .estourou .tabela-orcamento__barra span { background: var(--red); }
+
+.lista-vencimentos > div { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.lista-vencimentos > div:last-child { border-bottom: 0; }
+.lista-vencimentos dt { font-size: .78rem; color: var(--muted); min-width: 4rem; }
+.lista-vencimentos dd { margin: 0; display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; }
+.lista-vencimentos .vencido dt { color: var(--red); font-weight: 600; }
+
+.lista-avisos, .lista-insights { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.lista-avisos li, .lista-insights li {
+  display: flex; align-items: flex-start; gap: 9px; padding: 11px 13px;
+  border-radius: var(--raio); background: var(--green-50); font-size: .86rem;
+}
+.lista-avisos .grave { background: #fdecea; color: #7d2b1f; }
+.lista-insights svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--muted); }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) .aviso-atraso, :root:not([data-tema='claro']) .lista-avisos .grave { background: #3b2523; color: #f3a89e; }
+  :root:not([data-tema='claro']) .cartao-saldo__linhas--destaque { border-top-color: rgb(255 255 255 / 10%); }
+}
+:root[data-tema='escuro'] .aviso-atraso, :root[data-tema='escuro'] .lista-avisos .grave { background: #3b2523; color: #f3a89e; }
+:root[data-tema='escuro'] .cartao-saldo__linhas--destaque { border-top-color: rgb(255 255 255 / 10%); }

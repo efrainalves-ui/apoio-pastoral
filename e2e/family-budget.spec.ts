@@ -26,29 +26,42 @@ test('orçamento pessoal funciona no computador e no celular sem misturar dados 
   const areas = page.getByRole('navigation', { name: 'Áreas do Orçamento' })
   await expect(areas.getByRole('link', { name: 'Pessoal' })).toHaveClass(/active/)
   await expect(areas.getByRole('link', { name: 'Trabalho' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Comece com o que já sabe' })).toBeVisible()
-  await page.getByRole('button', { name: 'Registrar entrada' }).click()
-  await page.getByLabel('Valor').fill('3500')
-  await page.getByLabel('Descrição (opcional)').fill('Entrada Fictícia da Família')
-  await page.getByLabel('Repetir mensalmente').check()
+  await expect(page.getByLabel('Saldo do mês')).toBeVisible()
+
+  /*
+    Entradas e Saídas no modelo novo. A categoria se escolhe em duas etapas —
+    a família primeiro, o item depois — porque duzentas e cinquenta opções não
+    cabem num seletor de celular.
+  */
+  await page.getByRole('link', { name: 'Entradas', exact: true }).click()
+  await page.getByRole('button', { name: 'Nova entrada' }).click()
+  await page.getByLabel('Descrição *').fill('Entrada Fictícia da Família')
+  await page.getByLabel('Valor *').fill('3.500,00')
+  await page.getByRole('button', { name: 'Escolher categoria' }).click()
+  await page.getByRole('button', { name: /Salário e remuneração/ }).click()
+  await page.getByRole('button', { name: 'Salário', exact: true }).click()
+  await page.getByRole('button', { name: 'Recebida', exact: true }).click()
   await page.getByRole('button', { name: 'Salvar entrada' }).click()
-  await expect(page.getByText('Entrada salva.')).toBeVisible()
+  await expect(page.getByText('Lançamento salvo.')).toBeVisible()
+  await expect(page.getByText('Entrada Fictícia da Família')).toBeVisible()
 
-  // "Despesas" virou um recorte dentro de Saídas, e não mais uma área própria.
   await page.getByRole('link', { name: 'Saídas', exact: true }).click()
-  await page.getByRole('link', { name: 'Despesas', exact: true }).click()
-  await page.getByRole('button', { name: 'Nova despesa' }).click()
-  await page.getByLabel('Descrição').fill('Despesa Fictícia da Família')
-  await page.getByLabel('Valor').fill('500')
-  await page.getByRole('button', { name: 'Salvar despesa' }).click()
-  await expect(page.getByText('Despesa salva.')).toBeVisible()
+  await page.getByRole('button', { name: 'Nova saída' }).click()
+  await page.getByLabel('Descrição *').fill('Despesa Fictícia da Família')
+  await page.getByLabel('Valor *').fill('500')
+  await page.getByRole('button', { name: 'Escolher categoria' }).click()
+  await page.getByRole('button', { name: /^Alimentação/ }).click()
+  await page.getByRole('button', { name: 'Supermercado', exact: true }).click()
+  await page.getByRole('button', { name: 'Paga', exact: true }).click()
+  await page.getByRole('button', { name: 'Salvar saída' }).click()
+  await expect(page.getByText('Lançamento salvo.')).toBeVisible()
 
+  // Saldo e livre: o painel soma pelos mesmos cálculos que a lista mostra.
   await page.getByRole('link', { name: 'Visão geral' }).click()
-  const summary = page.getByLabel('Resumo financeiro do mês')
-  await expect(summary.getByText('R$ 3.500,00')).toBeVisible()
-  await expect(summary.getByText('R$ 500,00')).toBeVisible()
-  await expect(summary.getByText('R$ 3.000,00')).toBeVisible()
-  await expect(page.getByText('Entrada Fictícia da Família')).toHaveCount(0)
+  const saldo = page.getByLabel('Saldo do mês')
+  await expect(saldo).toContainText('3.000,00')
+  await expect(saldo).toContainText('3.500,00')
+  await expect(saldo).toContainText('500,00')
 })
 
 test('as duas áreas do Orçamento não misturam o dinheiro da família com o do ministério', async ({ page }, testInfo) => {
