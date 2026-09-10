@@ -92,13 +92,12 @@ test('as duas áreas do Orçamento não misturam o dinheiro da família com o do
   await page.getByRole('link', { name: 'Visão do mês' }).click()
   await expect(page.getByText('do bolso', { exact: false }).first()).toBeVisible()
 
-  // A lista de compras é da área pessoal e soma em tempo real.
+  /*
+    A lista de compras é da área pessoal e agora nasce do catálogo: o fluxo
+    inteiro dela — carrinho, limite e a saída única — está em
+    `orcamento-pessoal.spec.ts`. Aqui basta confirmar que ela é pessoal.
+  */
   await page.getByRole('navigation', { name: 'Áreas do Orçamento' }).getByRole('link', { name: 'Pessoal' }).click()
   await page.getByRole('link', { name: 'Lista de compras' }).click()
-  await page.getByRole('button', { name: 'Novo item' }).click()
-  await page.getByLabel('Item').fill('Arroz fictício')
-  await page.getByLabel('Quantidade').fill('2')
-  await page.getByLabel('Valor no mercado').fill('25')
-  await page.getByRole('button', { name: 'Salvar item' }).click()
-  await expect(page.getByRole('button', { name: 'Confirmar Arroz fictício' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Monte sua lista' })).toBeVisible()
 })

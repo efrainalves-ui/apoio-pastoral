@@ -30,7 +30,8 @@ describe('interface do orçamento pessoal', () => {
   it('mostra estado vazio acolhedor e as seis áreas do módulo', async () => {
     renderBudget('/app/orcamento/resumo?mes=2026-08')
     expect(await screen.findByRole('heading', { name: 'Pessoal' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Saldo do mês')).toBeInTheDocument()
+    // O painel entra depois do esqueleto de carregamento.
+    expect(await screen.findByLabelText('Saldo do mês')).toBeInTheDocument()
     for (const label of ['Visão geral', 'Entradas', 'Saídas', 'Metas e Planejamento', 'Lista de compras', 'Relatórios']) {
       expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
     }

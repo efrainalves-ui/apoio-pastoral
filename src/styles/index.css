@@ -2882,3 +2882,60 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 }
 :root[data-tema='escuro'] .aviso-atraso, :root[data-tema='escuro'] .lista-avisos .grave { background: #3b2523; color: #f3a89e; }
 :root[data-tema='escuro'] .cartao-saldo__linhas--destaque { border-top-color: rgb(255 255 255 / 10%); }
+
+/* ==========================================================================
+   Metas, lista de compras e relatórios.
+   ========================================================================== */
+
+/* O esqueleto de carregamento: três faixas, sem giro no meio da tela. */
+.esqueleto { display: grid; gap: 14px; }
+.esqueleto span { height: 74px; border-radius: var(--raio); background: var(--green-50); animation: pulsar 1.4s ease-in-out infinite; }
+.esqueleto span:nth-child(2) { animation-delay: .15s; }
+.esqueleto span:nth-child(3) { animation-delay: .3s; }
+@keyframes pulsar { 0%, 100% { opacity: 1 } 50% { opacity: .55 } }
+@media (prefers-reduced-motion: reduce) { .esqueleto span { animation: none } }
+
+.lista-metas { display: grid; gap: 12px; }
+.cartao-meta {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start;
+  padding: 15px; border-radius: var(--raio); background: var(--green-50);
+}
+.cartao-meta__corpo { display: grid; gap: 3px; min-width: 0; }
+.cartao-meta__corpo strong { font-size: .98rem; font-weight: 600; overflow-wrap: break-word; }
+.cartao-meta__corpo small { font-size: .8rem; color: var(--muted); }
+.cartao-meta__nota { margin: 4px 0 0; font-size: .82rem; }
+.cartao-meta__acoes { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 8px; }
+.aporte-rapido { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.aporte-rapido .field__input { width: 7rem; height: 40px; }
+
+.prateleira { margin-bottom: 20px; }
+.item-compra {
+  display: grid; gap: 8px; align-items: center; padding: 10px 2px;
+  grid-template-columns: auto minmax(0, 1fr) 4rem 6rem 6rem auto auto;
+  border-bottom: 1px solid var(--line);
+}
+.item-compra:last-child { border-bottom: 0; }
+.item-compra__nome { font-size: .9rem; overflow-wrap: break-word; }
+.item-compra--pego .item-compra__nome { color: var(--muted); text-decoration: line-through; }
+.item-compra .field__input { height: 40px; padding: 0 8px; font-size: .84rem; }
+.item-compra__subtotal { font-size: .86rem; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.acrescentar-item { display: flex; gap: 8px; }
+.acrescentar-item .field__input { flex: 1; min-width: 0; }
+.acrescentar-item .botao-novo { padding: 0 14px; }
+
+/*
+  No celular a linha do item quebra: nome em cima, números embaixo.
+
+  Sete colunas num telefone espremem o preço a ponto de "1.234,56" não caber.
+  Aqui a linha vira um bloco que quebra sozinho, sem áreas nomeadas — quatro
+  elementos na mesma área do grid se empilhariam um sobre o outro.
+*/
+@media (max-width: 640px) {
+  .item-compra { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .item-compra__nome { grid-column: 2; }
+  .item-compra__quantidade { grid-column: 2; width: 4.5rem; }
+  .item-compra__unidade { grid-column: 2; width: 7rem; }
+  .item-compra__preco { grid-column: 2; width: 7rem; }
+  .item-compra__subtotal { grid-column: 2; text-align: left; }
+  .item-compra > button:last-child { grid-row: 1; grid-column: 3; }
+}
