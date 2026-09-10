@@ -21,6 +21,8 @@ import { configuracaoVazia, type ConfiguracaoDoTrabalhoData } from '../work-budg
 import { lancamentoVazio, resumoDoTrabalho, type LancamentoDoTrabalho, type LancamentoDoTrabalhoData } from '../work-budget/lancamento'
 import type { AquisicaoLetra, AquisicaoLetraData, ItemDoCatalogoLetra, OrcamentoLetraData } from '../work-budget/letra'
 import { subsistenciaBasica, vigenteEm } from '../work-budget/parametros'
+import { espelhoPessoal } from '../work-budget/integracao'
+import { FinancasPessoaisService } from '../family-budget/pessoal'
 import {
   ALLOWANCE_CATEGORY_LABELS, WORK_EXPENSE_CATEGORY_LABELS, suggestedAllowance,
   type AllowanceCategory, type MileageData, type WorkAllowanceData, type WorkBudgetSnapshot,
@@ -29,6 +31,7 @@ import {
 
 const service = new WorkBudgetService()
 const districtService = new DistrictService()
+const pessoaisService = new FinancasPessoaisService()
 const carimbo = () => new Date().toISOString()
 const hoje = localDateKey
 
@@ -173,6 +176,33 @@ export function WorkBudgetPage() {
     try { await service.salvarAquisicaoLetra(account.id, masterKey, dados); await pronto('Aquisição registrada.') } catch (motivo) { falhou(motivo) }
   }
 
+  /**
+   * Leva ao orçamento da família o que sobrou no bolso do pastor.
+   *
+   * Só a parcela pessoal atravessa, e uma vez só: quando o reembolso cai, o
+   * lançamento da família é corrigido em vez de somado de novo. Somar de novo
+   * dobraria a despesa do mês na casa.
+   */
+  async function levarAoPessoal(lancamento: LancamentoDoTrabalho) {
+    if (!account || !masterKey) return
+    const espelho = espelhoPessoal(lancamento)
+    try {
+      if (espelho.acao === 'nada') { setNotice('Nada saiu do bolso neste lançamento.'); setError(''); return }
+      if (espelho.acao === 'remover' && espelho.id) {
+        await pessoaisService.apagar(account.id, espelho.id)
+        const { id: _id, ...dados } = lancamento; void _id
+        await service.salvarLancamento(account.id, masterKey, { ...dados, lancamentoPessoalId: null }, lancamento.id)
+        await pronto('O reembolso cobriu tudo: o lançamento saiu do orçamento pessoal.')
+        return
+      }
+      if (!espelho.dados) return
+      const [gravado] = await pessoaisService.salvarLancamento(account.id, masterKey, espelho.dados, espelho.id ? { id: espelho.id } : {})
+      const { id: _id, ...dados } = lancamento; void _id
+      await service.salvarLancamento(account.id, masterKey, { ...dados, lancamentoPessoalId: gravado?.id ?? null }, lancamento.id)
+      await pronto(espelho.acao === 'criar' ? 'Parcela pessoal lançada no orçamento pessoal.' : 'Parcela pessoal atualizada no orçamento pessoal.')
+    } catch (motivo) { falhou(motivo) }
+  }
+
   async function apagar(id: string, oQue: string) {
     if (!account || !masterKey || !window.confirm(`Apagar ${oQue}?`)) return
     try { await service.remove(account.id, masterKey, id); await pronto('Registro apagado.') } catch (motivo) { falhou(motivo) }
@@ -247,6 +277,7 @@ export function WorkBudgetPage() {
       onNovo={() => { setLancamentoId(''); setLancamentoDraft(lancamentoVazio(month, hoje())) }}
       onEditar={(lancamento) => { setLancamentoId(lancamento.id); const { id: _id, ...dados } = lancamento; void _id; setLancamentoDraft(dados) }}
       onApagar={(id) => void apagar(id, 'este lançamento')}
+      onLevarAoPessoal={(lancamento) => void levarAoPessoal(lancamento)}
     />}
 
     {section === 'letra' && <PainelLetra

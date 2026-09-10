@@ -23,6 +23,7 @@ interface LancamentosDoTrabalhoProps {
   onEditar: (lancamento: LancamentoDoTrabalho) => void
   onApagar: (id: string) => void
   onNovo: () => void
+  onLevarAoPessoal: (lancamento: LancamentoDoTrabalho) => void
 }
 
 /**
@@ -34,7 +35,7 @@ interface LancamentosDoTrabalhoProps {
  */
 export function LancamentosDoTrabalho({
   lancamentos, configuracao, rascunho, editandoId,
-  onRascunho, onSalvar, onEditar, onApagar, onNovo,
+  onRascunho, onSalvar, onEditar, onApagar, onNovo, onLevarAoPessoal,
 }: LancamentosDoTrabalhoProps) {
   const [memoriaAberta, setMemoriaAberta] = useState('')
   const resumo = useMemo(() => resumoDoTrabalho(lancamentos), [lancamentos])
@@ -146,6 +147,7 @@ export function LancamentosDoTrabalho({
             <span className={`status-pill ${situacaoPill(lancamento.situacao)}`}>{SITUACAO_DO_LANCAMENTO_LABELS[lancamento.situacao]}</span>
             {diferenca !== null && diferenca !== 0 && <span className="status-pill status-pill--warning">{formatar(diferenca)}</span>}
             {lancamento.memoria && <Button variant="quiet" aria-expanded={memoriaAberta === lancamento.id} onClick={() => setMemoriaAberta(memoriaAberta === lancamento.id ? '' : lancamento.id)}>Memória</Button>}
+            {parcelaPessoal(lancamento) > 0 && <Button variant="quiet" onClick={() => onLevarAoPessoal(lancamento)}>{lancamento.lancamentoPessoalId ? 'Atualizar no pessoal' : 'Levar ao pessoal'}</Button>}
             <Button variant="quiet" onClick={() => onEditar(lancamento)}>Editar</Button>
             <Button variant="danger" icon={<Trash2 />} aria-label={`Apagar lançamento ${lancamento.descricao || nomeCompleto(lancamento.subcategoriaId)}`} onClick={() => onApagar(lancamento.id)} />
           </div>

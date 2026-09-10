@@ -118,6 +118,40 @@ test('o orçamento pessoal não vê nada do Trabalho', async ({ page }) => {
     Os dois orçamentos vivem em bancos separados. Se o Campo do obreiro
     aparecesse na tela da família, a separação seria só de nome.
   */
-  await navigateInsideApp(page, '/app/orcamento/pessoal', page.getByRole('heading', { name: 'Pessoal' }))
+  await navigateInsideApp(page, '/app/orcamento/resumo', page.getByRole('heading', { name: 'Pessoal' }))
   await expect(page.getByText('Campo Fictício do Norte')).toHaveCount(0)
+})
+
+test('a parcela pessoal atravessa uma vez só para o orçamento da família', async ({ page }) => {
+  test.setTimeout(120_000)
+  await entrar(page)
+
+  await navigateInsideApp(page, '/app/orcamento/trabalho/lancamentos', page.getByRole('button', { name: 'Novo lançamento' }))
+  await page.getByRole('button', { name: 'Novo lançamento' }).click()
+  await page.locator('#lancamento-categoria').selectOption('combustivel')
+  await page.locator('#lancamento-descricao').fill('Combustível do distrito')
+  await page.locator('#lancamento-pago').fill('400')
+  await page.getByRole('button', { name: 'Salvar lançamento' }).click()
+  await expect(page.getByText('Lançamento registrado.')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Levar ao pessoal' }).click()
+  await expect(page.getByText('Parcela pessoal lançada no orçamento pessoal.')).toBeVisible()
+
+  /*
+    Reembolso de 120 depois: os 400 viram 280 no bolso. O lançamento da família
+    é corrigido, não somado de novo — somar de novo dobraria a despesa do mês.
+  */
+  await page.getByRole('button', { name: 'Editar' }).first().click()
+  await page.locator('#lancamento-recebido').fill('120')
+  await page.locator('#lancamento-situacao').selectOption('recebido')
+  await page.getByRole('button', { name: 'Salvar lançamento' }).click()
+  await expect(page.getByText('Lançamento registrado.')).toBeVisible()
+  await page.getByRole('button', { name: 'Atualizar no pessoal' }).click()
+  await expect(page.getByText('Parcela pessoal atualizada no orçamento pessoal.')).toBeVisible()
+
+  await navigateInsideApp(page, '/app/orcamento/despesas', page.getByRole('heading', { name: 'Pessoal' }))
+  const saidas = page.getByText('Combustível do distrito')
+  await expect(saidas).toHaveCount(1)
+  await expect(page.getByText('R$ 280,00').first()).toBeVisible()
+  await expect(page.getByText('R$ 400,00')).toHaveCount(0)
 })
