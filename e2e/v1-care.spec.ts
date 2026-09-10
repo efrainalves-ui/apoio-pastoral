@@ -86,6 +86,43 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   await navigateInsideApp(page, '/app/visitacao', page.getByText('Rodada Cuidado Fictícia'))
   await expect(page.getByText('Rodada Cuidado Fictícia')).toBeVisible()
   await expect(page.getByText('1 de 1 famílias visitadas')).toBeVisible()
+
+  /*
+    A lista de visitas agrupada por igreja, com busca e filtro.
+
+    A etiqueta de cada linha não é campo gravado na visita — `status` é sempre
+    `completed`. Ela é lida do que ficou em aberto depois: o acompanhamento
+    pendente e a tarefa de prioridade alta. Aqui a visita não tem nada em
+    aberto, então nenhum filtro de atenção pode alcançá-la, e "Todos" tem de
+    trazê-la de volta.
+  */
+  const grupo = page.getByRole('button', { name: /Igreja Esperança Fictícia/ })
+  const linha = page.getByRole('link', { name: /Pessoa Cuidado Fictícia/ }).first()
+  await expect(linha).toBeVisible()
+
+  await page.getByRole('button', { name: 'Urgentes' }).click()
+  await expect(page.getByText('Nenhuma visita encontrada')).toBeVisible()
+  await page.getByRole('button', { name: 'Todos' }).click()
+  await expect(linha).toBeVisible()
+
+  await page.getByLabel('Buscar pessoa ou igreja').fill('esperanca')
+  await expect(linha).toBeVisible()
+  await page.getByLabel('Buscar pessoa ou igreja').fill('ninguem com esse nome')
+  await expect(page.getByText('Nenhuma visita encontrada')).toBeVisible()
+  await page.getByLabel('Buscar pessoa ou igreja').fill('')
+
+  // Recolher a igreja esconde as linhas sem tirar a igreja da tela.
+  await grupo.click()
+  await expect(grupo).toHaveAttribute('aria-expanded', 'false')
+  await expect(linha).toBeHidden()
+  await grupo.click()
+  await expect(linha).toBeVisible()
+
+  // Tocar na linha abre a visita; editar e excluir moraram para o detalhe.
+  await linha.click()
+  await expect(page.getByRole('heading', { name: 'Pessoa Cuidado Fictícia', level: 1 })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Editar' })).toBeVisible()
+  await navigateInsideApp(page, '/app/visitacao', page.getByText('Rodada Cuidado Fictícia'))
   await context.setOffline(true)
   await page.reload()
   await page.getByRole('textbox', { name: 'Senha' }).fill(password)

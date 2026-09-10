@@ -2237,10 +2237,14 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   números ou para nove, cheia ou pela metade.
 */
 .metric-row, .budget-metrics, .reading-metrics, .district-metrics, .private-summary,
-.dashboard-metrics:not(:has(> a)), .import-metrics {
+.dashboard-metrics:not(:has(> a)), .import-metrics, .estrato {
   border-bottom: 1px solid var(--line);
   row-gap: 4px;
 }
+/* Três colunas fixas deixavam o quarto número sozinho numa linha. */
+.estrato { grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); }
+.estrato > div { padding: 15px 18px 15px 0; }
+.estrato > div + div { padding-left: 0; border-left: 0; }
 .metric-row small, .metric-row span, .budget-metrics span, .reading-metrics span,
 .district-metrics small, .private-summary span {
   font-size: .64rem;
@@ -2358,9 +2362,12 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .acao-destrutiva { color: var(--red); background: transparent; border: 1px solid transparent; }
 .acao-destrutiva:hover:not(:disabled) { color: var(--red); background: #fdf0ee; border-color: #f0cfc9; }
 
-/* O botão do cartão espremia o título contra a borda quando os dois eram longos. */
+/* O botão do cartão espremia o título contra a borda quando os dois eram longos.
+   Quando não cabem na mesma linha o botão desce, mas mantém a largura dele:
+   esticado de ponta a ponta ele virava uma faixa empurrando a tela para baixo. */
 .card__header { flex-wrap: wrap; }
-.card__header > :first-child { flex: 1 1 12rem; min-width: 0; }
+.card__header > :first-child { flex: 1 1 8rem; min-width: 0; }
+.card__header .button, .card__header > .button { width: auto; flex: 0 0 auto; }
 
 /* ==========================================================================
    Os formulários.
@@ -2383,3 +2390,83 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 /* A barra que fica colada embaixo escondia o último campo enquanto se rola. */
 .page-stack:has(.form-actions--sticky) { scroll-padding-bottom: 96px; }
 .form-actions--sticky { margin-top: 4px; }
+
+/* ==========================================================================
+   Visitação: a lista que responde "quem precisa de mim agora".
+
+   Uma lista corrida de cem visitas responde "o que aconteceu". Agrupada por
+   igreja, com o que ficou em aberto marcado na linha, ela passa a responder a
+   pergunta que o pastor realmente faz ao abrir a tela.
+
+   Cinco linhas por igreja e o grupo recolhível bastam: treze igrejas abertas
+   dão sessenta e cinco linhas. Virtualizar aqui seria peso sem ganho.
+   ========================================================================== */
+.visitacao-busca { position: relative; margin-bottom: 12px; }
+.visitacao-busca svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; color: var(--muted); pointer-events: none; }
+.visitacao-busca .field__input { padding-left: 42px; }
+
+.tira-filtros { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; }
+.chip-filtro {
+  min-height: 38px; padding: 0 15px; border: 1px solid var(--line); border-radius: 999px;
+  color: var(--muted); background: transparent; font: inherit; font-size: .82rem; font-weight: 600;
+  white-space: nowrap; cursor: pointer; transition: color var(--tempo-curto) linear, background var(--tempo-curto) linear, border-color var(--tempo-curto) linear;
+}
+.chip-filtro:hover { color: var(--ink); background: var(--green-50); }
+.chip-filtro--ativo { color: var(--green-900); background: var(--green-50); border-color: var(--acento-dado); }
+
+.igreja-visitada + .igreja-visitada { margin-top: 6px; }
+.igreja-visitada__topo {
+  width: 100%; min-height: 50px; padding: 10px 2px; display: flex; align-items: center; gap: 12px;
+  border: 0; border-top: 1px solid var(--line); background: transparent; color: inherit; font: inherit;
+  text-align: left; cursor: pointer;
+}
+.igreja-visitada__nome { flex: 1; min-width: 0; font-size: .96rem; font-weight: 600; overflow-wrap: break-word; }
+.igreja-visitada__conta { font-size: .78rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.igreja-visitada__topo svg { width: 18px; height: 18px; flex: none; color: var(--muted); transition: transform var(--tempo-curto) var(--saida); }
+.igreja-visitada__seta { transform: rotate(90deg); }
+
+.linhas-visita { display: grid; }
+.linha-visita {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 12px; align-items: center;
+  padding: 11px 2px; color: inherit; text-decoration: none;
+  transition: background var(--tempo-curto) linear;
+}
+.linha-visita:hover { background: var(--green-50); }
+.linha-visita__inicial {
+  width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--green-50); color: var(--green-900);
+  font-family: var(--serifada); font-size: .86rem; letter-spacing: .02em;
+}
+.linha-visita__corpo { display: grid; gap: 1px; min-width: 0; }
+/* Nome comprido quebra em duas linhas antes de encolher a fonte. */
+.linha-visita__corpo strong { font-size: .93rem; font-weight: 600; line-height: 1.25; overflow-wrap: break-word; }
+.linha-visita__corpo small { font-size: .77rem; color: var(--muted); }
+.linha-visita__seta { width: 16px; height: 16px; color: var(--muted); flex: none; }
+
+.linhas-visita__mais {
+  min-height: 44px; padding: 0 2px; display: flex; align-items: center; gap: 5px;
+  border: 0; background: transparent; color: var(--green-800); font: inherit; font-size: .82rem; font-weight: 600;
+  cursor: pointer;
+}
+.linhas-visita__mais svg { width: 15px; height: 15px; }
+.linhas-visita__mais:hover { text-decoration: underline; }
+
+/*
+  A cor reforça, nunca informa sozinha: cada selo traz a palavra escrita, e
+  quem não distingue verde de vermelho lê exatamente a mesma coisa.
+*/
+.selo-atencao--urgente { color: var(--red); background: #fdecea; }
+.selo-atencao--atrasada { color: var(--ambar); background: var(--ambar-fraca); }
+.selo-atencao--retorno { color: var(--green-900); background: var(--green-50); }
+.selo-atencao--pendente { color: var(--ambar); background: var(--ambar-fraca); }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) .selo-atencao--urgente { color: #f3a89e; background: #3b2523; }
+  :root:not([data-tema='claro']) .linha-visita__inicial { background: rgb(255 255 255 / 8%); color: var(--ink); }
+}
+:root[data-tema='escuro'] .selo-atencao--urgente { color: #f3a89e; background: #3b2523; }
+:root[data-tema='escuro'] .linha-visita__inicial { background: rgb(255 255 255 / 8%); color: var(--ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .chip-filtro, .linha-visita, .igreja-visitada__topo svg { transition: none; }
+}
