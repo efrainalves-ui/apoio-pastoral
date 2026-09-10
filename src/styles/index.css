@@ -2584,3 +2584,48 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   :root:not([data-tema='claro']) .resposta-de-antes { background: rgb(255 255 255 / 6%); }
 }
 :root[data-tema='escuro'] .resposta-de-antes { background: rgb(255 255 255 / 6%); }
+
+/* ==========================================================================
+   O topo da agenda, sem o vazio.
+
+   Título numa linha, dois botões grandes noutra, e a tira de abas numa
+   terceira: três faixas para chegar ao primeiro compromisso. O título e as
+   ações passam a dividir a mesma linha — "Novo" perdeu a palavra
+   "compromisso" e o sinal de mais, e o itinerário ficou só no ícone.
+   ========================================================================== */
+.agenda-hero { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 4px; }
+.agenda-hero h1 { margin: 0; }
+.acoes-do-topo { display: flex; align-items: center; gap: 9px; flex: none; }
+
+.botao-itinerario {
+  width: 42px; height: 42px; display: grid; place-items: center; flex: none;
+  border: 1px solid var(--line); border-radius: 50%;
+  color: var(--ink); background: transparent; cursor: pointer;
+  transition: background var(--tempo-curto) linear, border-color var(--tempo-curto) linear;
+}
+.botao-itinerario svg { width: 18px; height: 18px; }
+.botao-itinerario:hover { background: var(--green-50); border-color: var(--acento-dado); }
+
+/* Cores diferentes porque as duas ações são diferentes: uma cria, outra leva. */
+.botao-novo {
+  min-height: 42px; padding: 0 18px; display: inline-flex; align-items: center; flex: none;
+  border-radius: 999px; background: var(--green-800); color: white;
+  font-weight: 600; font-size: .9rem; text-decoration: none; white-space: nowrap;
+  transition: background var(--tempo-curto) linear;
+}
+.botao-novo:hover { background: var(--green-900); color: white; }
+
+/* A tira de abas encosta no título; o cartão em volta era moldura de nada. */
+.agenda-controls { padding: 14px; gap: 12px; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) .botao-novo { background: #9ed4bd; color: #0e1714; }
+  :root:not([data-tema='claro']) .botao-novo:hover { background: #b6e3cf; color: #0e1714; }
+}
+:root[data-tema='escuro'] .botao-novo { background: #9ed4bd; color: #0e1714; }
+:root[data-tema='escuro'] .botao-novo:hover { background: #b6e3cf; color: #0e1714; }
+
+@media (prefers-reduced-motion: reduce) { .botao-novo, .botao-itinerario { transition: none; } }
+
+/* Entre a tira de abas e o primeiro dia sobrava uma faixa morta. */
+.dias-abaixo { margin-top: 8px; }

@@ -51,7 +51,7 @@ describe('agenda visual', () => {
     expect(quickCreate).toHaveAttribute('href', expect.stringContaining('/app/agenda/novo?inicio='))
     await user.click(screen.getByRole('button', { name: 'Próximo período' }))
     await user.click(screen.getByRole('button', { name: 'Hoje' }))
-    expect(screen.getByRole('link', { name: 'Novo compromisso' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Novo' })).toBeInTheDocument()
   })
 
   it('mostra rótulo, cor por categoria e ações de visita, sermão e itinerário', async () => {
@@ -92,13 +92,21 @@ describe('agenda visual', () => {
     expect(numero).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('a semana lista os sete dias sem colunas vazias', async () => {
+  /*
+    O que já passou nesta semana não é agenda, é histórico: quinta de manhã a
+    lista abria com domingo e segunda, dois dias mortos antes do primeiro
+    compromisso que ainda importa.
+  */
+  it('a semana começa em hoje e vai até sábado', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter><AgendaPage /></MemoryRouter>)
 
     await screen.findByRole('tab', { name: 'Semana' })
     await user.click(screen.getByRole('tab', { name: 'Semana' }))
-    expect(document.querySelectorAll('.dias-abaixo > section')).toHaveLength(7)
-    expect(screen.getAllByRole('link', { name: /^Criar compromisso em / })).toHaveLength(6)
+
+    const restam = 7 - new Date().getDay()
+    expect(document.querySelectorAll('.dias-abaixo > section')).toHaveLength(restam)
+    // O compromisso fictício é hoje, então só os outros dias pedem para criar.
+    expect(screen.queryAllByRole('link', { name: /^Criar compromisso em / })).toHaveLength(restam - 1)
   })
 })

@@ -63,3 +63,21 @@ export function hoursForDay(events: readonly AgendaEventEntity[], date: Date): n
   }
   return [...hours].sort((left, right) => left - right)
 }
+
+/**
+ * A semana a partir de hoje.
+ *
+ * O que já passou nesta semana não é agenda, é histórico: quinta-feira de manhã
+ * a lista abria com domingo e segunda, dois dias mortos ocupando o alto da tela
+ * antes do primeiro compromisso que ainda importa. Domingo a semana aparece
+ * inteira de novo, porque aí não passou nada dela.
+ *
+ * Só a semana corrente encolhe. Semana passada continua inteira — quem volta
+ * para olhar o que aconteceu quer ver o que aconteceu.
+ */
+export function diasQueAindaImportam(dias: readonly Date[], hoje: Date): Date[] {
+  const contemHoje = dias.some((dia) => sameDay(dia, hoje))
+  if (!contemHoje) return [...dias]
+  const inicio = dayStart(hoje).getTime()
+  return dias.filter((dia) => dayStart(dia).getTime() >= inicio)
+}

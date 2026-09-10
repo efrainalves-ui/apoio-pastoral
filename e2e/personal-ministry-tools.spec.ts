@@ -59,7 +59,7 @@ test('pedidos de oração, leitura e cerimônias são acessíveis no computador 
 
   await openMenuOnMobile(page, testInfo.project.name)
   await mainNavigation(page).getByRole('link', { name: 'Agenda', exact: true }).click()
-  await page.getByRole('link', { name: 'Novo compromisso' }).click()
+  await page.getByRole('link', { name: 'Novo', exact: true }).click()
   const category = page.getByLabel('Categoria')
   for (const label of ['Batismo', 'Santa Ceia', 'Casamento', 'Dedicação de criança']) {
     await category.selectOption({ label })
