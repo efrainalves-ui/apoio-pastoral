@@ -107,6 +107,7 @@ describe('encerrar distrito', () => {
     expect(isPersonalRecord({ schemaVersion: 1, type: 'letra_budget', data: {} })).toBe(true)
     expect(isPersonalRecord({ schemaVersion: 1, type: 'letra_item', data: {} })).toBe(true)
     expect(isPersonalRecord({ schemaVersion: 1, type: 'letra_acquisition', data: {} })).toBe(true)
+    expect(isPersonalRecord({ schemaVersion: 1, type: 'work_paycheck', data: {} })).toBe(true)
   })
 
   /* O trabalho feito no distrito fica com o distrito. */

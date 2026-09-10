@@ -25,7 +25,7 @@ import { pendingActionId, type PendingActionRecord, type PendingActionStage, typ
  * da agenda, permanecem os compromissos marcados como pessoais e sem igreja.
  */
 const TIPOS_DO_OBREIRO = new Set([
-  'work_config', 'work_dependent', 'letra_budget', 'letra_item', 'letra_acquisition',
+  'work_config', 'work_dependent', 'letra_budget', 'letra_item', 'letra_acquisition', 'work_paycheck',
 ])
 
 export function isPersonalRecord(payload: VaultPayload): boolean {

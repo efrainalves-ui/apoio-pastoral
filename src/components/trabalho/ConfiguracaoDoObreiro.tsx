@@ -4,7 +4,8 @@ import { formatar, type Centavos } from '../../family-budget/dinheiro'
 import {
   CONDICAO_LABELS, CONDICOES_MINISTERIAIS, RESPONSABILIDADE_LABELS, RESPONSABILIDADES,
   SITUACAO_DE_AGUA_LABELS, SITUACOES_DE_AGUA, TIPO_DE_MORADIA_LABELS, TIPOS_DE_MORADIA,
-  regraDeItemVazia, type ConfiguracaoDoTrabalhoData, type RegraDeItem,
+  quotaPais, regraDeItemVazia, VINCULOS_DE_DEPENDENTE,
+  type ConfiguracaoDoTrabalhoData, type DependenteData, type RegraDeItem, type VinculoDeDependente,
 } from '../../work-budget/configuracao'
 import { CATALOGO_DO_TRABALHO, itensDoLimiteConjunto, nomeCompleto } from '../../work-budget/catalogo'
 import {
@@ -18,8 +19,12 @@ import { CampoDePercentual, CampoDeValor, ValorOuPendencia, dataDeHoje, formatar
 interface ConfiguracaoDoObreiroProps {
   valor: ConfiguracaoDoTrabalhoData
   hoje: string
+  competencia: string
+  dependentes: Array<DependenteData & { id: string }>
   onChange: (valor: ConfiguracaoDoTrabalhoData) => void
   onSalvar: () => void
+  onSalvarDependente: (dados: DependenteData, id?: string) => void
+  onApagarDependente: (id: string) => void
 }
 
 /**
@@ -29,7 +34,11 @@ interface ConfiguracaoDoObreiroProps {
  * histórico em vez de ser sobrescrito. É isso que permite a um lançamento de
  * março continuar usando o FPE de março depois que o FPE mudar em julho.
  */
-export function ConfiguracaoDoObreiro({ valor, hoje, onChange, onSalvar }: ConfiguracaoDoObreiroProps) {
+export function ConfiguracaoDoObreiro({
+  valor, hoje, competencia, dependentes, onChange, onSalvar, onSalvarDependente, onApagarDependente,
+}: ConfiguracaoDoObreiroProps) {
+  const [dependente, setDependente] = useState<DependenteData | null>(null)
+  const [dependenteId, setDependenteId] = useState('')
   const [novoFpe, setNovoFpe] = useState<Centavos>(0)
   const [inicioDoFpe, setInicioDoFpe] = useState(dataDeHoje())
   const [referenciaDoFpe, setReferenciaDoFpe] = useState('')
@@ -234,6 +243,83 @@ export function ConfiguracaoDoObreiro({ valor, hoje, onChange, onSalvar }: Confi
             </div>
           </fieldset>)}
         </div>}
+    </Card>
+
+    <Card title="Dependentes">
+      <div className="page-actions">
+        <Button icon={<Plus />} onClick={() => {
+          setDependenteId('')
+          setDependente({
+            nome: '', vinculo: 'filho', dataDeNascimento: '', dependente: true,
+            nivelDeEnsino: '', instituicao: '', matriculaVigenteAte: '',
+            temBolsaInstitucional: false, observacao: '', createdAt: '', updatedAt: '',
+          })
+        }}>Novo dependente</Button>
+      </div>
+
+      {dependente && <>
+        <div className="form-grid">
+          <label className="field" htmlFor="dependente-nome"><span className="field__label">Nome</span>
+            <input id="dependente-nome" className="field__input" value={dependente.nome} onChange={(evento) => setDependente({ ...dependente, nome: evento.target.value })} />
+          </label>
+          <label className="field" htmlFor="dependente-vinculo"><span className="field__label">Vínculo</span>
+            <select id="dependente-vinculo" className="field__input" value={dependente.vinculo} onChange={(evento) => setDependente({ ...dependente, vinculo: evento.target.value as VinculoDeDependente })}>
+              {VINCULOS_DE_DEPENDENTE.map((opcao) => <option key={opcao} value={opcao}>{opcao === 'filho' ? 'Filho' : opcao === 'conjuge' ? 'Cônjuge' : 'Outro'}</option>)}
+            </select>
+          </label>
+          <label className="field" htmlFor="dependente-nascimento"><span className="field__label">Nascimento</span>
+            <input id="dependente-nascimento" className="field__input" type="date" value={dependente.dataDeNascimento} onChange={(evento) => setDependente({ ...dependente, dataDeNascimento: evento.target.value })} />
+          </label>
+          <label className="field" htmlFor="dependente-ensino"><span className="field__label">Nível de ensino</span>
+            <input id="dependente-ensino" className="field__input" value={dependente.nivelDeEnsino} onChange={(evento) => setDependente({ ...dependente, nivelDeEnsino: evento.target.value })} />
+          </label>
+          <label className="field" htmlFor="dependente-instituicao"><span className="field__label">Instituição</span>
+            <input id="dependente-instituicao" className="field__input" value={dependente.instituicao} onChange={(evento) => setDependente({ ...dependente, instituicao: evento.target.value })} />
+          </label>
+          <label className="field" htmlFor="dependente-matricula"><span className="field__label">Matrícula até</span>
+            <input id="dependente-matricula" className="field__input" type="date" value={dependente.matriculaVigenteAte} onChange={(evento) => setDependente({ ...dependente, matriculaVigenteAte: evento.target.value })} />
+          </label>
+          <label className="field field--checkbox" htmlFor="dependente-dependente">
+            <input id="dependente-dependente" type="checkbox" checked={dependente.dependente} onChange={(evento) => setDependente({ ...dependente, dependente: evento.target.checked })} />
+            <span className="field__label">Consta como dependente</span>
+          </label>
+          <label className="field field--checkbox" htmlFor="dependente-bolsa">
+            <input id="dependente-bolsa" type="checkbox" checked={dependente.temBolsaInstitucional} onChange={(evento) => setDependente({ ...dependente, temBolsaInstitucional: evento.target.checked })} />
+            <span className="field__label">Tem bolsa institucional</span>
+          </label>
+        </div>
+        <div className="form-actions">
+          <Button onClick={() => { onSalvarDependente(dependente, dependenteId || undefined); setDependente(null); setDependenteId('') }}>Salvar dependente</Button>
+          <Button variant="quiet" onClick={() => { setDependente(null); setDependenteId('') }}>Cancelar</Button>
+        </div>
+      </>}
+
+      {dependentes.length === 0
+        ? <p className="card-copy">Nenhum dependente cadastrado.</p>
+        : <div className="entity-list">{dependentes.map((item) => {
+          /*
+            A quota muda no mês seguinte ao nono aniversário e termina no mês do
+            décimo oitavo. Mostrá-la ao lado do nome é o que faz o pastor
+            perceber a virada antes de ela passar em branco no contracheque.
+          */
+          const quota = quotaPais(item, competencia)
+          return <div className="entity-row entity-row--texto" key={item.id}>
+            <span>
+              <strong>{item.nome}</strong>
+              <small>
+                {item.dataDeNascimento ? formatarData(item.dataDeNascimento) : 'Sem data de nascimento'}
+                {item.instituicao ? ` · ${item.instituicao}` : ''}
+                {item.temBolsaInstitucional ? ' · Com bolsa' : ''}
+              </small>
+            </span>
+            {quota.elegivel
+              ? <strong>{quota.percentual}%</strong>
+              : <span className="valor-pendente">{quota.motivo}</span>}
+            {Boolean(quota.motivo) && quota.elegivel && <span className="status-pill status-pill--muted">{quota.motivo}</span>}
+            <Button variant="quiet" onClick={() => { setDependenteId(item.id); const { id: _id, ...dados } = item; void _id; setDependente(dados) }}>Editar</Button>
+            <Button variant="danger" icon={<Trash2 />} aria-label={`Apagar dependente ${item.nome}`} onClick={() => onApagarDependente(item.id)} />
+          </div>
+        })}</div>}
     </Card>
 
     <div className="form-actions"><Button onClick={onSalvar}>Salvar configuração</Button></div>

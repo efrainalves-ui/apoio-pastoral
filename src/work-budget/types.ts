@@ -1,4 +1,5 @@
 import type { ConfiguracaoDoTrabalhoData, DependenteData } from './configuracao'
+import type { ContrachequeData } from './contracheque'
 import type { LancamentoDoTrabalhoData } from './lancamento'
 import type { AquisicaoLetraData, ItemDoCatalogoLetra, OrcamentoLetraData } from './letra'
 
@@ -122,7 +123,7 @@ export interface WorkBudgetSnapshot {
 
 export type WorkBudgetExtraRecordType =
   | 'work_config' | 'work_dependent' | 'work_entry'
-  | 'letra_budget' | 'letra_item' | 'letra_acquisition'
+  | 'letra_budget' | 'letra_item' | 'letra_acquisition' | 'work_paycheck'
 
 export type WorkBudgetAnyRecordType = WorkBudgetRecordType | WorkBudgetExtraRecordType
 
@@ -138,6 +139,7 @@ export type WorkExtraDataByType = {
   */
   letra_item: Omit<ItemDoCatalogoLetra, 'id'> & WorkTimestamps
   letra_acquisition: AquisicaoLetraData
+  work_paycheck: ContrachequeData
 }
 
 export type WorkAnyDataByType = WorkDataByType & WorkExtraDataByType

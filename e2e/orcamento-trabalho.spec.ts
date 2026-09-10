@@ -155,3 +155,63 @@ test('a parcela pessoal atravessa uma vez só para o orçamento da família', as
   await expect(page.getByText('R$ 280,00').first()).toBeVisible()
   await expect(page.getByText('R$ 400,00')).toHaveCount(0)
 })
+
+test('a base informativa do contracheque fica fora do líquido', async ({ page }) => {
+  test.setTimeout(120_000)
+  await entrar(page)
+
+  await navigateInsideApp(page, '/app/orcamento/trabalho/contracheques', page.getByRole('button', { name: 'Novo contracheque' }))
+  await page.getByRole('button', { name: 'Novo contracheque' }).click()
+
+  await page.locator('#rubrica-0-descricao').fill('Subsistência básica')
+  await page.locator('#rubrica-0-tipo').selectOption('provento')
+  await page.locator('#rubrica-0-valor').fill('5600')
+  await page.locator('#rubrica-0-item').selectOption('subsistencia_basica')
+
+  await page.getByRole('button', { name: 'Nova rubrica' }).click()
+  await page.locator('#rubrica-1-descricao').fill('Previdência')
+  await page.locator('#rubrica-1-tipo').selectOption('desconto')
+  await page.locator('#rubrica-1-valor').fill('600')
+
+  await page.getByRole('button', { name: 'Nova rubrica' }).click()
+  await page.locator('#rubrica-2-descricao').fill('Base de cálculo da previdência')
+  await page.locator('#rubrica-2-tipo').selectOption('informativa')
+  await page.locator('#rubrica-2-valor').fill('5600')
+
+  /*
+    5.600 de provento menos 600 de desconto dá 5.000. A base informativa de
+    5.600 aparece à parte: somá-la mostraria uma renda que não caiu na conta, e
+    o pastor planejaria o mês em cima dela.
+  */
+  const totais = page.locator('.estrato').first()
+  await expect(totais.getByText('R$ 5.000,00')).toBeVisible()
+  await expect(page.locator('.memoria-do-calculo').getByText('R$ 5.600,00')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Salvar contracheque' }).click()
+  await expect(page.getByText('Contracheque guardado.')).toBeVisible()
+  await expect(page.getByText('A conferir')).toBeVisible()
+
+  // Reimportar o mesmo mês avisa antes de dobrar a renda do mês.
+  await page.getByRole('button', { name: 'Novo contracheque' }).click()
+  await expect(page.getByText(/Já há um contracheque de \d{4}-\d{2} guardado/u)).toBeVisible()
+})
+
+test('a quota-pais vira no mês seguinte ao nono aniversário', async ({ page }) => {
+  test.setTimeout(120_000)
+  await entrar(page)
+
+  await navigateInsideApp(page, '/app/orcamento/trabalho/configuracao?mes=2026-04', page.getByRole('button', { name: 'Novo dependente' }))
+  await page.getByRole('button', { name: 'Novo dependente' }).click()
+  await page.locator('#dependente-nome').fill('Dependente Fictício')
+  await page.locator('#dependente-nascimento').fill('2017-05-10')
+  await page.getByRole('button', { name: 'Salvar dependente' }).click()
+  await expect(page.getByText('Dependente salvo.')).toBeVisible()
+
+  // Abril de 2026: ainda não fez nove anos, vale o percentual menor.
+  const linha = page.locator('.entity-row').filter({ hasText: 'Dependente Fictício' })
+  await expect(linha.getByText('3%')).toBeVisible()
+
+  // Junho: o mês seguinte ao nono aniversário, e o percentual sobe.
+  await navigateInsideApp(page, '/app/orcamento/trabalho/configuracao?mes=2026-06', page.getByRole('button', { name: 'Novo dependente' }))
+  await expect(page.locator('.entity-row').filter({ hasText: 'Dependente Fictício' }).getByText('5%')).toBeVisible()
+})

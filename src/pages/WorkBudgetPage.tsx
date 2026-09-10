@@ -16,8 +16,10 @@ import { WorkBudgetService } from '../work-budget/service'
 import { ConfiguracaoDoObreiro } from '../components/trabalho/ConfiguracaoDoObreiro'
 import { LancamentosDoTrabalho } from '../components/trabalho/LancamentosDoTrabalho'
 import { PainelLetra } from '../components/trabalho/PainelLetra'
+import { Contracheques } from '../components/trabalho/Contracheques'
+import type { Contracheque, ContrachequeData } from '../work-budget/contracheque'
 import { formatar } from '../family-budget/dinheiro'
-import { configuracaoVazia, type ConfiguracaoDoTrabalhoData } from '../work-budget/configuracao'
+import { configuracaoVazia, type ConfiguracaoDoTrabalhoData, type DependenteData } from '../work-budget/configuracao'
 import { lancamentoVazio, resumoDoTrabalho, type LancamentoDoTrabalho, type LancamentoDoTrabalhoData } from '../work-budget/lancamento'
 import type { AquisicaoLetra, AquisicaoLetraData, ItemDoCatalogoLetra, OrcamentoLetraData } from '../work-budget/letra'
 import { subsistenciaBasica, vigenteEm } from '../work-budget/parametros'
@@ -36,7 +38,7 @@ const carimbo = () => new Date().toISOString()
 const hoje = localDateKey
 
 const sectionLabels = {
-  resumo: 'Visão do mês', lancamentos: 'Lançamentos', letra: 'LETRA',
+  resumo: 'Visão do mês', lancamentos: 'Lançamentos', contracheques: 'Contracheques', letra: 'LETRA',
   auxilios: 'Auxílios', despesas: 'Despesas', quilometragem: 'Quilometragem',
   configuracao: 'Configuração',
 } as const
@@ -85,6 +87,8 @@ export function WorkBudgetPage() {
   const [orcamentoLetra, setOrcamentoLetra] = useState<(OrcamentoLetraData & { id: string }) | null>(null)
   const [itensLetra, setItensLetra] = useState<ItemDoCatalogoLetra[]>([])
   const [aquisicoes, setAquisicoes] = useState<AquisicaoLetra[]>([])
+  const [contracheques, setContracheques] = useState<Contracheque[]>([])
+  const [dependentes, setDependentes] = useState<Array<DependenteData & { id: string }>>([])
 
   const load = useCallback(async () => {
     if (!account || !masterKey) return
@@ -94,18 +98,22 @@ export function WorkBudgetPage() {
       const district = await districtService.getDistrict(account.id, masterKey)
       setChurches(district ? await districtService.listChurches(account.id, masterKey, district.id) : [])
 
-      const [config, todosOsLancamentos, orcamentos, itens, compras] = await Promise.all([
+      const [config, todosOsLancamentos, orcamentos, itens, compras, folhas, filhos] = await Promise.all([
         service.configuracao(account.id, masterKey),
         service.lancamentos(account.id, masterKey),
         service.orcamentosLetra(account.id, masterKey),
         service.itensLetra(account.id, masterKey),
         service.aquisicoesLetra(account.id, masterKey),
+        service.contracheques(account.id, masterKey),
+        service.dependentes(account.id, masterKey),
       ])
       setConfiguracao(config ? (({ id: _id, ...dados }) => { void _id; return dados })(config) : null)
       setLancamentos(todosOsLancamentos.filter((item) => item.competencia === month))
       setOrcamentoLetra(orcamentos.find((item) => item.ano === month.slice(0, 4)) ?? null)
       setItensLetra(itens)
       setAquisicoes(compras)
+      setContracheques(folhas)
+      setDependentes(filhos)
     } catch (motivo) {
       setError(motivo instanceof Error ? motivo.message : 'Não foi possível abrir o orçamento do trabalho.')
     } finally {
@@ -170,6 +178,14 @@ export function WorkBudgetPage() {
   async function salvarItemLetra(dados: Omit<ItemDoCatalogoLetra, 'id'>, id?: string) {
     if (!account || !masterKey) return
     try { await service.salvarItemLetra(account.id, masterKey, { ...dados, createdAt: '', updatedAt: '' }, id); await pronto('Item salvo.') } catch (motivo) { falhou(motivo) }
+  }
+  async function salvarDependente(dados: DependenteData, id?: string) {
+    if (!account || !masterKey) return
+    try { await service.salvarDependente(account.id, masterKey, dados, id); await pronto('Dependente salvo.') } catch (motivo) { falhou(motivo) }
+  }
+  async function salvarContracheque(dados: ContrachequeData, id?: string) {
+    if (!account || !masterKey) return
+    try { await service.salvarContracheque(account.id, masterKey, dados, id); await pronto('Contracheque guardado.') } catch (motivo) { falhou(motivo) }
   }
   async function salvarAquisicaoLetra(dados: AquisicaoLetraData) {
     if (!account || !masterKey) return
@@ -280,6 +296,14 @@ export function WorkBudgetPage() {
       onLevarAoPessoal={(lancamento) => void levarAoPessoal(lancamento)}
     />}
 
+    {section === 'contracheques' && <Contracheques
+      competencia={month}
+      contracheques={contracheques}
+      subsistencia={subsistencia}
+      onSalvar={(dados, id) => void salvarContracheque(dados, id)}
+      onApagar={(id) => void apagar(id, 'este contracheque')}
+    />}
+
     {section === 'letra' && <PainelLetra
       ano={month.slice(0, 4)}
       hoje={hoje()}
@@ -296,8 +320,12 @@ export function WorkBudgetPage() {
     {section === 'configuracao' && <ConfiguracaoDoObreiro
       valor={configuracao ?? configuracaoVazia()}
       hoje={hoje()}
+      competencia={month}
+      dependentes={dependentes}
       onChange={setConfiguracao}
       onSalvar={salvarConfiguracao}
+      onSalvarDependente={(dados, id) => void salvarDependente(dados, id)}
+      onApagarDependente={(id) => void apagar(id, 'este dependente')}
     />}
 
     {section === 'auxilios' && <>

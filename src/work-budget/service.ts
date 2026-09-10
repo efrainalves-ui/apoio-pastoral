@@ -131,6 +131,20 @@ export class WorkBudgetService {
     return this.save(accountId, key, 'letra_acquisition', { ...input, descricao: input.descricao.trim() }, id)
   }
 
+  contracheques(accountId: string, key: CryptoKey) { return this.list(accountId, key, 'work_paycheck') }
+
+  /**
+   * Grava um contracheque.
+   *
+   * A competência é obrigatória porque é ela que impede a duplicata: reimportar
+   * o mês é comum, e dois contracheques do mesmo mês dobrariam a renda em todo
+   * relatório.
+   */
+  async salvarContracheque(accountId: string, key: CryptoKey, input: WorkAnyDataByType['work_paycheck'], id?: string) {
+    if (!/^\d{4}-\d{2}$/u.test(input.competencia)) throw new Error('Informe a competência do contracheque.')
+    return this.save(accountId, key, 'work_paycheck', input, id)
+  }
+
   /** Apaga um registro do orçamento do trabalho, publicando a lápide cifrada. */
   async remove(accountId: string, key: CryptoKey, id: string): Promise<void> {
     const record = await this.database.vaultRecords.get(id)
