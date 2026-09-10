@@ -48,11 +48,19 @@ export function atencaoDaVisita(
   return null
 }
 
+/** Domingo que abre a semana da data dada, em chave local. */
+export function inicioDaSemana(hoje = new Date()): string {
+  const domingo = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - hoje.getDay())
+  return localDateKey(domingo)
+}
+
 export interface ResumoDaVisitacao {
   visitas: number
   urgentes: number
   retornos: number
   atrasadas: number
+  pendentes: number
+  semana: number
 }
 
 /**
@@ -68,18 +76,16 @@ export function resumoDaVisitacao(
   tarefas: readonly TaskEntity[],
   hoje = localDateKey(),
 ): ResumoDaVisitacao {
-  const resumo: ResumoDaVisitacao = { visitas: visitas.length, urgentes: 0, retornos: 0, atrasadas: 0 }
+  const domingo = inicioDaSemana(new Date(`${hoje}T12:00:00`))
+  const resumo: ResumoDaVisitacao = { visitas: visitas.length, urgentes: 0, retornos: 0, atrasadas: 0, pendentes: 0, semana: 0 }
   for (const visita of visitas) {
     const atencao = atencaoDaVisita(visita, acompanhamentos, tarefas, hoje)
     if (atencao === 'urgente') resumo.urgentes += 1
     else if (atencao === 'atrasada') resumo.atrasadas += 1
     else if (atencao === 'retorno') resumo.retornos += 1
+    else if (atencao === 'pendente') resumo.pendentes += 1
+    if ((visita.versions.at(-1)?.startAt ?? '').slice(0, 10) >= domingo) resumo.semana += 1
   }
   return resumo
 }
 
-/** Domingo que abre a semana da data dada, em chave local. */
-export function inicioDaSemana(hoje = new Date()): string {
-  const domingo = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - hoje.getDay())
-  return localDateKey(domingo)
-}

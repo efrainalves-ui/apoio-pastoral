@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { FollowUpEntity, TaskEntity, VisitEntity } from '../care/types'
 import type { ChurchEntity } from '../district/types'
-import { VisitasPorIgreja } from './VisitasPorIgreja'
+import { VisitasPorIgreja, type FiltroDaVisitacao } from './VisitasPorIgreja'
 
 const IGREJA: ChurchEntity = {
   id: 'igreja-ficticia', districtId: 'distrito-ficticio', name: 'Igreja Fictícia do Porto', type: 'organized_church',
@@ -26,10 +26,21 @@ const NOMES: Record<string, string> = {
   p4: 'Davi Fictício Lima', p5: 'Elza Fictícia Prado', p6: 'Fábio Fictício Sales',
 }
 
-function montar(visits: VisitEntity[], followUps: FollowUpEntity[] = [], tasks: TaskEntity[] = []) {
+interface Opcoes {
+  followUps?: FollowUpEntity[]
+  tasks?: TaskEntity[]
+  filtro?: FiltroDaVisitacao
+  busca?: string
+}
+
+function montar(
+  visits: VisitEntity[],
+  { followUps = [], tasks = [], filtro = 'todos', busca = '' }: Opcoes = {},
+) {
   render(<MemoryRouter><VisitasPorIgreja
     visits={visits} followUps={followUps} tasks={tasks} churches={[IGREJA]}
     nomeDoAlvo={(visit) => NOMES[visit.targetId] ?? null}
+    filtro={filtro} busca={busca}
   /></MemoryRouter>)
 }
 
@@ -58,18 +69,14 @@ describe('visitas por igreja', () => {
     expect(grupo).toBeInTheDocument()
   })
 
-  it('busca por pessoa e por igreja, sem tropeçar em acento', async () => {
-    const user = userEvent.setup()
-    montar([visita('v1', 'p1'), visita('v2', 'p6')])
-
-    const busca = screen.getByLabelText('Buscar pessoa ou igreja')
-    await user.type(busca, 'fabio')
-    expect(await screen.findByText('Fábio Fictício Sales')).toBeInTheDocument()
+  it('busca por pessoa e por igreja, sem tropeçar em acento', () => {
+    montar([visita('v1', 'p1'), visita('v2', 'p6')], { busca: 'fabio' })
+    expect(screen.getByText('Fábio Fictício Sales')).toBeInTheDocument()
     expect(screen.queryByText('Ana Fictícia da Silva')).toBeNull()
 
-    await user.clear(busca)
-    await user.type(busca, 'PORTO')
-    expect(await screen.findByText('Ana Fictícia da Silva')).toBeInTheDocument()
+    cleanup()
+    montar([visita('v1', 'p1'), visita('v2', 'p6')], { busca: 'PORTO' })
+    expect(screen.getByText('Ana Fictícia da Silva')).toBeInTheDocument()
   })
 
   /*
@@ -77,21 +84,24 @@ describe('visitas por igreja', () => {
     é sempre `completed`. Por isso o filtro precisa achar a pessoa pela tarefa
     de prioridade alta ligada a ela, e não por um valor gravado na linha.
   */
-  it('filtra pelo que ficou em aberto depois da visita', async () => {
-    const user = userEvent.setup()
+  it('filtra pelo que ficou em aberto depois da visita', () => {
     const urgente: TaskEntity = {
       id: 't1', title: 'Tarefa fictícia', description: '', dueAt: '2026-09-20', priority: 'high',
       status: 'pending', churchId: IGREJA.id, relatedType: 'visit', relatedId: 'v1',
       reminderMinutes: null, createdAt: '2026-09-09T19:00:00.000Z', updatedAt: '2026-09-09T19:00:00.000Z',
     }
-    montar([visita('v1', 'p1'), visita('v2', 'p2')], [], [urgente])
+    const duas = [visita('v1', 'p1'), visita('v2', 'p2')]
 
+    montar(duas, { tasks: [urgente] })
     expect(screen.getByText('Urgente')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Urgentes' }))
+
+    cleanup()
+    montar(duas, { tasks: [urgente], filtro: 'urgente' })
     expect(screen.getByText('Ana Fictícia da Silva')).toBeInTheDocument()
     expect(screen.queryByText('Bento Fictício Rocha')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'Retorno' }))
+    cleanup()
+    montar(duas, { tasks: [urgente], filtro: 'retorno' })
     expect(screen.getByText('Nenhuma visita encontrada')).toBeInTheDocument()
   })
 

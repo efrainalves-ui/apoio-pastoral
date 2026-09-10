@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, HeartHandshake, Search } from 'lucide-react'
+import { ChevronDown, ChevronRight, HeartHandshake } from 'lucide-react'
 import { useDeferredValue, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ATENCAO_LABELS, atencaoDaVisita, inicioDaSemana, type Atencao } from '../care/atencaoDaVisita'
@@ -10,14 +10,6 @@ import { normalizePersonName } from '../people/validation'
 /** Quantas linhas cada igreja mostra antes de pedir para ver o resto. */
 const LINHAS_POR_IGREJA = 5
 
-const FILTROS = [
-  ['todos', 'Todos'],
-  ['pendente', 'Pendentes'],
-  ['retorno', 'Retorno'],
-  ['urgente', 'Urgentes'],
-  ['semana', 'Esta semana'],
-] as const
-type Filtro = (typeof FILTROS)[number][0]
 
 const dataCurta = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' })
 const horaCurta = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -36,12 +28,17 @@ function iniciais(nome: string): string {
   return escolhidas.map((parte) => parte[0]?.toLocaleUpperCase('pt-BR') ?? '').join('').slice(0, 2)
 }
 
+export const FILTROS_DA_VISITACAO = ['todos', 'urgente', 'retorno', 'atrasada', 'pendente', 'semana'] as const
+export type FiltroDaVisitacao = (typeof FILTROS_DA_VISITACAO)[number]
+
 interface VisitasPorIgrejaProps {
   visits: VisitEntity[]
   followUps: FollowUpEntity[]
   tasks: TaskEntity[]
   churches: ChurchEntity[]
   nomeDoAlvo: (visit: VisitEntity) => string | null | undefined
+  filtro: FiltroDaVisitacao
+  busca: string
 }
 
 /**
@@ -52,9 +49,7 @@ interface VisitasPorIgrejaProps {
  * vez mantém a tela navegável sem precisar de virtualização — treze igrejas
  * abertas dão sessenta e cinco linhas, não milhares.
  */
-export function VisitasPorIgreja({ visits, followUps, tasks, churches, nomeDoAlvo }: VisitasPorIgrejaProps) {
-  const [filtro, setFiltro] = useState<Filtro>('todos')
-  const [busca, setBusca] = useState('')
+export function VisitasPorIgreja({ visits, followUps, tasks, churches, nomeDoAlvo, filtro, busca }: VisitasPorIgrejaProps) {
   const buscaAdiada = useDeferredValue(busca)
   const [recolhidas, setRecolhidas] = useState<Set<string>>(new Set())
   const [abertas, setAbertas] = useState<Set<string>>(new Set())
@@ -96,30 +91,6 @@ export function VisitasPorIgreja({ visits, followUps, tasks, churches, nomeDoAlv
   }
 
   return <>
-    <div className="visitacao-busca">
-      <Search aria-hidden="true" />
-      <input
-        type="search"
-        className="field__input"
-        value={busca}
-        onChange={(event) => setBusca(event.target.value)}
-        placeholder="Buscar pessoa ou igreja"
-        aria-label="Buscar pessoa ou igreja"
-      />
-    </div>
-
-    <div className="tira-filtros" role="group" aria-label="Filtrar visitas">
-      {FILTROS.map(([valor, rotulo]) => (
-        <button
-          key={valor}
-          type="button"
-          className={`chip-filtro ${filtro === valor ? 'chip-filtro--ativo' : ''}`}
-          aria-pressed={filtro === valor}
-          onClick={() => setFiltro(valor)}
-        >{rotulo}</button>
-      ))}
-    </div>
-
     {!agrupado.igrejas.length && <div className="empty-state">
       <HeartHandshake />
       <strong>{visits.length ? 'Nenhuma visita encontrada' : 'Nenhuma visita registrada'}</strong>
@@ -148,8 +119,8 @@ export function VisitasPorIgreja({ visits, followUps, tasks, churches, nomeDoAlv
             const versao = visita.versions.at(-1)!
             const nome = nomes.get(visita.id) ?? 'Cadastro preservado'
             const atencao = atencoes.get(visita.id) ?? null
-            return <Link className="linha-visita" to={`/app/visitas/${visita.id}`} key={visita.id}>
-              <span className="linha-visita__inicial" aria-hidden="true">{iniciais(nome)}</span>
+            return <Link className={`linha-visita ${atencao ? `linha-visita--${atencao}` : ''}`} to={`/app/visitas/${visita.id}`} key={visita.id}>
+              <span className={`linha-visita__inicial ${atencao ? `linha-visita__inicial--${atencao}` : ''}`} aria-hidden="true">{iniciais(nome)}</span>
               <span className="linha-visita__corpo">
                 <strong>{nome}</strong>
                 <small>{VISIT_REASON_LABELS[versao.reason]} · {quando(versao.startAt, anoCorrente)}</small>

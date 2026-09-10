@@ -1299,7 +1299,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   diferença entre seguir o sistema e ficar preso ao tema do momento da escolha.
 */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-tema='claro']) { --acento-dado: #6fe3b0; --acento-comparacao: #2d5647; }
+  :root:not([data-tema='claro']) { --acento-dado: #6fe3b0; --acento-comparacao: #2d5647; --sobre-acento: #07130e; }
   :root:not([data-tema='claro']) .metric--atencao .metric__value { color: #f19289; }
   :root:not([data-tema='claro']) .ring--atencao .ring__traco { stroke: #f19289; }
   :root:not([data-tema='claro']) .fidelidade--nao strong { color: #f19289; }
@@ -1533,6 +1533,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   --ambar: #9a6410;
   --ambar-fraca: #f6ecd8;
   --acento-dado: var(--green-700);
+  --sobre-acento: #ffffff;
   --acento-comparacao: var(--green-100);
   --tempo-curto: 140ms;
   --tempo: 260ms;
@@ -1602,7 +1603,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   a barra de comparação saía clara sobre fundo escuro; `--green-700` era escuro
   demais para virar traço sobre o mesmo fundo.
 */
-:root[data-tema='escuro'] { color: #eaf2ed; background: #070f0c; --cream: #070f0c; --paper: #0b1512; --ink: #eaf2ed; --muted: #8ba397; --line: #1e332b; --green-50: #16261f; --ambar: #e5a53f; --ambar-fraca: #3a2d13; --acento-dado: #6fe3b0; --acento-comparacao: #2d5647; }
+:root[data-tema='escuro'] { color: #eaf2ed; background: #070f0c; --cream: #070f0c; --paper: #0b1512; --ink: #eaf2ed; --muted: #8ba397; --line: #1e332b; --green-50: #16261f; --ambar: #e5a53f; --ambar-fraca: #3a2d13; --acento-dado: #6fe3b0; --acento-comparacao: #2d5647; --sobre-acento: #07130e; }
 :root[data-tema='escuro'] .metric--atencao .metric__value { color: #f19289; }
 :root[data-tema='escuro'] .ring--atencao .ring__traco { stroke: #f19289; }
 
@@ -1889,7 +1890,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   transition: background var(--tempo-curto) linear, width var(--tempo-curto) var(--saida), height var(--tempo-curto) var(--saida);
 }
 .agenda-time-slot:hover span, .agenda-time-slot:focus-visible span {
-  width: 22px; height: 22px; background: var(--acento-dado); color: #07130e; font-size: .95rem; font-weight: 700;
+  width: 22px; height: 22px; background: var(--acento-dado); color: var(--sobre-acento); font-size: .95rem; font-weight: 700;
   display: grid; place-items: center;
 }
 .agenda-time-events { padding: 6px 0 10px 6px; gap: 6px; }
@@ -2120,8 +2121,8 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .calendario__dia:hover { background: var(--green-50); }
 .calendario__dia--fora { color: var(--muted); opacity: .45; }
 .calendario__dia--hoje { font-weight: 700; box-shadow: inset 0 0 0 1px var(--acento-dado); }
-.calendario__dia--escolhido { background: var(--acento-dado); color: #07130e; font-weight: 700; }
-.calendario__dia--escolhido .ponto-categoria { box-shadow: 0 0 0 1.5px #07130e; }
+.calendario__dia--escolhido { background: var(--acento-dado); color: var(--sobre-acento); font-weight: 700; }
+.calendario__dia--escolhido .ponto-categoria { box-shadow: 0 0 0 1.5px var(--sobre-acento); }
 .calendario__pontos { display: flex; gap: 3px; min-height: 6px; }
 .ponto-categoria { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); display: block; }
 
@@ -2629,3 +2630,106 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 
 /* Entre a tira de abas e o primeiro dia sobrava uma faixa morta. */
 .dias-abaixo { margin-top: 8px; }
+
+/* ==========================================================================
+   Visitação: menos faixas para chegar às pessoas.
+
+   Eram cinco: título, dois botões grandes, abas quebrando em duas linhas, o
+   número gigante de pessoas visitadas, a faixa de indicadores — e só então uma
+   tira de filtros repetindo as mesmas cinco palavras dos indicadores.
+
+   Agora as abas rolam numa linha, a busca divide a linha com o relatório, e os
+   indicadores são os próprios filtros: o número e o recorte daquele número são
+   a mesma coisa, então não precisam ser dois controles.
+   ========================================================================== */
+.botao-itinerario--forte { border-color: var(--acento-dado); background: var(--green-50); color: var(--green-900); }
+.botao-itinerario--forte:hover { background: var(--acento-dado); color: var(--sobre-acento); }
+
+.tira-abas {
+  display: flex; gap: 7px; margin-bottom: 14px; padding-bottom: 2px;
+  overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity;
+}
+.tira-abas::-webkit-scrollbar { display: none; }
+.chip-aba {
+  flex: none; min-height: 40px; padding: 0 16px; scroll-snap-align: start;
+  border: 1px solid var(--line); border-radius: 999px;
+  color: var(--muted); background: transparent; font: inherit; font-size: .85rem; font-weight: 600;
+  white-space: nowrap; cursor: pointer;
+  transition: color var(--tempo-curto) linear, background var(--tempo-curto) linear, border-color var(--tempo-curto) linear;
+}
+.chip-aba:hover { color: var(--ink); background: var(--green-50); }
+.chip-aba--ativa { color: var(--sobre-acento); background: var(--acento-dado); border-color: var(--acento-dado); }
+
+.linha-de-busca { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.linha-de-busca .visitacao-busca { flex: 1; min-width: 0; margin-bottom: 0; }
+
+.cartoes-resumo {
+  display: flex; gap: 9px; margin-bottom: 16px; padding-bottom: 4px;
+  overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity;
+}
+.cartoes-resumo::-webkit-scrollbar { display: none; }
+.cartao-resumo {
+  flex: none; min-width: 92px; padding: 12px 14px; scroll-snap-align: start;
+  display: grid; gap: 2px; justify-items: start;
+  border: 1px solid var(--line); border-radius: var(--raio);
+  background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  transition: border-color var(--tempo-curto) linear, background var(--tempo-curto) linear;
+}
+.cartao-resumo strong { font-family: var(--serifada); font-weight: 400; font-size: 1.5rem; line-height: 1.05; }
+.cartao-resumo small { font-size: .72rem; color: var(--muted); }
+.cartao-resumo:hover { border-color: var(--acento-dado); }
+.cartao-resumo--ativo { background: var(--green-50); border-color: var(--acento-dado); }
+
+/* A cor pertence ao estado, não ao cartão: vermelho é urgência em toda a tela. */
+.cartao-resumo--urgente strong { color: var(--red); }
+.cartao-resumo--urgente { border-color: #f0cfc9; }
+.cartao-resumo--retorno strong { color: var(--green-800); }
+.cartao-resumo--atrasada strong, .cartao-resumo--pendente strong { color: var(--ambar); }
+.cartao-resumo--atrasada, .cartao-resumo--pendente { border-color: #e8d3a4; }
+
+/* A inicial da pessoa toma a cor do que ficou pendente com ela. */
+.linha-visita__inicial--urgente { background: #fdecea; color: #a33224; }
+.linha-visita__inicial--atrasada, .linha-visita__inicial--pendente { background: var(--ambar-fraca); color: var(--ambar); }
+.linha-visita__inicial--retorno { background: var(--green-50); color: var(--green-900); }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) .cartao-resumo--urgente { border-color: #6d4340; }
+  :root:not([data-tema='claro']) .cartao-resumo--atrasada, :root:not([data-tema='claro']) .cartao-resumo--pendente { border-color: #6a5a34; }
+  :root:not([data-tema='claro']) .linha-visita__inicial--urgente { background: #3b2523; color: #f3a89e; }
+  :root:not([data-tema='claro']) .linha-visita__inicial--atrasada, :root:not([data-tema='claro']) .linha-visita__inicial--pendente { background: #3a3223; color: var(--ambar); }
+  :root:not([data-tema='claro']) .botao-itinerario--forte { background: rgb(255 255 255 / 10%); color: var(--ink); }
+}
+:root[data-tema='escuro'] .cartao-resumo--urgente { border-color: #6d4340; }
+:root[data-tema='escuro'] .cartao-resumo--atrasada, :root[data-tema='escuro'] .cartao-resumo--pendente { border-color: #6a5a34; }
+:root[data-tema='escuro'] .linha-visita__inicial--urgente { background: #3b2523; color: #f3a89e; }
+:root[data-tema='escuro'] .linha-visita__inicial--atrasada, :root[data-tema='escuro'] .linha-visita__inicial--pendente { background: #3a3223; color: var(--ambar); }
+:root[data-tema='escuro'] .botao-itinerario--forte { background: rgb(255 255 255 / 10%); color: var(--ink); }
+
+@media (prefers-reduced-motion: reduce) { .chip-aba, .cartao-resumo { transition: none; } }
+
+/* A urgência ficava gravada como "normal" e não havia onde marcá-la: o selo
+   vermelho da lista nunca podia aparecer a partir de uma visita. */
+.marca-urgente { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; cursor: pointer; }
+.marca-urgente input { width: 20px; height: 20px; accent-color: var(--red); }
+.marca-urgente span { font-size: .88rem; font-weight: 600; color: var(--red); }
+
+/* A lista de tarefas antes do formulário: quem abre Tarefas quer ver o que
+   precisa fazer, não preencher sete campos até a primeira linha aparecer. */
+.conta-de-tarefas { flex: 1; margin: 0; font-size: .88rem; color: var(--muted); }
+.lista-tarefas-cuidado { display: grid; }
+.linha-tarefa {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 12px; align-items: center;
+  padding: 13px 2px; border: 0; border-bottom: 1px solid var(--line);
+  background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  transition: background var(--tempo-curto) linear;
+}
+.lista-tarefas-cuidado .linha-tarefa:last-child { border-bottom: 0; }
+.linha-tarefa:hover { background: var(--green-50); }
+.linha-tarefa__marca { width: 21px; height: 21px; flex: none; color: var(--acento-dado); }
+.linha-tarefa__corpo { display: grid; gap: 2px; min-width: 0; }
+.linha-tarefa__corpo strong { font-size: .93rem; font-weight: 600; overflow-wrap: break-word; }
+.linha-tarefa__corpo small { font-size: .77rem; color: var(--muted); }
+.linha-tarefa--feita .linha-tarefa__corpo strong { text-decoration: line-through; color: var(--muted); font-weight: 400; }
+.linha-tarefa--feita .linha-tarefa__marca { color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) { .linha-tarefa { transition: none; } }

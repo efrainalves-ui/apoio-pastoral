@@ -88,7 +88,18 @@ describe('resumo da visitação', () => {
     const tarefas = [tarefa({ id: 't1', relatedId: 'v1' })]
 
     expect(resumoDaVisitacao(visitas, acompanhamentos, tarefas, HOJE)).toEqual({
-      visitas: 4, urgentes: 1, retornos: 1, atrasadas: 1,
+      visitas: 4, urgentes: 1, retornos: 1, atrasadas: 1, pendentes: 0, semana: 4,
+    })
+  })
+
+  it('conta pendentes e o que caiu nesta semana', () => {
+    const daSemana = visita({ id: 'v9', targetId: 'p9' })
+    const antiga = visita({ id: 'v8', targetId: 'p8' })
+    antiga.versions[0]!.startAt = '2026-08-01T10:00:00.000Z'
+    const pendente = acompanhamento({ id: 'a9', visitId: 'v9', subjectId: 'p9', kind: 'call' })
+
+    expect(resumoDaVisitacao([daSemana, antiga], [pendente], [], HOJE)).toEqual({
+      visitas: 2, urgentes: 0, retornos: 0, atrasadas: 0, pendentes: 1, semana: 1,
     })
   })
 })

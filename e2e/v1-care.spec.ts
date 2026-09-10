@@ -93,9 +93,11 @@ test('agenda, visita versionada e cuidado funcionam no armazenamento offline', a
   const linha = page.getByRole('link', { name: /Pessoa Cuidado Fictícia/ }).first()
   await expect(linha).toBeVisible()
 
-  await page.getByRole('button', { name: 'Urgentes' }).click()
+  // Os cartões de cima são os próprios filtros: o número e o recorte daquele
+  // número são a mesma coisa, e não precisavam ser dois controles.
+  await page.locator('.cartao-resumo--urgente').click()
   await expect(page.getByText('Nenhuma visita encontrada')).toBeVisible()
-  await page.getByRole('button', { name: 'Todos' }).click()
+  await page.locator('.cartao-resumo').first().click()
   await expect(linha).toBeVisible()
 
   await page.getByLabel('Buscar pessoa ou igreja').fill('esperanca')
