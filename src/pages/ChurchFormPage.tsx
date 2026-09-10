@@ -138,7 +138,7 @@ export function ChurchFormPage() {
           <div className="form-grid">
             <Field label="Nome da igreja *" name="church-name" value={input.name} onChange={(event) => update('name', event.target.value)} error={fieldErrors.name} maxLength={160} autoFocus />
             <label className="field" htmlFor="church-type"><span className="field__label">Tipo *</span><select id="church-type" className="field__input" value={input.type} onChange={(event) => update('type', event.target.value as ChurchType | '')} aria-invalid={Boolean(fieldErrors.type)}><option value="">Selecione</option>{typeOptions.map((type) => <option value={type} key={type}>{CHURCH_TYPE_LABELS[type]}</option>)}</select>{fieldErrors.type && <span className="field__error">{fieldErrors.type}</span>}{currentChurch && <span className="field__hint">A evolução preserva o histórico e não permite retrocesso.</span>}</label>
-            <Field label="Código externo (opcional)" name="external-code" value={input.externalCode} onChange={(event) => update('externalCode', event.target.value)} error={fieldErrors.externalCode} maxLength={80} />
+            <Field label="Código externo" name="external-code" value={input.externalCode} onChange={(event) => update('externalCode', event.target.value)} error={fieldErrors.externalCode} maxLength={80} />
             <label className="field" htmlFor="church-status"><span className="field__label">Situação *</span><select id="church-status" className="field__input" value={input.status} onChange={(event) => update('status', event.target.value as ChurchStatus)} aria-invalid={Boolean(fieldErrors.status)}>{(Object.keys(CHURCH_STATUS_LABELS) as ChurchStatus[]).map((status) => <option value={status} key={status}>{CHURCH_STATUS_LABELS[status]}</option>)}</select>{fieldErrors.status && <span className="field__error">{fieldErrors.status}</span>}</label>
           </div>
         </Card>
@@ -148,7 +148,7 @@ export function ChurchFormPage() {
         </Card>
 
         <Card eyebrow="Agenda regular" title="Dias e horários de culto" action={<Button type="button" variant="secondary" onClick={addSchedule} icon={<Plus size={17} />}>Adicionar horário</Button>}>
-          {input.worshipSchedules.length === 0 ? <div className="empty-state compact-empty"><Clock3 /><strong>Nenhum horário informado</strong><span>Este campo é opcional e pode ser preenchido depois.</span></div> : (
+          {input.worshipSchedules.length === 0 ? <div className="empty-state compact-empty"><Clock3 /><strong>Nenhum horário informado</strong></div> : (
             <div className="schedule-editor">
               {input.worshipSchedules.map((schedule, index) => (
                 <div className="schedule-row" key={schedule.id}>
@@ -162,7 +162,7 @@ export function ChurchFormPage() {
         </Card>
 
         <Card eyebrow="Uso interno" title="Observações administrativas">
-          <label className="field" htmlFor="administrative-notes"><span className="field__label">Observações</span><textarea id="administrative-notes" className="field__input field__textarea field__textarea--large" value={input.administrativeNotes} onChange={(event) => update('administrativeNotes', event.target.value)} maxLength={2000} aria-invalid={Boolean(fieldErrors.administrativeNotes)} placeholder="Informações administrativas opcionais" />{fieldErrors.administrativeNotes && <span className="field__error">{fieldErrors.administrativeNotes}</span>}</label>
+          <label className="field" htmlFor="administrative-notes"><span className="field__label">Observações</span><textarea id="administrative-notes" className="field__input field__textarea field__textarea--large" value={input.administrativeNotes} onChange={(event) => update('administrativeNotes', event.target.value)} maxLength={2000} aria-invalid={Boolean(fieldErrors.administrativeNotes)}  />{fieldErrors.administrativeNotes && <span className="field__error">{fieldErrors.administrativeNotes}</span>}</label>
         </Card>
 
         <div className="form-actions form-actions--sticky"><Button type="submit" disabled={busy} icon={<Save size={18} />}>{busy ? 'Salvando no aplicativo…' : 'Salvar igreja'}</Button><Link className="button button--secondary" to={cancelPath}><span>Cancelar</span></Link></div>

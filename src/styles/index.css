@@ -2361,3 +2361,25 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 /* O botão do cartão espremia o título contra a borda quando os dois eram longos. */
 .card__header { flex-wrap: wrap; }
 .card__header > :first-child { flex: 1 1 12rem; min-width: 0; }
+
+/* ==========================================================================
+   Os formulários.
+
+   São as telas onde o pastor digita, e as mais compridas do aplicativo: uma
+   pessoa nova dava três mil e quinhentos pixels de altura no celular para
+   sete campos. O que alonga não é o campo, é o intervalo entre eles.
+   ========================================================================== */
+.field { gap: 5px; margin-bottom: 14px; }
+.field__label { font-size: .84rem; }
+.field__hint, .field__error { font-size: .74rem; line-height: 1.35; }
+
+/*
+  Duas colunas quando couberem, uma quando não couberem — em vez de duas
+  fixas que viram uma no celular por regra de largura. Assim o telefone
+  deitado e o tablet aproveitam a linha, sem espremer nada.
+*/
+.form-grid { grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: 0 18px; }
+
+/* A barra que fica colada embaixo escondia o último campo enquanto se rola. */
+.page-stack:has(.form-actions--sticky) { scroll-padding-bottom: 96px; }
+.form-actions--sticky { margin-top: 4px; }

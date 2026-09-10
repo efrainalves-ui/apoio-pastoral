@@ -69,7 +69,7 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   await expect(question.getByText('1. Comunhão')).toBeVisible()
   await question.getByRole('button', { name: 'Sim', exact: true }).click()
   await expect(question.getByRole('button', { name: 'Sim', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await page.getByLabel('Pedido opcional').fill('Pedido de oração inteiramente fictício')
+  await page.getByLabel('Pedido', { exact: true }).fill('Pedido de oração inteiramente fictício')
   await page.getByRole('button', { name: 'Finalizar visita' }).click()
   // A visita abre no detalhe, com editar e excluir. A cerimônia de versão saiu:
   // corrigir o que se escreveu é corrigir, não criar um retrato novo.
