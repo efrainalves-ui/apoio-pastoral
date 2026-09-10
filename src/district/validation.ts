@@ -1,4 +1,4 @@
-import { allowedChurchTypes, CHURCH_STATUSES, CHURCH_TYPES, type ChurchInput, type ChurchType } from './types'
+import { CHURCH_STATUSES, CHURCH_TYPES, type ChurchInput } from './types'
 
 export type FieldErrors = Record<string, string>
 
@@ -21,14 +21,11 @@ function isValidTime(value: string): boolean {
   return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59
 }
 
-export function validateChurchInput(input: ChurchInput, currentType?: ChurchType): FieldErrors {
+export function validateChurchInput(input: ChurchInput): FieldErrors {
   const errors: FieldErrors = {}
   if (!input.name.trim()) errors.name = 'Informe o nome da igreja.'
   if (input.name.trim().length > 160) errors.name = 'Use no máximo 160 caracteres.'
   if (!input.type || !CHURCH_TYPES.includes(input.type)) errors.type = 'Selecione o tipo da igreja.'
-  if (input.type && currentType && !allowedChurchTypes(currentType).includes(input.type)) {
-    errors.type = 'A evolução permitida é ponto de pregação → grupo → igreja organizada.'
-  }
   if (!CHURCH_STATUSES.includes(input.status)) errors.status = 'Selecione uma situação válida.'
   if (input.externalCode.trim().length > 80) errors.externalCode = 'Use no máximo 80 caracteres.'
   if (input.address.trim().length > 500) errors.address = 'Use no máximo 500 caracteres.'

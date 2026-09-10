@@ -135,7 +135,7 @@ export class DistrictService {
     const current = await this.getChurch(accountId, masterKey, churchId)
     if (!current) throw new Error('Igreja não encontrada.')
     const normalized = normalizeChurchInput(input)
-    assertValid(validateChurchInput(normalized, current.type))
+    assertValid(validateChurchInput(normalized))
     const now = new Date().toISOString()
     const history = [...current.history]
 

@@ -93,11 +93,23 @@ export const emptyChurchInput = (): ChurchInput => ({
   status: 'active',
 })
 
-export function allowedChurchTypes(current?: ChurchType): ChurchType[] {
-  if (!current) return [...CHURCH_TYPES]
-  if (current === 'preaching_point') return ['preaching_point', 'group']
-  if (current === 'group') return ['group', 'organized_church']
-  return ['organized_church']
+/*
+  Qualquer tipo, sempre.
+
+  A regra antiga só deixava avançar: ponto de pregação → grupo → igreja
+  organizada, nunca o contrário. Ela descreve o que acontece de verdade na
+  organização de uma igreja, e por isso parecia certa.
+
+  Só que a importação da lista de membros cadastra toda unidade como igreja
+  organizada — o PDF não diz o tipo, e o aplicativo assumiu um. O pastor
+  terminava com grupos gravados como igrejas organizadas e a regra o proibia
+  de corrigir o próprio distrito. Uma regra que trava a correção de um palpite
+  do aplicativo protege menos do que atrapalha: quem sabe o que cada unidade é
+  é o pastor, não o cadastro. A troca continua registrada no histórico da
+  igreja, que é onde a evolução realmente importa.
+*/
+export function allowedChurchTypes(): ChurchType[] {
+  return [...CHURCH_TYPES]
 }
 
 export function historyEventLabel(entry: ChurchHistoryEntry): string {

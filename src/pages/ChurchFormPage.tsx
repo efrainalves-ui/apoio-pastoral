@@ -46,7 +46,6 @@ export function ChurchFormPage() {
   const navigate = useNavigate()
   const [districtId, setDistrictId] = useState('')
   const [districtName, setDistrictName] = useState('')
-  const [currentChurch, setCurrentChurch] = useState<ChurchEntity | null>(null)
   const [input, setInput] = useState<ChurchInput>(emptyChurchInput)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [error, setError] = useState('')
@@ -64,7 +63,6 @@ export function ChurchFormPage() {
       if (churchId) {
         const church = await service.getChurch(account.id, masterKey, churchId)
         if (!church || church.districtId !== district.id) throw new Error('Igreja não encontrada.')
-        setCurrentChurch(church)
         setInput(churchToInput(church))
       }
     } catch (loadError) {
@@ -97,7 +95,7 @@ export function ChurchFormPage() {
   async function submit(event: React.FormEvent) {
     event.preventDefault()
     if (!account || !masterKey || !districtId) return
-    const errors = validateChurchInput(input, currentChurch?.type)
+    const errors = validateChurchInput(input)
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) {
       setError('Revise os campos destacados.')
@@ -124,7 +122,7 @@ export function ChurchFormPage() {
     return <div className="page-stack page-narrow"><div className="alert alert--error" role="alert">{error}</div><Link className="text-link" to="/app/distrito"><ArrowLeft />Voltar ao distrito</Link></div>
   }
 
-  const typeOptions = allowedChurchTypes(currentChurch?.type)
+  const typeOptions = allowedChurchTypes()
   const cancelPath = churchId ? `/app/distrito/igrejas/${churchId}` : '/app/distrito'
 
   return (
@@ -137,7 +135,7 @@ export function ChurchFormPage() {
         <Card eyebrow="Identificação" title="Dados principais">
           <div className="form-grid">
             <Field label="Nome da igreja *" name="church-name" value={input.name} onChange={(event) => update('name', event.target.value)} error={fieldErrors.name} maxLength={160} autoFocus />
-            <label className="field" htmlFor="church-type"><span className="field__label">Tipo *</span><select id="church-type" className="field__input" value={input.type} onChange={(event) => update('type', event.target.value as ChurchType | '')} aria-invalid={Boolean(fieldErrors.type)}><option value="">Selecione</option>{typeOptions.map((type) => <option value={type} key={type}>{CHURCH_TYPE_LABELS[type]}</option>)}</select>{fieldErrors.type && <span className="field__error">{fieldErrors.type}</span>}{currentChurch && <span className="field__hint">A evolução preserva o histórico e não permite retrocesso.</span>}</label>
+            <label className="field" htmlFor="church-type"><span className="field__label">Tipo *</span><select id="church-type" className="field__input" value={input.type} onChange={(event) => update('type', event.target.value as ChurchType | '')} aria-invalid={Boolean(fieldErrors.type)}><option value="">Selecione</option>{typeOptions.map((type) => <option value={type} key={type}>{CHURCH_TYPE_LABELS[type]}</option>)}</select>{fieldErrors.type && <span className="field__error">{fieldErrors.type}</span>}</label>
             <Field label="Código externo" name="external-code" value={input.externalCode} onChange={(event) => update('externalCode', event.target.value)} error={fieldErrors.externalCode} maxLength={80} />
             <label className="field" htmlFor="church-status"><span className="field__label">Situação *</span><select id="church-status" className="field__input" value={input.status} onChange={(event) => update('status', event.target.value as ChurchStatus)} aria-invalid={Boolean(fieldErrors.status)}>{(Object.keys(CHURCH_STATUS_LABELS) as ChurchStatus[]).map((status) => <option value={status} key={status}>{CHURCH_STATUS_LABELS[status]}</option>)}</select>{fieldErrors.status && <span className="field__error">{fieldErrors.status}</span>}</label>
           </div>

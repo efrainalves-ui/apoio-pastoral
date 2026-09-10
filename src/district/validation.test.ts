@@ -10,11 +10,19 @@ describe('validações de distrito e igrejas', () => {
     expect(errors).toHaveProperty('type')
   })
 
-  it('permite evolução somente na ordem oficial', () => {
-    const input = { ...emptyChurchInput(), name: 'Comunidade Fictícia', type: 'organized_church' as const }
-    expect(validateChurchInput(input, 'preaching_point')).toHaveProperty('type')
-    expect(validateChurchInput({ ...input, type: 'group' }, 'preaching_point')).not.toHaveProperty('type')
-    expect(validateChurchInput(input, 'group')).not.toHaveProperty('type')
+  /*
+    A ordem oficial — ponto de pregação, grupo, igreja organizada — descreve o
+    que acontece de verdade, e por isso o cadastro só deixava avançar. Mas a
+    importação da lista de membros grava toda unidade como igreja organizada,
+    porque o PDF não diz o tipo. Com a regra ligada, o pastor não conseguia
+    corrigir os grupos do próprio distrito. Corrigir um palpite do aplicativo
+    tem de ser possível; a evolução fica registrada no histórico da igreja.
+  */
+  it('aceita corrigir o tipo em qualquer direção', () => {
+    const input = { ...emptyChurchInput(), name: 'Comunidade Fictícia', type: 'group' as const }
+    expect(validateChurchInput(input)).not.toHaveProperty('type')
+    expect(validateChurchInput({ ...input, type: 'preaching_point' })).not.toHaveProperty('type')
+    expect(validateChurchInput({ ...input, type: 'organized_church' })).not.toHaveProperty('type')
   })
 
   it('rejeita horários inválidos e duplicados', () => {

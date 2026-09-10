@@ -50,6 +50,23 @@ test('CRUD e histórico de evolução da igreja', async ({ page }) => {
   // e conferi-los separados é mais firme do que casar a pontuação entre eles.
   await expect(page.locator('.page-hero').getByText('Grupo', { exact: true })).toBeVisible()
   await expect(page.locator('.manchete').getByText(/membros? nesta igreja/)).toBeVisible()
+
+  /*
+    A importação da lista de membros cadastra toda unidade como igreja
+    organizada — o PDF não diz o tipo. Enquanto o cadastro só deixava avançar,
+    o pastor ficava com grupos gravados como igrejas e sem como corrigir.
+    Aqui a igreja desce de organizada para grupo e o histórico registra a
+    troca, que é o caso que estava travado.
+  */
+  await page.getByRole('link', { name: 'Editar' }).click()
+  await page.getByLabel(/Tipo/).selectOption('organized_church')
+  await page.getByRole('button', { name: 'Salvar igreja' }).click()
+  await expect(page.locator('.page-hero').getByText('Igreja organizada', { exact: true })).toBeVisible()
+
+  await page.getByRole('link', { name: 'Editar' }).click()
+  await page.getByLabel(/Tipo/).selectOption('group')
+  await page.getByRole('button', { name: 'Salvar igreja' }).click()
+  await expect(page.locator('.page-hero').getByText('Grupo', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Histórico' }).click()
   await expect(page.getByText('Tipo alterado de Ponto de pregação para Grupo')).toBeVisible()
   await expect(page.getByText('Situação alterada de Ativa para Arquivada')).toBeVisible()
