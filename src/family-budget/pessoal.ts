@@ -4,6 +4,8 @@ import type {
   Cartao, CartaoData, Conta, ContaData, Integrante, IntegranteData,
   Lancamento, LancamentoData, Transferencia, TransferenciaData,
 } from './lancamento'
+import type { Compra, CompraData } from './compras'
+import type { AporteData, Aporte, Meta, MetaData, Planejamento, PlanejamentoData } from './metas'
 import { alcanceDaEdicao, gerarOcorrencias, gerarParcelas, type EscopoDeEdicao, type PlanoDeParcelamento } from './series'
 
 /**
@@ -15,7 +17,7 @@ import { alcanceDaEdicao, gerarOcorrencias, gerarParcelas, type EscopoDeEdicao, 
  * dado antigo preservado até que o novo esteja conferido.
  */
 
-type TipoPessoal = 'lancamento' | 'transferencia' | 'conta' | 'cartao' | 'integrante'
+type TipoPessoal = 'lancamento' | 'transferencia' | 'conta' | 'cartao' | 'integrante' | 'meta' | 'aporte' | 'planejamento' | 'compra'
 
 interface DadosPorTipo {
   lancamento: LancamentoData
@@ -23,6 +25,10 @@ interface DadosPorTipo {
   conta: ContaData
   cartao: CartaoData
   integrante: IntegranteData
+  meta: MetaData
+  aporte: AporteData
+  planejamento: PlanejamentoData
+  compra: CompraData
 }
 
 /** Quantas ocorrências futuras uma série gera de uma vez. */
@@ -71,11 +77,19 @@ export class FinancasPessoaisService {
   contas(accountId: string, masterKey: CryptoKey): Promise<Conta[]> { return this.listar(accountId, masterKey, 'conta') }
   cartoes(accountId: string, masterKey: CryptoKey): Promise<Cartao[]> { return this.listar(accountId, masterKey, 'cartao') }
   integrantes(accountId: string, masterKey: CryptoKey): Promise<Integrante[]> { return this.listar(accountId, masterKey, 'integrante') }
+  metas(accountId: string, masterKey: CryptoKey): Promise<Meta[]> { return this.listar(accountId, masterKey, 'meta') }
+  aportes(accountId: string, masterKey: CryptoKey): Promise<Aporte[]> { return this.listar(accountId, masterKey, 'aporte') }
+  planejamentos(accountId: string, masterKey: CryptoKey): Promise<Planejamento[]> { return this.listar(accountId, masterKey, 'planejamento') }
+  compras(accountId: string, masterKey: CryptoKey): Promise<Compra[]> { return this.listar(accountId, masterKey, 'compra') }
 
   salvarConta(accountId: string, masterKey: CryptoKey, dados: ContaData, id?: string) { return this.gravar(accountId, masterKey, 'conta', dados, id) }
   salvarCartao(accountId: string, masterKey: CryptoKey, dados: CartaoData, id?: string) { return this.gravar(accountId, masterKey, 'cartao', dados, id) }
   salvarIntegrante(accountId: string, masterKey: CryptoKey, dados: IntegranteData, id?: string) { return this.gravar(accountId, masterKey, 'integrante', dados, id) }
   salvarTransferencia(accountId: string, masterKey: CryptoKey, dados: TransferenciaData, id?: string) { return this.gravar(accountId, masterKey, 'transferencia', dados, id) }
+  salvarMeta(accountId: string, masterKey: CryptoKey, dados: MetaData, id?: string) { return this.gravar(accountId, masterKey, 'meta', dados, id) }
+  salvarAporte(accountId: string, masterKey: CryptoKey, dados: AporteData, id?: string) { return this.gravar(accountId, masterKey, 'aporte', dados, id) }
+  salvarPlanejamento(accountId: string, masterKey: CryptoKey, dados: PlanejamentoData, id?: string) { return this.gravar(accountId, masterKey, 'planejamento', dados, id) }
+  salvarCompra(accountId: string, masterKey: CryptoKey, dados: CompraData, id?: string) { return this.gravar(accountId, masterKey, 'compra', dados, id) }
 
   /**
    * Grava um lançamento e, quando for o caso, a série que ele abre.

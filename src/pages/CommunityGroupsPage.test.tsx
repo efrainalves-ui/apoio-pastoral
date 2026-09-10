@@ -18,10 +18,17 @@ describe('edição visual dos registros missionários', () => {
     await db.delete(); await db.open(); localStorage.clear()
     auth.account = { id: crypto.randomUUID(), email: 'missionario.teste@example.invalid' }
     auth.masterKey = await generateMasterKey()
-  })
+  }, 30_000)
 
   afterEach(async () => { vi.restoreAllMocks(); await db.delete(); auth.account = null; auth.masterKey = null })
 
+  /*
+    Trinta segundos porque este teste é caro de verdade: gera chave mestra,
+    cria distrito, igreja, pessoa e classe, e cada gravação passa por
+    criptografia. Com a suíte inteira em paralelo ele encostava nos quinze
+    segundos padrão e falhava uma execução a cada duas — falha de relógio, não
+    de comportamento.
+  */
   it('visualiza, preenche a edição, salva com o mesmo ID e remove após confirmação', async () => {
     const districtService = new DistrictService(); const peopleService = new PeopleService(); const missionaryService = new MissionaryService()
     const district = await districtService.createDistrict(auth.account!.id, auth.masterKey!, 'Distrito Fictício')
