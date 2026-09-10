@@ -13,6 +13,14 @@ import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
 import { allowanceBalances, currency, mileageByChurch, workMonthSummary } from '../work-budget/core'
 import { WorkBudgetService } from '../work-budget/service'
+import { ConfiguracaoDoObreiro } from '../components/trabalho/ConfiguracaoDoObreiro'
+import { LancamentosDoTrabalho } from '../components/trabalho/LancamentosDoTrabalho'
+import { PainelLetra } from '../components/trabalho/PainelLetra'
+import { formatar } from '../family-budget/dinheiro'
+import { configuracaoVazia, type ConfiguracaoDoTrabalhoData } from '../work-budget/configuracao'
+import { lancamentoVazio, resumoDoTrabalho, type LancamentoDoTrabalho, type LancamentoDoTrabalhoData } from '../work-budget/lancamento'
+import type { AquisicaoLetra, AquisicaoLetraData, ItemDoCatalogoLetra, OrcamentoLetraData } from '../work-budget/letra'
+import { subsistenciaBasica, vigenteEm } from '../work-budget/parametros'
 import {
   ALLOWANCE_CATEGORY_LABELS, WORK_EXPENSE_CATEGORY_LABELS, suggestedAllowance,
   type AllowanceCategory, type MileageData, type WorkAllowanceData, type WorkBudgetSnapshot,
@@ -24,7 +32,11 @@ const districtService = new DistrictService()
 const carimbo = () => new Date().toISOString()
 const hoje = localDateKey
 
-const sectionLabels = { resumo: 'Visão do mês', auxilios: 'Auxílios', despesas: 'Despesas', quilometragem: 'Quilometragem' } as const
+const sectionLabels = {
+  resumo: 'Visão do mês', lancamentos: 'Lançamentos', letra: 'LETRA',
+  auxilios: 'Auxílios', despesas: 'Despesas', quilometragem: 'Quilometragem',
+  configuracao: 'Configuração',
+} as const
 type WorkSection = keyof typeof sectionLabels
 
 const vazioAuxilio = (): WorkAllowanceData => ({ category: 'fuel', description: '', amount: 0, date: hoje(), churchId: null, notes: '', createdAt: carimbo(), updatedAt: carimbo() })
@@ -63,6 +75,13 @@ export function WorkBudgetPage() {
   const [expenseId, setExpenseId] = useState('')
   const [mileageDraft, setMileageDraft] = useState<MileageData | null>(null)
   const [mileageId, setMileageId] = useState('')
+  const [configuracao, setConfiguracao] = useState<ConfiguracaoDoTrabalhoData | null>(null)
+  const [lancamentos, setLancamentos] = useState<LancamentoDoTrabalho[]>([])
+  const [lancamentoDraft, setLancamentoDraft] = useState<LancamentoDoTrabalhoData | null>(null)
+  const [lancamentoId, setLancamentoId] = useState('')
+  const [orcamentoLetra, setOrcamentoLetra] = useState<(OrcamentoLetraData & { id: string }) | null>(null)
+  const [itensLetra, setItensLetra] = useState<ItemDoCatalogoLetra[]>([])
+  const [aquisicoes, setAquisicoes] = useState<AquisicaoLetra[]>([])
 
   const load = useCallback(async () => {
     if (!account || !masterKey) return
@@ -71,6 +90,19 @@ export function WorkBudgetPage() {
       setSnapshot(await service.snapshot(account.id, masterKey, month))
       const district = await districtService.getDistrict(account.id, masterKey)
       setChurches(district ? await districtService.listChurches(account.id, masterKey, district.id) : [])
+
+      const [config, todosOsLancamentos, orcamentos, itens, compras] = await Promise.all([
+        service.configuracao(account.id, masterKey),
+        service.lancamentos(account.id, masterKey),
+        service.orcamentosLetra(account.id, masterKey),
+        service.itensLetra(account.id, masterKey),
+        service.aquisicoesLetra(account.id, masterKey),
+      ])
+      setConfiguracao(config ? (({ id: _id, ...dados }) => { void _id; return dados })(config) : null)
+      setLancamentos(todosOsLancamentos.filter((item) => item.competencia === month))
+      setOrcamentoLetra(orcamentos.find((item) => item.ano === month.slice(0, 4)) ?? null)
+      setItensLetra(itens)
+      setAquisicoes(compras)
     } catch (motivo) {
       setError(motivo instanceof Error ? motivo.message : 'Não foi possível abrir o orçamento do trabalho.')
     } finally {
@@ -88,6 +120,22 @@ export function WorkBudgetPage() {
   const summary = useMemo(() => snapshot ? workMonthSummary(snapshot.allowances, snapshot.expenses, snapshot.mileage) : null, [snapshot])
   const kmPorIgreja = useMemo(() => snapshot ? mileageByChurch(snapshot.mileage) : [], [snapshot])
 
+  /*
+    O último dia do mês aberto, e não a data de hoje: olhando março, o pastor
+    quer ver o FPE que valia em março.
+  */
+  const fimDoMes = useMemo(() => {
+    const [ano, mes] = month.split('-').map(Number)
+    return `${month}-${String(new Date(ano!, mes!, 0).getDate()).padStart(2, '0')}`
+  }, [month])
+  const fpeDoMes = useMemo(() => configuracao ? vigenteEm(configuracao.fpe, fimDoMes) : null, [configuracao, fimDoMes])
+  const auditDoMes = useMemo(() => configuracao ? vigenteEm(configuracao.percentualDeAudit, fimDoMes) : null, [configuracao, fimDoMes])
+  const fpeVigente = fpeDoMes?.valor ?? null
+  const auditVigente = auditDoMes?.valor ?? null
+  const subsistencia = subsistenciaBasica(fpeVigente, auditVigente)
+  const vigenciaDoFpe = fpeDoMes ? `Desde ${fpeDoMes.inicio.split('-').reverse().join('/')}` : ''
+  const resumoDosLancamentos = useMemo(() => resumoDoTrabalho(lancamentos), [lancamentos])
+
   const ir = (destino: WorkSection, mes = month) => void navigate(`/app/orcamento/trabalho/${destino}?mes=${mes}`)
   const pronto = async (mensagem: string) => { setNotice(mensagem); setError(''); await load() }
   const falhou = (motivo: unknown) => setError(motivo instanceof Error ? motivo.message : 'Não foi possível salvar.')
@@ -104,6 +152,27 @@ export function WorkBudgetPage() {
     if (!account || !masterKey || !mileageDraft) return
     try { await service.saveMileage(account.id, masterKey, mileageDraft, mileageId || undefined); setMileageDraft(null); setMileageId(''); await pronto('Deslocamento registrado.') } catch (motivo) { falhou(motivo) }
   }
+  async function salvarConfiguracao() {
+    if (!account || !masterKey || !configuracao) return
+    try { await service.salvarConfiguracao(account.id, masterKey, configuracao); await pronto('Configuração salva.') } catch (motivo) { falhou(motivo) }
+  }
+  async function salvarLancamento() {
+    if (!account || !masterKey || !lancamentoDraft) return
+    try { await service.salvarLancamento(account.id, masterKey, lancamentoDraft, lancamentoId || undefined); setLancamentoDraft(null); setLancamentoId(''); await pronto('Lançamento registrado.') } catch (motivo) { falhou(motivo) }
+  }
+  async function salvarOrcamentoLetra(dados: OrcamentoLetraData) {
+    if (!account || !masterKey) return
+    try { await service.salvarOrcamentoLetra(account.id, masterKey, dados, orcamentoLetra?.id); await pronto('Orçamento do LETRA salvo.') } catch (motivo) { falhou(motivo) }
+  }
+  async function salvarItemLetra(dados: Omit<ItemDoCatalogoLetra, 'id'>, id?: string) {
+    if (!account || !masterKey) return
+    try { await service.salvarItemLetra(account.id, masterKey, { ...dados, createdAt: '', updatedAt: '' }, id); await pronto('Item salvo.') } catch (motivo) { falhou(motivo) }
+  }
+  async function salvarAquisicaoLetra(dados: AquisicaoLetraData) {
+    if (!account || !masterKey) return
+    try { await service.salvarAquisicaoLetra(account.id, masterKey, dados); await pronto('Aquisição registrada.') } catch (motivo) { falhou(motivo) }
+  }
+
   async function apagar(id: string, oQue: string) {
     if (!account || !masterKey || !window.confirm(`Apagar ${oQue}?`)) return
     try { await service.remove(account.id, masterKey, id); await pronto('Registro apagado.') } catch (motivo) { falhou(motivo) }
@@ -127,6 +196,23 @@ export function WorkBudgetPage() {
     {error && <div className="alert alert--error" role="alert">{error}</div>}
 
     {section === 'resumo' && <>
+      <Card title="Base de subsistência">
+        <dl className="estrato">
+          <div><dt>FPE vigente</dt><dd>{fpeVigente === null ? <span className="valor-pendente">Ainda não configurado</span> : formatar(fpeVigente)}</dd></div>
+          <div><dt>Percentual de Audit</dt><dd>{auditVigente === null ? <span className="valor-pendente">Ainda não configurado</span> : `${auditVigente.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`}</dd></div>
+          <div><dt>Subsistência básica</dt><dd>{subsistencia === null ? <span className="valor-pendente">Ainda não configurado</span> : formatar(subsistencia)}</dd></div>
+          <div><dt>Vigência</dt><dd>{vigenciaDoFpe || '—'}</dd></div>
+        </dl>
+        <div className="form-actions"><Link className="button button--quiet" to={`/app/orcamento/trabalho/configuracao?mes=${month}`}>Ver histórico</Link></div>
+      </Card>
+      <section className="budget-metrics" aria-label="Reembolsos do mês">
+        <div><span>Pago no ministério</span><strong>{formatar(resumoDosLancamentos.pago)}</strong></div>
+        <div><span>Previsto</span><strong>{formatar(resumoDosLancamentos.previsto)}</strong></div>
+        <div><span>A receber</span><strong>{formatar(resumoDosLancamentos.aReceber)}</strong></div>
+        <div><span>Recebido</span><strong>{formatar(resumoDosLancamentos.recebido)}</strong></div>
+        <div><span>Do bolso</span><strong>{formatar(resumoDosLancamentos.doBolso)}</strong></div>
+        <div><span>Pendentes</span><strong>{resumoDosLancamentos.pendentes}</strong></div>
+      </section>
       <section className="budget-metrics" aria-label="Resumo do mês no trabalho">
         <div><span>Auxílios recebidos</span><strong>{currency(summary.received)}</strong></div>
         <div><span>Despesas do ministério</span><strong>{currency(summary.spent)}</strong></div>
@@ -142,16 +228,46 @@ export function WorkBudgetPage() {
               <strong>{currency(linha.balance)}</strong>
               {linha.fromPocket && <span className="status-pill status-pill--warning">{currency(linha.overspent)} do bolso</span>}
             </div>)}</div>}
-        {summary.fromPocket > 0 && <div className="alert alert--warning" role="status">
-          Neste mês, {currency(summary.fromPocket)} saíram do seu bolso: o que passou de cada auxílio, mais as despesas sem auxílio apontado.
-        </div>}
       </Card>
       <section className="budget-quick-actions" aria-label="Ações rápidas">
+        <button onClick={() => { setLancamentoId(''); setLancamentoDraft(lancamentoVazio(month, hoje())); ir('lancamentos') }}><ReceiptText /><span>Novo lançamento</span></button>
         <button onClick={() => { setAllowanceDraft(vazioAuxilio()); ir('auxilios') }}><HandCoins /><span>Registrar auxílio</span></button>
         <button onClick={() => { setExpenseDraft(vazioDespesa()); ir('despesas') }}><ReceiptText /><span>Registrar despesa</span></button>
         <button onClick={() => { setMileageDraft(vazioKm()); ir('quilometragem') }}><Car /><span>Registrar deslocamento</span></button>
       </section>
     </>}
+
+    {section === 'lancamentos' && <LancamentosDoTrabalho
+      lancamentos={lancamentos}
+      configuracao={configuracao}
+      rascunho={lancamentoDraft}
+      editandoId={lancamentoId}
+      onRascunho={setLancamentoDraft}
+      onSalvar={salvarLancamento}
+      onNovo={() => { setLancamentoId(''); setLancamentoDraft(lancamentoVazio(month, hoje())) }}
+      onEditar={(lancamento) => { setLancamentoId(lancamento.id); const { id: _id, ...dados } = lancamento; void _id; setLancamentoDraft(dados) }}
+      onApagar={(id) => void apagar(id, 'este lançamento')}
+    />}
+
+    {section === 'letra' && <PainelLetra
+      ano={month.slice(0, 4)}
+      hoje={hoje()}
+      orcamento={orcamentoLetra}
+      itens={itensLetra}
+      aquisicoes={aquisicoes}
+      configuracao={configuracao}
+      onSalvarOrcamento={(dados) => void salvarOrcamentoLetra(dados)}
+      onSalvarItem={(dados, id) => void salvarItemLetra(dados, id)}
+      onSalvarAquisicao={(dados) => void salvarAquisicaoLetra(dados)}
+      onApagar={(id) => void apagar(id, 'esta aquisição')}
+    />}
+
+    {section === 'configuracao' && <ConfiguracaoDoObreiro
+      valor={configuracao ?? configuracaoVazia()}
+      hoje={hoje()}
+      onChange={setConfiguracao}
+      onSalvar={salvarConfiguracao}
+    />}
 
     {section === 'auxilios' && <>
       <div className="page-actions"><Button icon={<Plus />} onClick={() => { setAllowanceId(''); setAllowanceDraft(vazioAuxilio()) }}>Novo auxílio</Button></div>
@@ -232,7 +348,6 @@ export function WorkBudgetPage() {
           <Button variant="danger" icon={<Trash2 />} aria-label={`Apagar deslocamento de ${item.date}`} onClick={() => apagar(item.id, 'este deslocamento')} />
         </div>)}</div>}
       </Card>
-      <p className="muted">Os quilômetros são informados por você. O aplicativo não usa GPS nem registra localização.</p>
     </>}
   </div>
 }

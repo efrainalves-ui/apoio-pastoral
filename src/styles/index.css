@@ -1526,6 +1526,8 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
     internet.
   */
   --serifada: "Instrument Serif", Georgia, "Times New Roman", serif;
+  /* A mesma pilha do corpo, nomeada para poder voltar a ela dentro de um bloco serifado. */
+  --sistema: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   /*
     Âmbar é o que está parado, e é escasso de propósito: usado em tudo, deixaria
     de significar coisa alguma. Nunca vai sozinho — sempre com ícone ou palavra.
@@ -2942,3 +2944,46 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 
 /* A renda familiar usava a manchete da tela inicial e não cabia no cartão. */
 .renda-total { margin: 0 0 10px; font-family: var(--serifada); font-size: clamp(1.6rem, 7vw, 2.1rem); line-height: 1.05; }
+
+/* ---- Orçamento do trabalho ---- */
+
+/*
+  Um parâmetro que ainda não foi informado.
+
+  Ele não pode parecer um valor: zero em cinza claro seria lido como "custa
+  nada". O texto diz o que é, e o âmbar diz que há algo a fazer.
+*/
+.valor-pendente { font-family: var(--sistema); font-size: .82rem; font-weight: 600; color: var(--ambar); }
+
+/*
+  A memória do cálculo é conferência, não manchete.
+
+  Os mesmos dados do estrato, em corpo de leitura: aqui há nove linhas, e o
+  número gigante que serve para um saldo transforma isso num paredão.
+*/
+.memoria-do-calculo { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); border-bottom: 1px solid var(--line); margin-top: 12px; }
+.memoria-do-calculo dd { font-family: var(--sistema); font-size: .95rem; font-variant-numeric: tabular-nums; }
+.memoria-do-calculo > div { padding: 10px 14px 10px 0; display: flex; flex-direction: column; gap: 3px; }
+.memoria-do-calculo dd { margin-top: auto; }
+.memoria-do-calculo > div + div { padding-left: 0; border-left: 0; }
+
+/*
+  Linha sem elemento à esquerda.
+
+  A `.entity-row` reserva a primeira coluna para uma marca — avatar, ícone — e
+  empilha o texto na segunda. Sem essa marca, o texto cai na coluna estreita e
+  sai colado no rótulo, enquanto o que vem depois se estica pela linha inteira.
+  Aqui o texto é o primeiro filho, e é ele quem ocupa a sobra.
+*/
+.entity-row--texto { display: flex; flex-wrap: wrap; align-items: center; }
+.entity-row--texto > span:first-child { flex: 1 1 220px; min-width: 0; display: grid; gap: 4px; }
+
+.lista-regras { display: grid; gap: 14px; }
+.regra-do-item { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px 10px; margin: 0; min-width: 0; }
+.regra-do-item legend { font-size: .78rem; font-weight: 700; color: var(--muted); padding: 0 6px; }
+
+.field--checkbox { flex-direction: row; align-items: center; gap: 10px; }
+.field--checkbox .field__label { margin: 0; }
+
+.status-pill--muted { background: var(--green-50); color: var(--muted); }
+.status-pill--danger { background: var(--ambar-fraca); color: var(--ambar); }
