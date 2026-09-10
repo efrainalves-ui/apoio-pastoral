@@ -34,7 +34,7 @@ async function foundation(page: Page) {
   await expect(page.getByRole('heading', { name: 'Família Cuidado Fictícia', exact: true })).toBeVisible()
 }
 
-test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento offline', async ({ page, context }) => {
+test('agenda, visita versionada e cuidado funcionam no armazenamento offline', async ({ page, context }) => {
   await foundation(page)
   const appointment = agendaDate()
   await navigateInsideApp(page, '/app/agenda/novo', page.getByLabel('Categoria'))
@@ -44,10 +44,6 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   await page.getByRole('button', { name: 'Salvar compromisso' }).click()
   await expect(page.getByRole('link', { name: /Abrir Visita Agendada Fictícia/ })).toBeVisible()
   await navigateInsideApp(page, '/app/visitacao', page.getByRole('heading', { name: 'Visitação', exact: true }))
-  await page.getByLabel('Nome da rodada').fill('Rodada Cuidado Fictícia')
-  await page.getByText('Família Cuidado Fictícia').click()
-  await page.getByRole('button', { name: 'Iniciar rodada' }).click()
-  await expect(page.getByText('0 de 1 famílias visitadas')).toBeVisible()
   const visitChurch = page.getByRole('combobox', { name: /^Igreja(?:$|\s)/ })
   // A tela de destino é reconhecida pelo título: o seletor de igreja também
   // existe em Visitação, e escolher antes da troca de tela perde o clique.
@@ -62,7 +58,6 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   await page.locator('.visit-members__results').getByRole('button', { name: 'Pessoa Cuidado Fictícia' }).click()
   await expect(page.locator('.question-card').first()).toBeVisible()
   await page.getByLabel('Agendamento vinculado').selectOption({ label: 'Visita Agendada Fictícia' })
-  await page.getByLabel('Rodada').selectOption({ label: 'Rodada Cuidado Fictícia' })
   // A pergunta é achada pelo texto, como o pastor a lê: o código interno não
   // aparece mais na tela, e responder é tocar no botão.
   const question = page.locator('.question-card').filter({ hasText: 'Você estudou a Bíblia hoje?' })
@@ -83,9 +78,7 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   await page.getByLabel('Observações pastorais').fill('Ajuste fictício')
   await page.getByRole('button', { name: 'Salvar correção' }).click()
   await expect(page.getByText('Ajuste fictício')).toBeVisible()
-  await navigateInsideApp(page, '/app/visitacao', page.getByText('Rodada Cuidado Fictícia'))
-  await expect(page.getByText('Rodada Cuidado Fictícia')).toBeVisible()
-  await expect(page.getByText('1 de 1 famílias visitadas')).toBeVisible()
+  await navigateInsideApp(page, '/app/visitacao', page.getByRole('heading', { name: 'Visitação', exact: true }))
 
   /*
     A lista de visitas agrupada por igreja, com busca e filtro.
@@ -122,12 +115,14 @@ test('agenda, visita versionada, cuidado e rodada funcionam no armazenamento off
   await linha.click()
   await expect(page.getByRole('heading', { name: 'Pessoa Cuidado Fictícia', level: 1 })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Editar' })).toBeVisible()
-  await navigateInsideApp(page, '/app/visitacao', page.getByText('Rodada Cuidado Fictícia'))
+  await navigateInsideApp(page, '/app/visitacao', page.getByRole('heading', { name: 'Visitação', exact: true }))
   await context.setOffline(true)
   await page.reload()
   await page.getByRole('textbox', { name: 'Senha' }).fill(password)
   await page.getByRole('button', { name: 'Entrar' }).click()
   // A visita passou a ser registrada por membro, então a lista mostra a pessoa.
-  await navigateInsideApp(page, '/app/visitacao', page.getByText('Pessoa Cuidado Fictícia'))
-  await expect(page.getByText('Pessoa Cuidado Fictícia')).toBeVisible()
+  // A visita passou a ser registrada por membro, então a lista mostra a pessoa.
+  const linhasDaPessoa = page.getByRole('link', { name: /Pessoa Cuidado Fictícia/ })
+  await navigateInsideApp(page, '/app/visitacao', linhasDaPessoa.first())
+  await expect(linhasDaPessoa).toHaveCount(1)
 })

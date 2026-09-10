@@ -1,6 +1,6 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import { CalendarPlus, CheckCircle2, Circle, FileText, ListChecks, Plus, RotateCcw, UsersRound } from 'lucide-react'
+import { CalendarPlus, CheckCircle2, Circle, FileText, ListChecks, Plus, RotateCcw } from 'lucide-react'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { agruparVisitasPorIgreja } from '../care/visitasPorIgreja'
@@ -9,7 +9,7 @@ import { VisitasPorIgreja } from '../components/VisitasPorIgreja'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { localDateKey } from '../shared/dates'
 import { CareService } from '../care/service'
-import { FOLLOW_UP_KINDS, FOLLOW_UP_LABELS, type FollowUpEntity, type FollowUpKind, type TaskEntity, type VisitEntity, type VisitRoundEntity } from '../care/types'
+import { FOLLOW_UP_KINDS, FOLLOW_UP_LABELS, type FollowUpEntity, type FollowUpKind, type TaskEntity, type VisitEntity } from '../care/types'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { CountUp } from '../components/ui/CountUp'
@@ -43,29 +43,26 @@ export function VisitationPage() {
   const [visits, setVisits] = useState<VisitEntity[]>([])
   const [followUps, setFollowUps] = useState<FollowUpEntity[]>([])
   const [tasks, setTasks] = useState<TaskEntity[]>([])
-  const [rounds, setRounds] = useState<VisitRoundEntity[]>([])
   const [families, setFamilies] = useState<FamilyEntity[]>([])
   const [people, setPeople] = useState<PersonEntity[]>([])
   const [churches, setChurches] = useState<ChurchEntity[]>([])
   const [taskTitle, setTaskTitle] = useState(''); const [taskDue, setTaskDue] = useState(today()); const [taskRemindAt, setTaskRemindAt] = useState(''); const [taskPriority, setTaskPriority] = useState<'low' | 'normal' | 'high'>('normal'); const [taskChurch, setTaskChurch] = useState(''); const [taskDescription, setTaskDescription] = useState('')
   const [followSubjectType, setFollowSubjectType] = useState<'person' | 'family'>('person'); const [followSubjectId, setFollowSubjectId] = useState(''); const [followChurch, setFollowChurch] = useState(''); const [followKind, setFollowKind] = useState<FollowUpKind>('revisit'); const [followDue, setFollowDue] = useState(today()); const [followNotes, setFollowNotes] = useState('')
-  const [roundName, setRoundName] = useState(''); const [roundChurch, setRoundChurch] = useState(''); const [roundFamilies, setRoundFamilies] = useState<Set<string>>(new Set())
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     if (!account || !masterKey) return
     try {
       const district = await districts.getDistrict(account.id, masterKey)
-      const [nextVisits, nextFollowUps, nextTasks, nextRounds, nextFamilies, nextPeople, nextChurches] = await Promise.all([
+      const [nextVisits, nextFollowUps, nextTasks, nextFamilies, nextPeople, nextChurches] = await Promise.all([
         care.listVisits(account.id, masterKey),
         care.listFollowUps(account.id, masterKey),
         care.listTasks(account.id, masterKey),
-        care.listRounds(account.id, masterKey),
         familiesService.listFamilies(account.id, masterKey),
         peopleService.listPeople(account.id, masterKey),
         district ? districts.listChurches(account.id, masterKey, district.id) : [],
       ])
-      setVisits(nextVisits); setFollowUps(nextFollowUps); setTasks(nextTasks); setRounds(nextRounds); setFamilies(nextFamilies); setPeople(nextPeople); setChurches(nextChurches)
+      setVisits(nextVisits); setFollowUps(nextFollowUps); setTasks(nextTasks); setFamilies(nextFamilies); setPeople(nextPeople); setChurches(nextChurches); setError('')
     } catch (motivo) { setError(motivo instanceof Error ? motivo.message : 'Não foi possível abrir a visitação.') }
   }, [account, masterKey])
   useReloadOnSync(load)
@@ -118,15 +115,6 @@ export function VisitationPage() {
     } catch (motivo) { setError(motivo instanceof Error ? motivo.message : 'Não foi possível criar o acompanhamento.') }
   }
 
-  async function createRound(event: FormEvent) {
-    event.preventDefault()
-    if (!account || !masterKey) return
-    try {
-      await care.createRound(account.id, masterKey, roundName, roundChurch || null, [...roundFamilies])
-      setRoundName(''); setRoundFamilies(new Set())
-      await load()
-    } catch (motivo) { setError(motivo instanceof Error ? motivo.message : 'Não foi possível iniciar a rodada.') }
-  }
 
   const agora = today()
   const agrupado = agruparVisitasPorIgreja(visits, churches)
@@ -153,27 +141,8 @@ export function VisitationPage() {
         <div><dt>Retornos</dt><dd>{resumo.retornos}</dd></div>
         <div><dt>Atrasadas</dt><dd className={resumo.atrasadas ? 'atencao' : ''}>{resumo.atrasadas}</dd></div>
       </dl>
-      <Card title="Visitas registradas" action={<Button variant="secondary" icon={<FileText />} onClick={() => previewLocalPdf('Relatório de Visitações', visitReportLines(visits, rounds, 'Distrito'))}>Relatório</Button>}>
+      <Card title="Visitas registradas" action={<Button variant="secondary" icon={<FileText />} onClick={() => previewLocalPdf('Relatório de Visitações', visitReportLines(visits, 'Distrito'))}>Relatório</Button>}>
         <VisitasPorIgreja visits={visits} followUps={followUps} tasks={tasks} churches={churches} nomeDoAlvo={targetName} />
-      </Card>
-      <Card title="Rodadas de visitação">
-        <form className="round-form" onSubmit={createRound}>
-          <div className="form-grid">
-            <Field label="Nome da rodada" name="round-name" value={roundName} onChange={(event) => setRoundName(event.target.value)} required />
-            <label className="field" htmlFor="round-church"><span className="field__label">Igreja (opcional)</span>
-              <select id="round-church" className="field__input" value={roundChurch} onChange={(event) => setRoundChurch(event.target.value)}><option value="">Distrito inteiro</option>{churches.map((church) => <option key={church.id} value={church.id}>{church.name}</option>)}</select>
-            </label>
-          </div>
-          <div className="family-selector">{families.filter((family) => !roundChurch || family.primaryChurchId === roundChurch).map((family) => <label key={family.id}>
-            <input type="checkbox" checked={roundFamilies.has(family.id)} onChange={(event) => setRoundFamilies((current) => { const next = new Set(current); if (event.target.checked) next.add(family.id); else next.delete(family.id); return next })} />{family.name}
-          </label>)}</div>
-          <Button type="submit" disabled={!roundName || !roundFamilies.size} icon={<UsersRound />}>Iniciar rodada</Button>
-        </form>
-        <div className="round-list">{rounds.map((round) => { const total = round.targetFamilyIds.length; const visited = round.visitedFamilyIds.length; return <article key={round.id} className={round.status === 'completed' ? 'round-complete' : ''}>
-          <span><strong>{round.name}</strong><small>{visited} de {total} famílias visitadas</small></span>
-          <progress value={visited} max={total} aria-label={`Progresso da ${round.name}`} />
-          <span className="entity-badge">{round.status === 'completed' ? 'Concluída' : 'Ativa'}</span>
-        </article> })}</div>
       </Card>
     </>}
 

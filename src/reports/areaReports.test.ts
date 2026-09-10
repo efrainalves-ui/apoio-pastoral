@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgendaEventEntity } from '../agenda/types'
-import type { VisitEntity, VisitRoundEntity } from '../care/types'
+import type { VisitEntity } from '../care/types'
 import { agendaReportLines, goalsReportLines, sermonReportLines, visitReportLines } from './areaReports'
 import { CommissionService } from '../commissions/service'
 import { campaignReportLines } from '../evangelism/report'
@@ -16,12 +16,6 @@ const visita = (targetType: 'person' | 'family'): VisitEntity => ({
   currentVersion: 1, versions: [], createdAt: '', updatedAt: '',
 })
 
-const rodada = (alvos: number, visitadas: number): VisitRoundEntity => ({
-  id: crypto.randomUUID(), name: 'Rodada Fictícia', churchId: IGREJA, status: 'active',
-  targetFamilyIds: Array.from({ length: alvos }, (_, indice) => `familia-${indice}`),
-  visitedFamilyIds: Array.from({ length: visitadas }, (_, indice) => `familia-${indice}`),
-  startedAt: '2026-09-01T12:00:00.000Z', completedAt: null, createdAt: '', updatedAt: '',
-})
 
 const evento = (partes: Partial<AgendaEventEntity>): AgendaEventEntity => ({
   id: crypto.randomUUID(), title: 'Compromisso Fictício', category: 'event', churchId: IGREJA, location: 'Salão Fictício', address: '',
@@ -31,15 +25,14 @@ const evento = (partes: Partial<AgendaEventEntity>): AgendaEventEntity => ({
 })
 
 describe('relatórios de cada área', () => {
-  it('resume as visitas e o que falta nas rodadas', () => {
-    const linhas = visitReportLines([visita('person'), visita('family')], [rodada(4, 1)], 'Igreja Fictícia')
+  it('resume as visitas do período', () => {
+    const linhas = visitReportLines([visita('person'), visita('family')], 'Igreja Fictícia')
 
     expect(linhas).toEqual([
       'Abrangência: Igreja Fictícia',
       'Visitas: 2',
       'Pessoas: 1',
       'Famílias: 1',
-      'Pendentes na rodada: 3',
     ])
   })
 

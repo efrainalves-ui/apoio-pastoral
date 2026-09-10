@@ -1,5 +1,5 @@
 import { AGENDA_CATEGORY_LABELS, type AgendaEventEntity } from '../agenda/types'
-import type { VisitEntity, VisitRoundEntity } from '../care/types'
+import type { VisitEntity } from '../care/types'
 import type { GoalArea } from '../goals/areas'
 import { GOAL_AREA_LABELS } from '../goals/areas'
 import { formatGoalValue } from '../goals/format'
@@ -11,14 +11,12 @@ const dataCurta = (valor: string) => new Intl.DateTimeFormat('pt-BR', { dateStyl
  * Cada área monta o próprio relatório. As linhas ficam aqui, separadas da tela,
  * para o conteúdo poder ser conferido em teste sem abrir PDF.
  */
-export function visitReportLines(visits: VisitEntity[], rounds: VisitRoundEntity[], scopeName: string): string[] {
-  const pendentes = rounds.reduce((total, round) => total + Math.max(0, round.targetFamilyIds.length - round.visitedFamilyIds.length), 0)
+export function visitReportLines(visits: VisitEntity[], scopeName: string): string[] {
   return [
     `Abrangência: ${scopeName}`,
     `Visitas: ${visits.length}`,
     `Pessoas: ${visits.filter((visit) => visit.targetType === 'person').length}`,
     `Famílias: ${visits.filter((visit) => visit.targetType === 'family').length}`,
-    `Pendentes na rodada: ${pendentes}`,
   ]
 }
 

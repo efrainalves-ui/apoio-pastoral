@@ -2554,3 +2554,33 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 /* Entre a tira de abas e a busca sobrava meia tela de nada. */
 .sermons-page .segmented { margin-bottom: 0; }
 .sermons-page .sermons-catalogue { margin-top: 0; }
+
+/* ==========================================================================
+   A visita anterior, ao lado da nova.
+
+   Registrar a terceira visita de alguém sem ver as duas primeiras é registrar
+   um retrato solto. O que importa não é "como ele está", é "como ele está em
+   relação à última vez" — se a leitura da Bíblia subiu de "raramente" para
+   "todo dia", ou se caiu. A resposta de antes fica encostada no campo, discreta
+   o bastante para não disputar com a nova.
+   ========================================================================== */
+.ja-visitados { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 1px; border-top: 1px solid var(--line); }
+.ja-visitados li {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: baseline;
+  padding: 11px 0; border-bottom: 1px solid var(--line);
+}
+.ja-visitados strong { font-size: .9rem; font-weight: 600; }
+.ja-visitados small { grid-column: 1; font-size: .77rem; color: var(--muted); }
+.ja-visitados a { grid-row: 1 / span 2; align-self: center; font-size: .8rem; font-weight: 600; color: var(--green-800); white-space: nowrap; }
+
+.resposta-de-antes {
+  margin: 5px 0 0; padding: 6px 10px; border-left: 2px solid var(--line); border-radius: 0 7px 7px 0;
+  display: flex; flex-wrap: wrap; gap: 3px 8px; align-items: baseline; background: var(--green-50);
+}
+.resposta-de-antes span { font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; color: var(--muted); }
+.resposta-de-antes strong { font-size: .84rem; font-weight: 600; overflow-wrap: break-word; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) .resposta-de-antes { background: rgb(255 255 255 / 6%); }
+}
+:root[data-tema='escuro'] .resposta-de-antes { background: rgb(255 255 255 / 6%); }
