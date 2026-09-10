@@ -2733,3 +2733,14 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .linha-tarefa--feita .linha-tarefa__marca { color: var(--muted); }
 
 @media (prefers-reduced-motion: reduce) { .linha-tarefa { transition: none; } }
+
+/* As seis áreas do orçamento pessoal, e o recorte dentro delas. */
+.tira-recortes { display: flex; gap: 6px; margin: -6px 0 14px; overflow-x: auto; scrollbar-width: none; }
+.tira-recortes::-webkit-scrollbar { display: none; }
+.chip-recorte {
+  flex: none; min-height: 34px; padding: 0 13px; display: inline-flex; align-items: center;
+  border-radius: 999px; color: var(--muted); background: transparent;
+  font-size: .8rem; font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.chip-recorte:hover { color: var(--ink); background: var(--green-50); }
+.chip-recorte--ativo { color: var(--green-900); background: var(--green-50); }

@@ -18,7 +18,50 @@ import { DEBT_STATUS_LABELS, DEBT_TYPE_LABELS, EXPENSE_CATEGORIES, EXPENSE_CATEG
 const service = new FamilyBudgetService()
 const timestamp = () => new Date().toISOString()
 const today = localDateKey
-const sectionLabels = { resumo: 'Visão do mês', entradas: 'Entradas', despesas: 'Despesas', planejamento: 'Planejamento', contas: 'Contas', dividas: 'Dívidas', metas: 'Metas', compras: 'Lista de compras', relatorios: 'Relatórios' } as const
+/*
+  Seis áreas, e não nove.
+
+  "Despesas", "Contas" e "Dívidas" descreviam a mesma coisa — dinheiro saindo —
+  e obrigavam a decidir, antes de lançar, em qual das três a conta de luz mora.
+  Elas viraram recortes dentro de Saídas. "Planejamento" e "Metas" juntaram-se
+  pelo mesmo motivo: planejar o mês e guardar para um sonho são o mesmo gesto
+  em prazos diferentes.
+
+  Os endereços antigos continuam funcionando: quem tem um atalho salvo em
+  /app/orcamento/dividas chega em Saídas com o recorte de dívidas aberto.
+*/
+const AREAS = {
+  resumo: 'Visão geral',
+  entradas: 'Entradas',
+  saidas: 'Saídas',
+  metas: 'Metas e Planejamento',
+  compras: 'Lista de compras',
+  relatorios: 'Relatórios',
+} as const
+type BudgetArea = keyof typeof AREAS
+
+/** O recorte dentro de uma área, quando ela tem mais de um. */
+const RECORTES: Partial<Record<BudgetArea, ReadonlyArray<readonly [string, string]>>> = {
+  saidas: [['despesas', 'Despesas'], ['contas', 'Contas'], ['dividas', 'Dívidas']],
+  metas: [['planejamento', 'Planejamento'], ['metas', 'Metas e sonhos']],
+}
+
+/** Endereço antigo para a área que hoje o contém. */
+const AREA_DO_ENDERECO: Record<string, { area: BudgetArea; recorte: string }> = {
+  resumo: { area: 'resumo', recorte: 'resumo' },
+  entradas: { area: 'entradas', recorte: 'entradas' },
+  despesas: { area: 'saidas', recorte: 'despesas' },
+  contas: { area: 'saidas', recorte: 'contas' },
+  dividas: { area: 'saidas', recorte: 'dividas' },
+  saidas: { area: 'saidas', recorte: 'despesas' },
+  planejamento: { area: 'metas', recorte: 'planejamento' },
+  metas: { area: 'metas', recorte: 'metas' },
+  compras: { area: 'compras', recorte: 'compras' },
+  relatorios: { area: 'relatorios', recorte: 'relatorios' },
+}
+
+const sectionLabels = { resumo: 'Visão geral', entradas: 'Entradas', despesas: 'Despesas', planejamento: 'Planejamento', contas: 'Contas', dividas: 'Dívidas', metas: 'Metas', compras: 'Lista de compras', relatorios: 'Relatórios' }
+
 type BudgetSection = keyof typeof sectionLabels
 
 const emptyIncome = (): BudgetIncomeData => ({ category: 'salary', description: '', amount: 0, date: today(), responsible: '', notes: '', recurring: false, createdAt: timestamp(), updatedAt: timestamp() })
@@ -34,9 +77,26 @@ const dateInMonth = (month: string, day: number | string) => {
 const withSelectedMonth = <T extends { date: string }>(draft: T, month: string): T => ({ ...draft, date: dateInMonth(month, draft.date.slice(8, 10)) })
 
 function BudgetNav({ section, month }: { section: BudgetSection; month: string }) {
-  return <nav className="budget-nav" aria-label="Áreas do orçamento pessoal">
-    {(Object.keys(sectionLabels) as BudgetSection[]).map((key) => <Link className={section === key ? 'active' : ''} key={key} to={`/app/orcamento/${key}?mes=${month}`}>{sectionLabels[key]}</Link>)}
-  </nav>
+  const atual = AREA_DO_ENDERECO[section] ?? AREA_DO_ENDERECO.resumo!
+  const recortes = RECORTES[atual.area]
+  return <>
+    <nav className="tira-abas" aria-label="Áreas do orçamento pessoal">
+      {(Object.keys(AREAS) as BudgetArea[]).map((chave) => <Link
+        key={chave}
+        className={`chip-aba ${atual.area === chave ? 'chip-aba--ativa' : ''}`}
+        aria-current={atual.area === chave ? 'page' : undefined}
+        to={`/app/orcamento/${chave === 'saidas' ? 'despesas' : chave === 'metas' ? 'planejamento' : chave}?mes=${month}`}
+      >{AREAS[chave]}</Link>)}
+    </nav>
+    {recortes && <nav className="tira-recortes" aria-label={`Recortes de ${AREAS[atual.area]}`}>
+      {recortes.map(([chave, rotulo]) => <Link
+        key={chave}
+        className={`chip-recorte ${atual.recorte === chave ? 'chip-recorte--ativo' : ''}`}
+        aria-current={atual.recorte === chave ? 'page' : undefined}
+        to={`/app/orcamento/${chave}?mes=${month}`}
+      >{rotulo}</Link>)}
+    </nav>}
+  </>
 }
 
 function MoneyInput({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {

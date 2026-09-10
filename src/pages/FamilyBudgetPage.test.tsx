@@ -23,11 +23,24 @@ function renderBudget(entry: string) {
 }
 
 describe('interface do orçamento pessoal', () => {
-  it('mostra estado vazio acolhedor e todas as áreas do módulo', async () => {
+  /*
+    Seis áreas, e não nove. "Despesas", "Contas" e "Dívidas" descreviam a mesma
+    coisa — dinheiro saindo — e viraram recortes dentro de Saídas; planejar o
+    mês e guardar para um sonho juntaram-se em Metas e Planejamento.
+  */
+  it('mostra estado vazio acolhedor e as seis áreas do módulo', async () => {
     renderBudget('/app/orcamento/resumo?mes=2026-08')
     expect(await screen.findByRole('heading', { name: 'Pessoal' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Comece com o que já sabe' })).toBeInTheDocument()
-    for (const label of ['Visão do mês', 'Entradas', 'Despesas', 'Planejamento', 'Contas', 'Dívidas', 'Metas', 'Lista de compras', 'Relatórios']) expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
+    for (const label of ['Visão geral', 'Entradas', 'Saídas', 'Metas e Planejamento', 'Lista de compras', 'Relatórios']) {
+      expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
+    }
+  })
+
+  it('o endereço antigo continua chegando, agora dentro da área que o contém', async () => {
+    renderBudget('/app/orcamento/dividas?mes=2026-08')
+    expect(await screen.findByRole('link', { name: 'Saídas' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Dívidas' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('as duas áreas do Orçamento ficam visíveis o tempo todo', async () => {

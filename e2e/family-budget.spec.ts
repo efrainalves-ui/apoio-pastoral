@@ -34,6 +34,8 @@ test('orçamento pessoal funciona no computador e no celular sem misturar dados 
   await page.getByRole('button', { name: 'Salvar entrada' }).click()
   await expect(page.getByText('Entrada salva.')).toBeVisible()
 
+  // "Despesas" virou um recorte dentro de Saídas, e não mais uma área própria.
+  await page.getByRole('link', { name: 'Saídas', exact: true }).click()
   await page.getByRole('link', { name: 'Despesas', exact: true }).click()
   await page.getByRole('button', { name: 'Nova despesa' }).click()
   await page.getByLabel('Descrição').fill('Despesa Fictícia da Família')
@@ -41,7 +43,7 @@ test('orçamento pessoal funciona no computador e no celular sem misturar dados 
   await page.getByRole('button', { name: 'Salvar despesa' }).click()
   await expect(page.getByText('Despesa salva.')).toBeVisible()
 
-  await page.getByRole('link', { name: 'Visão do mês' }).click()
+  await page.getByRole('link', { name: 'Visão geral' }).click()
   const summary = page.getByLabel('Resumo financeiro do mês')
   await expect(summary.getByText('R$ 3.500,00')).toBeVisible()
   await expect(summary.getByText('R$ 500,00')).toBeVisible()
@@ -66,7 +68,7 @@ test('as duas áreas do Orçamento não misturam o dinheiro da família com o do
   await page.getByRole('button', { name: 'Salvar auxílio' }).click()
   await expect(page.getByText('Auxílio registrado.')).toBeVisible()
 
-  await page.getByRole('link', { name: 'Despesas' }).click()
+  await page.getByRole('link', { name: 'Despesas', exact: true }).click()
   await page.getByRole('button', { name: 'Nova despesa' }).click()
   await page.getByLabel('Descrição').fill('Abastecimento fictício')
   await page.getByLabel('Valor').fill('520')
