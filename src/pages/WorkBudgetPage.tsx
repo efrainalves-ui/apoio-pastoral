@@ -17,6 +17,7 @@ import { ConfiguracaoDoObreiro } from '../components/trabalho/ConfiguracaoDoObre
 import { LancamentosDoTrabalho } from '../components/trabalho/LancamentosDoTrabalho'
 import { PainelLetra } from '../components/trabalho/PainelLetra'
 import { Contracheques } from '../components/trabalho/Contracheques'
+import { RelatoriosDoTrabalho } from '../components/trabalho/RelatoriosDoTrabalho'
 import type { Contracheque, ContrachequeData } from '../work-budget/contracheque'
 import { formatar } from '../family-budget/dinheiro'
 import { configuracaoVazia, type ConfiguracaoDoTrabalhoData, type DependenteData } from '../work-budget/configuracao'
@@ -40,7 +41,7 @@ const hoje = localDateKey
 const sectionLabels = {
   resumo: 'Visão do mês', lancamentos: 'Lançamentos', contracheques: 'Contracheques', letra: 'LETRA',
   auxilios: 'Auxílios', despesas: 'Despesas', quilometragem: 'Quilometragem',
-  configuracao: 'Configuração',
+  relatorios: 'Relatórios', configuracao: 'Configuração',
 } as const
 type WorkSection = keyof typeof sectionLabels
 
@@ -82,6 +83,7 @@ export function WorkBudgetPage() {
   const [mileageId, setMileageId] = useState('')
   const [configuracao, setConfiguracao] = useState<ConfiguracaoDoTrabalhoData | null>(null)
   const [lancamentos, setLancamentos] = useState<LancamentoDoTrabalho[]>([])
+  const [todosOsLancamentos, setTodosOsLancamentos] = useState<LancamentoDoTrabalho[]>([])
   const [lancamentoDraft, setLancamentoDraft] = useState<LancamentoDoTrabalhoData | null>(null)
   const [lancamentoId, setLancamentoId] = useState('')
   const [orcamentoLetra, setOrcamentoLetra] = useState<(OrcamentoLetraData & { id: string }) | null>(null)
@@ -108,6 +110,7 @@ export function WorkBudgetPage() {
         service.dependentes(account.id, masterKey),
       ])
       setConfiguracao(config ? (({ id: _id, ...dados }) => { void _id; return dados })(config) : null)
+      setTodosOsLancamentos(todosOsLancamentos)
       setLancamentos(todosOsLancamentos.filter((item) => item.competencia === month))
       setOrcamentoLetra(orcamentos.find((item) => item.ano === month.slice(0, 4)) ?? null)
       setItensLetra(itens)
@@ -315,6 +318,15 @@ export function WorkBudgetPage() {
       onSalvarItem={(dados, id) => void salvarItemLetra(dados, id)}
       onSalvarAquisicao={(dados) => void salvarAquisicaoLetra(dados)}
       onApagar={(id) => void apagar(id, 'esta aquisição')}
+    />}
+
+    {section === 'relatorios' && <RelatoriosDoTrabalho
+      mes={month}
+      lancamentos={todosOsLancamentos}
+      contracheques={contracheques}
+      orcamentoLetra={orcamentoLetra}
+      itensLetra={itensLetra}
+      aquisicoes={aquisicoes}
     />}
 
     {section === 'configuracao' && <ConfiguracaoDoObreiro

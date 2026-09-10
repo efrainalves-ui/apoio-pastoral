@@ -139,11 +139,18 @@ export function LancamentosDoTrabalho({
               <strong>{lancamento.descricao || nomeCompleto(lancamento.subcategoriaId)}</strong>
               <small>
                 {nomeCompleto(lancamento.subcategoriaId)} · {formatarData(lancamento.data)}
-                {' · '}Pago {formatar(lancamento.valorPago)}
+                {lancamento.recebido === null
+                  ? (lancamento.previsto > 0 ? ` · Previsto ${formatar(lancamento.previsto)}` : '')
+                  : ` · Recebido ${formatar(lancamento.recebido)}`}
                 {' · '}Do bolso {formatar(parcelaPessoal(lancamento))}
               </small>
             </span>
-            <strong>{formatar(lancamento.recebido ?? lancamento.previsto)}</strong>
+            {/*
+              O destaque é o que foi pago, porque é o único número que não muda
+              ao longo do ciclo. Mostrar o previsto aqui daria R$ 0,00 num
+              lançamento de centenas de reais enquanto ninguém pediu o cálculo.
+            */}
+            <strong>{formatar(lancamento.valorPago)}</strong>
             <span className={`status-pill ${situacaoPill(lancamento.situacao)}`}>{SITUACAO_DO_LANCAMENTO_LABELS[lancamento.situacao]}</span>
             {diferenca !== null && diferenca !== 0 && <span className="status-pill status-pill--warning">{formatar(diferenca)}</span>}
             {lancamento.memoria && <Button variant="quiet" aria-expanded={memoriaAberta === lancamento.id} onClick={() => setMemoriaAberta(memoriaAberta === lancamento.id ? '' : lancamento.id)}>Memória</Button>}

@@ -238,7 +238,7 @@ export function ConfiguracaoDoObreiro({
                 <input id={`regra-${chave}-ref`} className="field__input" value={regra.referencia} onChange={(evento) => mudarRegra(chave, { referencia: evento.target.value })} />
               </label>
             </div>
-            <div className="form-actions">
+            <div className="form-actions form-actions--fim">
               <Button variant="danger" icon={<Trash2 />} aria-label={`Remover regra de ${nomeCompleto(chave)}`} onClick={() => removerRegra(chave)} />
             </div>
           </fieldset>)}

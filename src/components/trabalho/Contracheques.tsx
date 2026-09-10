@@ -101,7 +101,7 @@ export function Contracheques({ competencia, contracheques, subsistencia, onSalv
               </select>
             </label>
           </div>
-          <div className="form-actions">
+          <div className="form-actions form-actions--fim">
             <Button variant="danger" icon={<Trash2 />} aria-label={`Remover rubrica ${indice + 1}`} onClick={() => setRascunho({ ...rascunho, rubricas: rascunho.rubricas.filter((_, atual) => atual !== indice) })} />
           </div>
         </fieldset>)}

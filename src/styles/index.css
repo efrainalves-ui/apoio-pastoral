@@ -2975,6 +2975,16 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   sai colado no rótulo, enquanto o que vem depois se estica pela linha inteira.
   Aqui o texto é o primeiro filho, e é ele quem ocupa a sobra.
 */
+/*
+  Fila de ações que não estica.
+
+  No celular, `.form-actions > *` recebe `flex: 1 1 auto` — o que serve para
+  dois botões lado a lado, e transforma um apagar solitário numa barra vermelha
+  da largura da tela, fácil de acertar sem querer.
+*/
+.form-actions--fim { justify-content: flex-end; }
+.form-actions--fim > * { flex: 0 0 auto; }
+
 .entity-row--texto { display: flex; flex-wrap: wrap; align-items: center; }
 .entity-row--texto > span:first-child { flex: 1 1 220px; min-width: 0; display: grid; gap: 4px; }
 
