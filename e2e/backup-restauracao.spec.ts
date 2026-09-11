@@ -101,7 +101,7 @@ test('o backup sai como arquivo e volta num cofre vazio', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Restaurar seu distrito' })).toBeVisible()
 
   await page.locator('#restaurar-codigo').fill(CODIGO)
-  await page.getByLabel('Arquivo de backup').setInputFiles(arquivo!)
+  await page.getByLabel('Arquivo de backup').setInputFiles(arquivo)
   await page.getByRole('checkbox').check()
   await page.getByRole('button', { name: 'Restaurar este backup' }).click()
   await expect(page.getByText(/Backup restaurado/u)).toBeVisible({ timeout: 60_000 })
@@ -202,7 +202,7 @@ test('a restauração interrompida deixa a pendência e é concluída depois', a
   await expect(page.getByRole('heading', { name: 'Restaurar seu distrito' })).toBeVisible()
 
   await page.locator('#restaurar-codigo').fill(CODIGO)
-  await page.getByLabel('Arquivo de backup').setInputFiles(arquivo!)
+  await page.getByLabel('Arquivo de backup').setInputFiles(arquivo)
   await page.getByRole('checkbox').check()
   await page.getByRole('button', { name: 'Restaurar este backup' }).click()
 
