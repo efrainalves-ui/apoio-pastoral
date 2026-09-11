@@ -1,16 +1,17 @@
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it } from 'vitest'
 import { generateMasterKey } from '../crypto/vault'
-import { FamilyBudgetDatabase } from '../family-budget/database'
+import { ApoioDatabase } from '../db/database'
+import { isPersonalRecord } from '../district/closeDistrict'
 import { ShoppingListService } from './service'
 import { frequentItems, itemTotal, shoppingTotals, type ShoppingItemData } from './types'
 
 const CONTA = 'conta-ficticia-compras'
-const bancos: FamilyBudgetDatabase[] = []
+const bancos: ApoioDatabase[] = []
 afterEach(async () => { await Promise.all(bancos.splice(0).map((banco) => banco.delete())) })
 
 function novoBanco() {
-  const banco = new FamilyBudgetDatabase(`compras-${crypto.randomUUID()}`)
+  const banco = new ApoioDatabase(`compras-${crypto.randomUUID()}`)
   bancos.push(banco)
   return banco
 }
@@ -45,9 +46,9 @@ describe('lista de compras, área pessoal', () => {
 
     const salvo = await service.save(CONTA, chave, item('Arroz fictício', 2, 25))
     expect((await service.items(CONTA, chave)).map(({ name }) => name)).toEqual(['Arroz fictício'])
-    expect(JSON.stringify(await banco.records.toArray())).not.toContain('Arroz fictício')
+    expect(JSON.stringify(await banco.vaultRecords.toArray())).not.toContain('Arroz fictício')
 
-    await service.remove(CONTA, salvo.id)
+    await service.remove(CONTA, chave, salvo.id)
     expect(await service.items(CONTA, chave)).toHaveLength(0)
   })
 
@@ -105,13 +106,18 @@ describe('lista de compras, área pessoal', () => {
 
 describe('a lista de compras é pessoal, não do distrito', () => {
   it('vive no banco pessoal, junto do orçamento familiar', async () => {
-    // Se vivesse no cofre pastoral, sairia no encerramento de distrito junto
-    // com o que é da igreja — e compra de casa não tem nada a ver com isso.
+    /*
+      A lista mora no cofre para poder viajar entre os aparelhos — feita no
+      celular, ela precisa existir no computador. O que a mantém fora do
+      encerramento de distrito é o tipo do registro, não o banco.
+    */
     const banco = novoBanco(); const chave = await generateMasterKey()
     await new ShoppingListService(banco).save(CONTA, chave, item('Arroz fictício', 1, 5))
 
-    const gravados = await banco.records.toArray()
+    const gravados = await banco.vaultRecords.toArray()
     expect(gravados).toHaveLength(1)
-    expect(gravados[0]?.recordType).toBe('shopping')
+    expect(gravados[0]?.recordType).toBe('personal_shopping')
+    expect(isPersonalRecord({ schemaVersion: 1, type: 'family_budget_shopping', data: {} })).toBe(true)
+    expect(await banco.outbox.count()).toBeGreaterThan(0)
   })
 })

@@ -1,5 +1,5 @@
-import { decryptRecord, encryptPayload } from '../crypto/vault'
-import { familyBudgetDb, type FamilyBudgetDatabase } from './database'
+import { db, type ApoioDatabase } from '../db/database'
+import { PersonalVaultStore } from '../db/personalVault'
 import type {
   Cartao, CartaoData, Conta, ContaData, Integrante, IntegranteData,
   Lancamento, LancamentoData, Transferencia, TransferenciaData,
@@ -51,34 +51,28 @@ export const OCORRENCIAS_ADIANTADAS = 12
 
 const agora = () => new Date().toISOString()
 
-export class FinancasPessoaisService {
-  constructor(private readonly database: FamilyBudgetDatabase = familyBudgetDb) {}
+/*
+  O orçamento pessoal vive no cofre cifrado do pastor, e não mais num banco à
+  parte.
 
-  private async listar<T extends TipoPessoal>(accountId: string, masterKey: CryptoKey, tipo: T): Promise<Array<DadosPorTipo[T] & { id: string }>> {
-    const registros = await this.database.records
-      .where('accountId').equals(accountId)
-      .filter((registro) => registro.recordType === (`pessoal_${tipo}` as never))
-      .toArray()
-    const abertos = await Promise.all(registros.map(async (registro) => {
-      const payload = await decryptRecord(masterKey, registro)
-      return payload?.type === `pessoal_${tipo}` ? { id: registro.id, ...(payload.data as DadosPorTipo[T]) } : null
-    }))
-    return abertos.flatMap((item) => item ? [item] : [])
+  O banco próprio garantia a separação do distrito, e cobrava um preço
+  invisível: nenhuma sincronização olhava para ele, e o que era anotado no
+  celular não existia no computador. A separação continua, feita pelo tipo do
+  registro — `isPersonalRecord` reconhece cada um, e o encerramento de distrito
+  os preserva.
+*/
+export class FinancasPessoaisService {
+  private readonly cofre: PersonalVaultStore
+  constructor(database: ApoioDatabase = db) { this.cofre = new PersonalVaultStore(database) }
+
+  private listar<T extends TipoPessoal>(accountId: string, masterKey: CryptoKey, tipo: T): Promise<Array<DadosPorTipo[T] & { id: string }>> {
+    return this.cofre.listar<DadosPorTipo[T]>(accountId, masterKey, `pessoal_${tipo}`, `pessoal_${tipo}`)
   }
 
-  private async gravar<T extends TipoPessoal>(
+  private gravar<T extends TipoPessoal>(
     accountId: string, masterKey: CryptoKey, tipo: T, dados: DadosPorTipo[T], id: string = crypto.randomUUID(),
   ): Promise<DadosPorTipo[T] & { id: string }> {
-    const existente = await this.database.records.get(id)
-    if (existente && existente.accountId !== accountId) throw new Error('Este registro pertence a outra conta.')
-    const carimbo = agora()
-    const completo = { ...dados, createdAt: dados.createdAt || carimbo, updatedAt: carimbo }
-    const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: `pessoal_${tipo}`, data: completo }, id)
-    await this.database.records.put({
-      id, accountId, recordType: `pessoal_${tipo}` as never,
-      createdAt: existente?.createdAt ?? carimbo, updatedAt: carimbo, ...envelope,
-    })
-    return { id, ...completo }
+    return this.cofre.gravar(accountId, masterKey, `pessoal_${tipo}`, `pessoal_${tipo}`, dados, id)
   }
 
   /** Os identificadores já migrados do formato antigo. */
@@ -114,10 +108,14 @@ export class FinancasPessoaisService {
     return paraGravar.length
   }
 
-  async apagar(accountId: string, id: string): Promise<void> {
-    const registro = await this.database.records.get(id)
-    if (!registro || registro.accountId !== accountId) throw new Error('Registro não encontrado.')
-    await this.database.records.delete(id)
+  /**
+   * Apaga publicando a lápide cifrada.
+   *
+   * Precisa da chave porque o apagamento também viaja: sem lápide, o registro
+   * voltaria do outro aparelho na sincronização seguinte.
+   */
+  async apagar(accountId: string, masterKey: CryptoKey, id: string): Promise<void> {
+    await this.cofre.apagar(accountId, masterKey, id)
   }
 
   lancamentos(accountId: string, masterKey: CryptoKey): Promise<Lancamento[]> { return this.listar(accountId, masterKey, 'lancamento') }
@@ -191,10 +189,10 @@ export class FinancasPessoaisService {
 
   /** Apaga uma ocorrência, as seguintes ou a série inteira. */
   async apagarSerie(
-    accountId: string, todos: readonly Lancamento[], alvo: Lancamento, escopo: EscopoDeEdicao,
+    accountId: string, masterKey: CryptoKey, todos: readonly Lancamento[], alvo: Lancamento, escopo: EscopoDeEdicao,
   ): Promise<number> {
     const alcancados = alcanceDaEdicao(todos, alvo, escopo)
-    await Promise.all(alcancados.map(({ id }) => this.apagar(accountId, id)))
+    for (const { id } of alcancados) await this.apagar(accountId, masterKey, id)
     return alcancados.length
   }
 }

@@ -1,60 +1,51 @@
-import { decryptRecord, encryptPayload } from '../crypto/vault'
-import { familyBudgetDb, type FamilyBudgetDatabase } from '../family-budget/database'
+import { db, type ApoioDatabase } from '../db/database'
+import { PersonalVaultStore } from '../db/personalVault'
 import type { BudgetExpenseData } from '../family-budget/types'
 import { itemTotal, type ShoppingItemData, type ShoppingItemEntity } from './types'
 
 const agora = () => new Date().toISOString()
 
 /**
- * A lista de compras mora no banco pessoal, ao lado do orçamento familiar.
+ * A lista de compras é do pastor, e agora viaja com ele.
  *
- * É o mesmo lugar por um motivo: compra de casa é dinheiro de casa. Ficar no
- * banco pastoral faria a lista sair no encerramento de distrito junto com o
- * que é da igreja, e ela não tem nada a ver com isso.
+ * Ela morava no banco pessoal, à parte, e era isso que a mantinha fora do
+ * encerramento de distrito — compra de casa é dinheiro de casa, e não tem nada
+ * a ver com a igreja. O preço era não existir no outro aparelho: a lista feita
+ * no celular não aparecia no computador, que é justamente onde ela seria útil.
+ *
+ * Agora mora no cofre cifrado e anda pelos mesmos trilhos. A promessa continua
+ * inteira, sustentada pelo tipo do registro: `isPersonalRecord` a reconhece, e
+ * o encerramento de distrito a preserva.
  */
 export class ShoppingListService {
-  constructor(private readonly database: FamilyBudgetDatabase = familyBudgetDb) {}
+  private readonly cofre: PersonalVaultStore
+  constructor(database: ApoioDatabase = db) { this.cofre = new PersonalVaultStore(database) }
 
   async items(accountId: string, key: CryptoKey): Promise<ShoppingItemEntity[]> {
-    const records = await this.database.records.where('accountId').equals(accountId)
-      .filter((record) => record.recordType === 'shopping').toArray()
-    const abertos = await Promise.all(records.map(async (record) => {
-      const payload = await decryptRecord(key, record)
-      return payload?.type === 'family_budget_shopping' ? ({ id: record.id, ...(payload.data as ShoppingItemData) }) : null
-    }))
-    return abertos.flatMap((item) => item ? [item] : [])
-      .sort((esquerda, direita) => esquerda.createdAt.localeCompare(direita.createdAt))
+    const abertos = await this.cofre.listar<ShoppingItemData>(accountId, key, 'personal_shopping', 'family_budget_shopping')
+    return abertos.sort((esquerda, direita) => esquerda.createdAt.localeCompare(direita.createdAt))
   }
 
   async save(accountId: string, key: CryptoKey, input: ShoppingItemData, id: string = crypto.randomUUID()): Promise<ShoppingItemEntity> {
     if (!input.name.trim()) throw new Error('Informe o nome do item.')
     if (!(input.quantity > 0)) throw new Error('Informe uma quantidade maior que zero.')
-    const existente = await this.database.records.get(id)
-    if (existente && existente.accountId !== accountId) throw new Error('Este item pertence a outra conta.')
-    const carimbo = agora()
     const data: ShoppingItemData = {
       ...input,
       name: input.name.trim(),
       notes: input.notes.trim(),
       unitPrice: Math.max(0, input.unitPrice),
-      createdAt: input.createdAt || carimbo,
-      updatedAt: carimbo,
     }
-    const envelope = await encryptPayload(key, { schemaVersion: 1, type: 'family_budget_shopping', data }, id)
-    await this.database.records.put({ id, accountId, recordType: 'shopping', createdAt: existente?.createdAt ?? carimbo, updatedAt: carimbo, ...envelope })
-    return { id, ...data }
+    return this.cofre.gravar(accountId, key, 'personal_shopping', 'family_budget_shopping', data, id)
   }
 
-  async remove(accountId: string, id: string): Promise<void> {
-    const record = await this.database.records.get(id)
-    if (!record || record.accountId !== accountId) throw new Error('Item não encontrado.')
-    await this.database.records.delete(id)
+  async remove(accountId: string, key: CryptoKey, id: string): Promise<void> {
+    await this.cofre.apagar(accountId, key, id)
   }
 
   /** Tira da lista tudo que já foi confirmado, depois da compra. */
   async clearConfirmed(accountId: string, key: CryptoKey): Promise<number> {
     const confirmados = (await this.items(accountId, key)).filter(({ confirmed }) => confirmed)
-    await this.database.records.bulkDelete(confirmados.map(({ id }) => id))
+    await this.cofre.apagarVarios(accountId, key, confirmados.map(({ id }) => id))
     return confirmados.length
   }
 

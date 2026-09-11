@@ -245,7 +245,7 @@ export function WorkBudgetPage() {
     try {
       if (espelho.acao === 'nada') { setNotice('Nada saiu do bolso neste lançamento.'); setError(''); return }
       if (espelho.acao === 'remover' && espelho.id) {
-        await pessoaisService.apagar(account.id, espelho.id)
+        await pessoaisService.apagar(account.id, masterKey, espelho.id)
         const { id: _id, ...dados } = lancamento; void _id
         await service.salvarLancamento(account.id, masterKey, { ...dados, lancamentoPessoalId: null }, lancamento.id)
         await pronto('O reembolso cobriu tudo: o lançamento saiu do orçamento pessoal.')

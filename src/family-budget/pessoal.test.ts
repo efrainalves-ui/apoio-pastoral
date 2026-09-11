@@ -1,16 +1,16 @@
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it } from 'vitest'
 import { generateMasterKey } from '../crypto/vault'
-import { FamilyBudgetDatabase } from './database'
+import { ApoioDatabase } from '../db/database'
 import { emCentavos } from './dinheiro'
 import type { LancamentoData } from './lancamento'
 import { FinancasPessoaisService, OCORRENCIAS_ADIANTADAS } from './pessoal'
 
-const bancos: FamilyBudgetDatabase[] = []
+const bancos: ApoioDatabase[] = []
 afterEach(async () => { await Promise.all(bancos.splice(0).map((banco) => banco.delete())) })
 
 async function montar() {
-  const banco = new FamilyBudgetDatabase(`pessoal-ficticio-${crypto.randomUUID()}`)
+  const banco = new ApoioDatabase(`pessoal-ficticio-${crypto.randomUUID()}`)
   bancos.push(banco)
   return { servico: new FinancasPessoaisService(banco), masterKey: await generateMasterKey(), conta: 'conta-ficticia' }
 }
@@ -119,7 +119,7 @@ describe('finanças pessoais', () => {
       await servico.salvarLancamento(conta, masterKey, saida({ recorrencia: 'mensal' }))
       const todos = await servico.lancamentos(conta, masterKey)
 
-      const apagados = await servico.apagarSerie(conta, todos, todos[0]!, 'serie_inteira')
+      const apagados = await servico.apagarSerie(conta, masterKey, todos, todos[0]!, 'serie_inteira')
       expect(apagados).toBe(OCORRENCIAS_ADIANTADAS + 1)
       expect(await servico.lancamentos(conta, masterKey)).toHaveLength(0)
     })

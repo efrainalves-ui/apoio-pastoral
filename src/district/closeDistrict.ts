@@ -28,8 +28,26 @@ const TIPOS_DO_OBREIRO = new Set([
   'work_config', 'work_dependent', 'letra_budget', 'letra_item', 'letra_acquisition', 'work_paycheck',
 ])
 
+/*
+  Leitura, orçamento familiar e lista de compras.
+
+  Eles ficavam de fora do encerramento por morarem em bancos próprios. Agora
+  moram no mesmo cofre, para poderem sincronizar — e a separação passa a ser
+  feita aqui, pelo tipo. É a mesma promessa de antes, sustentada por outro
+  mecanismo: o que é do pastor continua sendo dele quando o distrito acaba.
+*/
+const TIPOS_PESSOAIS = new Set([
+  /* Os nomes são os do payload, que é o que `isPersonalRecord` recebe — e eles
+     não mudam, para os registros já gravados continuarem sendo reconhecidos. */
+  'personal_reading_book', 'personal_reading_session', 'personal_reading_goal',
+  'family_budget_shopping',
+  'pessoal_lancamento', 'pessoal_transferencia', 'pessoal_conta', 'pessoal_cartao',
+  'pessoal_integrante', 'pessoal_meta', 'pessoal_aporte', 'pessoal_planejamento',
+  'pessoal_compra', 'pessoal_migracao',
+])
+
 export function isPersonalRecord(payload: VaultPayload): boolean {
-  if (TIPOS_DO_OBREIRO.has(payload.type)) return true
+  if (TIPOS_DO_OBREIRO.has(payload.type) || TIPOS_PESSOAIS.has(payload.type)) return true
   if (payload.type !== 'agenda_event') return false
   const dados = payload.data as { category?: string; churchId?: string | null }
   return dados.category === 'personal' && !dados.churchId

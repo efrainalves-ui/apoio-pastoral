@@ -6,7 +6,7 @@ import { ApoioDatabase } from '../db/database'
 import { FamilyBudgetDatabase } from '../family-budget/database'
 import { VaultRepository } from '../db/repository'
 import { pendingRemotePurge } from '../db/purge'
-import { ReadingDatabase } from '../reading/database'
+import type { ReadingDatabase } from '../reading/database'
 import { ReadingService } from '../reading/service'
 import { CloseDistrictService, districtClosureStage, isPersonalRecord, pendingDistrictClosure, type CloseDistrictRemote } from './closeDistrict'
 
@@ -110,6 +110,21 @@ describe('encerrar distrito', () => {
     expect(isPersonalRecord({ schemaVersion: 1, type: 'work_paycheck', data: {} })).toBe(true)
   })
 
+  /*
+    Leitura, orçamento familiar e lista de compras passaram a morar no cofre
+    para poderem sincronizar. A promessa de que eles sobrevivem ao encerramento
+    continua — sustentada agora pelo tipo, e não pelo banco separado.
+  */
+  it('leitura, orçamento familiar e lista de compras seguem o pastor', () => {
+    for (const tipo of [
+      'personal_reading_book', 'personal_reading_session', 'personal_reading_goal',
+      'family_budget_shopping', 'pessoal_lancamento', 'pessoal_meta', 'pessoal_conta',
+      'pessoal_compra', 'pessoal_planejamento',
+    ]) {
+      expect(isPersonalRecord({ schemaVersion: 1, type: tipo, data: {} })).toBe(true)
+    }
+  })
+
   /* O trabalho feito no distrito fica com o distrito. */
   it('os lançamentos do ministério são do distrito', () => {
     expect(isPersonalRecord({ schemaVersion: 1, type: 'work_entry', data: {} })).toBe(false)
@@ -203,8 +218,12 @@ describe('encerrar distrito', () => {
   it('não toca em leitura nem no orçamento familiar', async () => {
     const banco = novoBanco(); const chave = await generateMasterKey()
     await distritoFicticio(banco, chave)
-    const bancoLeitura = new ReadingDatabase(`leitura-${crypto.randomUUID()}`); bancosLeitura.push(bancoLeitura)
-    const leitura = new ReadingService(bancoLeitura)
+    /*
+      A leitura agora mora no mesmo cofre, para poder sincronizar. Por isso este
+      teste passou a valer mais do que antes: ele prova que ela sobrevive ao
+      encerramento **estando no mesmo banco** que tudo o que é apagado.
+    */
+    const leitura = new ReadingService(banco)
     await leitura.saveBook(CONTA, chave, { title: 'Livro Fictício', author: 'Autor Fictício', category: 'theology', totalPages: 100, pagesRead: 10, startDate: '2026-01-01', completedDate: null, status: 'reading', notes: '', createdAt: '', updatedAt: '' })
     const familia = new FamilyBudgetDatabase(`orcamento-${crypto.randomUUID()}`); bancosFamilia.push(familia)
     await familia.records.put({ id: 'entrada-ficticia', accountId: CONTA, recordType: 'income', algorithm: 'AES-GCM-256', ciphertext: 'x', iv: 'y', aad: 'z', keyVersion: 1, createdAt: '', updatedAt: '' })

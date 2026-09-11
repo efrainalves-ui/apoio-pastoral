@@ -166,7 +166,7 @@ export function FinancasPessoaisPage({ area, mes }: FinancasPessoaisPageProps) {
     if (!window.confirm(escopo === 'somente_esta'
       ? `Excluir "${lancamento.descricao}"?`
       : `Excluir ${escopo === 'serie_inteira' ? 'toda a série' : 'esta e as próximas ocorrências'} de "${lancamento.descricao}"?`)) return
-    const quantos = await pessoais.apagarSerie(account.id, novos, lancamento, escopo)
+    const quantos = await pessoais.apagarSerie(account.id, masterKey, novos, lancamento, escopo)
     setAviso(quantos === 1 ? 'Lançamento excluído.' : `${quantos} lançamentos excluídos.`)
     await carregar()
   }
@@ -251,10 +251,10 @@ export function FinancasPessoaisPage({ area, mes }: FinancasPessoaisPageProps) {
         onSalvarMeta={(dados, id) => void salvarMeta(dados, id)}
         onAportar={(metaId, valor, data) => void aportar(metaId, valor, data)}
         onApagarMeta={(meta) => {
-          if (!account || !window.confirm(`Excluir "${meta.nome}"? Os aportes registrados nela também saem.`)) return
+          if (!account || !masterKey || !window.confirm(`Excluir "${meta.nome}"? Os aportes registrados nela também saem.`)) return
           void (async () => {
-            await Promise.all(aportes.filter(({ metaId }) => metaId === meta.id).map(({ id }) => pessoais.apagar(account.id, id)))
-            await pessoais.apagar(account.id, meta.id)
+            await Promise.all(aportes.filter(({ metaId }) => metaId === meta.id).map(({ id }) => pessoais.apagar(account.id, masterKey, id)))
+            await pessoais.apagar(account.id, masterKey, meta.id)
             setAviso('Meta excluída.')
             await carregar()
           })()

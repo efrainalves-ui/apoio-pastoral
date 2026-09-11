@@ -42,6 +42,8 @@ import { GoalsPage } from '../pages/GoalsPage'
 import { MissionaryPairsPage } from '../pages/MissionaryPairsPage'
 import { GoalAreaPage } from '../pages/GoalAreaPage'
 import { BackupPage } from '../pages/BackupPage'
+import { MigracaoDosPessoais } from '../db/migrarPessoais'
+import { notificarDadosSincronizados } from '../sync/useReloadOnSync'
 import { RestoreBackupPage } from '../pages/RestoreBackupPage'
 import { CommissionsPage } from '../pages/CommissionsPage'
 import { CommissionConfigPage } from '../pages/CommissionConfigPage'
@@ -185,6 +187,40 @@ function SyncPending() {
  * precisa restaurar. Encerramento pendente e aprovação de aparelho continuam
  * valendo: são anteriores a qualquer coisa que se faça com os dados.
  */
+/**
+ * Traz para o cofre, uma vez por aparelho, o que ficou nos bancos pessoais.
+ *
+ * Precisa acontecer antes de as telas lerem: elas agora procuram leitura,
+ * orçamento e lista de compras no cofre, e sem a mudança o pastor abriria o
+ * aplicativo e veria tudo vazio. Roda em silêncio e avisa as telas quando
+ * termina, para elas relerem sem que ninguém precise recarregar a página.
+ *
+ * Uma falha aqui não trava o aplicativo: o banco antigo continua intacto, e a
+ * próxima abertura tenta de novo.
+ */
+function useMudancaDosPessoais() {
+  const { account, masterKey } = useAuthVault()
+  const [pronta, setPronta] = useState(false)
+
+  useEffect(() => {
+    if (!account || !masterKey) return
+    let cancelado = false
+    void (async () => {
+      try {
+        const resultado = await new MigracaoDosPessoais().mover(account.id, masterKey)
+        if (resultado.movidos > 0) notificarDadosSincronizados()
+      } catch {
+        // O lugar antigo continua intacto; a próxima abertura tenta outra vez.
+      } finally {
+        if (!cancelado) setPronta(true)
+      }
+    })()
+    return () => { cancelado = true }
+  }, [account, masterKey])
+
+  return pronta
+}
+
 function RestoreAccess({ children }: { children: ReactNode }) {
   const { masterKey, recoveryCode } = useAuthVault()
   const encerramento = usePendingClosure()
@@ -217,7 +253,9 @@ function ProtectedApp() {
   const encerramento = usePendingClosure()
   const { pending, approve } = useCurrentDeviceApproval()
   const hasDistrict = useDistrictPresence()
+  const pessoaisProntos = useMudancaDosPessoais()
   if (!masterKey || recoveryCode) return <Navigate to="/acesso" replace />
+  if (!pessoaisProntos) return <div className="app-loading" role="status">Preparando sua área…</div>
   if (encerramento.pending === null) return <div className="app-loading" role="status">Preparando sua área…</div>
   if (encerramento.pending) return <ResumeClosurePage onDone={encerramento.done} />
   if (pending === null) return <div className="app-loading" role="status">Preparando sua área…</div>

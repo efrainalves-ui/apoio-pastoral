@@ -63,8 +63,8 @@ export function ShoppingListView({ accountId, masterKey, onDone, onFail }: {
   }
 
   async function apagar(item: ShoppingItemEntity) {
-    if (!window.confirm(`Apagar ${item.name} da lista?`)) return
-    try { await service.remove(accountId, item.id); await carregar(); onDone('Item apagado.') } catch (motivo) { onFail(motivo) }
+    if (!masterKey || !window.confirm(`Apagar ${item.name} da lista?`)) return
+    try { await service.remove(accountId, masterKey, item.id); await carregar(); onDone('Item apagado.') } catch (motivo) { onFail(motivo) }
   }
 
   async function lancarDespesa() {
