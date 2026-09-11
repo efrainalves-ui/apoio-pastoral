@@ -51,6 +51,7 @@ const TYPE_LABELS: Record<string, string> = {
   work_allowance: 'Auxílios do ministério', work_expense: 'Despesas do ministério',
   mileage: 'Quilometragem',
   work_entry: 'Lançamentos do ministério',
+  work_trip: 'Viagens e mudanças',
   material: 'Materiais', material_distribution: 'Distribuições de material',
   material_need: 'Necessidades e pedidos', acms_report: 'Relatórios ACMS importados',
 }

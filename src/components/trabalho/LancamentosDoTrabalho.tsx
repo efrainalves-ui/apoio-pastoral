@@ -24,6 +24,7 @@ interface LancamentosDoTrabalhoProps {
   onApagar: (id: string) => void
   onNovo: () => void
   onLevarAoPessoal: (lancamento: LancamentoDoTrabalho) => void
+  viagens: Array<{ id: string; destino: string }>
 }
 
 /**
@@ -35,7 +36,7 @@ interface LancamentosDoTrabalhoProps {
  */
 export function LancamentosDoTrabalho({
   lancamentos, configuracao, rascunho, editandoId,
-  onRascunho, onSalvar, onEditar, onApagar, onNovo, onLevarAoPessoal,
+  onRascunho, onSalvar, onEditar, onApagar, onNovo, onLevarAoPessoal, viagens,
 }: LancamentosDoTrabalhoProps) {
   const [memoriaAberta, setMemoriaAberta] = useState('')
   const resumo = useMemo(() => resumoDoTrabalho(lancamentos), [lancamentos])
@@ -110,6 +111,13 @@ export function LancamentosDoTrabalho({
         <label className="field" htmlFor="lancamento-recebimento"><span className="field__label">Data do recebimento</span>
           <input id="lancamento-recebimento" className="field__input" type="date" value={rascunho.dataDoRecebimento} onChange={(evento) => campo('dataDoRecebimento', evento.target.value)} />
         </label>
+        {/* Agrupar a despesa sob a viagem é o que faz o relatório dela dizer algo. */}
+        {Boolean(viagens.length) && <label className="field" htmlFor="lancamento-viagem"><span className="field__label">Viagem ou mudança</span>
+          <select id="lancamento-viagem" className="field__input" value={rascunho.viagemId ?? ''} onChange={(evento) => campo('viagemId', evento.target.value || null)}>
+            <option value="">Nenhuma</option>
+            {viagens.map((viagem) => <option key={viagem.id} value={viagem.id}>{viagem.destino}</option>)}
+          </select>
+        </label>}
         <label className="field" htmlFor="lancamento-documento"><span className="field__label">Documento</span>
           <input id="lancamento-documento" className="field__input" value={rascunho.documento} onChange={(evento) => campo('documento', evento.target.value)} />
         </label>

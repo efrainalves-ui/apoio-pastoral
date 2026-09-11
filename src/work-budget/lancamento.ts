@@ -61,6 +61,14 @@ export interface LancamentoDoTrabalhoData {
   agendaEventId: string | null
   /** Lançamento espelho no orçamento pessoal, quando houver parcela pessoal. */
   lancamentoPessoalId: string | null
+  /**
+   * Viagem ou mudança a que este lançamento pertence.
+   *
+   * Uma passagem, um hotel e três almoços isolados no mês não dizem nada;
+   * agrupados sob a viagem, dizem quanto ela custou ao pastor. Ausente nos
+   * lançamentos gravados antes desta ligação existir.
+   */
+  viagemId?: string | null
   observacao: string
   createdAt: string
   updatedAt: string

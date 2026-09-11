@@ -136,6 +136,21 @@ export class WorkBudgetService {
     return this.save(accountId, key, 'letra_acquisition', { ...input, descricao: input.descricao.trim() }, id)
   }
 
+  viagens(accountId: string, key: CryptoKey) { return this.list(accountId, key, 'work_trip') }
+
+  /**
+   * Grava uma viagem ou mudança.
+   *
+   * O destino é obrigatório porque é ele que dá sentido ao agrupamento: uma
+   * viagem sem destino é uma pasta sem nome, e o relatório dela não diz nada.
+   */
+  async salvarViagem(accountId: string, key: CryptoKey, input: WorkAnyDataByType['work_trip'], id?: string) {
+    if (!input.destino.trim()) throw new Error('Informe o destino.')
+    if (!input.saida) throw new Error('Informe a data de saída.')
+    if (input.retorno && input.retorno < input.saida) throw new Error('O retorno não pode ser antes da saída.')
+    return this.save(accountId, key, 'work_trip', { ...input, destino: input.destino.trim(), motivo: input.motivo.trim() }, id)
+  }
+
   contracheques(accountId: string, key: CryptoKey) { return this.list(accountId, key, 'work_paycheck') }
 
   /**

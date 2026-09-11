@@ -17,6 +17,8 @@ import { ConfiguracaoDoObreiro } from '../components/trabalho/ConfiguracaoDoObre
 import { LancamentosDoTrabalho } from '../components/trabalho/LancamentosDoTrabalho'
 import { PainelLetra } from '../components/trabalho/PainelLetra'
 import { Contracheques } from '../components/trabalho/Contracheques'
+import { Viagens } from '../components/trabalho/Viagens'
+import type { Viagem, ViagemData } from '../work-budget/viagem'
 import { RelatoriosDoTrabalho } from '../components/trabalho/RelatoriosDoTrabalho'
 import type { Contracheque, ContrachequeData } from '../work-budget/contracheque'
 import { formatar } from '../family-budget/dinheiro'
@@ -45,7 +47,7 @@ const hoje = localDateKey
   auxílios, despesas e quilometragem guardam registros que já existem.
 */
 const sectionLabels = {
-  resumo: 'Visão do mês', lancamentos: 'Lançamentos', quilometragem: 'Quilometragem',
+  resumo: 'Visão do mês', lancamentos: 'Lançamentos', quilometragem: 'Quilometragem', viagens: 'Viagens',
   contracheques: 'Contracheques', letra: 'LETRA', relatorios: 'Relatórios',
   auxilios: 'Auxílios', despesas: 'Despesas', configuracao: 'Configuração',
 } as const
@@ -97,6 +99,7 @@ export function WorkBudgetPage() {
   const [aquisicoes, setAquisicoes] = useState<AquisicaoLetra[]>([])
   const [contracheques, setContracheques] = useState<Contracheque[]>([])
   const [dependentes, setDependentes] = useState<Array<DependenteData & { id: string }>>([])
+  const [viagens, setViagens] = useState<Viagem[]>([])
 
   const load = useCallback(async () => {
     if (!account || !masterKey) return
@@ -106,7 +109,7 @@ export function WorkBudgetPage() {
       const district = await districtService.getDistrict(account.id, masterKey)
       setChurches(district ? await districtService.listChurches(account.id, masterKey, district.id) : [])
 
-      const [config, todosOsLancamentos, orcamentos, itens, compras, folhas, filhos] = await Promise.all([
+      const [config, todosOsLancamentos, orcamentos, itens, compras, folhas, filhos, idas] = await Promise.all([
         service.configuracao(account.id, masterKey),
         service.lancamentos(account.id, masterKey),
         service.orcamentosLetra(account.id, masterKey),
@@ -114,6 +117,7 @@ export function WorkBudgetPage() {
         service.aquisicoesLetra(account.id, masterKey),
         service.contracheques(account.id, masterKey),
         service.dependentes(account.id, masterKey),
+        service.viagens(account.id, masterKey),
       ])
       setConfiguracao(config ? (({ id: _id, ...dados }) => { void _id; return dados })(config) : null)
       setTodosOsLancamentos(todosOsLancamentos)
@@ -123,6 +127,7 @@ export function WorkBudgetPage() {
       setAquisicoes(compras)
       setContracheques(folhas)
       setDependentes(filhos)
+      setViagens(idas)
     } catch (motivo) {
       setError(motivo instanceof Error ? motivo.message : 'Não foi possível abrir o orçamento do trabalho.')
     } finally {
@@ -213,6 +218,10 @@ export function WorkBudgetPage() {
   async function salvarDependente(dados: DependenteData, id?: string) {
     if (!account || !masterKey) return
     try { await service.salvarDependente(account.id, masterKey, dados, id); await pronto('Dependente salvo.') } catch (motivo) { falhou(motivo) }
+  }
+  async function salvarViagem(dados: ViagemData, id?: string) {
+    if (!account || !masterKey) return
+    try { await service.salvarViagem(account.id, masterKey, dados, id); await pronto('Viagem salva.') } catch (motivo) { falhou(motivo) }
   }
   async function salvarContracheque(dados: ContrachequeData, id?: string) {
     if (!account || !masterKey) return
@@ -325,6 +334,17 @@ export function WorkBudgetPage() {
       onEditar={(lancamento) => { setLancamentoId(lancamento.id); const { id: _id, ...dados } = lancamento; void _id; setLancamentoDraft(dados) }}
       onApagar={(id) => void apagar(id, 'este lançamento')}
       onLevarAoPessoal={(lancamento) => void levarAoPessoal(lancamento)}
+      viagens={viagens}
+    />}
+
+    {section === 'viagens' && <Viagens
+      viagens={viagens}
+      lancamentos={todosOsLancamentos}
+      valorDaDiaria={configuracao?.regrasPorItem.diaria?.valorFixo ?? null}
+      fpe={fpeVigente}
+      percentualDeAudit={auditVigente}
+      onSalvar={(dados, id) => void salvarViagem(dados, id)}
+      onApagar={(id) => void apagar(id, 'esta viagem')}
     />}
 
     {section === 'contracheques' && <Contracheques

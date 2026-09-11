@@ -316,3 +316,53 @@ test('o contracheque é importado de arquivo e conferido antes de gravar', async
   await expect(page.getByText('Contracheque guardado.')).toBeVisible()
   await expect(page.getByText('2026-08')).toBeVisible()
 })
+
+test('a viagem agrupa diárias e despesas num relatório só', async ({ page }) => {
+  test.setTimeout(120_000)
+  await entrar(page)
+
+  await navigateInsideApp(page, '/app/orcamento/trabalho/configuracao', page.getByRole('heading', { name: 'Base de subsistência' }))
+  await page.locator('#config-nova-regra').selectOption('diaria')
+  await page.locator('#regra-diaria-fixo').fill('180,00')
+  await page.getByRole('button', { name: 'Salvar configuração' }).click()
+  await expect(page.getByText('Configuração salva.')).toBeVisible()
+
+  await navigateInsideApp(page, '/app/orcamento/trabalho/viagens', page.getByRole('button', { name: 'Nova viagem' }))
+  await page.getByRole('button', { name: 'Nova viagem' }).click()
+  await page.locator('#viagem-destino').fill('Assembleia Fictícia')
+  await page.locator('#viagem-motivo').fill('Assembleia do Campo')
+  await page.locator('#viagem-saida').fill('2026-09-10')
+  await page.locator('#viagem-retorno').fill('2026-09-13')
+
+  // De 10 a 13 são três noites: proposto pelas datas, e corrigível.
+  await expect(page.locator('#viagem-diarias')).toHaveValue('3')
+  await page.getByRole('button', { name: 'Salvar', exact: true }).click()
+  await expect(page.getByText('Viagem salva.')).toBeVisible()
+
+  // 3 × R$ 180,00 = R$ 540,00.
+  const cartao = page.locator('.card').filter({ hasText: 'Assembleia Fictícia' })
+  await expect(cartao.getByText(/3 · R\$.540,00/u)).toBeVisible()
+
+  // Uma despesa ligada à viagem entra no relatório dela.
+  await navigateInsideApp(page, '/app/orcamento/trabalho/lancamentos', page.getByRole('button', { name: 'Novo lançamento' }))
+  await page.getByRole('button', { name: 'Novo lançamento' }).click()
+  await page.locator('#lancamento-categoria').selectOption('hospedagem')
+  await page.locator('#lancamento-descricao').fill('Hotel fictício')
+  await page.locator('#lancamento-pago').fill('450')
+  await page.locator('#lancamento-viagem').selectOption({ label: 'Assembleia Fictícia' })
+  await page.getByRole('button', { name: 'Salvar lançamento' }).click()
+  await expect(page.getByText('Lançamento registrado.')).toBeVisible()
+
+  await navigateInsideApp(page, '/app/orcamento/trabalho/viagens', page.getByRole('button', { name: 'Nova viagem' }))
+  const relatorio = page.locator('.card').filter({ hasText: 'Assembleia Fictícia' })
+  await expect(relatorio.getByText('R$ 450,00').first()).toBeVisible()
+  await relatorio.getByRole('button', { name: '1 despesa' }).click()
+  await expect(relatorio.getByText('Hotel fictício')).toBeVisible()
+
+  /*
+    Mudança não rende diária — o obreiro não está a serviço fora, está se
+    mudando — mas as despesas dela seguem valendo.
+  */
+  await page.getByRole('button', { name: 'Nova mudança' }).click()
+  await expect(page.locator('#viagem-diarias')).toHaveCount(0)
+})
