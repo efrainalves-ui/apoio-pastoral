@@ -42,10 +42,17 @@ esteja na mesma nuvem.
 
 ## 3. Como restauro
 
+**No aparelho que já está funcionando:**
+
 1. Menu → **Backup seguro**.
 2. Em "Restaurar backup", escolha o arquivo `.apb`.
-3. Marque a confirmação.
-4. Clique em **Restaurar este backup** e informe o código.
+3. Marque a confirmação e informe o código.
+4. Clique em **Restaurar este backup**.
+
+**Num aparelho novo, ou num que perdeu os dados:** depois de entrar com o seu
+e-mail e a sua senha, o aplicativo pergunta o nome do distrito, como se fosse a
+primeira vez. **Não crie um distrito novo.** Clique em **Já tenho um backup**,
+logo abaixo, e siga os mesmos passos. O distrito volta como estava.
 
 Duas proteções que existem de propósito:
 
@@ -53,6 +60,17 @@ Duas proteções que existem de propósito:
   conta em outra é recusado, com essa explicação.
 - **Registros com o mesmo identificador podem substituir os locais.** É por isso
   que a confirmação é obrigatória: restaurar não é "juntar", é "trazer de volta".
+
+### Se a restauração parar no meio
+
+Se o aparelho descarregar ou o aplicativo fechar durante a restauração, ela para
+onde estava — e o aplicativo passa a mostrar um aviso em todas as telas dizendo
+quantos registros já entraram. **Enquanto isso aparecer, a sincronização fica
+parada**, de propósito: metade de um distrito não pode subir para os outros
+aparelhos.
+
+Clique em **Concluir restauração**, informe o mesmo código, e ela continua de
+onde parou. O que já entrou não entra de novo.
 
 ---
 
@@ -80,15 +98,21 @@ antigo não devem viajar com você.
 
 **O que é apagado** — tudo que é do distrito: igrejas, pessoas, famílias,
 visitas, pedidos de oração, acompanhamentos, sermões, metas, comissões,
-nomeações, campanhas, materiais, relatórios importados, o orçamento **do
-trabalho** (auxílios, despesas do ministério, quilometragem) e os compromissos
-de agenda ligados a igrejas.
+nomeações, campanhas, materiais, relatórios importados, os lançamentos do
+ministério (auxílios, despesas, quilometragem, reembolsos) e os compromissos de
+agenda ligados a igrejas.
 
 **O que fica** — o que é seu, e não do distrito:
 
 - a sua **Leitura**;
 - o seu **Orçamento Familiar** e a lista de compras;
-- os compromissos de agenda marcados como **pessoais e sem igreja vinculada**.
+- os compromissos de agenda marcados como **pessoais e sem igreja vinculada**;
+- os **seus parâmetros de obreiro**: FPE, Percentual de Audit, dependentes,
+  contracheques e o histórico do LETRA.
+
+Os parâmetros de obreiro ficam porque são seus, não do lugar: o seu FPE continua
+o mesmo depois da transferência, e um item do LETRA comprado no ano passado não
+volta a ser elegível só porque você mudou de cidade.
 
 Um compromisso pessoal que tenha uma igreja escolhida é tratado como do
 distrito e vai junto. Se você quer que algo fique, marque como pessoal e não
