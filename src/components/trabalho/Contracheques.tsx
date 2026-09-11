@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { FileUp, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { formatar, type Centavos } from '../../family-budget/dinheiro'
 import { CATALOGO_DO_TRABALHO, nomeCompleto } from '../../work-budget/catalogo'
@@ -6,6 +6,8 @@ import {
   divergencias, jaExisteParaACompetencia, TIPO_DE_RUBRICA_LABELS, TIPOS_DE_RUBRICA,
   totaisDoContracheque, type Contracheque, type ContrachequeData, type Rubrica, type TipoDeRubrica,
 } from '../../work-budget/contracheque'
+import { extractPdfText, validatePdfFile } from '../../imports/pdf'
+import { conferirComODeclarado, interpretarContracheque } from '../../work-budget/importarContracheque'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { CampoDeValor, dataDeHoje, formatarData } from './campos'
@@ -31,6 +33,53 @@ const rubricaVazia = (): Rubrica => ({ codigo: '', descricao: '', tipo: 'provent
 export function Contracheques({ competencia, contracheques, subsistencia, onSalvar, onApagar }: ContrachequesProps) {
   const [rascunho, setRascunho] = useState<ContrachequeData | null>(null)
   const [editandoId, setEditandoId] = useState('')
+  const [lendo, setLendo] = useState(false)
+  const [erroDaLeitura, setErroDaLeitura] = useState('')
+  const [divergenciasDoArquivo, setDivergenciasDoArquivo] = useState<string[]>([])
+  const [ignoradas, setIgnoradas] = useState<string[]>([])
+
+  /**
+   * Lê o contracheque no aparelho e abre a conferência.
+   *
+   * O arquivo não é guardado nem enviado a lugar nenhum: é lido na memória,
+   * vira proposta de rubricas e é descartado. Nada é gravado antes de o pastor
+   * conferir linha por linha — importar sem conferência é como um erro de
+   * leitura vira o número de referência do mês.
+   */
+  async function importar(arquivo: File | undefined) {
+    if (!arquivo) return
+    setLendo(true)
+    setErroDaLeitura('')
+    setDivergenciasDoArquivo([])
+    setIgnoradas([])
+    try {
+      const ehPdf = arquivo.name.toLocaleLowerCase('pt-BR').endsWith('.pdf')
+      let texto: string
+      if (ehPdf) {
+        validatePdfFile(arquivo)
+        texto = await extractPdfText(await arquivo.arrayBuffer())
+      } else {
+        texto = await arquivo.text()
+      }
+
+      const leitura = interpretarContracheque(texto)
+      if (!leitura.rubricas.length) throw new Error('Não encontrei rubricas neste arquivo. Confira se é o contracheque e se ele tem texto selecionável.')
+
+      setEditandoId('')
+      setRascunho({
+        competencia: leitura.competencia ?? competencia,
+        dataDePagamento: dataDeHoje(),
+        /* Só o nome do arquivo, nunca o conteúdo: o documento não vira registro. */
+        origem: arquivo.name,
+        rubricas: leitura.rubricas.map(({ origem: _origem, ...rubrica }) => { void _origem; return rubrica }),
+        conferido: false, observacao: '', createdAt: '', updatedAt: '',
+      })
+      setDivergenciasDoArquivo(conferirComODeclarado(leitura.rubricas, leitura.totaisDeclarados))
+      setIgnoradas(leitura.ignoradas)
+    } catch (motivo) {
+      setErroDaLeitura(motivo instanceof Error ? motivo.message : 'Não foi possível ler este arquivo.')
+    } finally { setLendo(false) }
+  }
 
   const doMes = useMemo(
     () => [...contracheques].sort((esquerda, direita) => direita.competencia.localeCompare(esquerda.competencia)),
@@ -50,6 +99,16 @@ export function Contracheques({ competencia, contracheques, subsistencia, onSalv
 
   return <>
     <div className="page-actions">
+      <label className="file-picker">
+        <FileUp aria-hidden="true" />
+        <span><strong>{lendo ? 'Lendo o arquivo…' : 'Importar contracheque'}</strong><small>PDF ou texto. O arquivo é lido aqui e descartado.</small></span>
+        <input
+          type="file"
+          accept="application/pdf,.pdf,text/plain,.txt"
+          disabled={lendo}
+          onChange={(evento) => { void importar(evento.target.files?.[0]); evento.currentTarget.value = '' }}
+        />
+      </label>
       <Button icon={<Plus />} onClick={() => {
         setEditandoId('')
         setRascunho({
@@ -59,7 +118,17 @@ export function Contracheques({ competencia, contracheques, subsistencia, onSalv
       }}>Novo contracheque</Button>
     </div>
 
+    {erroDaLeitura && <div className="alert alert--error" role="alert">{erroDaLeitura}</div>}
+
     {rascunho && <Card title={editandoId ? 'Editar contracheque' : 'Novo contracheque'}>
+      {/*
+        O que o documento declarava e não bateu com a soma das linhas lidas.
+        Não acusa a instituição nem a leitura: diz que alguém precisa olhar.
+      */}
+      {divergenciasDoArquivo.map((divergencia) => <div className="alert alert--warning" role="status" key={divergencia}>{divergencia}</div>)}
+      {Boolean(ignoradas.length) && <div className="alert alert--warning" role="status">
+        {ignoradas.length} {ignoradas.length === 1 ? 'linha com valor ficou' : 'linhas com valor ficaram'} de fora: {ignoradas.slice(0, 3).join(' · ')}
+      </div>}
       <div className="form-grid">
         <label className="field" htmlFor="folha-competencia"><span className="field__label">Competência</span>
           <input id="folha-competencia" className="field__input" type="month" value={rascunho.competencia} onChange={(evento) => setRascunho({ ...rascunho, competencia: evento.target.value })} />

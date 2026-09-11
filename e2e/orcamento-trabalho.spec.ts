@@ -253,3 +253,66 @@ test('o deslocamento entra no ciclo do reembolso, e só uma vez', async ({ page 
   // O Intl emite espaço inquebrável depois de "R$".
   await expect(page.getByText(/Previsto R\$.180,00/u)).toBeVisible()
 })
+
+test('o contracheque é importado de arquivo e conferido antes de gravar', async ({ page }) => {
+  test.setTimeout(120_000)
+  await entrar(page)
+
+  await navigateInsideApp(page, '/app/orcamento/trabalho/contracheques', page.getByRole('button', { name: 'Novo contracheque' }))
+
+  /*
+    Contracheque fictício, montado aqui mesmo. Nenhum documento real entra em
+    teste — nem como arquivo no repositório, nem como texto colado.
+  */
+  const ficticio = [
+    'DEMONSTRATIVO DE PAGAMENTO',
+    'Competência: AGOSTO/2026',
+    '',
+    'PROVENTOS',
+    '0001 SUBSISTENCIA BASICA 5.600,00',
+    '0015 AUXILIO COMBUSTIVEL 400,00',
+    '',
+    'DESCONTOS',
+    '0101 PREVIDENCIA 11,00 616,00',
+    '',
+    'TOTAL DE PROVENTOS 6.000,00',
+    'LIQUIDO A RECEBER 5.384,00',
+    '',
+    'OUTRAS BASES INFORMATIVAS',
+    '0900 BASE DA PREVIDENCIA 5.600,00',
+  ].join('\n')
+
+  await page.getByLabel(/Importar contracheque/u).setInputFiles({
+    name: 'contracheque-ficticio.txt', mimeType: 'text/plain', buffer: Buffer.from(ficticio, 'utf-8'),
+  })
+
+  // A competência vem do documento, não do mês aberto na tela.
+  await expect(page.locator('#folha-competencia')).toHaveValue('2026-08')
+
+  // As rubricas chegam classificadas pelo título da seção, e editáveis.
+  await expect(page.locator('#rubrica-0-descricao')).toHaveValue('SUBSISTENCIA BASICA')
+  await expect(page.locator('#rubrica-2-tipo')).toHaveValue('desconto')
+  await expect(page.locator('#rubrica-3-tipo')).toHaveValue('informativa')
+
+  /*
+    O valor é o último da linha: "0101 PREVIDENCIA 11,00 616,00" tem a
+    referência antes do dinheiro, e tomar o primeiro número traria 11,00.
+  */
+  await expect(page.locator('#rubrica-2-valor')).toHaveValue('616')
+
+  // 6.000 − 616 = 5.384, e a base informativa de 5.600 fica fora.
+  const totais = page.locator('.estrato').first()
+  await expect(totais.getByText('R$ 5.384,00')).toBeVisible()
+  await expect(page.locator('.memoria-do-calculo').getByText('R$ 5.600,00')).toBeVisible()
+
+  /*
+    Nada foi gravado ainda: importar abre a conferência, não o registro. É a
+    diferença entre um erro de leitura corrigido e um erro de leitura que vira o
+    número de referência do mês.
+  */
+  await expect(page.getByText('Nenhum contracheque guardado.')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Salvar contracheque' }).click()
+  await expect(page.getByText('Contracheque guardado.')).toBeVisible()
+  await expect(page.getByText('2026-08')).toBeVisible()
+})
