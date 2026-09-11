@@ -17,7 +17,11 @@ export function SecurityPage() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [message, setMessage] = useState('')
+  /* Erro dos aparelhos e erro da troca de senha são coisas separadas: um só
+     estado fazia a falha de revogação aparecer também sob o formulário de
+     senha, como se a senha tivesse algo a ver com ela. */
   const [error, setError] = useState('')
+  const [erroDaSenha, setErroDaSenha] = useState('')
 
   const loadDevices = useCallback(async () => {
     if (!account) return
@@ -37,7 +41,10 @@ export function SecurityPage() {
     // serviço; sem ela, os outros aparelhos ficariam invisíveis e não haveria
     // como revogar nenhum deles.
     const remotos = await fetchRemoteDevices().catch(() => null)
-    if (!remotos) { setDevices(locais); return }
+    // Lista vazia vinda do serviço não é uma afirmação verdadeira: este mesmo
+    // aparelho está falando com ele. Sem esta linha, a tela ficava sem nenhum
+    // aparelho e o pastor não tinha como revogar coisa alguma.
+    if (!remotos?.length) { setDevices(locais); return }
 
     const porId = new Map(locais.map((device) => [device.id, device]))
     setDevices(remotos.map((remoto) => {
@@ -59,14 +66,14 @@ export function SecurityPage() {
   async function submit(event: FormEvent) {
     event.preventDefault()
     setMessage('')
-    setError('')
+    setErroDaSenha('')
     try {
       await changePassword(currentPassword, newPassword)
       setCurrentPassword('')
       setNewPassword('')
       setMessage('Senha alterada. Seus dados continuam como estavam.')
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Não foi possível alterar a senha.')
+      setErroDaSenha(reason instanceof Error ? reason.message : 'Não foi possível alterar a senha.')
     }
   }
 
@@ -125,7 +132,7 @@ export function SecurityPage() {
           <Field label="Senha atual" name="current-password" type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required />
           <Field label="Nova senha" name="new-password" type="password" autoComplete="new-password" minLength={12} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required />
           {message && <div className="alert alert--success" role="status"><ShieldCheck size={18} />{message}</div>}
-          {error && <div className="alert alert--error" role="alert">{error}</div>}
+          {erroDaSenha && <div className="alert alert--error" role="alert">{erroDaSenha}</div>}
           <Button type="submit" icon={<LockKeyhole size={18} />}>Alterar senha</Button>
         </form>
       </Card>
