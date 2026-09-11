@@ -58,13 +58,26 @@ export function HomePage() {
 
   const refresh = useCallback(async () => {
     if (!account || !masterKey) return
+    try {
+      await carregarTudo()
+    } finally {
+      /*
+        A espera termina mesmo quando a leitura falha. O portão quer dizer
+        "já tentei", não "consegui": se quisesse dizer a segunda coisa, uma
+        falha qualquer deixaria o pastor olhando o anel girar para sempre.
+      */
+      setPronta(true)
+    }
+
+    async function carregarTudo() {
+    if (!account || !masterKey) return
     const district = await districtService.getDistrict(account.id, masterKey)
     const [nextPeople, nextFamilies, nextChurches, nextEvents, nextTasks, nextPrayers, nextFollowUps, , nextCampaigns, nextInterests, nextStudies] = await Promise.all([
       peopleService.listPeople(account.id, masterKey), familyService.listFamilies(account.id, masterKey), district ? districtService.listChurches(account.id, masterKey, district.id) : [], agendaService.listEvents(account.id, masterKey), careService.listTasks(account.id, masterKey), careService.listPrayerRequests(account.id, masterKey), careService.listFollowUps(account.id, masterKey), careService.listRounds(account.id, masterKey), evangelismService.listCampaigns(account.id, masterKey), missionaryService.listInterests(account.id, masterKey), missionaryService.listStudies(account.id, masterKey),
     ])
     const today = localDateKey()
     setPeople(nextPeople); setFamilies(nextFamilies.length); setChurches(nextChurches); setTodayBirthdays(upcomingBirthdays(nextPeople, new Date(), 0)); setEvents(nextEvents); setTodayEvents(nextEvents.filter(({ startAt }) => startAt.slice(0, 10) === today)); setTasks(nextTasks); setPrayers(nextPrayers); setFollowUps(nextFollowUps); setCampaigns(nextCampaigns); setInterests(nextInterests); setStudies(nextStudies)
-    setPronta(true)
+    }
   }, [account, masterKey])
 
   useReloadOnSync(refresh)

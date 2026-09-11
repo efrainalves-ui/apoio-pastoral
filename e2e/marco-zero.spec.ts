@@ -118,6 +118,12 @@ test('não apresenta violações críticas de acessibilidade no acesso', async (
 })
 
 test('não apresenta violações críticas de acessibilidade dentro do aplicativo', async ({ page }) => {
+  /*
+    Cinco rotas, cada uma varrida inteira pelo axe. O limite padrão de trinta
+    segundos era orçamento de um teste comum, não deste — e o que ele acusava
+    era o próprio relógio, nunca uma violação.
+  */
+  test.setTimeout(120_000)
   await register(page)
   // As telas de uso diário passam pela mesma verificação da tela de acesso.
   for (const rota of ['/app', '/app/distrito', '/app/visitacao', '/app/metas', '/app/configuracoes']) {
