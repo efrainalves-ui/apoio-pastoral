@@ -2281,6 +2281,15 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
    rolagem escondida não avisava que havia mais. Passa a quebrar linha: todas
    as abas ficam à vista, que é o que importa quando são quatro ou cinco. */
 .segmented, .tab-bar, .budget-nav, .reading-nav { max-width: 100%; width: fit-content; flex-wrap: wrap; overflow: visible; }
+/*
+  Fila que rola em vez de quebrar.
+
+  Quebrar serve para três ou quatro abas. Com nove — e o Trabalho tem nove — a
+  navegação vira três linhas e empurra o conteúdo para fora da primeira tela.
+  Rolar de lado mantém tudo alcançável em uma linha só.
+*/
+  .budget-nav--rolante { width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .budget-nav--rolante::-webkit-scrollbar { display: none; }
 .segmented button, .segmented a, .tab-bar .button, .budget-nav a, .budget-nav button, .reading-nav button { flex: 0 1 auto; white-space: nowrap; }
 
 /* Ações da página lado a lado enquanto couberem, em vez de uma por linha. */

@@ -39,10 +39,15 @@ const pessoaisService = new FinancasPessoaisService()
 const carimbo = () => new Date().toISOString()
 const hoje = localDateKey
 
+/*
+  A ordem é a de uso, não a de construção: o que o pastor abre todo dia vem
+  primeiro, o modelo antigo e a configuração ficam no fim da fila. Nenhuma sai —
+  auxílios, despesas e quilometragem guardam registros que já existem.
+*/
 const sectionLabels = {
-  resumo: 'Visão do mês', lancamentos: 'Lançamentos', contracheques: 'Contracheques', letra: 'LETRA',
-  auxilios: 'Auxílios', despesas: 'Despesas', quilometragem: 'Quilometragem',
-  relatorios: 'Relatórios', configuracao: 'Configuração',
+  resumo: 'Visão do mês', lancamentos: 'Lançamentos', quilometragem: 'Quilometragem',
+  contracheques: 'Contracheques', letra: 'LETRA', relatorios: 'Relatórios',
+  auxilios: 'Auxílios', despesas: 'Despesas', configuracao: 'Configuração',
 } as const
 type WorkSection = keyof typeof sectionLabels
 
@@ -255,7 +260,7 @@ export function WorkBudgetPage() {
   return <div className="page-stack">
     <header className="page-hero"><div><p className="eyebrow">Orçamento</p><h1>Trabalho</h1></div></header>
     <BudgetAreaNav area="trabalho" month={month} />
-    <nav className="budget-nav" aria-label="Áreas do orçamento do trabalho">
+    <nav className="budget-nav budget-nav--rolante" aria-label="Áreas do orçamento do trabalho">
       {(Object.keys(sectionLabels) as WorkSection[]).map((chave) => <Link className={section === chave ? 'active' : ''} key={chave} to={`/app/orcamento/trabalho/${chave}?mes=${month}`}>{sectionLabels[chave]}</Link>)}
     </nav>
     <div className="budget-month-nav">
