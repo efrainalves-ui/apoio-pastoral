@@ -87,14 +87,16 @@ test('continua disponível offline depois do primeiro carregamento', async ({ pa
   const saveAppointment = page.getByRole('button', { name: 'Salvar compromisso' })
   await expect(saveAppointment).toBeEnabled()
   await saveAppointment.click()
-  await expect(page.getByText('Compromisso Offline Fictício')).toBeVisible()
+  await expect(page.getByText('Compromisso Offline Fictício').first()).toBeVisible()
   await context.setOffline(true)
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Entre na sua conta' })).toBeVisible()
   await page.getByRole('textbox', { name: 'Senha' }).fill(password)
   await page.getByRole('button', { name: 'Entrar' }).click()
   await expect(page.getByRole('heading', { name: 'Visão do distrito' })).toBeVisible()
-  await navigateInsideApp(page, '/app/agenda', page.getByText('Compromisso Offline Fictício'))
+  // A agenda mostra o compromisso no dia e na lista abaixo: dois nós com o
+  // mesmo texto, e o localizador precisa dizer qual basta.
+  await navigateInsideApp(page, '/app/agenda', page.getByText('Compromisso Offline Fictício').first())
 })
 
 test('manifesto e service worker tornam a PWA instalável', async ({ page }) => {

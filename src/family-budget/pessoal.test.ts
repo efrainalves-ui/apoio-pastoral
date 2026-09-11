@@ -163,3 +163,54 @@ describe('finanças pessoais', () => {
     expect(await servico.lancamentos(conta, masterKey)).toHaveLength(0)
   })
 })
+
+describe('migração dos lançamentos antigos', () => {
+  const antigo = (id: string) => ({ ...saida({ descricao: `Herdado ${id}` }), id })
+
+  it('grava com o mesmo identificador do registro antigo', async () => {
+    const { servico, masterKey, conta } = await montar()
+    await servico.migrarAntigos(conta, masterKey, [antigo('saida-1'), antigo('saida-2')])
+
+    const gravados = await servico.lancamentos(conta, masterKey)
+    expect(gravados.map(({ id }) => id).sort()).toEqual(['saida-1', 'saida-2'])
+  })
+
+  /*
+    Rodar de novo reescreve o mesmo lançamento em vez de criar um segundo. Sem
+    isso, uma migração interrompida e retomada dobraria o mês do pastor.
+  */
+  it('rodar de novo não duplica', async () => {
+    const { servico, masterKey, conta } = await montar()
+    await servico.migrarAntigos(conta, masterKey, [antigo('saida-1')])
+    await servico.migrarAntigos(conta, masterKey, [antigo('saida-1')])
+
+    expect(await servico.lancamentos(conta, masterKey)).toHaveLength(1)
+  })
+
+  it('anota o que passou, para a rodada seguinte continuar de onde parou', async () => {
+    const { servico, masterKey, conta } = await montar()
+    await servico.migrarAntigos(conta, masterKey, [antigo('saida-1'), antigo('saida-2')])
+
+    const migrados = await servico.idsMigrados(conta, masterKey)
+    expect([...migrados].sort()).toEqual(['saida-1', 'saida-2'])
+  })
+
+  it('lista vazia não grava nem marca nada', async () => {
+    const { servico, masterKey, conta } = await montar()
+    expect(await servico.migrarAntigos(conta, masterKey, [])).toBe(0)
+    expect(await servico.idsMigrados(conta, masterKey)).toEqual(new Set())
+  })
+
+  /*
+    Migrado, o lançamento é editável como qualquer outro — era exatamente isso
+    que o formato antigo impedia.
+  */
+  it('o lançamento migrado pode ser editado depois', async () => {
+    const { servico, masterKey, conta } = await montar()
+    await servico.migrarAntigos(conta, masterKey, [antigo('saida-1')])
+    await servico.salvarLancamento(conta, masterKey, saida({ descricao: 'Editado depois de migrar' }), { id: 'saida-1' })
+
+    const [gravado] = await servico.lancamentos(conta, masterKey)
+    expect(gravado?.descricao).toBe('Editado depois de migrar')
+  })
+})

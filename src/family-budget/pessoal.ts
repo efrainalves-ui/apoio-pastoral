@@ -17,7 +17,7 @@ import { alcanceDaEdicao, gerarOcorrencias, gerarParcelas, type EscopoDeEdicao, 
  * dado antigo preservado até que o novo esteja conferido.
  */
 
-type TipoPessoal = 'lancamento' | 'transferencia' | 'conta' | 'cartao' | 'integrante' | 'meta' | 'aporte' | 'planejamento' | 'compra'
+type TipoPessoal = 'lancamento' | 'transferencia' | 'conta' | 'cartao' | 'integrante' | 'meta' | 'aporte' | 'planejamento' | 'compra' | 'migracao'
 
 interface DadosPorTipo {
   lancamento: LancamentoData
@@ -29,6 +29,21 @@ interface DadosPorTipo {
   aporte: AporteData
   planejamento: PlanejamentoData
   compra: CompraData
+  migracao: MigracaoData
+}
+
+/**
+ * O que já saiu do formato antigo.
+ *
+ * Guardar os identificadores, e não só uma data de conclusão, é o que permite
+ * migrar em partes: uma interrupção no meio deixa o que passou marcado, e a
+ * rodada seguinte continua de onde parou em vez de recomeçar.
+ */
+export interface MigracaoData {
+  ids: string[]
+  atualizadaEm: string
+  createdAt: string
+  updatedAt: string
 }
 
 /** Quantas ocorrências futuras uma série gera de uma vez. */
@@ -64,6 +79,39 @@ export class FinancasPessoaisService {
       createdAt: existente?.createdAt ?? carimbo, updatedAt: carimbo, ...envelope,
     })
     return { id, ...completo }
+  }
+
+  /** Os identificadores já migrados do formato antigo. */
+  async idsMigrados(accountId: string, masterKey: CryptoKey): Promise<Set<string>> {
+    const registros = await this.listar(accountId, masterKey, 'migracao')
+    return new Set(registros.flatMap(({ ids }) => ids))
+  }
+
+  /**
+   * Migra os lançamentos do formato antigo para o novo.
+   *
+   * Nada é apagado: o registro antigo continua onde está. O identificador é o
+   * mesmo, então rodar de novo reescreve o mesmo lançamento em vez de criar um
+   * segundo — e a marca é atualizada a cada gravação, para que uma interrupção
+   * no meio não faça a rodada seguinte recomeçar do zero.
+   */
+  async migrarAntigos(
+    accountId: string, masterKey: CryptoKey,
+    paraGravar: ReadonlyArray<LancamentoData & { id: string }>,
+  ): Promise<number> {
+    if (!paraGravar.length) return 0
+    const migrados = await this.idsMigrados(accountId, masterKey)
+    const marcaId = `pessoal-migracao-${accountId}`
+
+    for (const lancamento of paraGravar) {
+      const { id, ...dados } = lancamento
+      await this.gravar(accountId, masterKey, 'lancamento', dados, id)
+      migrados.add(id)
+      await this.gravar(accountId, masterKey, 'migracao', {
+        ids: [...migrados], atualizadaEm: agora(), createdAt: '', updatedAt: '',
+      }, marcaId)
+    }
+    return paraGravar.length
   }
 
   async apagar(accountId: string, id: string): Promise<void> {

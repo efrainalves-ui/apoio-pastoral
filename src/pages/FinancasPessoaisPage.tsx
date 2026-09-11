@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { FormularioDeLancamento, lancamentoVazio } from '../components/orcamento/FormularioDeLancamento'
 import { ListaDeLancamentos } from '../components/orcamento/ListaDeLancamentos'
@@ -11,7 +12,8 @@ import { Relatorios } from '../components/orcamento/Relatorios'
 import type { Compra, CompraData } from '../family-budget/compras'
 import { totaisDaCompra } from '../family-budget/compras'
 import type { Aporte, Meta, MetaData, Planejamento, PlanejamentoData } from '../family-budget/metas'
-import { lerOAntigo } from '../family-budget/adaptador'
+import { lerOAntigo, type RegistrosAntigos } from '../family-budget/adaptador'
+import { aindaLegados, planoDeMigracao } from '../family-budget/migracao'
 import { doMes } from '../family-budget/calculos'
 import type { NaturezaDoLancamento } from '../family-budget/catalogo'
 import { emCentavos, formatar as formatarValor, type Centavos } from '../family-budget/dinheiro'
@@ -48,6 +50,9 @@ export function FinancasPessoaisPage({ area, mes }: FinancasPessoaisPageProps) {
   const { account, masterKey } = useAuthVault()
   const [novos, setNovos] = useState<Lancamento[]>([])
   const [herdados, setHerdados] = useState<Lancamento[]>([])
+  const [registrosAntigos, setRegistrosAntigos] = useState<RegistrosAntigos | null>(null)
+  const [porMigrar, setPorMigrar] = useState(0)
+  const [migrando, setMigrando] = useState(false)
   const [contas, setContas] = useState<Conta[]>([])
   const [cartoes, setCartoes] = useState<Cartao[]>([])
   const [integrantes, setIntegrantes] = useState<Integrante[]>([])
@@ -88,7 +93,16 @@ export function FinancasPessoaisPage({ area, mes }: FinancasPessoaisPageProps) {
         antigo.plans(account.id, masterKey),
       ])
       setNovos(lancamentos)
-      setHerdados(lerOAntigo({ incomes, expenses, bills }))
+      /*
+        O que já migrou sai da leitura antiga: ele tem equivalente no formato
+        novo com o mesmo identificador, e ler os dois somaria o mesmo
+        lançamento duas vezes.
+      */
+      const antigos: RegistrosAntigos = { incomes, expenses, bills }
+      const migrados = await pessoais.idsMigrados(account.id, masterKey)
+      setRegistrosAntigos(antigos)
+      setHerdados(aindaLegados(lerOAntigo(antigos), migrados))
+      setPorMigrar(planoDeMigracao(antigos, migrados).paraGravar.length)
       setContas(listaContas)
       setCartoes(listaCartoes)
       setIntegrantes(listaIntegrantes)
@@ -281,9 +295,35 @@ export function FinancasPessoaisPage({ area, mes }: FinancasPessoaisPageProps) {
     </>
   }
 
+  /**
+   * Migra o que ficou no formato antigo.
+   *
+   * Pedida pelo pastor, nunca automática: reescrever registro financeiro é o
+   * passo mais arriscado desta reconstrução, e ele não se dá de passagem.
+   */
+  async function migrar() {
+    if (!account || !masterKey || !registrosAntigos) return
+    setMigrando(true)
+    try {
+      const migrados = await pessoais.idsMigrados(account.id, masterKey)
+      const plano = planoDeMigracao(registrosAntigos, migrados)
+      const quantos = await pessoais.migrarAntigos(account.id, masterKey, plano.paraGravar)
+      await carregar()
+      setErro('')
+      setAviso(`${quantos} ${quantos === 1 ? 'lançamento migrado' : 'lançamentos migrados'}.`)
+    } catch (motivo) {
+      setErro(motivo instanceof Error ? motivo.message : 'Não foi possível migrar.')
+    } finally { setMigrando(false) }
+  }
+
   if (area === 'resumo') {
     return <>
       {erro && <div className="alert alert--error" role="alert">{erro}</div>}
+      {porMigrar > 0 && <Card className="danger-card" title="Lançamentos no formato antigo">
+        <p>{porMigrar} {porMigrar === 1 ? 'lançamento continua' : 'lançamentos continuam'} no formato antigo. Eles aparecem nas somas, mas não podem ser editados.</p>
+        <p>Migrar não apaga nada: o registro antigo continua guardado, e rodar de novo não duplica.</p>
+        <Button disabled={migrando} onClick={() => void migrar()}>{migrando ? 'Migrando…' : 'Migrar agora'}</Button>
+      </Card>}
       <VisaoGeral
         mes={mes}
         doMes={doMesEscolhido}
