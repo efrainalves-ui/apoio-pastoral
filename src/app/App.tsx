@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { currentDeviceId } from '../auth/device'
 import { DeviceApprovalPage } from '../pages/DeviceApprovalPage'
 import { db } from '../db/database'
@@ -42,6 +42,7 @@ import { GoalsPage } from '../pages/GoalsPage'
 import { MissionaryPairsPage } from '../pages/MissionaryPairsPage'
 import { GoalAreaPage } from '../pages/GoalAreaPage'
 import { BackupPage } from '../pages/BackupPage'
+import { RestoreBackupPage } from '../pages/RestoreBackupPage'
 import { CommissionsPage } from '../pages/CommissionsPage'
 import { CommissionConfigPage } from '../pages/CommissionConfigPage'
 import { CommissionKindPage } from '../pages/CommissionKindPage'
@@ -171,9 +172,29 @@ function SyncPending() {
   return (
     <div className="page-stack page-narrow">
       <header className="page-hero"><div><p className="eyebrow">Aguardando seus dados</p><h1>Ainda não recebemos os dados desta conta neste aparelho</h1><p>Este aparelho entrou na sua conta, mas a primeira sincronização não terminou. Conecte-se à internet e tente de novo. Não crie um distrito novo agora: os dados que já existem chegariam depois e ficariam duplicados.</p></div></header>
+      <Link className="button button--secondary" to="/restaurar-backup">Restaurar de um backup</Link>
       <button type="button" className="button" onClick={() => window.location.reload()}>Tentar de novo</button>
     </div>
   )
+}
+
+/**
+ * Acesso à restauração: cofre aberto basta.
+ *
+ * Não exige distrito de propósito — é justamente quem não tem distrito que
+ * precisa restaurar. Encerramento pendente e aprovação de aparelho continuam
+ * valendo: são anteriores a qualquer coisa que se faça com os dados.
+ */
+function RestoreAccess({ children }: { children: ReactNode }) {
+  const { masterKey, recoveryCode } = useAuthVault()
+  const encerramento = usePendingClosure()
+  const { pending, approve } = useCurrentDeviceApproval()
+  if (!masterKey || recoveryCode) return <Navigate to="/acesso" replace />
+  if (encerramento.pending === null) return <div className="app-loading" role="status">Preparando seu distrito…</div>
+  if (encerramento.pending) return <ResumeClosurePage onDone={encerramento.done} />
+  if (pending === null) return <div className="app-loading" role="status">Preparando seu distrito…</div>
+  if (pending) return <DeviceApprovalPage onApproved={approve} />
+  return <>{children}</>
 }
 
 function SetupAccess({ children }: { children: ReactNode }) {
@@ -235,6 +256,7 @@ export function App() {
       <Route path="/privacidade" element={<PrivacyPage />} />
       <Route path="/acesso" element={masterKey && !recoveryCode ? <Navigate to="/app" replace /> : <AuthPage />} />
       <Route path="/configuracao-inicial" element={<SetupAccess><InitialSetupPage /></SetupAccess>} />
+      <Route path="/restaurar-backup" element={<RestoreAccess><RestoreBackupPage /></RestoreAccess>} />
       <Route path="/app" element={<ProtectedApp />}>
         <Route index element={<HomePage />} />
         <Route path="agenda" element={<AgendaPage />} />

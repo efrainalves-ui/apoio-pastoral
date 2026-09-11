@@ -20,13 +20,14 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { isHomologationEnvironment } from '../sync/config'
 import { QuickActions } from './QuickActions'
 import { SyncNowButton } from './SyncNowButton'
 import { Button } from './ui/Button'
 import { GlobalSearchField } from './GlobalSearchField'
+import { pendingBackupRestore } from '../backup/service'
 
 const primaryNav = [
   { to: '/app', label: 'Início', icon: Home, end: true },
@@ -53,6 +54,32 @@ const mobileNav = [
   { to: '/app/distrito', label: 'Distrito', icon: Church, end: false },
   { to: '/app/visitacao', label: 'Visitação', icon: HeartHandshake, end: false },
 ]
+
+/**
+ * Aviso de restauração pela metade, em toda tela.
+ *
+ * Sem ele, uma restauração interrompida deixa o pastor dentro de um aplicativo
+ * de aparência normal segurando metade de um distrito, com a sincronização
+ * parada em silêncio. Só a tela de backup sabia — e não é para lá que alguém
+ * vai quando não sabe que há algo errado.
+ */
+function AvisoDeRestauracao() {
+  const { account } = useAuthVault()
+  const [pendente, setPendente] = useState<{ applied: number; total: number } | null>(null)
+
+  useEffect(() => {
+    let cancelado = false
+    if (!account) return
+    void pendingBackupRestore(account.id).then((resultado) => { if (!cancelado) setPendente(resultado) })
+    return () => { cancelado = true }
+  }, [account])
+
+  if (!pendente) return null
+  return <div className="alert alert--error" role="alert">
+    <span>Restauração pela metade: {pendente.applied} de {pendente.total} registros entraram. A sincronização está parada até ela terminar.</span>
+    <Link className="text-link" to="/app/backup">Concluir restauração</Link>
+  </div>
+}
 
 export function AppShell() {
   useAvisosDeTarefa()
@@ -151,7 +178,7 @@ export function AppShell() {
           <button className="icon-button app-header__leave" aria-label="Bloquear cofre" onClick={bloquear}><LockKeyhole /></button>
           <button className="icon-button app-header__leave app-header__sair" aria-label="Sair" onClick={leave}><LogOut /></button>
         </header>
-        <main id="conteudo" className="content" tabIndex={-1}><Outlet /></main>
+        <main id="conteudo" className="content" tabIndex={-1}><AvisoDeRestauracao /><Outlet /></main>
         <nav className="bottom-nav" aria-label="Navegação principal móvel">
           {mobileNav.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} {...(end ? { end: true } : {})} className={({ isActive }) => `bottom-nav__item ${isActive || (to === '/app/distrito' && ['/app/distrito', '/app/pessoas', '/app/familias'].some((section) => pathname.startsWith(section))) || (to === '/app/visitacao' && ['/app/visitacao', '/app/visitas'].some((section) => pathname.startsWith(section))) ? 'bottom-nav__item--active' : ''}`}>
