@@ -215,3 +215,41 @@ test('a quota-pais vira no mês seguinte ao nono aniversário', async ({ page })
   await navigateInsideApp(page, '/app/orcamento/trabalho/configuracao?mes=2026-06', page.getByRole('button', { name: 'Novo dependente' }))
   await expect(page.locator('.entity-row').filter({ hasText: 'Dependente Fictício' }).getByText('5%')).toBeVisible()
 })
+
+test('o deslocamento entra no ciclo do reembolso, e só uma vez', async ({ page }) => {
+  test.setTimeout(120_000)
+  await entrar(page)
+
+  await navigateInsideApp(page, '/app/orcamento/trabalho/configuracao', page.getByRole('heading', { name: 'Base de subsistência' }))
+  await page.locator('#config-nova-regra').selectOption('quilometragem')
+  await page.locator('#regra-quilometragem-fixo').fill('1,50')
+  await page.getByRole('button', { name: 'Salvar configuração' }).click()
+  await expect(page.getByText('Configuração salva.')).toBeVisible()
+
+  await navigateInsideApp(page, '/app/orcamento/trabalho/quilometragem', page.getByRole('button', { name: 'Novo deslocamento' }))
+  await page.getByRole('button', { name: 'Novo deslocamento' }).click()
+  await page.getByLabel('Quilômetros').fill('120')
+  await page.getByRole('button', { name: 'Salvar deslocamento' }).click()
+  await expect(page.getByText('Deslocamento registrado.')).toBeVisible()
+
+  // 120 km × R$ 1,50 = R$ 180,00, calculado pela regra e não digitado.
+  const linha = page.locator('.entity-row').filter({ hasText: '120 km' })
+  await expect(linha.getByText('R$ 180,00')).toBeVisible()
+
+  await linha.getByRole('button', { name: 'Lançar' }).click()
+  await expect(page.getByText('Deslocamento lançado no ciclo do reembolso.')).toBeVisible()
+
+  /*
+    Lançado uma vez, o botão sai. Sem isso, cada visita à tela ofereceria lançar
+    os mesmos quilômetros de novo e o mês fecharia pedindo duas vezes o mesmo
+    trajeto.
+  */
+  await expect(page.locator('.entity-row').filter({ hasText: '120 km' }).getByText('No ciclo')).toBeVisible()
+  await expect(page.locator('.entity-row').filter({ hasText: '120 km' }).getByRole('button', { name: 'Lançar' })).toHaveCount(0)
+
+  // E ele aparece nos lançamentos, com o previsto vindo dos quilômetros.
+  await navigateInsideApp(page, '/app/orcamento/trabalho/lancamentos', page.getByRole('button', { name: 'Novo lançamento' }))
+  await expect(page.getByText('120 km')).toBeVisible()
+  // O Intl emite espaço inquebrável depois de "R$".
+  await expect(page.getByText(/Previsto R\$.180,00/u)).toBeVisible()
+})

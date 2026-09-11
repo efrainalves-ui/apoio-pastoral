@@ -48,6 +48,14 @@ export interface RegraDeItem {
   responsabilidade: Responsabilidade
   /** Percentual reembolsado, quando parcial. */
   percentual: number | null
+  /**
+   * Valor fixo por unidade, quando a base é o valor fixo local.
+   *
+   * Quilometragem e diária são pagas assim: tanto por quilômetro, tanto por
+   * dia. Sem este campo, a regra não tinha onde guardar esse número e os dois
+   * ficavam fora de qualquer cálculo.
+   */
+  valorFixo: Centavos | null
   /** Teto absoluto em centavos, quando houver. */
   teto: Centavos | null
   tetoPercentual: number | null
@@ -65,7 +73,7 @@ export interface RegraDeItem {
 
 export function regraDeItemVazia(): RegraDeItem {
   return {
-    responsabilidade: 'do_pastor', percentual: null, teto: null,
+    responsabilidade: 'do_pastor', percentual: null, valorFixo: null, teto: null,
     tetoPercentual: null, tetoBase: null, limiteConjunto: '', referencia: '', vigenciaInicio: '',
   }
 }

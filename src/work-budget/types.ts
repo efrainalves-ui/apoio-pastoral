@@ -91,6 +91,14 @@ export interface MileageData extends WorkTimestamps {
   /** Gasto informado, quando o pastor quiser registrar. */
   amount: number | null
   notes: string
+  /**
+   * Lançamento que este deslocamento gerou, quando já gerou.
+   *
+   * Guardar o vínculo aqui é o que impede pedir duas vezes o mesmo trajeto:
+   * sem ele, cada visita à tela ofereceria lançar os mesmos quilômetros de
+   * novo. Ausente nos registros gravados antes desta ligação existir.
+   */
+  workEntryId?: string | null
 }
 
 export type WorkBudgetRecordType = 'work_allowance' | 'work_expense' | 'mileage'

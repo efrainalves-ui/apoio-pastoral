@@ -7,7 +7,7 @@ import {
   quotaPais, regraDeItemVazia, VINCULOS_DE_DEPENDENTE,
   type ConfiguracaoDoTrabalhoData, type DependenteData, type RegraDeItem, type VinculoDeDependente,
 } from '../../work-budget/configuracao'
-import { CATALOGO_DO_TRABALHO, itensDoLimiteConjunto, nomeCompleto } from '../../work-budget/catalogo'
+import { acharSubcategoria, CATALOGO_DO_TRABALHO, itensDoLimiteConjunto, nomeCompleto } from '../../work-budget/catalogo'
 import {
   BASE_LABELS, BASES_DE_CALCULO, emOrdem, subsistenciaBasica, vigenteEm,
   type BaseDeCalculo, type ValorComVigencia,
@@ -214,6 +214,17 @@ export function ConfiguracaoDoObreiro({
               {regra.responsabilidade === 'reembolso_parcial' && <CampoDePercentual
                 id={`regra-${chave}-perc`} label="Percentual reembolsado"
                 valor={regra.percentual} onChange={(percentual) => mudarRegra(chave, { percentual })}
+              />}
+              {/*
+                Quilometragem e diária são pagas por unidade: tanto por
+                quilômetro, tanto por dia. O campo só aparece onde isso faz
+                sentido — nas outras categorias seria uma pergunta sem resposta.
+              */}
+              {acharSubcategoria(chave)?.subcategoria.baseSugerida === 'VALOR_FIXO_LOCAL' && <CampoDeValor
+                id={`regra-${chave}-fixo`}
+                label={chave === 'quilometragem' ? 'Valor por quilômetro' : 'Valor por unidade'}
+                valor={regra.valorFixo ?? 0}
+                onChange={(valorFixo) => mudarRegra(chave, { valorFixo: valorFixo || null })}
               />}
               <CampoDeValor id={`regra-${chave}-teto`} label="Teto" valor={regra.teto ?? 0} onChange={(teto) => mudarRegra(chave, { teto: teto || null })} />
               <CampoDePercentual id={`regra-${chave}-tetop`} label="Teto em percentual" valor={regra.tetoPercentual} onChange={(tetoPercentual) => mudarRegra(chave, { tetoPercentual })} />

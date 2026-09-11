@@ -24,11 +24,12 @@ import { configuracaoVazia, type ConfiguracaoDoTrabalhoData, type DependenteData
 import { lancamentoVazio, resumoDoTrabalho, type LancamentoDoTrabalho, type LancamentoDoTrabalhoData } from '../work-budget/lancamento'
 import type { AquisicaoLetra, AquisicaoLetraData, ItemDoCatalogoLetra, OrcamentoLetraData } from '../work-budget/letra'
 import { subsistenciaBasica, vigenteEm } from '../work-budget/parametros'
+import { lancamentoDeQuilometragem, previstoDaQuilometragem } from '../work-budget/quilometragem'
 import { espelhoPessoal } from '../work-budget/integracao'
 import { FinancasPessoaisService } from '../family-budget/pessoal'
 import {
   ALLOWANCE_CATEGORY_LABELS, WORK_EXPENSE_CATEGORY_LABELS, suggestedAllowance,
-  type AllowanceCategory, type MileageData, type WorkAllowanceData, type WorkBudgetSnapshot,
+  type AllowanceCategory, type MileageData, type MileageEntity, type WorkAllowanceData, type WorkBudgetSnapshot,
   type WorkExpenseCategory, type WorkExpenseData,
 } from '../work-budget/types'
 
@@ -149,6 +150,8 @@ export function WorkBudgetPage() {
   const subsistencia = subsistenciaBasica(fpeVigente, auditVigente)
   const vigenciaDoFpe = fpeDoMes ? `Desde ${fpeDoMes.inicio.split('-').reverse().join('/')}` : ''
   const resumoDosLancamentos = useMemo(() => resumoDoTrabalho(lancamentos), [lancamentos])
+  const regraDaQuilometragem = configuracao?.regrasPorItem.quilometragem ?? null
+  const valorPorKm = regraDaQuilometragem?.valorFixo ?? null
 
   const ir = (destino: WorkSection, mes = month) => void navigate(`/app/orcamento/trabalho/${destino}?mes=${mes}`)
   const pronto = async (mensagem: string) => { setNotice(mensagem); setError(''); await load() }
@@ -182,6 +185,26 @@ export function WorkBudgetPage() {
     if (!account || !masterKey) return
     try { await service.salvarItemLetra(account.id, masterKey, { ...dados, createdAt: '', updatedAt: '' }, id); await pronto('Item salvo.') } catch (motivo) { falhou(motivo) }
   }
+  /**
+   * Manda um deslocamento para o ciclo do reembolso.
+   *
+   * O vínculo volta gravado no próprio deslocamento: sem ele, a tela ofereceria
+   * lançar os mesmos quilômetros de novo e o mês fecharia pedindo duas vezes o
+   * mesmo trajeto.
+   */
+  async function lancarDeslocamento(item: MileageEntity) {
+    if (!account || !masterKey) return
+    try {
+      const lancamento = await service.salvarLancamento(
+        account.id, masterKey,
+        lancamentoDeQuilometragem(item, valorPorKm, { fpe: fpeVigente, percentualDeAudit: auditVigente }, regraDaQuilometragem?.referencia ?? ''),
+      )
+      const { id: _id, ...dados } = item; void _id
+      await service.saveMileage(account.id, masterKey, { ...dados, workEntryId: lancamento.id }, item.id)
+      await pronto('Deslocamento lançado no ciclo do reembolso.')
+    } catch (motivo) { falhou(motivo) }
+  }
+
   async function salvarDependente(dados: DependenteData, id?: string) {
     if (!account || !masterKey) return
     try { await service.salvarDependente(account.id, masterKey, dados, id); await pronto('Dependente salvo.') } catch (motivo) { falhou(motivo) }
@@ -412,12 +435,21 @@ export function WorkBudgetPage() {
         </div>)}</div>}
       </Card>
       <Card title="Deslocamentos do mês">
-        {snapshot.mileage.length === 0 ? <p className="card-copy">Nada registrado ainda.</p> : <div className="entity-list">{snapshot.mileage.map((item) => <div className="entity-row" key={item.id}>
-          <span><strong>{nomeDaIgreja(item.churchId)}</strong><small>{item.date}{item.reason ? ` · ${item.reason}` : ''}</small></span>
-          <strong>{item.kilometers.toLocaleString('pt-BR')} km</strong>
-          <Button variant="quiet" onClick={() => { setMileageId(item.id); const { id: _id, ...dados } = item; void _id; setMileageDraft(dados) }}>Editar</Button>
-          <Button variant="danger" icon={<Trash2 />} aria-label={`Apagar deslocamento de ${item.date}`} onClick={() => apagar(item.id, 'este deslocamento')} />
-        </div>)}</div>}
+        {snapshot.mileage.length === 0 ? <p className="card-copy">Nada registrado ainda.</p> : <div className="entity-list">{snapshot.mileage.map((item) => {
+          const { previsto } = previstoDaQuilometragem(item.kilometers, valorPorKm, { fpe: fpeVigente, percentualDeAudit: auditVigente })
+          return <div className="entity-row" key={item.id}>
+            <span><strong>{nomeDaIgreja(item.churchId)}</strong><small>{item.date}{item.reason ? ` · ${item.reason}` : ''}</small></span>
+            <strong>{item.kilometers.toLocaleString('pt-BR')} km</strong>
+            {previsto === null
+              ? <span className="valor-pendente">Valor por quilômetro não configurado</span>
+              : <span>{formatar(previsto)}</span>}
+            {item.workEntryId
+              ? <span className="status-pill status-pill--success">No ciclo</span>
+              : <Button variant="quiet" disabled={previsto === null} onClick={() => void lancarDeslocamento(item)}>Lançar</Button>}
+            <Button variant="quiet" onClick={() => { setMileageId(item.id); const { id: _id, ...dados } = item; void _id; setMileageDraft(dados) }}>Editar</Button>
+            <Button variant="danger" icon={<Trash2 />} aria-label={`Apagar deslocamento de ${item.date}`} onClick={() => apagar(item.id, 'este deslocamento')} />
+          </div>
+        })}</div>}
       </Card>
     </>}
   </div>

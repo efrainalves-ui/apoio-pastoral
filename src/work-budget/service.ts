@@ -103,7 +103,12 @@ export class WorkBudgetService {
   async salvarLancamento(accountId: string, key: CryptoKey, input: WorkAnyDataByType['work_entry'], id?: string) {
     if (!input.subcategoriaId) throw new Error('Escolha a categoria do lançamento.')
     if (!input.data) throw new Error('Informe a data.')
-    if (!(input.valorPago > 0)) throw new Error('Informe um valor maior que zero.')
+    /*
+      Pago ou previsto: um dos dois. Exigir o pago barrava a quilometragem, que
+      nasce sem desembolso — o pastor não paga por quilômetro rodado, ele
+      recebe. Lançamento com os dois em zero é que não descreve nada.
+    */
+    if (!(input.valorPago > 0) && !(input.previsto > 0)) throw new Error('Informe um valor pago ou um valor previsto.')
     return this.save(accountId, key, 'work_entry', {
       ...input, descricao: input.descricao.trim(), observacao: input.observacao.trim(),
     }, id)

@@ -92,7 +92,13 @@ describe('persistência do Trabalho', () => {
 
     await expect(servico.salvarLancamento(CONTA, chave, { ...base, subcategoriaId: '' })).rejects.toThrow('categoria')
     await expect(servico.salvarLancamento(CONTA, chave, { ...base, data: '' })).rejects.toThrow('data')
-    await expect(servico.salvarLancamento(CONTA, chave, { ...base, valorPago: 0 })).rejects.toThrow('maior que zero')
+    await expect(servico.salvarLancamento(CONTA, chave, { ...base, valorPago: 0 })).rejects.toThrow('pago ou um valor previsto')
+
+    /*
+      A quilometragem nasce sem desembolso: o pastor não paga por quilômetro
+      rodado, ele recebe. Só o previsto já descreve o lançamento.
+    */
+    await expect(servico.salvarLancamento(CONTA, chave, { ...base, valorPago: 0, previsto: emCentavos(180) })).resolves.toBeTruthy()
   })
 
   it('a reserva de livros não pode passar do total do ano', async () => {
