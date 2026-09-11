@@ -1,9 +1,8 @@
 import { db, type ApoioDatabase } from '../db/database'
 import { PersonalVaultStore } from '../db/personalVault'
-import type { BudgetExpenseData } from '../family-budget/types'
+import { emCentavos } from '../family-budget/dinheiro'
+import type { LancamentoData } from '../family-budget/lancamento'
 import { itemTotal, type ShoppingItemData, type ShoppingItemEntity } from './types'
-
-const agora = () => new Date().toISOString()
 
 /**
  * A lista de compras é do pastor, e agora viaja com ele.
@@ -61,27 +60,40 @@ export class ShoppingListService {
     accountId: string,
     key: CryptoKey,
     date: string,
-    salvarDespesa: (data: BudgetExpenseData) => Promise<unknown>,
+    salvarDespesa: (data: LancamentoData) => Promise<unknown>,
   ): Promise<{ total: number; items: number }> {
     const confirmados = (await this.items(accountId, key)).filter(({ confirmed }) => confirmed)
     if (!confirmados.length) throw new Error('Confirme ao menos um item antes de lançar a despesa.')
     const total = confirmados.reduce((soma, item) => soma + itemTotal(item), 0)
     if (!(total > 0)) throw new Error('Informe o valor dos itens confirmados antes de lançar a despesa.')
-    const carimbo = agora()
+
+    /*
+      A despesa nasce no modelo novo.
+
+      Ela ia para o formato antigo, que não viaja entre os aparelhos: a lista de
+      compras sincronizava e a despesa que ela gerava, não. Pior, cada compra
+      criava um registro velho novo em folha, que a migração teria de converter
+      depois.
+
+      O valor da lista está em reais e o lançamento guarda centavos — converter
+      aqui é o que impede uma compra de R$ 59,00 virar R$ 0,59.
+    */
     await salvarDespesa({
-      category: 'food',
-      description: `Compras do mercado (${confirmados.length} ${confirmados.length === 1 ? 'item' : 'itens'})`,
-      amount: total,
-      date,
-      status: 'paid',
-      fixed: false,
-      installment: false,
-      installmentsTotal: 0,
-      installmentNumber: 0,
-      notes: '',
-      titheDeducted: false,
-      createdAt: carimbo,
-      updatedAt: carimbo,
+      natureza: 'saida',
+      descricao: `Compras do mercado (${confirmados.length} ${confirmados.length === 1 ? 'item' : 'itens'})`,
+      valor: emCentavos(total),
+      subcategoria: 'alimentacao.supermercado',
+      data: date,
+      competencia: date.slice(0, 7),
+      vencimento: date,
+      situacao: 'paga',
+      tipo: 'variavel',
+      formaDePagamento: null,
+      contaId: null, cartaoId: null, integranteId: null, referenteA: null,
+      recorrencia: 'nenhuma', serieId: null, parcelamento: null,
+      descontadoNaFonte: false,
+      observacao: '',
+      createdAt: '', updatedAt: '',
     })
     return { total, items: confirmados.length }
   }

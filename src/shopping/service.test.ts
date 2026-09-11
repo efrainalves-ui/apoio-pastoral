@@ -1,6 +1,8 @@
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it } from 'vitest'
 import { generateMasterKey } from '../crypto/vault'
+import { emCentavos } from '../family-budget/dinheiro'
+import type { LancamentoData } from '../family-budget/lancamento'
 import { ApoioDatabase } from '../db/database'
 import { isPersonalRecord } from '../district/closeDistrict'
 import { ShoppingListService } from './service'
@@ -87,7 +89,7 @@ describe('lista de compras, área pessoal', () => {
   it('lança uma despesa pessoal com o total do que está no carrinho', async () => {
     const banco = novoBanco(); const chave = await generateMasterKey()
     const service = new ShoppingListService(banco)
-    const lancadas: Array<{ amount: number; description: string; date: string }> = []
+    const lancadas: LancamentoData[] = []
 
     await service.save(CONTA, chave, item('Arroz fictício', 2, 25, true))
     await service.save(CONTA, chave, item('Feijão fictício', 1, 9, true))
@@ -97,7 +99,14 @@ describe('lista de compras, área pessoal', () => {
 
     expect(resultado).toEqual({ total: 59, items: 2 })
     expect(lancadas).toHaveLength(1)
-    expect(lancadas[0]).toMatchObject({ amount: 59, date: '2026-09-10' })
+    /*
+      A lista guarda reais e o lançamento guarda centavos. Sem a conversão, uma
+      compra de R$ 59,00 entraria no orçamento como R$ 0,59.
+    */
+    expect(lancadas[0]).toMatchObject({
+      natureza: 'saida', valor: emCentavos(59), data: '2026-09-10',
+      competencia: '2026-09', situacao: 'paga', subcategoria: 'alimentacao.supermercado',
+    })
     // O item não confirmado continua na lista para a próxima ida ao mercado.
     expect(await service.clearConfirmed(CONTA, chave)).toBe(2)
     expect((await service.items(CONTA, chave)).map(({ name }) => name)).toEqual(['Café fictício'])

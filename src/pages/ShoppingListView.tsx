@@ -5,13 +5,13 @@ import { useCallback, useMemo, useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { currency } from '../family-budget/core'
-import { FamilyBudgetService } from '../family-budget/service'
+import { FinancasPessoaisService } from '../family-budget/pessoal'
 import { ShoppingListService } from '../shopping/service'
 import { frequentItems, itemTotal, shoppingTotals, SHOPPING_UNIT_LABELS, type ShoppingItemData, type ShoppingItemEntity, type ShoppingUnit } from '../shopping/types'
 import { localDateKey } from '../shared/dates'
 
 const service = new ShoppingListService()
-const budget = new FamilyBudgetService()
+const pessoais = new FinancasPessoaisService()
 const carimbo = () => new Date().toISOString()
 const hoje = () => localDateKey()
 
@@ -71,7 +71,7 @@ export function ShoppingListView({ accountId, masterKey, onDone, onFail }: {
     if (!masterKey) return
     if (!window.confirm('Lançar as compras confirmadas como uma despesa pessoal?')) return
     try {
-      const resultado = await service.toPersonalExpense(accountId, masterKey, hoje(), (data) => budget.saveExpense(accountId, masterKey, data))
+      const resultado = await service.toPersonalExpense(accountId, masterKey, hoje(), (data) => pessoais.salvarLancamento(accountId, masterKey, data))
       await service.clearConfirmed(accountId, masterKey)
       await carregar()
       onDone(`Despesa de ${currency(resultado.total)} lançada e itens confirmados retirados da lista.`)

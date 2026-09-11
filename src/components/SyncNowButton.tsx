@@ -29,6 +29,15 @@ export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
   const transport = useMemo(() => createSyncTransport(), [])
   const service = useMemo(() => new SyncService(transport), [transport])
   const [situacao, setSituacao] = useState<Situacao>('parado')
+  /*
+    O motivo da falha, quando há um.
+
+    O botão dizia "Não foi possível atualizar agora" e descartava o porquê. Para
+    quem está com o aparelho na mão isso é um beco: não dá para saber se é
+    sessão, aparelho revogado ou serviço fora do ar — e nem para contar a
+    alguém que possa ajudar.
+  */
+  const [motivo, setMotivo] = useState('')
   const [pendentes, setPendentes] = useState(0)
   // Em `ref`, e não em estado: quem decide se pode começar uma rodada precisa
   // do valor do instante, não do valor que existia quando o efeito foi criado.
@@ -58,6 +67,7 @@ export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
     emCurso.current = true
     ultimaRodada.current = Date.now()
     setSituacao('sincronizando')
+    setMotivo('')
     try {
       const resumo = await service.synchronize(account.id, currentDeviceId(account.id), syncKey)
       // "Dados atualizados" é uma afirmação, e ela só pode ser feita quando a
@@ -66,8 +76,9 @@ export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
       // Chegou coisa de outro aparelho: as telas abertas precisam saber, senão
       // o dado está no banco e a lista na frente do pastor continua a de antes.
       if (resumo.pulled > 0 || resumo.conflicts > 0) notificarDadosSincronizados()
-    } catch {
+    } catch (falha) {
       setSituacao(navigator.onLine ? 'erro' : 'offline')
+      setMotivo(falha instanceof Error ? falha.message : '')
     } finally {
       emCurso.current = false
       await conferirFila()
@@ -127,7 +138,7 @@ export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
         <RefreshCw className={situacao === 'sincronizando' ? 'spin' : ''} aria-hidden="true" />
         {pendentes > 0 && <span className="sync-now__dot" aria-hidden="true" />}
       </button>
-      {situacao !== 'parado' ? <p className="sync-now__toast" role="status">{MENSAGENS[situacao]}</p> : null}
+      {situacao !== 'parado' ? <p className="sync-now__toast" role="status">{MENSAGENS[situacao]}{motivo ? ` ${motivo}` : ''}</p> : null}
     </div>
   )
 
@@ -139,7 +150,7 @@ export function SyncNowButton({ compact = false }: { compact?: boolean } = {}) {
       </button>
       {situacao === 'parado' && aviso && <p className="sync-now__notice" role="status">{aviso}</p>}
       {situacao !== 'parado' && (
-        <p className={`sync-now__notice${situacao === 'pronto' ? ' sync-now__notice--ok' : ''}`} role={situacao === 'incompleto' ? 'alert' : 'status'}>{MENSAGENS[situacao]}</p>
+        <p className={`sync-now__notice${situacao === 'pronto' ? ' sync-now__notice--ok' : ''}`} role={situacao === 'incompleto' ? 'alert' : 'status'}>{MENSAGENS[situacao]}{motivo ? ` ${motivo}` : ''}</p>
       )}
     </>
   )
