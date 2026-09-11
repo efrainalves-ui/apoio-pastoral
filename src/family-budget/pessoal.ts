@@ -1,4 +1,5 @@
 import { db, type ApoioDatabase } from '../db/database'
+import { idFixo } from '../db/identificadores'
 import { PersonalVaultStore } from '../db/personalVault'
 import type {
   Cartao, CartaoData, Conta, ContaData, Integrante, IntegranteData,
@@ -95,7 +96,7 @@ export class FinancasPessoaisService {
   ): Promise<number> {
     if (!paraGravar.length) return 0
     const migrados = await this.idsMigrados(accountId, masterKey)
-    const marcaId = `pessoal-migracao-${accountId}`
+    const marcaId = await idFixo('pessoal-migracao', accountId)
 
     for (const lancamento of paraGravar) {
       const { id, ...dados } = lancamento

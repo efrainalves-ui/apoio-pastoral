@@ -2,6 +2,7 @@ import { currentDeviceId } from '../auth/device'
 import { encryptPayload } from '../crypto/vault'
 import { readPayload } from '../db/corrupted'
 import { db, type ApoioDatabase } from '../db/database'
+import { idFixo } from '../db/identificadores'
 import { VaultRepository } from '../db/repository'
 import { inMonth } from './core'
 import type {
@@ -88,7 +89,7 @@ export class WorkBudgetService {
 
   async salvarConfiguracao(accountId: string, key: CryptoKey, input: WorkAnyDataByType['work_config']) {
     const atual = await this.configuracao(accountId, key)
-    return this.save(accountId, key, 'work_config', input, atual?.id ?? `work-config-${accountId}`)
+    return this.save(accountId, key, 'work_config', input, atual?.id ?? await idFixo('work-config', accountId))
   }
 
   dependentes(accountId: string, key: CryptoKey) { return this.list(accountId, key, 'work_dependent') }

@@ -1,5 +1,6 @@
 import { remoteAccountGuard, type AccountSessionGuard } from '../auth/accountGuard'
 import { assertDeviceCanSync, assertRemoteDeviceStillActive, type RemoteDeviceStatusReader } from '../auth/device'
+import { ehUuid } from '../db/identificadores'
 import { fetchRemoteDeviceStatus, purgeRemoteRecordHistory, PURGE_BATCH_SIZE, type PurgeTarget } from '../auth/supabase'
 import { db, type ApoioDatabase } from '../db/database'
 import { clearRemotePurge, pendingRemotePurge } from '../db/purge'
@@ -99,7 +100,22 @@ export class SyncService {
     // revogou este aqui.
     await assertRemoteDeviceStillActive(accountId, deviceId, this.database, this.readRemoteDeviceStatus)
 
-    const pending = await this.database.outbox.where('accountId').equals(accountId).filter(({ status }) => status === 'pending').toArray()
+    const todasPendentes = await this.database.outbox.where('accountId').equals(accountId).filter(({ status }) => status === 'pending').toArray()
+
+    /*
+      Uma operação torta não pode parar a fila inteira.
+
+      O serviço converte `record_id` para `uuid`, e a conversão que falha derruba
+      o lote todo. Enquanto essa operação ficasse na fila, nada mais saía do
+      aparelho — nem o que não tinha defeito nenhum. Agora ela é separada e
+      marcada como falha, e o resto segue.
+    */
+    const tortas = todasPendentes.filter(({ recordId }) => !ehUuid(recordId))
+    if (tortas.length) {
+      await this.database.outbox.bulkPut(tortas.map((operacao) => ({ ...operacao, status: 'failed' as const })))
+    }
+    const pending = todasPendentes.filter(({ recordId }) => ehUuid(recordId))
+
     const assinadas = await Promise.all(pending.map(async (record) => withOperationMac(syncKey, toOperation(record))))
     const pushResult = await this.transport.push(assinadas)
 

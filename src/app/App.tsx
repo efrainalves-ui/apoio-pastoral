@@ -43,6 +43,7 @@ import { MissionaryPairsPage } from '../pages/MissionaryPairsPage'
 import { GoalAreaPage } from '../pages/GoalAreaPage'
 import { BackupPage } from '../pages/BackupPage'
 import { MigracaoDosPessoais } from '../db/migrarPessoais'
+import { ReparoDeIdentificadores } from '../db/repararIdentificadores'
 import { notificarDadosSincronizados } from '../sync/useReloadOnSync'
 import { RestoreBackupPage } from '../pages/RestoreBackupPage'
 import { CommissionsPage } from '../pages/CommissionsPage'
@@ -207,8 +208,13 @@ function useMudancaDosPessoais() {
     let cancelado = false
     void (async () => {
       try {
+        /*
+          O reparo vem antes: enquanto houver um identificador que o serviço
+          recusa, nada sai deste aparelho — nem o que a mudança acabou de trazer.
+        */
+        const reparo = await new ReparoDeIdentificadores().reparar(account.id)
         const resultado = await new MigracaoDosPessoais().mover(account.id, masterKey)
-        if (resultado.movidos > 0) notificarDadosSincronizados()
+        if (resultado.movidos > 0 || reparo.reparados > 0) notificarDadosSincronizados()
       } catch {
         // O lugar antigo continua intacto; a próxima abertura tenta outra vez.
       } finally {
