@@ -725,7 +725,35 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .round-list small { color: var(--muted); }
 .round-list progress { width: 100%; accent-color: var(--green-700); }
 .round-complete { color: var(--green-800); }
-.app-loading { min-height: 100vh; display: grid; place-items: center; color: var(--green-800); }
+/*
+  A espera com cara de espera.
+
+  Era texto seco no meio da tela, e texto parado por quatro segundos não parece
+  carregamento: parece travado. O anel diz que algo está acontecendo sem
+  prometer quanto falta — barra de progresso mentiria, porque o tempo aqui
+  depende de quantos registros o cofre tem para abrir.
+*/
+/* `--line`, `--muted` e `--acento-dado` existem nos dois temas; `--green-800`
+   e `--green-100` não, e no escuro virariam anel claro com texto invisível. */
+.app-loading { min-height: 100vh; display: grid; place-items: center; align-content: center; gap: 18px; color: var(--muted); font-weight: 600; }
+.app-loading::before {
+  content: '';
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: 3px solid var(--line);
+  border-top-color: var(--acento-dado);
+  animation: app-loading-gira 900ms linear infinite;
+}
+@keyframes app-loading-gira { to { transform: rotate(1turn); } }
+
+/*
+  Sem movimento, o anel pulsa de leve em vez de girar: quem pediu menos
+  animação continua sabendo que a tela está trabalhando.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .app-loading::before { animation: app-loading-pulsa 1.6s ease-in-out infinite; border-top-color: var(--line); }
+  @keyframes app-loading-pulsa { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+}
 
 .budget-hero { align-items: center; }
 

@@ -7,15 +7,7 @@ import { CloseDistrictService } from '../district/closeDistrict'
 import { PersonDataService } from '../people/personData'
 import { SyncService } from '../sync/service'
 import { LocalDevelopmentTransport, resetLocalDevelopmentTransport } from '../sync/transport'
-import {
-  AVISO_SESSAO_EXPIRADA,
-  AVISO_SESSAO_TROCADA,
-  SessaoDeOutraContaError,
-  clearAccountSessionLock,
-  createAccountSessionGuard,
-  lockedAccountId,
-  onAccountSessionLost,
-} from './accountGuard'
+import { AVISO_SESSAO_TROCADA, SessaoDeOutraContaError, SessaoIndisponivelError, clearAccountSessionLock, createAccountSessionGuard, lockedAccountId, onAccountSessionLost } from './accountGuard'
 
 vi.mock('./supabase', async (importarOriginal) => ({
   ...await importarOriginal<Record<string, unknown>>(),
@@ -80,19 +72,48 @@ describe('duas contas em abas do mesmo navegador', () => {
     expect(lockedAccountId()).toBe(CONTA_A)
   })
 
-  it('bloqueia quando a sessão do serviço deixou de existir', async () => {
+  /*
+    Sem sessão, a operação não sai — mas a aba continua viva.
+
+    Nenhuma chamada remota funcionaria sem sessão, então não há risco de agir
+    como outra conta aqui. Derrubar o cofre por isso cobraria do pastor um novo
+    acesso por um problema que não era dele.
+  */
+  it('sessão ausente recusa a operação sem matar a aba', async () => {
     navegador.sessao = null
-    await expect(guarda(CONTA_A)).rejects.toThrow(AVISO_SESSAO_EXPIRADA)
+    await expect(guarda(CONTA_A)).rejects.toBeInstanceOf(SessaoIndisponivelError)
+    expect(lockedAccountId()).toBeNull()
   })
 
-  it('erro ao conferir a sessão também bloqueia: falha fechada', async () => {
-    // Uma operação remota feita com a conta errada não tem volta; uma tela
-    // bloqueada por engano custa um novo acesso.
+  /*
+    Rede instável é indisponibilidade, não invasão.
+
+    Enquanto os dois casos eram um só, uma oscilação de sinal derrubava o cofre
+    e mandava o pastor de volta ao acesso dizendo que outra conta tinha entrado
+    — o que não tinha acontecido. Num aplicativo feito para funcionar no meio do
+    distrito, era perder a sessão a cada oscilação.
+  */
+  it('erro de rede recusa a operação, e a próxima tentativa funciona', async () => {
+    let vezes = 0
     const instavel = createAccountSessionGuard({
       remoteEnabled: true,
-      readRemoteAccountId: () => Promise.reject(new Error('rede caiu')),
+      readRemoteAccountId: () => {
+        vezes += 1
+        return vezes === 1 ? Promise.reject(new Error('rede caiu')) : Promise.resolve(CONTA_A)
+      },
     })
-    await expect(instavel(CONTA_A)).rejects.toBeInstanceOf(SessaoDeOutraContaError)
+    await expect(instavel(CONTA_A)).rejects.toBeInstanceOf(SessaoIndisponivelError)
+    expect(lockedAccountId()).toBeNull()
+    await expect(instavel(CONTA_A)).resolves.toBeUndefined()
+  })
+
+  /*
+    O que continua valendo sem exceção: conta confirmadamente diferente mata a
+    aba. É a única situação em que agir teria consequência sem volta.
+  */
+  it('só a conta confirmadamente diferente bloqueia a aba', async () => {
+    navegador.sessao = CONTA_B
+    await expect(guarda(CONTA_A)).rejects.toBeInstanceOf(SessaoDeOutraContaError)
     expect(lockedAccountId()).toBe(CONTA_A)
   })
 

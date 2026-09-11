@@ -38,7 +38,15 @@ export function CountUp({ value, format = String, durationMs = 700 }: CountUpPro
     let quadro = 0
     const inicio = performance.now()
     const passo = (agora: number) => {
-      const t = Math.min(1, (agora - inicio) / durationMs)
+      /*
+        Progresso não pode ser negativo.
+
+        Só o teto estava preso. Quando o carimbo do quadro vem de uma origem de
+        tempo diferente da de `performance.now()`, `t` fica negativo — e
+        `1 - (1 - t)³` com t = −1 dá −7. O contador de "pedidos de oração"
+        chegava a piscar número negativo antes de subir.
+      */
+      const t = Math.min(1, Math.max(0, (agora - inicio) / durationMs))
       setMostrado(value * desacelerar(t))
       if (t < 1) quadro = requestAnimationFrame(passo)
     }

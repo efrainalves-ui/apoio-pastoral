@@ -48,6 +48,13 @@ export function HomePage() {
   const [campaigns, setCampaigns] = useState<EvangelismCampaignEntity[]>([])
   const [interests, setInterests] = useState<InterestEntity[]>([])
   const [studies, setStudies] = useState<BibleStudyEntity[]>([])
+  /*
+    Sem isto, a tela desenhava zero em tudo enquanto o cofre era aberto — e
+    "nenhuma pessoa, nenhuma visita, nenhum aniversário" é uma afirmação, não
+    uma espera. Quem entra e vê o distrito zerado por quatro segundos não pensa
+    "está carregando": pensa que perdeu os dados.
+  */
+  const [pronta, setPronta] = useState(false)
 
   const refresh = useCallback(async () => {
     if (!account || !masterKey) return
@@ -57,6 +64,7 @@ export function HomePage() {
     ])
     const today = localDateKey()
     setPeople(nextPeople); setFamilies(nextFamilies.length); setChurches(nextChurches); setTodayBirthdays(upcomingBirthdays(nextPeople, new Date(), 0)); setEvents(nextEvents); setTodayEvents(nextEvents.filter(({ startAt }) => startAt.slice(0, 10) === today)); setTasks(nextTasks); setPrayers(nextPrayers); setFollowUps(nextFollowUps); setCampaigns(nextCampaigns); setInterests(nextInterests); setStudies(nextStudies)
+    setPronta(true)
   }, [account, masterKey])
 
   useReloadOnSync(refresh)
@@ -135,6 +143,8 @@ export function HomePage() {
     quem chega pelo leitor de tela não vê a tela: para ele o título continua
     dizendo onde está, que é o que uma data sozinha não diz.
   */
+  if (!pronta) return <div className="app-loading" role="status">Abrindo o distrito…</div>
+
   return <div className="page-stack"><header className="page-hero page-hero--dia"><div><h1><span className="sr-only">Visão do distrito</span><span aria-hidden="true">{diaDeHoje}</span></h1></div></header>
 
     <section className="manchete" aria-label="O que exige atenção">

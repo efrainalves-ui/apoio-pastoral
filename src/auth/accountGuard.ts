@@ -27,7 +27,29 @@ export class SessaoDeOutraContaError extends Error {
 }
 
 export const AVISO_SESSAO_TROCADA = 'Outra conta entrou neste navegador. Esta aba foi bloqueada; entre de novo com e-mail e senha para continuar.'
-export const AVISO_SESSAO_EXPIRADA = 'Sua sessão no serviço não está mais aberta. Entre de novo com e-mail e senha para continuar.'
+export const AVISO_SESSAO_INDISPONIVEL = 'Não foi possível confirmar a sessão agora. Esta ação não foi feita; tente de novo quando houver conexão.'
+
+/**
+ * A sessão não pôde ser conferida agora.
+ *
+ * Diferente de `SessaoDeOutraContaError` no que importa: ali a conta está
+ * **confirmadamente** errada e a aba precisa morrer; aqui não se sabe, e a
+ * resposta certa é não fazer a operação.
+ *
+ * A distinção não é sutil. Enquanto as duas situações eram a mesma, uma falha
+ * de rede ao conferir a sessão derrubava o cofre do pastor e o mandava de volta
+ * ao acesso dizendo que outra conta tinha entrado — o que não tinha acontecido.
+ * Num aplicativo feito para funcionar no meio do distrito, isso significava
+ * perder a sessão toda vez que o sinal oscilasse.
+ */
+export class SessaoIndisponivelError extends Error {
+  readonly accountId: string
+  constructor(accountId: string, message: string) {
+    super(message)
+    this.name = 'SessaoIndisponivelError'
+    this.accountId = accountId
+  }
+}
 
 let contaBloqueada: string | null = null
 const ouvintes = new Set<(accountId: string) => void>()
@@ -61,9 +83,16 @@ export interface AccountGuardConfig {
 }
 
 /**
- * Falha fechada de propósito: erro técnico ao consultar a sessão bloqueia a
- * aba em vez de deixá-la seguir. Uma operação remota executada com a conta
- * errada não tem volta; uma tela bloqueada por engano custa um novo acesso.
+ * Falha fechada, e só bloqueia o que precisa ser bloqueado.
+ *
+ * Nenhuma operação segue sem confirmação — essa parte não muda, e é ela que
+ * impede uma lápide de ir para a conta errada.
+ *
+ * O que muda é o preço de não conseguir confirmar. Só a conta **confirmadamente
+ * diferente** mata a aba, porque só ela é risco: agir como outra conta não tem
+ * volta. Sessão ausente ou erro de rede não são risco nenhum — sem sessão a
+ * chamada remota nem sairia — e para elas a resposta honesta é recusar a
+ * operação e deixar o pastor continuar trabalhando offline.
  */
 export function createAccountSessionGuard({ remoteEnabled, readRemoteAccountId }: AccountGuardConfig): AccountSessionGuard {
   return async (accountId: string) => {
@@ -75,9 +104,9 @@ export function createAccountSessionGuard({ remoteEnabled, readRemoteAccountId }
     try {
       daSessao = await readRemoteAccountId()
     } catch (motivo) {
-      bloquear(accountId, `${AVISO_SESSAO_EXPIRADA} (${motivo instanceof Error ? motivo.message : 'falha ao conferir a sessão'})`)
+      throw new SessaoIndisponivelError(accountId, `${AVISO_SESSAO_INDISPONIVEL} (${motivo instanceof Error ? motivo.message : 'falha ao conferir a sessão'})`)
     }
-    if (!daSessao) bloquear(accountId, AVISO_SESSAO_EXPIRADA)
+    if (!daSessao) throw new SessaoIndisponivelError(accountId, AVISO_SESSAO_INDISPONIVEL)
     if (daSessao !== accountId) bloquear(accountId, AVISO_SESSAO_TROCADA)
   }
 }

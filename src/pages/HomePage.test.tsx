@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from './HomePage'
 
 const auth = vi.hoisted(() => ({ account: { id: 'conta-painel-ficticia' }, masterKey: {} as CryptoKey }))
@@ -21,13 +21,40 @@ vi.mock('../goals/service', () => ({ GoalsService: class { listGoals = vi.fn(() 
 vi.mock('../evangelism/service', () => ({ EvangelismPlanningService: class { listCampaigns = services.listCampaigns } }))
 vi.mock('../missionary/service', () => ({ MissionaryService: class { listInterests = vi.fn(() => Promise.resolve([])); listStudies = vi.fn(() => Promise.resolve([])); listUapgs = vi.fn(() => Promise.resolve([])) } }))
 
+/* Sem isto, o DOM de um teste sobra para o seguinte e os localizadores duplicam. */
+afterEach(cleanup)
+
 describe('painel inicial', () => {
+  /*
+    Zero não é espera, é afirmação.
+
+    Enquanto o cofre abre — quatro, cinco segundos com um distrito inteiro para
+    decifrar — a tela mostrava "nenhuma pessoa, nenhum aniversário, nenhum
+    pedido". Quem entra e vê o distrito zerado não pensa "está carregando":
+    pensa que perdeu os dados.
+  */
+  it('mostra a espera antes de afirmar que não há nada', async () => {
+    let liberar: (valor: typeof people) => void = () => undefined
+    services.listPeople.mockReturnValueOnce(new Promise<typeof people>((resolve) => { liberar = resolve }))
+
+    render(<MemoryRouter><HomePage /></MemoryRouter>)
+    expect(screen.getByRole('status')).toHaveTextContent(/Abrindo/u)
+    expect(screen.queryByRole('heading', { name: 'Fidelidade' })).toBeNull()
+
+    liberar(people)
+    expect(await screen.findByRole('heading', { name: 'Fidelidade' })).toBeInTheDocument()
+  })
+
   it('mostra o cartão Fidelidade sem valores financeiros', async () => {
     render(<MemoryRouter><HomePage /></MemoryRouter>)
     expect(await screen.findByRole('heading', { name: 'Fidelidade' })).toBeInTheDocument()
     expect(screen.getByText('Dizimistas não sistemáticos')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Abrir Fidelidade/i })).toHaveAttribute('href', '/app/fidelidade')
-    expect(screen.getByText('Pedidos de oração').parentElement).toHaveTextContent('Pedidos de oração1')
+    /*
+      O número sobe animado. Conferi-lo sem esperar pega o meio da contagem — o
+      que o teste media era a animação, não o dado.
+    */
+    await waitFor(() => expect(screen.getByText('Pedidos de oração').parentElement).toHaveTextContent('Pedidos de oração1'))
     expect(screen.queryByText('Conteúdo reservado fictício')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Evangelismo' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Abrir Evangelismo/i })).toHaveAttribute('href', '/app/evangelismo')
