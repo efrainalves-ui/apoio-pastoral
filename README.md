@@ -95,3 +95,13 @@ Documentos técnicos e decisões estão em `docs/`. O estado de continuidade est
 
 Para preparar a rodada de homologação em nuvem com dados fictícios, comece por
 `docs/HOMOLOGACAO_NUVEM.md` e siga `docs/CHECKLIST_DISPOSITIVOS.md`.
+
+## Licença
+
+[AGPL-3.0-or-later](LICENSE).
+
+Quem modificar este aplicativo e oferecê-lo a outras pessoas — inclusive apenas
+pela rede, sem distribuir arquivo nenhum — precisa publicar o código da versão
+modificada. A escolha é deliberada: este aplicativo guarda dados de membros
+cifrados no aparelho do pastor, e uma versão fechada com a criptografia
+enfraquecida seria indistinguível desta por quem a usasse.
