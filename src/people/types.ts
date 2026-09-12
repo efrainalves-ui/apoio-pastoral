@@ -75,6 +75,22 @@ export interface PersonData {
   importStatus: PersonImportStatus
   currentChurchId: string
   memberships: MembershipPeriod[]
+  /**
+   * Quem decidiu a igreja atual desta pessoa.
+   *
+   * O ponto de pregação recebe gente que, no registro da Associação, é membro
+   * da Central, de Monte Sião ou de Sertãozinho. O relatório de membros diz a
+   * verdade oficial e o pastor sabe onde a pessoa realmente congrega — e eram
+   * duas verdades disputando o mesmo campo: cada importação devolvia a pessoa
+   * para a igreja de origem e desfazia o trabalho.
+   *
+   * Quando o pastor escolhe a igreja, a escolha dele fica. A importação
+   * continua registrando o vínculo oficial em `memberships`, para a divergência
+   * ficar visível em vez de sumir.
+   *
+   * Ausente nas pessoas gravadas antes desta mudança: elas vieram da importação.
+   */
+  churchSource?: MembershipPeriod['source']
   history: PersonHistoryEntry[]
   incomeStatus: IncomeStatus
   fidelity: FidelitySnapshot | null

@@ -65,7 +65,7 @@ export class ImportService {
   async previewMembers(accountId: string, masterKey: CryptoKey, fileHash: string, rows: ParsedMemberRow[], people: PersonEntity[], churches: ChurchEntity[]): Promise<MemberImportPreview> {
     const alreadyImported = (await this.listBatches(accountId, masterKey, 'members')).some((batch) => batch.fileHash === fileHash && batch.status === 'applied')
     const churchMap = churchByName(churches); const issues: ImportIssue[] = []; const churchCounts: Record<string, number> = {}
-    const newPeople: PlannedPersonChange[] = []; const updatedPeople: PlannedPersonChange[] = []; const seen = new Set<string>(); const importedKeys = new Set<string>(); const importedChurchIds = new Set<string>(); let unchanged = 0
+    const newPeople: PlannedPersonChange[] = []; const updatedPeople: PlannedPersonChange[] = []; const mantidasOndeVoceColocou: PlannedPersonChange[] = []; const seen = new Set<string>(); const importedKeys = new Set<string>(); const importedChurchIds = new Set<string>(); let unchanged = 0
     const now = new Date().toISOString()
     for (const row of rows) {
       churchCounts[row.churchName] = (churchCounts[row.churchName] ?? 0) + 1
@@ -85,22 +85,50 @@ export class ImportService {
         newPeople.push({ personId, previousData: null, nextData: data, churchName: church.name }); continue
       }
       const current = exact[0]!; const previousData = storedPerson(current); const history = [...current.history]; const memberships = current.memberships.map((membership) => ({ ...membership })); let changed = false
-      if (current.currentChurchId !== church.id) {
+      /*
+        A escolha do pastor não é desfeita pelo relatório.
+
+        O ponto de pregação recebe gente que, no registro da Associação, é
+        membro da Central, de Monte Sião ou de Sertãozinho. Antes, cada
+        importação devolvia essas pessoas para a igreja de origem e desfazia o
+        trabalho — e sem dizer nada. Agora a pessoa fica onde foi colocada, o
+        vínculo oficial continua sendo registrado, e a divergência aparece na
+        prévia em vez de sumir.
+      */
+      const lotadaPeloPastor = current.churchSource === 'manual' && current.currentChurchId !== church.id
+      if (lotadaPeloPastor) {
+        if (!memberships.some((membership) => membership.churchId === church.id && membership.source === 'member_import' && !membership.validTo)) {
+          memberships.push({ id: crypto.randomUUID(), churchId: church.id, source: 'member_import', validFrom: now, validTo: now })
+          changed = true
+        }
+      } else if (current.currentChurchId !== church.id) {
         const active = memberships.find((membership) => !membership.validTo); if (active) active.validTo = now
         memberships.push({ id: crypto.randomUUID(), churchId: church.id, source: 'member_import', validFrom: now })
         history.push({ id: crypto.randomUUID(), at: now, event: 'church_changed', from: current.currentChurchId, to: church.id, source: 'Importação de membros' }); changed = true
       }
       if (current.importStatus !== 'current') { history.push({ id: crypto.randomUUID(), at: now, event: 'import_status_changed', from: IMPORT_STATUS_LABELS[current.importStatus], to: IMPORT_STATUS_LABELS.current, source: 'Importação de membros' }); changed = true }
       if (current.name !== row.name.trim()) { history.push({ id: crypto.randomUUID(), at: now, event: 'details_updated', changedFields: ['nome'], source: 'Importação de membros' }); changed = true }
-      if (changed) updatedPeople.push({ personId: current.id, previousData, nextData: { ...previousData, name: row.name.trim(), currentChurchId: church.id, memberships, importStatus: 'current', history, updatedAt: now }, churchName: church.name }); else unchanged += 1
+      const proxima: PersonData = { ...previousData, name: row.name.trim(), currentChurchId: lotadaPeloPastor ? current.currentChurchId : church.id, memberships, importStatus: 'current', history, updatedAt: now }
+      if (changed) {
+        const destino: PlannedPersonChange = { personId: current.id, previousData, nextData: proxima, churchName: church.name }
+        if (lotadaPeloPastor) mantidasOndeVoceColocou.push(destino); else updatedPeople.push(destino)
+      } else if (lotadaPeloPastor) {
+        mantidasOndeVoceColocou.push({ personId: current.id, previousData, nextData: proxima, churchName: church.name })
+      } else unchanged += 1
     }
     const missingPeople: PlannedPersonChange[] = []
     for (const person of people) {
+      /*
+        Quem o pastor lotou não some por ausência no relatório: ela consta lá
+        na igreja de origem, não na igreja onde congrega. Marcar "não veio no
+        relatório" a cada importação seria acusar de sumiço quem está bem ali.
+      */
+      if (person.churchSource === 'manual') continue
       if (person.importStatus !== 'current' || !importedChurchIds.has(person.currentChurchId) || importedKeys.has(personKey(person.name, person.birthDate))) continue
       const history: PersonHistoryEntry[] = [...person.history, { id: crypto.randomUUID(), at: now, event: 'import_status_changed', from: IMPORT_STATUS_LABELS.current, to: IMPORT_STATUS_LABELS.missing, source: 'Importação de membros' }]
       missingPeople.push({ personId: person.id, previousData: storedPerson(person), nextData: { ...storedPerson(person), importStatus: 'missing', history, updatedAt: now }, churchName: churches.find(({ id }) => id === person.currentChurchId)?.name ?? 'Igreja' })
     }
-    return { kind: 'members', fileHash, parsedRows: rows.length, churchCounts, newPeople, updatedPeople, missingPeople, unchanged, issues, alreadyImported }
+    return { kind: 'members', fileHash, parsedRows: rows.length, churchCounts, newPeople, updatedPeople, missingPeople, unchanged, mantidasOndeVoceColocou, issues, alreadyImported }
   }
 
   async previewFidelity(accountId: string, masterKey: CryptoKey, fileHash: string, rows: ParsedFidelityRow[], people: PersonEntity[], churches: ChurchEntity[], referenceYear: number): Promise<FidelityImportPreview> {

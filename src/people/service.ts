@@ -55,7 +55,14 @@ export class PeopleService {
     const now = new Date().toISOString()
     const history = [...current.history]
     const memberships = current.memberships.map((membership) => ({ ...membership }))
-    if (current.currentChurchId !== input.currentChurchId) {
+    /*
+      Mudar a igreja aqui é decisão do pastor, e decisão de pastor não é
+      desfeita por importação. É assim que alguém que consta como membro da
+      Central mas congrega no ponto de pregação fica no ponto — e continua lá
+      depois do próximo relatório de membros.
+    */
+    const igrejaMudou = current.currentChurchId !== input.currentChurchId
+    if (igrejaMudou) {
       const active = memberships.find((membership) => !membership.validTo)
       if (active) active.validTo = now
       memberships.push({ id: crypto.randomUUID(), churchId: input.currentChurchId, source: 'manual', validFrom: now })
@@ -72,6 +79,7 @@ export class PeopleService {
       pastoralStatus: input.pastoralStatus,
       importStatus: current.importStatus,
       currentChurchId: input.currentChurchId,
+      ...(igrejaMudou ? { churchSource: 'manual' as const } : current.churchSource ? { churchSource: current.churchSource } : {}),
       memberships,
       history,
       incomeStatus: current.incomeStatus,

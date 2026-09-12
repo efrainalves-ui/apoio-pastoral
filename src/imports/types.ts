@@ -40,6 +40,12 @@ export interface MemberImportPreview {
   updatedPeople: PlannedPersonChange[]
   missingPeople: PlannedPersonChange[]
   unchanged: number
+  /**
+   * Pessoas que o relatório colocaria noutra igreja e que ficaram onde o pastor
+   * as colocou. Contar é o que torna a divergência visível: sem isso o
+   * aplicativo simplesmente ignoraria o relatório, em silêncio.
+   */
+  mantidasOndeVoceColocou: PlannedPersonChange[]
   issues: ImportIssue[]
   alreadyImported: boolean
 }

@@ -11,6 +11,7 @@ import { ImportService } from './service'
 const churches: ChurchEntity[] = [
   { id: 'church-a', districtId: 'district', name: 'Igreja Aurora Fictícia', type: 'organized_church', externalCode: '', address: '', worshipSchedules: [], administrativeNotes: '', status: 'active', history: [], createdAt: '2026-01-01', updatedAt: '2026-01-01' },
   { id: 'church-b', districtId: 'district', name: 'Grupo Horizonte Fictício', type: 'group', externalCode: '', address: '', worshipSchedules: [], administrativeNotes: '', status: 'active', history: [], createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+  { id: 'church-c', districtId: 'district', name: 'Ponto Fictício de Pregação', type: 'preaching_point', externalCode: '', address: '', worshipSchedules: [], administrativeNotes: '', status: 'active', history: [], createdAt: '2026-01-01', updatedAt: '2026-01-01' },
 ]
 
 describe('importadores locais e idempotentes', () => {
@@ -224,5 +225,82 @@ describe('importadores locais e idempotentes', () => {
     const migrated = await people.getPerson(accountId, masterKey, person.id)
     expect(migrated?.fidelity).toMatchObject({ months: 9, rangeMin: 9, rangeMax: 9, category: 'tither', precision: 'exact', importedAt: '2026-01-01T00:00:00.000Z' })
     expect(migrated?.incomeStatus).toBe('unknown')
+  })
+
+  /*
+    O ponto de pregação recebe gente que, no registro da Associação, é membro de
+    outra igreja. As duas verdades disputavam o mesmo campo: cada importação
+    devolvia a pessoa à igreja de origem e desfazia o trabalho do pastor, sem
+    dizer nada. A escolha dele passa a ficar.
+  */
+  it('a importação não tira do ponto de pregação quem o pastor colocou lá', async () => {
+    const { masterKey, accountId, people, imports } = await fixture()
+    const rows = parseMemberText('IGREJA: Igreja Aurora Fictícia\nPessoa Gama Fictícia | 10/05/1990')
+    await imports.applyPreview(accountId, masterKey, await imports.previewMembers(accountId, masterKey, 'hash-1', rows, [], churches))
+
+    const [pessoa] = await people.listPeople(accountId, masterKey)
+    await people.updatePerson(accountId, masterKey, pessoa!.id, {
+      ...emptyPersonInput(), name: pessoa!.name, birthDate: pessoa!.birthDate!, currentChurchId: 'church-c',
+    })
+
+    // O mesmo relatório, de novo: continua dizendo que ela é da Aurora.
+    const depois = await people.listPeople(accountId, masterKey)
+    const previa = await imports.previewMembers(accountId, masterKey, 'hash-2', rows, depois, churches)
+    expect(previa.updatedPeople).toHaveLength(0)
+    expect(previa.mantidasOndeVoceColocou).toHaveLength(1)
+    expect(previa.mantidasOndeVoceColocou[0]!.nextData.currentChurchId).toBe('church-c')
+
+    await imports.applyPreview(accountId, masterKey, previa)
+    const final = (await people.listPeople(accountId, masterKey))[0]!
+    expect(final.currentChurchId).toBe('church-c')
+  })
+
+  /* O vínculo oficial não se perde: ele fica registrado para a divergência ser vista. */
+  it('guarda o vínculo oficial de quem ficou no ponto de pregação', async () => {
+    const { masterKey, accountId, people, imports } = await fixture()
+    const rows = parseMemberText('IGREJA: Igreja Aurora Fictícia\nPessoa Delta Fictícia | 10/05/1990')
+    await imports.applyPreview(accountId, masterKey, await imports.previewMembers(accountId, masterKey, 'hash-1', rows, [], churches))
+    const [pessoa] = await people.listPeople(accountId, masterKey)
+    await people.updatePerson(accountId, masterKey, pessoa!.id, {
+      ...emptyPersonInput(), name: pessoa!.name, birthDate: pessoa!.birthDate!, currentChurchId: 'church-c',
+    })
+
+    const previa = await imports.previewMembers(accountId, masterKey, 'hash-2', rows, await people.listPeople(accountId, masterKey), churches)
+    await imports.applyPreview(accountId, masterKey, previa)
+
+    const final = (await people.listPeople(accountId, masterKey))[0]!
+    expect(final.memberships.some((vinculo) => vinculo.churchId === 'church-a')).toBe(true)
+    expect(final.currentChurchId).toBe('church-c')
+  })
+
+  /* E não é acusada de ter sumido só porque o relatório a traz noutra igreja. */
+  it('quem o pastor lotou não vira ausente do relatório', async () => {
+    const { masterKey, accountId, people, imports } = await fixture()
+    const rows = parseMemberText('IGREJA: Igreja Aurora Fictícia\nPessoa Épsilon Fictícia | 10/05/1990')
+    await imports.applyPreview(accountId, masterKey, await imports.previewMembers(accountId, masterKey, 'hash-1', rows, [], churches))
+    const [pessoa] = await people.listPeople(accountId, masterKey)
+    await people.updatePerson(accountId, masterKey, pessoa!.id, {
+      ...emptyPersonInput(), name: pessoa!.name, birthDate: pessoa!.birthDate!, currentChurchId: 'church-c',
+    })
+
+    // Um relatório que não traz esta pessoa em lugar nenhum.
+    const outras = parseMemberText('IGREJA: Ponto Fictício de Pregação\nPessoa Zeta Fictícia | 01/02/1985')
+    const previa = await imports.previewMembers(accountId, masterKey, 'hash-3', outras, await people.listPeople(accountId, masterKey), churches)
+    expect(previa.missingPeople).toHaveLength(0)
+  })
+
+  /* Sem escolha do pastor, o relatório continua mandando. */
+  it('sem escolha do pastor, a importação continua movendo', async () => {
+    const { masterKey, accountId, people, imports } = await fixture()
+    const rows = parseMemberText('IGREJA: Igreja Aurora Fictícia\nPessoa Eta Fictícia | 10/05/1990')
+    await imports.applyPreview(accountId, masterKey, await imports.previewMembers(accountId, masterKey, 'hash-1', rows, [], churches))
+
+    const mudou = parseMemberText('IGREJA: Grupo Horizonte Fictício\nPessoa Eta Fictícia | 10/05/1990')
+    const previa = await imports.previewMembers(accountId, masterKey, 'hash-2', mudou, await people.listPeople(accountId, masterKey), churches)
+    expect(previa.updatedPeople).toHaveLength(1)
+    expect(previa.mantidasOndeVoceColocou).toHaveLength(0)
+
+    await imports.applyPreview(accountId, masterKey, previa)
+    expect((await people.listPeople(accountId, masterKey))[0]!.currentChurchId).toBe('church-b')
   })
 })
