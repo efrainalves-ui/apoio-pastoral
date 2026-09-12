@@ -144,3 +144,53 @@ describe('lista de compras com a gravação ainda em voo', () => {
     expect(salvos.at(-1)!.itens[0]!.valorUnitario).toBe(2500)
   })
 })
+
+/**
+ * O botão é a única porta de volta para o que ficou na lista antiga. Ele só
+ * existe quando há o que trazer — senão vira enfeite numa tela que já é densa.
+ */
+describe('o caminho de volta da lista antiga', () => {
+  it('não aparece quando não há nada para trazer', () => {
+    render(<ListaDeCompras
+      mes="2026-09"
+      compra={compraDeTeste()}
+      anterior={null}
+      onSalvar={() => undefined}
+      onFinalizar={() => undefined}
+      antigos={0}
+      onTrazerAntigos={() => undefined}
+    />)
+
+    expect(screen.queryByRole('button', { name: /lista antiga/ })).toBeNull()
+  })
+
+  it('diz quantos são e chama quem sabe trazer', () => {
+    const trazer = vi.fn()
+    render(<ListaDeCompras
+      mes="2026-09"
+      compra={compraDeTeste()}
+      anterior={null}
+      onSalvar={() => undefined}
+      onFinalizar={() => undefined}
+      antigos={7}
+      onTrazerAntigos={trazer}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trazer 7 itens da lista antiga' }))
+    expect(trazer).toHaveBeenCalledOnce()
+  })
+
+  it('aparece também quando ainda não há compra do mês', () => {
+    render(<ListaDeCompras
+      mes="2026-09"
+      compra={null}
+      anterior={null}
+      onSalvar={() => undefined}
+      onFinalizar={() => undefined}
+      antigos={1}
+      onTrazerAntigos={() => undefined}
+    />)
+
+    expect(screen.getByRole('button', { name: 'Trazer 1 item da lista antiga' })).toBeTruthy()
+  })
+})

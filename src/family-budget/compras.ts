@@ -203,6 +203,49 @@ export function listaPadrao(mes: string, escolhidos: readonly ItemDoCatalogo[] =
 }
 
 /**
+ * A lista de compras antiga, trazida para a lista de hoje.
+ *
+ * A tela antiga saiu do ar quando o Orçamento Pessoal ganhou as seis áreas, e
+ * os itens que estavam nela ficaram guardados sem nenhuma tela que os
+ * mostrasse. Eles continuam no cofre e continuam sincronizando; só não tinham
+ * por onde aparecer.
+ *
+ * A lista antiga guardava reais; esta guarda centavos. Sem converter, um item
+ * de R$ 25,00 entraria como R$ 0,25. O que já estava no carrinho chega
+ * marcado, porque isso é informação do mercado, não da tela.
+ */
+export function trazerDaListaAntiga(itens: readonly ItemAntigo[]): ItemDaCompra[] {
+  return itens.map((item) => {
+    const doCatalogo = CATALOGO_DE_COMPRAS.find(({ nome }) => nome.toLowerCase() === item.name.trim().toLowerCase())
+    return {
+      id: crypto.randomUUID(),
+      nome: item.name.trim(),
+      categoria: doCatalogo?.categoria ?? 'Outros',
+      quantidade: Math.max(0, item.quantity),
+      unidade: UNIDADE_DA_LISTA_ANTIGA[item.unit] ?? doCatalogo?.unidade ?? 'unidade',
+      valorUnitario: Math.round(Math.max(0, item.unitPrice) * 100),
+      comprado: item.confirmed,
+      observacao: item.notes.trim(),
+    }
+  })
+}
+
+/** O que a lista antiga guardava de um item. */
+export interface ItemAntigo {
+  name: string
+  quantity: number
+  unit: string
+  /** Preço unitário em reais — a lista antiga não usava centavos. */
+  unitPrice: number
+  confirmed: boolean
+  notes: string
+}
+
+const UNIDADE_DA_LISTA_ANTIGA: Record<string, Unidade> = {
+  un: 'unidade', kg: 'kg', g: 'g', l: 'L', ml: 'ml', pct: 'pacote', cx: 'caixa',
+}
+
+/**
  * A lista do mês passado, pronta para servir de base.
  *
  * Os preços vêm junto — é o que o mercado cobrava — mas nada vem marcado como

@@ -10,7 +10,9 @@ import { MetasEPlanejamento } from '../components/orcamento/MetasEPlanejamento'
 import { ListaDeCompras } from '../components/orcamento/ListaDeCompras'
 import { Relatorios } from '../components/orcamento/Relatorios'
 import type { Compra, CompraData } from '../family-budget/compras'
-import { totaisDaCompra } from '../family-budget/compras'
+import { totaisDaCompra, trazerDaListaAntiga } from '../family-budget/compras'
+import { ShoppingListService } from '../shopping/service'
+import type { ShoppingItemEntity } from '../shopping/types'
 import type { Aporte, Meta, MetaData, Planejamento, PlanejamentoData } from '../family-budget/metas'
 import { lerOAntigo, type RegistrosAntigos } from '../family-budget/adaptador'
 import { aindaLegados, planoDeMigracao } from '../family-budget/migracao'
@@ -27,6 +29,7 @@ import { useReloadOnSync } from '../sync/useReloadOnSync'
 
 const pessoais = new FinancasPessoaisService()
 const antigo = new FamilyBudgetService()
+const listaAntiga = new ShoppingListService()
 
 const mesAnterior = (mes: string) => {
   const [ano, numero] = mes.split('-').map(Number)
@@ -61,6 +64,7 @@ export function FinancasPessoaisPage({ area, mes }: FinancasPessoaisPageProps) {
   const [aportes, setAportes] = useState<Aporte[]>([])
   const [planejamentos, setPlanejamentos] = useState<Planejamento[]>([])
   const [compras, setCompras] = useState<Compra[]>([])
+  const [itensAntigos, setItensAntigos] = useState<ShoppingItemEntity[]>([])
   const [transferencias, setTransferencias] = useState<Transferencia[]>([])
   const [carregando, setCarregando] = useState(true)
   const [rascunho, setRascunho] = useState<LancamentoData | null>(null)
@@ -77,7 +81,7 @@ export function FinancasPessoaisPage({ area, mes }: FinancasPessoaisPageProps) {
   const carregar = useCallback(async () => {
     if (!account || !masterKey) return
     try {
-      const [lancamentos, listaContas, listaCartoes, listaIntegrantes, listaMetas, listaAportes, listaPlanejamentos, listaCompras, listaTransferencias, incomes, expenses, bills, plans] = await Promise.all([
+      const [lancamentos, listaContas, listaCartoes, listaIntegrantes, listaMetas, listaAportes, listaPlanejamentos, listaCompras, listaTransferencias, daListaAntiga, incomes, expenses, bills, plans] = await Promise.all([
         pessoais.lancamentos(account.id, masterKey),
         pessoais.contas(account.id, masterKey),
         pessoais.cartoes(account.id, masterKey),
@@ -87,6 +91,7 @@ export function FinancasPessoaisPage({ area, mes }: FinancasPessoaisPageProps) {
         pessoais.planejamentos(account.id, masterKey),
         pessoais.compras(account.id, masterKey),
         pessoais.transferencias(account.id, masterKey),
+        listaAntiga.items(account.id, masterKey),
         antigo.incomes(account.id, masterKey),
         antigo.expenses(account.id, masterKey),
         antigo.bills(account.id, masterKey),
@@ -111,6 +116,7 @@ export function FinancasPessoaisPage({ area, mes }: FinancasPessoaisPageProps) {
       setPlanejamentos(listaPlanejamentos)
       setCompras(listaCompras)
       setTransferencias(listaTransferencias)
+      setItensAntigos(daListaAntiga)
       const doMesEscolhido = plans.find((plano) => plano.month === mes)
       setPlanejado(Object.fromEntries(Object.entries(doMesEscolhido?.limits ?? {}).map(([chave, valor]) => [chave, emCentavos(valor ?? 0)])))
       setErro('')
@@ -231,6 +237,38 @@ export function FinancasPessoaisPage({ area, mes }: FinancasPessoaisPageProps) {
     await carregar()
   }
 
+  /**
+   * Traz para a lista de hoje o que ficou na lista de compras antiga.
+   *
+   * A tela antiga saiu do ar quando o Orçamento Pessoal ganhou as seis áreas, e
+   * o que estava nela ficou guardado sem nenhuma tela que mostrasse. Continua no
+   * cofre, continua sincronizando — só não tinha por onde aparecer.
+   *
+   * Traz primeiro, apaga depois: se a gravação da lista falhar, os itens antigos
+   * continuam onde estavam e o botão continua ali.
+   */
+  async function trazerOsAntigos(compra: Compra | null) {
+    if (!account || !masterKey || !itensAntigos.length) return
+    if (!window.confirm(`Trazer ${itensAntigos.length} ${itensAntigos.length === 1 ? 'item' : 'itens'} da lista antiga para a lista deste mês?`)) return
+    const trazidos = trazerDaListaAntiga(itensAntigos)
+    try {
+      if (compra) {
+        const { id, ...dados } = compra
+        await pessoais.salvarCompra(account.id, masterKey, { ...dados, itens: [...compra.itens, ...trazidos] }, id)
+      } else {
+        await pessoais.salvarCompra(account.id, masterKey, {
+          mes, nome: 'Compra do mês', itens: trazidos, limite: 0,
+          lancamentoId: null, finalizadaEm: null, createdAt: '', updatedAt: '',
+        })
+      }
+      await Promise.all(itensAntigos.map(({ id }) => listaAntiga.remove(account.id, masterKey, id)))
+      setAviso(`${trazidos.length} ${trazidos.length === 1 ? 'item trazido' : 'itens trazidos'} da lista antiga.`)
+      await carregar()
+    } catch (motivo) {
+      setErro(motivo instanceof Error ? motivo.message : 'Não foi possível trazer a lista antiga.')
+    }
+  }
+
   if (carregando) return <div className="esqueleto" aria-busy="true" aria-label="Carregando o orçamento">
     {[0, 1, 2].map((linha) => <span key={linha} />)}
   </div>
@@ -273,6 +311,8 @@ export function FinancasPessoaisPage({ area, mes }: FinancasPessoaisPageProps) {
         anterior={compras.find((item) => item.mes === mesAnterior(mes)) ?? null}
         onSalvar={(dados, id) => void salvarCompra(dados, id)}
         onFinalizar={(compra) => void finalizarCompra(compra)}
+        antigos={itensAntigos.length}
+        onTrazerAntigos={() => void trazerOsAntigos(compras.find((item) => item.mes === mes) ?? null)}
       />
     </>
   }

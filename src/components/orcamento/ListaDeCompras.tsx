@@ -15,6 +15,9 @@ interface ListaDeComprasProps {
   anterior: Compra | null
   onSalvar: (dados: CompraData, id?: string) => void
   onFinalizar: (compra: Compra) => void
+  /** Quantos itens ficaram na lista de compras antiga, esperando por uma tela. */
+  antigos?: number
+  onTrazerAntigos?: () => void
 }
 
 /**
@@ -24,7 +27,7 @@ interface ListaDeComprasProps {
  * total, e o limite mostra quanto ainda dá para gastar. É a conta que se faz
  * de cabeça no corredor, e fazer de cabeça é como se estoura.
  */
-export function ListaDeCompras({ mes, compra, anterior, onSalvar, onFinalizar }: ListaDeComprasProps) {
+export function ListaDeCompras({ mes, compra, anterior, onSalvar, onFinalizar, antigos = 0, onTrazerAntigos }: ListaDeComprasProps) {
   const [busca, setBusca] = useState('')
   const [novoItem, setNovoItem] = useState('')
   const [enviado, setEnviado] = useState<Compra | null>(null)
@@ -42,7 +45,18 @@ export function ListaDeCompras({ mes, compra, anterior, onSalvar, onFinalizar }:
   if (alcancado && enviado) setEnviado(null)
   const atual = alcancado ? compra : enviado
 
-  if (!atual) return <PrimeiroUso mes={mes} anterior={anterior} onCriar={onSalvar} />
+  const daListaAntiga = antigos > 0 && onTrazerAntigos
+    ? <div className="form-actions">
+        <Button variant="secondary" icon={<ListPlus size={17} />} onClick={onTrazerAntigos}>
+          Trazer {antigos} {antigos === 1 ? 'item' : 'itens'} da lista antiga
+        </Button>
+      </div>
+    : null
+
+  if (!atual) return <>
+    {daListaAntiga}
+    <PrimeiroUso mes={mes} anterior={anterior} onCriar={onSalvar} />
+  </>
 
   const totais = totaisDaCompra(atual)
   const finalizada = Boolean(atual.finalizadaEm)
@@ -97,6 +111,7 @@ export function ListaDeCompras({ mes, compra, anterior, onSalvar, onFinalizar }:
     .filter(({ itens }) => itens.length > 0)
 
   return <div className="painel-financeiro">
+    {daListaAntiga}
     <section className="cartao-saldo" aria-label="Orçamento da compra">
       <p className="cartao-saldo__rotulo">No carrinho</p>
       <p className="cartao-saldo__num">{formatar(totais.noCarrinho)}</p>

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   CATALOGO_DE_COMPRAS, CATEGORIAS_DO_CATALOGO, listaPadrao, podeRegistrar,
-  repetirCompra, subtotal, totaisDaCompra, type CompraData, type ItemDaCompra,
+  repetirCompra, subtotal, totaisDaCompra, trazerDaListaAntiga,
+  type CompraData, type ItemAntigo, type ItemDaCompra,
 } from './compras'
 import { emCentavos } from './dinheiro'
 
@@ -144,5 +145,53 @@ describe('registrar a compra nas finanças', () => {
   it('não registra duas vezes a mesma compra', () => {
     const jaRegistrada = { ...compra([item({ comprado: true })]), lancamentoId: 'lancamento-ficticio' }
     expect(podeRegistrar(jaRegistrada)).toBe(false)
+  })
+})
+
+/**
+ * A tela da lista antiga saiu do ar quando o Orçamento Pessoal ganhou as seis
+ * áreas. O que estava nela continuou no cofre, sincronizando, sem nenhuma tela
+ * que mostrasse. Trazer é o caminho de volta — e a armadilha é a moeda: a lista
+ * antiga guardava reais, esta guarda centavos.
+ */
+describe('trazer o que ficou na lista de compras antiga', () => {
+  const antigo = (overrides: Partial<ItemAntigo> = {}): ItemAntigo => ({
+    name: 'Arroz branco', quantity: 2, unit: 'kg', unitPrice: 25, confirmed: false, notes: '', ...overrides,
+  })
+
+  it('converte reais em centavos', () => {
+    const [trazido] = trazerDaListaAntiga([antigo({ unitPrice: 25.5 })])
+    expect(trazido!.valorUnitario).toBe(emCentavos(25.5))
+  })
+
+  it('mantém o que já estava no carrinho', () => {
+    const [pego, naoPego] = trazerDaListaAntiga([antigo({ confirmed: true }), antigo({ confirmed: false })])
+    expect(pego!.comprado).toBe(true)
+    expect(naoPego!.comprado).toBe(false)
+  })
+
+  it('traduz a unidade antiga e reconhece o item do catálogo', () => {
+    const [trazido] = trazerDaListaAntiga([antigo({ unit: 'pct' })])
+    expect(trazido!.unidade).toBe('pacote')
+    expect(CATEGORIAS_DO_CATALOGO).toContain(trazido!.categoria)
+  })
+
+  it('o que não está no catálogo entra em Outros, sem perder nada', () => {
+    const [trazido] = trazerDaListaAntiga([antigo({ name: '  Tempero fictício  ', unit: 'un', notes: ' na feira ' })])
+    expect(trazido!.nome).toBe('Tempero fictício')
+    expect(trazido!.categoria).toBe('Outros')
+    expect(trazido!.unidade).toBe('unidade')
+    expect(trazido!.observacao).toBe('na feira')
+  })
+
+  it('não deixa quantidade nem preço negativos entrarem', () => {
+    const [trazido] = trazerDaListaAntiga([antigo({ quantity: -3, unitPrice: -10 })])
+    expect(trazido!.quantidade).toBe(0)
+    expect(trazido!.valorUnitario).toBe(0)
+  })
+
+  it('cada item trazido nasce com identificador próprio', () => {
+    const trazidos = trazerDaListaAntiga([antigo(), antigo()])
+    expect(new Set(trazidos.map(({ id }) => id)).size).toBe(2)
   })
 })
