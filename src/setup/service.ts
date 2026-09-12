@@ -1,5 +1,7 @@
 import { currentDeviceId } from '../auth/device'
 import { encryptPayload } from '../crypto/vault'
+import { readPayload } from '../db/corrupted'
+import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository, type EncryptedMutation } from '../db/repository'
 import type { ChurchData, DistrictData } from '../district/types'
 import { assertValid, validateDistrictName } from '../district/validation'
@@ -14,11 +16,43 @@ const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u0
 
 /** Creates the initial district in one encrypted persistence operation. */
 export class InitialSetupService {
-  constructor(private readonly repository: Pick<VaultRepository, 'applyEncryptedMutations' | 'list'> = new VaultRepository()) {}
+  constructor(
+    private readonly repository: Pick<VaultRepository, 'applyEncryptedMutations' | 'list'> = new VaultRepository(),
+    private readonly database: ApoioDatabase = db,
+  ) {}
+
+  /**
+   * Organizar um distrito aqui é seguro?
+   *
+   * A pergunta parece a mesma que "há registro do tipo distrito", mas não é. O
+   * que chega de outro aparelho entra sem tipo — a sincronização não tem a
+   * chave para descobri-lo, nem deve ter — e por isso aparece em qualquer
+   * listagem por tipo. Contar sem abrir fazia um registro pessoal vindo do
+   * celular passar por distrito, e a configuração inicial recusava com uma
+   * frase que não era verdade: quem ainda não tinha distrito nenhum ficava sem
+   * caminho para organizar o seu.
+   *
+   * Abrir também não basta. Um registro que não abre neste aparelho pode ser o
+   * distrito, e deixar passar criaria um segundo por cima do primeiro — o
+   * estrago que esta verificação existe para evitar. Então ele recusa dizendo o
+   * que é, em vez de recusar dizendo o que não é.
+   */
+  private async impedimento(accountId: string, masterKey: CryptoKey): Promise<string | null> {
+    let ilegiveis = 0
+    for (const record of await this.repository.list(accountId, 'district')) {
+      const payload = await readPayload(masterKey, record, this.database)
+      if (payload?.type === 'district') return 'Este dispositivo já possui um distrito organizado.'
+      if (!payload) ilegiveis += 1
+    }
+    return ilegiveis > 0
+      ? `${ilegiveis} registro(s) não abriram neste aparelho, e um deles pode ser o seu distrito. Organizar agora criaria um segundo por cima do primeiro — restaurar um backup costuma resolver.`
+      : null
+  }
 
   async organize(accountId: string, masterKey: CryptoKey, input: InitialSetupInput): Promise<InitialSetupResult> {
     assertValid(validateDistrictName(input.districtName))
-    if ((await this.repository.list(accountId, 'district')).length > 0) throw new Error('Este dispositivo já possui um distrito organizado.')
+    const impedimento = await this.impedimento(accountId, masterKey)
+    if (impedimento) throw new Error(impedimento)
     const churches = input.churches.map((church) => ({ ...church, name: church.name.trim() })).filter((church) => church.name)
     if (new Set(churches.map((church) => normalize(church.name))).size !== churches.length) throw new Error('Una ou corrija as igrejas com o mesmo nome antes de confirmar.')
 
