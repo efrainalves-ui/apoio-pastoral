@@ -88,3 +88,30 @@ describe('agenda cifrada', () => {
     }
   })
 })
+
+describe('batismo sem responsável', () => {
+  const cerimonia = { responsible: '', involvedPersonIds: [], parentPersonIds: [], childPersonId: null, checklist: {} }
+
+  /*
+    A tela do batismo deixou de perguntar responsável — é o próprio pastor — e a
+    lista de envolvidos trazia o distrito inteiro. Exigir na gravação o que a
+    tela não pergunta travaria o salvamento com um erro sem saída.
+  */
+  it('salva um batismo sem responsável informado', async () => {
+    const database = new ApoioDatabase(`agenda-batismo-${crypto.randomUUID()}`); databases.push(database)
+    const service = new AgendaService(database); const key = await generateMasterKey()
+    const salvo = await service.createEvent('account-fixture', key, input({
+      category: 'baptism', churchId: 'igreja-ficticia', ceremonyDetails: cerimonia,
+    }))
+    expect(salvo.category).toBe('baptism')
+  })
+
+  /* Casamento continua pedindo: ali a pergunta é real. */
+  it('casamento sem responsável continua recusado', async () => {
+    const database = new ApoioDatabase(`agenda-casamento-${crypto.randomUUID()}`); databases.push(database)
+    const service = new AgendaService(database); const key = await generateMasterKey()
+    await expect(service.createEvent('account-fixture', key, input({
+      category: 'wedding', churchId: 'igreja-ficticia', ceremonyDetails: cerimonia,
+    }))).rejects.toThrow('responsável')
+  })
+})

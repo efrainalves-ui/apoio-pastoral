@@ -79,6 +79,30 @@ export function SyncConflictsPage() {
     }
   }
 
+  /**
+   * Resolve de uma vez as que não têm diferença nenhuma.
+   *
+   * Pedir um clique por revisão em que as duas versões são idênticas não é
+   * proteção: é transferir ao pastor um trabalho que o aplicativo sabe fazer.
+   */
+  async function resolverIguais() {
+    if (!account || !masterKey) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const quantas = await service.resolverSemDiferenca(account.id, masterKey)
+      setNotice(quantas === 1
+        ? '1 revisão resolvida: as duas versões eram iguais.'
+        : `${quantas} revisões resolvidas: as duas versões eram iguais.`)
+      await load()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível resolver as revisões.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const semDiferenca = previews.filter((preview) => service.semDiferencaReal(preview)).length
+
   if (loading) return <LoadingState title="Abrindo as revisões…" />
 
   return (
@@ -95,6 +119,17 @@ export function SyncConflictsPage() {
       {error && previews.length > 0 && <div className="alert alert--error" role="alert">{error}</div>}
       {error && previews.length === 0 && <ErrorState title="As revisões não puderam ser abertas" detail={error} retry={() => void load()} />}
       {notice && <div className="alert alert--success" role="status">{notice}</div>}
+
+      {semDiferenca > 0 && <Card title="Revisões sem diferença">
+        <p className="card-copy">
+          {semDiferenca === 1
+            ? '1 revisão tem as duas versões iguais: mudou só o que o aplicativo controla sozinho.'
+            : `${semDiferenca} revisões têm as duas versões iguais: mudou só o que o aplicativo controla sozinho.`}
+        </p>
+        <Button disabled={busy} onClick={() => void resolverIguais()}>
+          {busy ? 'Resolvendo…' : 'Resolver todas de uma vez'}
+        </Button>
+      </Card>}
 
       {previews.length === 0
         ? <Card title="Nenhuma revisão pendente"><div className="empty-state"><Check /><strong>Está tudo alinhado</strong><span>Quando o mesmo registro for alterado em dois aparelhos, ele aparece aqui para você decidir.</span></div></Card>

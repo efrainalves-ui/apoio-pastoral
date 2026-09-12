@@ -8,7 +8,7 @@ import type { SyncConflictRecord, VaultRecord } from '../db/types'
 /** O que o pastor escolheu fazer com as duas versões. */
 export type ConflictChoice = 'keep_local' | 'keep_remote' | 'keep_both'
 
-const RECORD_LABELS: Record<string, string> = {
+export const RECORD_LABELS: Record<string, string> = {
   district: 'Distrito', church: 'Igreja', person: 'Pessoa', family: 'Família',
   agenda_event: 'Compromisso', sermon: 'Sermão', goal: 'Meta', goal_entry: 'Registro de meta', goal_history: 'Resultado do ano anterior',
   visit: 'Visita', prayer_request: 'Pedido de oração', follow_up: 'Acompanhamento',
@@ -258,6 +258,53 @@ export class ConflictService {
    * aparelho não tinha como ser aceita: o único caminho era manter a versão
    * daqui, então apagar um registro em um aparelho nunca chegava ao outro.
    */
+  /**
+   * Uma revisão em que não há o que revisar.
+   *
+   * Quando as duas versões não diferem em nenhum campo que o pastor edita — só
+   * em campos que o aplicativo controla, como carimbos e contagem de versão —
+   * a pergunta "qual das duas deve ficar valendo?" não tem resposta, porque as
+   * duas são a mesma coisa. A tela já dizia isso; faltava agir.
+   *
+   * Exclusão nunca entra aqui: apagar contra alterar é uma escolha de verdade,
+   * e ela continua sendo do pastor.
+   */
+  semDiferencaReal(preview: ConflictPreview): boolean {
+    return preview.differences.length === 0
+      && preview.hiddenDifferences > 0
+      && !preview.remoteIsDeletion
+      && !preview.localIsDeletion
+  }
+
+  /** Quantas das revisões pendentes não têm diferença nenhuma a decidir. */
+  async contarSemDiferenca(accountId: string, masterKey: CryptoKey): Promise<number> {
+    const pendentes = await this.listPending(accountId)
+    const previas = await Promise.all(pendentes.map((conflito) => this.preview(conflito, masterKey)))
+    return previas.filter((previa) => this.semDiferencaReal(previa)).length
+  }
+
+  /**
+   * Resolve de uma vez as revisões sem diferença real.
+   *
+   * Fica com a versão deste aparelho — e "ficar com" aqui não descarta
+   * conteúdo nenhum, porque o conteúdo é idêntico dos dois lados. A outra
+   * versão continua guardada, como em qualquer resolução.
+   *
+   * Pedir 943 cliques por uma escolha que não existe não é proteção, é só
+   * transferir para o pastor um trabalho que o aplicativo sabe fazer.
+   */
+  async resolverSemDiferenca(accountId: string, masterKey: CryptoKey): Promise<number> {
+    const pendentes = await this.listPending(accountId)
+    let resolvidas = 0
+    for (const conflito of pendentes) {
+      const previa = await this.preview(conflito, masterKey)
+      if (!this.semDiferencaReal(previa)) continue
+      await this.resolve(accountId, masterKey, conflito.id, 'keep_local')
+      resolvidas += 1
+    }
+    return resolvidas
+  }
+
   async resolve(accountId: string, masterKey: CryptoKey, conflictId: string, choice: ConflictChoice): Promise<void> {
     const conflict = await this.database.syncConflicts.get(conflictId)
     if (!conflict || conflict.accountId !== accountId) throw new Error('Esta revisão não foi encontrada.')

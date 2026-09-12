@@ -7,7 +7,9 @@ import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { StatusPill } from '../components/ui/StatusPill'
-import { countCorruptedRecords } from '../db/corrupted'
+import { countCorruptedRecords, listCorruptedRecords } from '../db/corrupted'
+import type { CorruptedRecordRecord } from '../db/types'
+import { RECORD_LABELS } from '../sync/conflicts'
 import { db } from '../db/database'
 import { pendingRemotePurge } from '../db/purge'
 import { SyncService, syncConfirmed, syncPendingReason } from '../sync/service'
@@ -23,6 +25,7 @@ export function SyncPage() {
   const [conflicts, setConflicts] = useState(0)
   const [quarantined, setQuarantined] = useState(0)
   const [corrupted, setCorrupted] = useState(0)
+  const [emQuarentena, setEmQuarentena] = useState<CorruptedRecordRecord[]>([])
   const [purgePending, setPurgePending] = useState(0)
   const [resolved, setResolved] = useState(0)
   const [summary, setSummary] = useState<SyncSummary | null>(null)
@@ -37,6 +40,7 @@ export function SyncPage() {
     setResolved(await db.syncConflicts.where('accountId').equals(account.id).filter(({ status }) => status === 'resolved').count())
     setQuarantined(await db.quarantine.where('accountId').equals(account.id).count())
     setCorrupted(await countCorruptedRecords(account.id))
+    setEmQuarentena(await listCorruptedRecords(account.id))
     setPurgePending((await pendingRemotePurge(account.id)).length)
   }, [account])
 
@@ -70,7 +74,19 @@ export function SyncPage() {
       </div>
       {purgePending > 0 && <div className="alert alert--warning" role="status">{purgePending} registro(s) apagado(s) aqui ainda têm histórico no serviço. Sincronize com internet até este aviso sumir.</div>}
       {quarantined > 0 && <div className="alert alert--error" role="alert">Recebemos {quarantined} alteração(ões) que não conferem com a sua conta e não foram aplicadas. Elas ficaram guardadas de lado, sem alterar nada, e a próxima sincronização vai buscá-las de novo. Se o número não diminuir depois de sincronizar, avise antes de continuar usando este aparelho.</div>}
-      {corrupted > 0 && <div className="alert alert--error" role="alert">{corrupted} registro(s) não abriram neste aparelho e ficaram em quarentena. O restante continua acessível — listas, backup, exportação e encerramento seguem funcionando; restaurar um backup costuma resolver.</div>}
+      {corrupted > 0 && <div className="alert alert--error" role="alert">
+        {corrupted} registro(s) não abriram neste aparelho e ficaram em quarentena. O restante continua acessível — listas, backup, exportação e encerramento seguem funcionando; restaurar um backup costuma resolver.
+        {/*
+          Dizer o que são, e não só quantos: dois registros parados podem ser
+          dois sermões que fazem falta ou dois restos técnicos que não fazem.
+          Sem o tipo e a data, não há como decidir.
+        */}
+        {Boolean(emQuarentena.length) && <ul className="plain-list">
+          {emQuarentena.map((registro) => <li key={registro.recordId}>
+            {RECORD_LABELS[registro.recordType] ?? registro.recordType} · visto em {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(registro.detectedAt))}
+          </li>)}
+        </ul>}
+      </div>}
       <Card title="Sincronização manual" action={navigator.onLine ? <Cloud /> : <CloudOff />}>
         <p className="card-copy">{transport.name === 'disabled' ? 'A sincronização não está habilitada. Suas informações permanecem somente neste dispositivo.' : 'Se houver uma interrupção, as alterações pendentes serão mantidas para uma nova tentativa.'}</p>
         {summary && (syncConfirmed(summary)

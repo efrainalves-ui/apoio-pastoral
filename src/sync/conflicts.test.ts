@@ -324,3 +324,61 @@ describe('revisão de alterações concorrentes', () => {
     }
   })
 })
+
+describe('revisões sem diferença real', () => {
+  /**
+   * Duas versões do mesmo registro em que só mudam campos internos.
+   *
+   * É o caso que apareceu no aparelho do pastor: 943 revisões em que os dois
+   * lados diziam exatamente a mesma coisa — o nome idêntico dos dois lados — e
+   * mudava só o carimbo que o aplicativo controla.
+   */
+  async function cenarioIgual() {
+    const database = new ApoioDatabase(`iguais-${crypto.randomUUID()}`)
+    const key = await generateMasterKey()
+    const repository = new VaultRepository(database)
+    const recordId = crypto.randomUUID()
+    const nome = 'Pessoa Fictícia Idêntica'
+
+    await repository.saveEncrypted(
+      accountId, deviceId, recordId,
+      await encryptPayload(key, { schemaVersion: 1, type: 'person', data: { name: nome, updatedAt: '2026-09-04T00:29:00.000Z' } }, recordId),
+      'person',
+    )
+
+    await database.syncConflicts.put({
+      id: crypto.randomUUID(), accountId, recordId,
+      localVersion: 1, remoteVersion: 2, remoteOperation: 'upsert',
+      remotePayload: await encryptPayload(key, { schemaVersion: 1, type: 'person', data: { name: nome, updatedAt: '2026-09-04T00:29:59.000Z' } }, recordId),
+      createdAt: new Date().toISOString(), status: 'pending',
+    } as SyncConflictRecord)
+
+    return { database, key, service: new ConflictService(database) }
+  }
+
+  it('reconhece a revisão em que não há o que decidir', async () => {
+    const { database, key, service } = await cenarioIgual()
+    expect(await service.contarSemDiferenca(accountId, key)).toBe(1)
+    await database.delete()
+  })
+
+  /*
+    Pedir um clique por revisão em que as duas versões são idênticas não é
+    proteção: é transferir ao pastor um trabalho que o aplicativo sabe fazer.
+  */
+  it('resolve todas de uma vez', async () => {
+    const { database, key, service } = await cenarioIgual()
+    expect(await service.resolverSemDiferenca(accountId, key)).toBe(1)
+    expect(await service.listPending(accountId)).toHaveLength(0)
+    await database.delete()
+  })
+
+  /* Diferença de verdade continua sendo escolha do pastor. */
+  it('não toca na revisão com diferença real', async () => {
+    const { database, key, service } = await cenario()
+    expect(await service.contarSemDiferenca(accountId, key)).toBe(0)
+    expect(await service.resolverSemDiferenca(accountId, key)).toBe(0)
+    expect(await service.listPending(accountId)).toHaveLength(1)
+    await database.delete()
+  })
+})

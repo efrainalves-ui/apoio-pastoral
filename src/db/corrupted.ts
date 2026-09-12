@@ -52,6 +52,7 @@ export async function countCorruptedRecords(accountId: string, database: ApoioDa
   return database.corruptedRecords.where('accountId').equals(accountId).count()
 }
 
+
 /**
  * Abre um registro guardado ou devolve `null` depois de colocá-lo de lado.
  *

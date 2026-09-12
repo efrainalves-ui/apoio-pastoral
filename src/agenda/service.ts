@@ -19,10 +19,15 @@ export function validateAgendaEvent(input: AgendaEventInput): void {
   if (input.notes.trim().length > 2_000) throw new Error('Use no máximo 2.000 caracteres nas observações.')
   if (input.location.trim().length > 160 || input.address.trim().length > 300) throw new Error('Local ou endereço excede o limite permitido.')
   if (isCeremonyCategory(input.category)) {
-    if (!input.ceremonyDetails?.responsible.trim()) throw new Error('Informe o responsável pela cerimônia.')
+    /*
+      O batismo não pede responsável: é o próprio pastor, e a tela deixou de
+      perguntar. Exigir aqui o que a tela não pergunta trava o salvamento com um
+      erro que o pastor não tem como resolver.
+    */
+    if (input.category !== 'baptism' && !input.ceremonyDetails?.responsible.trim()) throw new Error('Informe o responsável pela cerimônia.')
     if (input.category !== 'wedding' && !input.churchId) throw new Error('Escolha a igreja da cerimônia.')
     if (input.category === 'wedding' && !input.churchId && !input.location.trim()) throw new Error('Informe a igreja ou o local do casamento.')
-    if (input.category === 'child_dedication' && !input.ceremonyDetails.childPersonId) throw new Error('Escolha a criança da dedicação.')
+    if (input.category === 'child_dedication' && !input.ceremonyDetails?.childPersonId) throw new Error('Escolha a criança da dedicação.')
   }
   // A folga de segunda-feira é um lembrete, não uma trava: quem marca um
   // compromisso nesse dia sabe o que está fazendo.
