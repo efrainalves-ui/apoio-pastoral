@@ -1,7 +1,7 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { ClipboardList, PackageCheck, Plus, Split, Trash2 } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { localDateKey } from '../shared/dates'
@@ -60,6 +60,16 @@ export function MaterialsPage() {
   const [quantidade, setQuantidade] = useState(0)
   const [manual, setManual] = useState<Record<string, number>>({})
   const [entregando, setEntregando] = useState<MaterialDistributionEntity | null>(null)
+  /*
+    O formulário de entrega nasce abaixo da lista de entregas. Com treze
+    igrejas, ele nasce fora da tela: o pastor toca em "Confirmar entrega", nada
+    muda no que ele está vendo, e a conclusão é que o botão não funciona.
+    Trazê-lo para a vista é o que torna o clique visível.
+  */
+  const formularioDaEntrega = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (entregando) formularioDaEntrega.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [entregando])
   const [entrega, setEntrega] = useState({ delivered: 0, deliveredAt: hoje(), receivedByPersonId: '', receivedByName: '', notes: '' })
 
   const load = useCallback(async () => {
@@ -90,6 +100,13 @@ export function MaterialsPage() {
     () => distribuindo ? distributionPreview(churches, quantidade, modo, { weights: pesos, manual }) : null,
     [distribuindo, churches, quantidade, modo, pesos, manual],
   )
+
+  /* Por que não dá para confirmar a divisão agora. Nulo quando dá. */
+  const impedimento = !previa ? 'Escolha um material.'
+    : previa.available === 0 ? 'Informe quanto quer dividir.'
+      : previa.missing > 0 ? `Faltam ${previa.missing} para esta divisão. Diminua a quantidade das igrejas ou aumente o total.`
+        : previa.distributed === 0 ? 'Nenhuma igreja recebeu nada nesta divisão. Ajuste os pesos ou as quantidades.'
+          : null
 
   const pronto = async (mensagem: string) => { setNotice(mensagem); setError(''); await load() }
   const falhou = (motivo: unknown) => setError(motivo instanceof Error ? motivo.message : 'Não foi possível salvar.')
@@ -184,13 +201,25 @@ export function MaterialsPage() {
       <Card title="Estoque">
         {materials.length === 0 ? <p className="card-copy">Nenhum material registrado ainda.</p> : <div className="entity-list">{materials.map((material) => {
           const estoque = materialStock(material, distributions)
-          return <div className="entity-row" key={material.id}>
-            <span><strong>{material.name}</strong><small>{MATERIAL_CATEGORY_LABELS[material.category]} · {material.date} · recebido {estoque.received} {MATERIAL_UNIT_LABELS[material.unit]}(s)</small></span>
-            <span><small>Distribuído {estoque.distributed} · a entregar {estoque.pending}</small></span>
-            <strong>{estoque.available} disponível</strong>
-            <Button variant="secondary" icon={<Split />} onClick={() => { setDistribuindo(material); setQuantidade(estoque.available); setManual({}); irPara('distribuicao') }}>Distribuir</Button>
-            <Button variant="quiet" onClick={() => { setMaterialId(material.id); const { id: _id, ...dados } = material; void _id; setMaterialDraft(dados) }}>Editar</Button>
-            <Button variant="danger" icon={<Trash2 />} aria-label={`Apagar material ${material.name}`} onClick={() => apagar(material.id, 'este material')} />
+          return <div className="entity-row entity-row--acoes" key={material.id}>
+            <span className="entity-row__nome">
+              <strong>{material.name}</strong>
+              <small>{MATERIAL_CATEGORY_LABELS[material.category]} · {material.date} · recebido {estoque.received} {MATERIAL_UNIT_LABELS[material.unit]}(s)</small>
+            </span>
+            <span className="entity-row__numeros">
+              <strong>{estoque.available} disponível</strong>
+              <small>Distribuído {estoque.distributed} · a entregar {estoque.pending}</small>
+            </span>
+            <span className="entity-row__botoes">
+              <Button
+                variant="secondary"
+                icon={<Split />}
+                disabled={estoque.available === 0}
+                onClick={() => { setDistribuindo(material); setQuantidade(estoque.available); setManual({}); irPara('distribuicao') }}
+              >Distribuir</Button>
+              <Button variant="quiet" onClick={() => { setMaterialId(material.id); const { id: _id, ...dados } = material; void _id; setMaterialDraft(dados) }}>Editar</Button>
+              <Button variant="danger" icon={<Trash2 />} aria-label={`Apagar material ${material.name}`} onClick={() => apagar(material.id, 'este material')} />
+            </span>
           </div>
         })}</div>}
       </Card>
@@ -199,6 +228,9 @@ export function MaterialsPage() {
     {aba === 'distribuicao' && <>
       {!distribuindo && <Card title="Distribuir material"><p className="card-copy">Escolha um material no Estoque e toque em Distribuir.</p></Card>}
       {distribuindo && previa && <Card title={`Dividir ${distribuindo.name}`}>
+        {previa.available === 0 && <div className="alert alert--warning" role="status">
+          Não há nada disponível deste material: tudo já foi dividido. Informe quanto quer dividir ou registre uma nova entrada no estoque.
+        </div>}
         <div className="form-grid">
           <label className="field"><span className="field__label">Quantidade a dividir</span><input className="field__input" type="number" min="0" value={quantidade || ''} onChange={(event) => setQuantidade(Number(event.target.value))} /></label>
           <label className="field"><span className="field__label">Modo</span><select className="field__input" value={modo} onChange={(event) => setModo(event.target.value as DistributionMode)}>{Object.entries(DISTRIBUTION_MODE_LABELS).map(([valor, rotulo]) => <option key={valor} value={valor}>{rotulo}</option>)}</select></label>
@@ -218,8 +250,15 @@ export function MaterialsPage() {
         </div>
         {previa.missing > 0 && <div className="alert alert--warning" role="status">A divisão pede {previa.missing} a mais do que há disponível. Ajuste antes de confirmar.</div>}
         {previa.leftover > 0 && <div className="alert" role="status">Sobram {previa.leftover} depois desta divisão.</div>}
+        {/*
+          Botão desligado sem motivo é indistinguível de botão quebrado: o
+          pastor toca, nada acontece, e ele conclui que o aplicativo não
+          funciona. Quando não dá para confirmar, o motivo fica no lugar do
+          botão — onde ele está olhando.
+        */}
+        {impedimento && <div className="alert alert--warning" role="status">{impedimento}</div>}
         <div className="form-actions">
-          <Button disabled={previa.missing > 0 || previa.distributed === 0} onClick={confirmarDistribuicao}>Confirmar divisão</Button>
+          <Button disabled={Boolean(impedimento)} onClick={confirmarDistribuicao}>Confirmar divisão</Button>
           <Button variant="secondary" onClick={() => setDistribuindo(null)}>Cancelar</Button>
         </div>
       </Card>}
@@ -236,7 +275,7 @@ export function MaterialsPage() {
         })}</div>}
       </Card>
 
-      {entregando && <Card title="Confirmar entrega">
+      {entregando && <div ref={formularioDaEntrega}><Card title="Confirmar entrega">
         <div className="form-grid">
           <label className="field"><span className="field__label">Quantidade entregue</span><input className="field__input" type="number" min="0" value={entrega.delivered || ''} onChange={(event) => setEntrega({ ...entrega, delivered: Number(event.target.value) })} /></label>
           <label className="field"><span className="field__label">Data</span><input className="field__input" type="date" value={entrega.deliveredAt} onChange={(event) => setEntrega({ ...entrega, deliveredAt: event.target.value })} /></label>
@@ -249,7 +288,7 @@ export function MaterialsPage() {
           {!entrega.receivedByPersonId && <label className="field"><span className="field__label">Nome de quem recebeu</span><input className="field__input" value={entrega.receivedByName} onChange={(event) => setEntrega({ ...entrega, receivedByName: event.target.value })} /></label>}
         </div>
         <div className="form-actions"><Button onClick={confirmarEntrega}>Confirmar entrega</Button><Button variant="secondary" onClick={() => setEntregando(null)}>Cancelar</Button></div>
-      </Card>}
+      </Card></div>}
     </>}
 
     {aba === 'necessidades' && <>

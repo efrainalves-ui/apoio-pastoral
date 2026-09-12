@@ -3,10 +3,10 @@ import { generateMasterKey } from '../crypto/vault'
 import { ApoioDatabase } from '../db/database'
 import type { ChurchEntity } from '../district/types'
 import { PeopleService } from '../people/service'
-import { emptyPersonInput } from '../people/types'
+import { emptyPersonInput, type PersonEntity } from '../people/types'
 import { ehDizimoOnline, parseDizimoOnlineText, parseFidelityText, parseMemberText } from './parsers'
 import { normalizePdfLayout, validatePdfFile } from './pdf'
-import { ImportService } from './service'
+import { ImportService, pessoasParecidas } from './service'
 
 const churches: ChurchEntity[] = [
   { id: 'church-a', districtId: 'district', name: 'Igreja Aurora Fictícia', type: 'organized_church', externalCode: '', address: '', worshipSchedules: [], administrativeNotes: '', status: 'active', history: [], createdAt: '2026-01-01', updatedAt: '2026-01-01' },
@@ -447,5 +447,117 @@ describe('importadores locais e idempotentes', () => {
     const segunda = await imports.previewDizimoOnline(accountId, masterKey, 'hash-d', parseDizimoOnlineText(texto), await people.listPeople(accountId, masterKey), churches)
     expect(segunda.alreadyImported).toBe(true)
     await expect(imports.applyPreview(accountId, masterKey, segunda)).rejects.toThrow('já foi aplicado')
+  })
+
+  /*
+    "Maiza Dos Santos Ramos" no relatório e "Maiza Ramos Costa" no cadastro são a
+    mesma pessoa. O aplicativo não adivinha — mas precisa mostrar quem se parece
+    e deixar o pastor decidir. Sem isso a divergência aparecia na tela sem
+    nenhum controle, e ele via o nome de alguém que existe sob a frase "não
+    encontrada no distrito".
+  */
+  it('a divergência do Dízimo Online traz os parecidos e pode ser resolvida à mão', async () => {
+    const { masterKey, accountId, people, imports } = await fixture()
+    const rows = parseMemberText('IGREJA: Igreja Aurora Fictícia\nMaiza Ramos Costa Fictícia | 10/05/1990')
+    await imports.applyPreview(accountId, masterKey, await imports.previewMembers(accountId, masterKey, 'hash-m', rows, [], churches))
+
+    const texto = normalizePdfLayout(paginaDoDizimoOnline([
+      { nome: 'Maiza Dos Santos Ramos Fictícia', remessa: '01/2026 - 1', tipo: 'Dízimo' },
+      { nome: 'Maiza Dos Santos Ramos Fictícia', remessa: '02/2026 - 1', tipo: 'Dízimo' },
+    ]))
+    const cadastradas = await people.listPeople(accountId, masterKey)
+    const previa = await imports.previewDizimoOnline(accountId, masterKey, 'hash-d', parseDizimoOnlineText(texto), cadastradas, churches)
+
+    const divergencia = previa.issues[0]!
+    expect(divergencia.kind).toBe('person_not_found')
+    expect(divergencia.mesesDoDizimoOnline).toEqual(['2026-01', '2026-02'])
+    expect(divergencia.parecidos?.map(({ name }) => name)).toContain('Maiza Ramos Costa Fictícia')
+
+    const escolhida = cadastradas.find(({ name }) => name === 'Maiza Ramos Costa Fictícia')!
+    const resolvida = imports.resolveFidelityIssue(previa, divergencia.id, escolhida.id, cadastradas, churches)
+    expect(resolvida.issues).toHaveLength(0)
+    expect(resolvida.changes).toHaveLength(1)
+    expect(resolvida.changes[0]!.nextData.fidelity?.months).toBe(2)
+    expect(resolvida.changes[0]!.nextData.fidelity?.source).toContain('Dízimo Online')
+
+    await imports.applyPreview(accountId, masterKey, resolvida)
+    const final = (await people.listPeople(accountId, masterKey)).find(({ id }) => id === escolhida.id)!
+    expect(final.fidelity?.months).toBe(2)
+  })
+
+  /* Resolver à mão precisa dar o mesmo número que daria se o nome tivesse casado sozinho. */
+  it('a revisão manual soma com a leitura anterior igual à importação automática', async () => {
+    const { masterKey, accountId, people, imports } = await fixture()
+    const rows = parseMemberText('IGREJA: Igreja Aurora Fictícia\nPessoa Revisada Fictícia | 10/05/1990')
+    await imports.applyPreview(accountId, masterKey, await imports.previewMembers(accountId, masterKey, 'hash-m', rows, [], churches))
+
+    const fidelidade = parseFidelityText('IGREJA: Igreja Aurora Fictícia\nPessoa Revisada Fictícia | 5')
+    await imports.applyPreview(accountId, masterKey, await imports.previewFidelity(accountId, masterKey, 'hash-f', fidelidade, await people.listPeople(accountId, masterKey), churches, 2026))
+
+    const texto = normalizePdfLayout(paginaDoDizimoOnline([
+      { nome: 'Nome Que Não Casa Fictício', remessa: '06/2026 - 1', tipo: 'Dízimo' },
+      { nome: 'Nome Que Não Casa Fictício', remessa: '07/2026 - 1', tipo: 'Dízimo' },
+      { nome: 'Nome Que Não Casa Fictício', remessa: '08/2026 - 1', tipo: 'Dízimo' },
+    ]))
+    const cadastradas = await people.listPeople(accountId, masterKey)
+    const previa = await imports.previewDizimoOnline(accountId, masterKey, 'hash-d', parseDizimoOnlineText(texto), cadastradas, churches)
+    const resolvida = imports.resolveFidelityIssue(previa, previa.issues[0]!.id, cadastradas[0]!.id, cadastradas, churches)
+
+    // 5 do relatório + 3 do Dízimo Online, lidos na régua de doze meses.
+    expect(resolvida.changes[0]!.nextData.fidelity?.months).toBe(8)
+    expect(resolvida.changes[0]!.nextData.fidelity?.category).toBe('tither')
+  })
+
+  /* Divergência que não vira leitura não ganha controle que não funciona. */
+  it('divergência sem meses e sem faixa não pode ser resolvida', async () => {
+    const { masterKey, accountId, people, imports } = await fixture()
+    const texto = normalizePdfLayout(paginaDoDizimoOnline([{ nome: 'Ninguém Fictício', remessa: '01/2026 - 1', tipo: 'Dízimo' }]))
+    const previa = await imports.previewDizimoOnline(accountId, masterKey, 'hash-d', parseDizimoOnlineText(texto), await people.listPeople(accountId, masterKey), churches)
+    const semNada = {
+      ...previa,
+      issues: previa.issues.map(({ mesesDoDizimoOnline: _meses, ...resto }) => { void _meses; return resto }),
+    }
+    expect(() => imports.resolveFidelityIssue(semNada, semNada.issues[0]!.id, 'qualquer', [], churches))
+      .toThrow('Selecione uma pessoa válida')
+  })
+})
+
+/*
+  A régua da sugestão é separada da régua da associação automática, e de
+  propósito. Associar sozinho exige quase certeza; sugerir exige só ser
+  plausível, porque quem decide é o pastor.
+*/
+describe('quem se parece com quem', () => {
+  const pessoa = (name: string): PersonEntity => ({
+    id: crypto.randomUUID(), name, birthDate: null, whatsapp: '', notes: '',
+    pastoralStatus: 'active', importStatus: 'current', currentChurchId: 'church-a',
+    memberships: [], history: [], incomeStatus: 'unknown', fidelity: null, fidelityHistory: [],
+    createdAt: '', updatedAt: '',
+  })
+
+  /* O caso real: sobrenome diferente, primeiro nome igual, um sobrenome em comum. */
+  it('acha quem perdeu ou trocou sobrenome', () => {
+    const gente = [pessoa('Maiza Ramos Costa'), pessoa('Joana Dos Santos Ramos')]
+    expect(pessoasParecidas('Maiza Dos Santos Ramos', gente).map(({ name }) => name)).toEqual(['Maiza Ramos Costa'])
+  })
+
+  /* Primeiro nome diferente não é a mesma pessoa, por mais sobrenome que coincida. */
+  it('não sugere quem só compartilha sobrenome', () => {
+    const gente = [pessoa('Carlos Dos Santos Ramos')]
+    expect(pessoasParecidas('Maiza Dos Santos Ramos', gente)).toEqual([])
+  })
+
+  it('não sugere xará sem nenhum sobrenome em comum', () => {
+    const gente = [pessoa('Maiza Ferreira Lopes')]
+    expect(pessoasParecidas('Maiza Dos Santos Ramos', gente)).toEqual([])
+  })
+
+  it('põe o mais parecido na frente', () => {
+    const gente = [pessoa('Maiza Ramos Andrade Costa'), pessoa('Maiza Dos Santos Ramos Silva')]
+    expect(pessoasParecidas('Maiza Dos Santos Ramos', gente)[0]?.name).toBe('Maiza Dos Santos Ramos Silva')
+  })
+
+  it('primeiro nome curto demais não sugere ninguém', () => {
+    expect(pessoasParecidas('Jô Ramos', [pessoa('Jô Ramos Costa')])).toEqual([])
   })
 })

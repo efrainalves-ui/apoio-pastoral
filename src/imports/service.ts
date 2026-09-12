@@ -39,6 +39,43 @@ function tokenSimilarity(left: string, right: string): number {
   const shared = [...leftTokens].filter((token) => rightTokens.has(token)).length
   return leftTokens.size + rightTokens.size ? 2 * shared / (leftTokens.size + rightTokens.size) : 0
 }
+/**
+ * Quem, no distrito, pode ser a pessoa do relatório — para o pastor escolher.
+ *
+ * Nome brasileiro perde e troca sobrenome de um documento para outro: "Maiza
+ * Dos Santos Ramos" no relatório é "Maiza Ramos Costa" no cadastro. A medida
+ * usada para a associação automática é estrita de propósito — atribuir dízimo
+ * por adivinhação é pior do que pedir conferência —, e por isso ela não achava
+ * ninguém: a tela dizia "pessoa não encontrada no distrito" sobre alguém que
+ * está lá.
+ *
+ * Aqui a régua é outra, porque a decisão é outra. Esta lista não associa nada:
+ * ela só põe candidatos na frente de quem sabe. Conta a fração do nome mais
+ * curto que os dois compartilham, e exige o primeiro nome igual — é o que
+ * sobrevive quando o sobrenome muda.
+ */
+function proximidadeDeNomes(esquerda: string, direita: string): number {
+  const daEsquerda = new Set(esquerda.split(' ').filter(Boolean))
+  const daDireita = new Set(direita.split(' ').filter(Boolean))
+  const comuns = [...daEsquerda].filter((parte) => daDireita.has(parte)).length
+  const menor = Math.min(daEsquerda.size, daDireita.size)
+  return menor ? comuns / menor : 0
+}
+
+export function pessoasParecidas(name: string, people: PersonEntity[], quantas = 8): PersonEntity[] {
+  const procurado = normalizePersonName(name)
+  const primeiro = procurado.split(' ')[0] ?? ''
+  if (primeiro.length < 3) return []
+  return people
+    .map((person) => ({ person, nome: normalizePersonName(person.name) }))
+    .filter(({ nome }) => nome.split(' ')[0] === primeiro)
+    .map(({ person, nome }) => ({ person, perto: proximidadeDeNomes(procurado, nome) }))
+    .filter(({ perto }) => perto >= 0.5)
+    .sort((esquerda, direita) => direita.perto - esquerda.perto || esquerda.person.name.localeCompare(direita.person.name, 'pt-BR'))
+    .slice(0, quantas)
+    .map(({ person }) => person)
+}
+
 function similarNames(name: string, people: PersonEntity[]): PersonEntity[] {
   const normalized = normalizePersonName(name)
   if (normalized.length < 8) return []
@@ -214,14 +251,32 @@ export class ImportService {
       const category = faixaDoDizimoOnline(linha.meses.length, lido.mesesDoPeriodo)
       if (category === 'tither') categories.tither += 1; else if (category === 'non_systematic_tither') categories.nonSystematicTither += 1; else categories.nonTither += 1
 
+      /*
+        A divergência precisa sair daqui pronta para ser resolvida: com os meses
+        que viraram a leitura e com as pessoas de nome parecido já ao lado. Sem
+        isso ela aparecia na tela sem controle nenhum, e o pastor via o nome de
+        alguém que existe sob a frase "não encontrada no distrito" — sem poder
+        fazer nada a respeito.
+      */
+      const comoResolver = (item: ImportIssue): ImportIssue => ({
+        ...item,
+        mesesDoDizimoOnline: [...linha.meses],
+        parecidos: pessoasParecidas(linha.name, people).map((pessoa) => ({
+          id: pessoa.id, name: pessoa.name,
+          churchName: churches.find(({ id }) => id === pessoa.currentChurchId)?.name ?? 'Sem igreja',
+        })),
+      })
+
       const candidatos = porNomeOuPrefixo(linha.name, people)
       if (candidatos.length === 0) {
-        const similar = similarNames(linha.name, people)
-        issues.push(issue('person_not_found', linha.churchName, linha.name, similar.length ? 'Há pessoa(s) com nome semelhante; nenhuma associação será presumida.' : 'Pessoa não encontrada no distrito.'))
+        const parecidas = pessoasParecidas(linha.name, people)
+        issues.push(comoResolver(issue('person_not_found', linha.churchName, linha.name, parecidas.length
+          ? `Não casou pelo nome. ${parecidas.length === 1 ? 'Há uma pessoa parecida' : `Há ${parecidas.length} pessoas parecidas`} no distrito; escolha ao lado.`
+          : 'Pessoa não encontrada no distrito.')))
         continue
       }
       if (candidatos.length > 1) {
-        issues.push(issue('ambiguous_person', linha.churchName, linha.name, 'O nome vem cortado no relatório e serve a mais de uma pessoa do distrito.'))
+        issues.push(comoResolver(issue('ambiguous_person', linha.churchName, linha.name, 'O nome vem cortado no relatório e serve a mais de uma pessoa do distrito.')))
         continue
       }
       const person = candidatos[0]!; const previousData = storedPerson(person)
@@ -242,13 +297,25 @@ export class ImportService {
 
   resolveFidelityIssue(preview: FidelityImportPreview, issueId: string, personId: string, people: PersonEntity[], churches: ChurchEntity[], automatic = false): FidelityImportPreview {
     const currentIssue = preview.issues.find(({ id }) => id === issueId)
-    const row = currentIssue?.sourceRow; const person = people.find(({ id }) => id === personId)
-    if (!currentIssue || !row || !person) throw new Error('Selecione uma pessoa válida para revisar a divergência.')
+    const row = currentIssue?.sourceRow; const meses = currentIssue?.mesesDoDizimoOnline
+    const person = people.find(({ id }) => id === personId)
+    if (!currentIssue || (!row && !meses) || !person) throw new Error('Selecione uma pessoa válida para revisar a divergência.')
     const church = churches.find(({ id }) => id === person.currentChurchId)
     if (!church) throw new Error('Selecione uma pessoa vinculada a uma igreja.')
     if (preview.changes.some((change) => change.personId === person.id)) throw new Error('Esta pessoa já possui uma correspondência preparada neste lote.')
-    const category = rowCategory(row); const now = new Date().toISOString(); const previousData = storedPerson(person); const snapshot = fidelitySnapshot(row, category, now, preview.referenceYear)
-    const history: PersonHistoryEntry[] = [...person.history, { id: crypto.randomUUID(), at: now, event: 'fidelity_updated', from: person.fidelity ? FIDELITY_CATEGORY_LABELS[person.fidelity.category] : 'Sem informação', to: FIDELITY_CATEGORY_LABELS[category], source: `Revisão manual da importação de fidelidade ${preview.referenceYear}` }]
+    const now = new Date().toISOString(); const previousData = storedPerson(person)
+    /*
+      As duas fontes chegam aqui. O relatório de fidelidade traz a faixa pronta;
+      o Dízimo Online traz os meses, e a leitura nasce somando com a que a
+      pessoa já tinha no mesmo ano — as mesmas regras da importação automática,
+      para a revisão manual não produzir um número diferente do que produziria
+      se o nome tivesse casado sozinho.
+    */
+    const snapshot = meses
+      ? somarComOQueJaExiste(person, { meses, mesesDoPeriodo: preview.mesesDoPeriodo ?? 12, referenceYear: preview.referenceYear, importedAt: now, importBatchId: '' })
+      : fidelitySnapshot(row!, rowCategory(row!), now, preview.referenceYear)
+    const category = snapshot.category
+    const history: PersonHistoryEntry[] = [...person.history, { id: crypto.randomUUID(), at: now, event: 'fidelity_updated', from: person.fidelity ? FIDELITY_CATEGORY_LABELS[person.fidelity.category] : 'Sem informação', to: FIDELITY_CATEGORY_LABELS[category], source: `Revisão manual da importação de ${meses ? 'Dízimo Online' : 'fidelidade'} ${preview.referenceYear}` }]
     const change: PlannedPersonChange = { personId: person.id, previousData, nextData: { ...previousData, ...mesclarFidelidade(person, snapshot), history, updatedAt: now }, churchName: church.name }
     const associatedCategories = { ...preview.associatedCategories }
     if (category === 'tither') associatedCategories.tither += 1; else if (category === 'non_systematic_tither') associatedCategories.nonSystematicTither += 1; else associatedCategories.nonTither += 1

@@ -245,8 +245,26 @@ export function FidelityPage() {
       {preview.issues.length > 0 && <div className="issue-list"><h3><TriangleAlert />Divergências preservadas para revisão</h3>{preview.issues.map((item) => {
         const selectedChurchId = manualChurches[item.id] ?? ''
         const candidates = people.filter((person) => person.currentChurchId === selectedChurchId && !preview.changes.some((change) => change.personId === person.id))
-        const reviewable = Boolean(item.sourceRow && (item.kind === 'person_not_found' || item.kind === 'ambiguous_person'))
-        return <div key={item.id} className="import-issue"><span><strong>{item.displayName}</strong><small>{item.churchName} · {item.message}</small></span>{reviewable && <span className="manual-match"><label><span className="sr-only">Igreja para {item.displayName}</span><select value={selectedChurchId} onChange={(event) => setManualChurches((current) => ({ ...current, [item.id]: event.target.value }))}><option value="">Escolher igreja…</option>{churches.map((church) => <option key={church.id} value={church.id}>{church.name}</option>)}</select></label>{selectedChurchId && <label><span className="sr-only">Pessoa para {item.displayName}</span><select defaultValue="" onChange={(event) => event.target.value && resolveIssue(item, event.target.value)}><option value="">Escolher pessoa em {churches.find((church) => church.id === selectedChurchId)?.name}…</option>{candidates.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>}</span>}</div>
+        /*
+          Revisável é a divergência que traz com que virar leitura: a faixa do
+          relatório de fidelidade ou os meses do Dízimo Online. Quem não traz
+          nenhum dos dois não teria como ser resolvida, e mostrar controles que
+          não funcionam é pior do que não mostrar.
+        */
+        const reviewable = Boolean((item.sourceRow || item.mesesDoDizimoOnline) && (item.kind === 'person_not_found' || item.kind === 'ambiguous_person'))
+        return <div key={item.id} className="import-issue"><span><strong>{item.displayName}</strong><small>{item.churchName} · {item.message}</small></span>{reviewable && <span className="manual-match">
+          {/*
+            O nome parecido primeiro. "Maiza Dos Santos Ramos" no relatório e
+            "Maiza Ramos Costa" no cadastro são a mesma pessoa, e pedir que o
+            pastor a procure igreja por igreja entre 936 nomes é pedir que ele
+            desista. O aplicativo mostra quem se parece; quem decide é ele.
+          */}
+          {(item.parecidos?.length ?? 0) > 0 && <label><span className="sr-only">Pessoa parecida com {item.displayName}</span>
+            <select defaultValue="" onChange={(event) => event.target.value && resolveIssue(item, event.target.value)}>
+              <option value="">É alguma destas?</option>
+              {item.parecidos!.map((pessoa) => <option key={pessoa.id} value={pessoa.id}>{pessoa.name} · {pessoa.churchName}</option>)}
+            </select>
+          </label>}<label><span className="sr-only">Igreja para {item.displayName}</span><select value={selectedChurchId} onChange={(event) => setManualChurches((current) => ({ ...current, [item.id]: event.target.value }))}><option value="">Escolher igreja…</option>{churches.map((church) => <option key={church.id} value={church.id}>{church.name}</option>)}</select></label>{selectedChurchId && <label><span className="sr-only">Pessoa para {item.displayName}</span><select defaultValue="" onChange={(event) => event.target.value && resolveIssue(item, event.target.value)}><option value="">Escolher pessoa em {churches.find((church) => church.id === selectedChurchId)?.name}…</option>{candidates.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>}</span>}</div>
       })}</div>}
       {!preview.alreadyImported && <>
         <label className="confirmation-check"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span>Revisei as correspondências. Confirmo que a classificação será privada e não será usada para condenar ou automatizar decisões.</span></label>

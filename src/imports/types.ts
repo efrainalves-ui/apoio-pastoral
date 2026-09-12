@@ -10,6 +10,17 @@ export interface ImportIssue {
   displayName: string
   message: string
   sourceRow?: ParsedFidelityRow
+  /**
+   * Meses distintos com dízimo, quando a divergência veio do Dízimo Online.
+   *
+   * O relatório de fidelidade traz a faixa pronta em `sourceRow`; o Dízimo
+   * Online traz os meses, e é deles que a leitura nasce. Sem carregar isto, a
+   * divergência aparecia na tela e não tinha como ser resolvida — os controles
+   * de revisão só existem para quem traz o que precisa para virar leitura.
+   */
+  mesesDoDizimoOnline?: string[]
+  /** Pessoas do distrito com nome parecido, para a revisão já começar perto. */
+  parecidos?: Array<{ id: string; name: string; churchName: string }>
 }
 
 export interface ParsedMemberRow { churchName: string; name: string; birthDate: string | null; needsReview: boolean }

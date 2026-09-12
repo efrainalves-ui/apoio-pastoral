@@ -3043,6 +3043,25 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .entity-row--texto { display: flex; flex-wrap: wrap; align-items: center; }
 .entity-row--texto > span:first-child { flex: 1 1 220px; min-width: 0; display: grid; gap: 4px; }
 
+/*
+  Linha com mais de uma ação.
+
+  A grade de `.entity-row` tem quatro colunas e espera um ícone no começo: o
+  texto longo mora na segunda. A linha do estoque de materiais tem seis filhos e
+  o nome no começo — ele caía numa coluna que não encolhe, empurrava o resto
+  para fora e jogava os dois últimos botões por cima do texto. Mirando a
+  lixeira, acertava-se o Editar.
+
+  Aqui o nome ocupa o que sobra, os números ficam juntos e as ações se agrupam
+  no fim. Quando não cabe, as ações descem inteiras para a linha de baixo em vez
+  de se espalharem por cima de alguma coisa.
+*/
+.entity-row--acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.entity-row--acoes > .entity-row__nome { flex: 1 1 240px; min-width: 0; display: grid; gap: 4px; }
+.entity-row--acoes > .entity-row__numeros { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.entity-row--acoes > .entity-row__numeros strong { white-space: nowrap; }
+.entity-row--acoes > .entity-row__botoes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+
 .lista-regras { display: grid; gap: 14px; }
 .regra-do-item { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px 10px; margin: 0; min-width: 0; }
 .regra-do-item legend { font-size: .78rem; font-weight: 700; color: var(--muted); padding: 0 6px; }
