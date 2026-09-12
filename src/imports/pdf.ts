@@ -4,7 +4,7 @@ import { toBase64Url } from '../crypto/encoding'
 const MAX_PDF_SIZE = 20 * 1024 * 1024
 
 export interface PdfLayoutItem { text: string; x: number; y: number }
-export interface PdfLayoutPage { width: number; height: number; items: PdfLayoutItem[] }
+export interface PdfLayoutPage { width: number; height: number; items: PdfLayoutItem[]; pagina?: number }
 
 interface LayoutRow { y: number; items: PdfLayoutItem[] }
 
@@ -128,8 +128,76 @@ function dizimoOnlineLayoutText(pages: PdfLayoutPage[]): string | null {
   return reconhecidas > 0 && saida.some((linha) => linha.includes('| DIZIMO')) ? `DIZIMO_ONLINE\n${saida.join('\n')}` : null
 }
 
+/**
+ * O Relatório Integrado do trimestre.
+ *
+ * Cada igreja ocupa exatamente três páginas, e o nome dela é a quarta linha da
+ * primeira — abaixo do distrito, do título e do trimestre, que se repetem em
+ * todas. A sede escreve "- Sede Anpa"; as demais, "- Anpa".
+ *
+ * Três formas de resposta convivem: um valor só, a quebra por classe da Escola
+ * Sabatina e a quebra por sábado da Secretaria. O traço é preservado como
+ * traço: quem decide que "não informado" não é zero é quem lê, não quem extrai.
+ */
+function relatorioIntegradoLayoutText(pages: PdfLayoutPage[]): string | null {
+  const saida: string[] = []
+  let igreja = ''
+  let classes: string[] | null = null
+  let reconhecidas = 0
+
+  for (const page of pages) {
+    const rows = layoutRows(page)
+    const topo = rows.slice(0, 4).map(({ items }) => rowText(items))
+    if (!topo.some((linha) => normalizeLabel(linha).includes('relatorio integrado'))) continue
+    reconhecidas += 1
+
+    const trimestre = topo.map((linha) => linha.match(/^(\d)\s*Trimestre-(\d{4})$/u)).find(Boolean)
+    if (trimestre) saida.push(`TRIMESTRE|${trimestre[2]}-${trimestre[1]}`)
+
+    if ((page.pagina ?? 0) % 3 === 1 || (!igreja && topo[3])) {
+      const cabecalho = topo[3] ?? ''
+      if (/Anpa$/u.test(cabecalho)) {
+        igreja = cabecalho.replace(/\s*-\s*(Sede\s+)?Anpa$/u, '').trim()
+        saida.push(`IGREJA|${page.pagina ?? 0}|${igreja}`)
+        classes = null
+      }
+    }
+
+    for (const row of rows) {
+      const celulas = row.items.map(({ text }) => text.trim()).filter(Boolean)
+      if (!celulas.length) continue
+      const plano = celulas.join(' ')
+      // O título é uma linha inteira, não um trecho: "As respostas do relatório
+      // integrado foram analisadas na Comissão Diretiva?" é pergunta, não título.
+      if (plano.includes('PAGE:') || normalizeLabel(plano) === 'relatorio integrado') continue
+      if (topo.includes(plano)) continue
+
+      if (celulas[0] === 'Bebês' || celulas[0] === 'Infantis') {
+        if (celulas.at(-1) === 'Total') { classes = celulas; continue }
+      }
+      // "Segundo Sábado | Sétimo Sábado" é cabeçalho de coluna da Secretaria, e
+      // não uma pergunta: sem isto o primeiro vira rótulo e o segundo, resposta.
+      if (celulas.length === 2 && normalizeLabel(celulas[0] ?? '').endsWith('sabado') && normalizeLabel(celulas[1] ?? '').endsWith('sabado')) continue
+      if (celulas.length < 2) continue
+
+      const [rotulo, ...valores] = celulas as [string, ...string[]]
+      if (rotulo.includes('|')) continue
+      if (classes && valores.length === classes.length) {
+        saida.push(`C|${page.pagina ?? 0}|${rotulo}|${valores.join(';')}|${classes.join(',')}`)
+      } else if (valores.length === 2) {
+        saida.push(`S|${page.pagina ?? 0}|${rotulo}|${valores.join(';')}`)
+      } else if (valores.length === 1) {
+        saida.push(`V|${page.pagina ?? 0}|${rotulo}|${valores[0]}`)
+      }
+    }
+  }
+  return reconhecidas > 0 && saida.some((linha) => linha.startsWith('IGREJA|'))
+    ? `RELATORIO_INTEGRADO\n${saida.join('\n')}`
+    : null
+}
+
 export function normalizePdfLayout(pages: PdfLayoutPage[]): string {
-  return memberLayoutText(pages) ?? dizimoOnlineLayoutText(pages) ?? fidelityLayoutText(pages) ?? pages.map((page) => layoutRows(page).map(({ items }) => rowText(items)).join('\n')).join('\n')
+  return memberLayoutText(pages) ?? relatorioIntegradoLayoutText(pages) ?? dizimoOnlineLayoutText(pages) ?? fidelityLayoutText(pages) ?? pages.map((page) => layoutRows(page).map(({ items }) => rowText(items)).join('\n')).join('\n')
 }
 
 export function validatePdfFile(file: Pick<File, 'name' | 'size' | 'type'>): void {
@@ -161,7 +229,9 @@ export async function extractPdfText(bytes: ArrayBuffer): Promise<string> {
         if (typeof x !== 'number' || typeof y !== 'number') continue
         items.push({ text: textItem.str, x, y })
       }
-      pages.push({ width: viewport.width, height: viewport.height, items })
+      // O número da página vai junto: o Relatório Integrado agrupa por igreja a
+      // cada três páginas, e a conferência precisa dizer de onde o valor veio.
+      pages.push({ width: viewport.width, height: viewport.height, items, pagina: pageNumber })
       page.cleanup()
     }
     await loadingTask.destroy()
