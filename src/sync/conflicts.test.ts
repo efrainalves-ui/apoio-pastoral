@@ -411,7 +411,7 @@ describe('a diferença de fidelidade fica legível', () => {
       localVersion: 1, remoteVersion: 2, remoteOperation: 'upsert',
       remotePayload: await encryptPayload(key, { schemaVersion: 1, type: 'person', data: { name: 'Pessoa Fictícia', fidelity: leitura('non_systematic_tither', 5, 2025) } }, recordId),
       createdAt: new Date().toISOString(), status: 'pending',
-    } as SyncConflictRecord)
+    })
 
     const service = new ConflictService(database)
     const [conflito] = await service.listPending(accountId)
