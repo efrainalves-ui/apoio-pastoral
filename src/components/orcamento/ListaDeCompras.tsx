@@ -27,31 +27,48 @@ interface ListaDeComprasProps {
 export function ListaDeCompras({ mes, compra, anterior, onSalvar, onFinalizar }: ListaDeComprasProps) {
   const [busca, setBusca] = useState('')
   const [novoItem, setNovoItem] = useState('')
+  const [enviado, setEnviado] = useState<Compra | null>(null)
 
-  if (!compra) return <PrimeiroUso mes={mes} anterior={anterior} onCriar={onSalvar} />
+  /*
+    Cada mudança sai daqui, é cifrada, gravada e só então volta pelo pai. No
+    corredor do mercado ninguém espera por isso: digita-se o preço e logo a
+    quantidade. A segunda mudança era montada em cima da compra antiga, ainda
+    sem a primeira — e o preço voltava a zero.
 
-  const totais = totaisDaCompra(compra)
-  const finalizada = Boolean(compra.finalizadaEm)
+    Aqui fica o que já foi mandado, e é dele que a próxima mudança parte. Some
+    sozinho quando o pai alcança, ou quando a compra do mês é outra.
+  */
+  const alcancado = !compra || !enviado || enviado.id !== compra.id || mesmaLista(enviado, compra)
+  if (alcancado && enviado) setEnviado(null)
+  const atual = alcancado ? compra : enviado
+
+  if (!atual) return <PrimeiroUso mes={mes} anterior={anterior} onCriar={onSalvar} />
+
+  const totais = totaisDaCompra(atual)
+  const finalizada = Boolean(atual.finalizadaEm)
+
+  function salvar(proxima: Compra) {
+    setEnviado(proxima)
+    const { id, ...dados } = proxima
+    onSalvar(dados, id)
+  }
 
   function mudar(itemId: string, mudanca: Partial<ItemDaCompra>) {
-    if (!compra) return
-    const { id, ...dados } = compra
-    onSalvar({ ...dados, itens: compra.itens.map((item) => item.id === itemId ? { ...item, ...mudanca } : item) }, id)
+    if (!atual) return
+    salvar({ ...atual, itens: atual.itens.map((item) => item.id === itemId ? { ...item, ...mudanca } : item) })
   }
 
   function remover(itemId: string) {
-    if (!compra) return
-    const { id, ...dados } = compra
-    onSalvar({ ...dados, itens: compra.itens.filter((item) => item.id !== itemId) }, id)
+    if (!atual) return
+    salvar({ ...atual, itens: atual.itens.filter((item) => item.id !== itemId) })
   }
 
   function acrescentar() {
-    if (!compra || !novoItem.trim()) return
-    const { id, ...dados } = compra
+    if (!atual || !novoItem.trim()) return
     const doCatalogo = CATALOGO_DE_COMPRAS.find(({ nome }) => normalizePersonName(nome) === normalizePersonName(novoItem))
-    onSalvar({
-      ...dados,
-      itens: [...compra.itens, {
+    salvar({
+      ...atual,
+      itens: [...atual.itens, {
         id: crypto.randomUUID(),
         nome: novoItem.trim(),
         categoria: doCatalogo?.categoria ?? 'Outros',
@@ -61,14 +78,13 @@ export function ListaDeCompras({ mes, compra, anterior, onSalvar, onFinalizar }:
         comprado: false,
         observacao: '',
       }],
-    }, id)
+    })
     setNovoItem('')
   }
 
   function mudarLimite(texto: string) {
-    if (!compra) return
-    const { id, ...dados } = compra
-    onSalvar({ ...dados, limite: lerValor(texto) ?? 0 }, id)
+    if (!atual) return
+    salvar({ ...atual, limite: lerValor(texto) ?? 0 })
   }
 
   const termo = normalizePersonName(busca)
@@ -76,7 +92,7 @@ export function ListaDeCompras({ mes, compra, anterior, onSalvar, onFinalizar }:
     .concat('Outros')
     .map((categoria) => ({
       categoria,
-      itens: compra.itens.filter((item) => item.categoria === categoria && (!termo || normalizePersonName(item.nome).includes(termo))),
+      itens: atual.itens.filter((item) => item.categoria === categoria && (!termo || normalizePersonName(item.nome).includes(termo))),
     }))
     .filter(({ itens }) => itens.length > 0)
 
@@ -101,7 +117,7 @@ export function ListaDeCompras({ mes, compra, anterior, onSalvar, onFinalizar }:
           id="compra-limite"
           className="field__input"
           inputMode="decimal"
-          defaultValue={compra.limite ? String(compra.limite / 100).replace('.', ',') : ''}
+          defaultValue={atual.limite ? String(atual.limite / 100).replace('.', ',') : ''}
           onBlur={(evento) => mudarLimite(evento.target.value)}
           placeholder="Sem limite"
         />
@@ -185,7 +201,7 @@ export function ListaDeCompras({ mes, compra, anterior, onSalvar, onFinalizar }:
       </article>)}
     </section>)}
 
-    {!compra.itens.length && <div className="empty-state">
+    {!atual.itens.length && <div className="empty-state">
       <ShoppingCart />
       <strong>A lista está vazia</strong>
       <span>Acrescente o primeiro item acima.</span>
@@ -197,12 +213,25 @@ export function ListaDeCompras({ mes, compra, anterior, onSalvar, onFinalizar }:
     */}
     {!finalizada && <div className="form-actions">
       <Button
-        onClick={() => onFinalizar(compra)}
-        disabled={!podeRegistrar(compra)}
+        onClick={() => onFinalizar(atual)}
+        disabled={!podeRegistrar(atual)}
         icon={<Check size={17} />}
       >Finalizar compra</Button>
     </div>}
   </div>
+}
+
+/** O pai alcançou o que mandamos? Só o que se edita aqui conta. */
+function mesmaLista(enviado: Compra, chegou: Compra): boolean {
+  return enviado.limite === chegou.limite
+    && enviado.finalizadaEm === chegou.finalizadaEm
+    && enviado.itens.length === chegou.itens.length
+    && enviado.itens.every((item, posicao) => {
+      const outro = chegou.itens[posicao]
+      return Boolean(outro) && item.id === outro!.id && item.quantidade === outro!.quantidade
+        && item.unidade === outro!.unidade && item.valorUnitario === outro!.valorUnitario
+        && item.comprado === outro!.comprado && item.nome === outro!.nome
+    })
 }
 
 function PrimeiroUso({ mes, anterior, onCriar }: { mes: string; anterior: Compra | null; onCriar: (dados: CompraData) => void }) {
