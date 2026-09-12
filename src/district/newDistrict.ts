@@ -1,4 +1,5 @@
-import { decryptPayload, encryptPayload } from '../crypto/vault'
+import { encryptPayload } from '../crypto/vault'
+import { readPayload } from '../db/corrupted'
 import { db, type ApoioDatabase } from '../db/database'
 import type { VaultRecord } from '../db/types'
 
@@ -29,9 +30,28 @@ function namesFor(types: string[]): string[] {
 export class NewDistrictService {
   constructor(private readonly database: ApoioDatabase = db) {}
 
+  /**
+   * Tudo que está ativo, e a recusa quando algo não abre.
+   *
+   * Esta lista alimenta o apagamento. Pular em silêncio o registro que não abre
+   * o deixaria sobreviver ao distrito novo — dado do distrito antigo dentro do
+   * seguinte, que é justamente o que este caminho existe para impedir. E
+   * apagá-lo às cegas seria apagar o que ninguém conferiu.
+   *
+   * Então recusa, dizendo quantos são: o pastor resolve a quarentena primeiro,
+   * normalmente restaurando um backup, e só então recomeça.
+   */
   private async active(accountId: string, key: CryptoKey): Promise<Array<{ record: VaultRecord; type: string }>> {
     const records = await this.database.vaultRecords.where('accountId').equals(accountId).filter((record) => !record.deletedAt).toArray()
-    return Promise.all(records.map(async (record) => ({ record, type: (await decryptPayload(key, record)).type })))
+    const abertos = await Promise.all(records.map(async (record) => {
+      const payload = await readPayload(key, record, this.database)
+      return payload ? { record, type: payload.type } : null
+    }))
+    const ilegiveis = abertos.filter((item) => item === null).length
+    if (ilegiveis > 0) {
+      throw new Error(`${ilegiveis} registro(s) não abriram neste aparelho. Comece um distrito novo apenas quando todos abrirem — restaurar um backup costuma resolver.`)
+    }
+    return abertos.flatMap((item) => item ? [item] : [])
   }
 
   async preview(accountId: string, key: CryptoKey, mode: NewDistrictMode): Promise<NewDistrictPreview> {

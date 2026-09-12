@@ -1,5 +1,5 @@
 import { currentDeviceId } from '../auth/device'
-import { decryptPayload, encryptPayload } from '../crypto/vault'
+import { decryptRecord, encryptPayload } from '../crypto/vault'
 import { VaultRepository, type EncryptedMutation } from '../db/repository'
 import { normalizePdfChurchName } from '../imports/parsers'
 import { normalizePersonName } from '../people/validation'
@@ -36,10 +36,19 @@ export class ImportedChurchRepairService {
   async apply(accountId: string, masterKey: CryptoKey, corrections: ChurchNameCorrection[]): Promise<{ corrected: number; merged: number; warnings: number }> {
     const records = await this.repository.list(accountId)
     const churches: ChurchEntity[] = []; const people: PersonEntity[] = []
+    /*
+      Aqui o ilegível é recusa, não omissão: este caminho renomeia e funde
+      igrejas, e fundir sem enxergar uma delas juntaria pessoas no lugar errado.
+    */
+    let ilegiveis = 0
     for (const record of records) {
-      const payload = await decryptPayload(masterKey, record)
+      const payload = await decryptRecord(masterKey, record)
+      if (!payload) { ilegiveis += 1; continue }
       if (payload.type === 'church') churches.push({ id: record.id, ...(payload.data as ChurchData) })
       if (payload.type === 'person') people.push({ id: record.id, ...(payload.data as PersonData) })
+    }
+    if (ilegiveis > 0) {
+      throw new Error(`${ilegiveis} registro(s) não abriram neste aparelho. Corrija os nomes apenas quando todos abrirem — restaurar um backup costuma resolver.`)
     }
     const planned = corrections.filter((correction) => !correction.warning)
     const now = new Date().toISOString(); const mutations: EncryptedMutation[] = []

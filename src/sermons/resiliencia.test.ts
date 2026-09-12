@@ -90,3 +90,21 @@ describe('um registro ilegível esconde só a si mesmo', () => {
     expect(await banco.corruptedRecords.count()).toBe(1)
   })
 })
+
+describe('caminhos que apagam recusam em vez de pular', () => {
+  /*
+    O espelho do defeito anterior, e o mais perigoso dos dois.
+
+    Na exibição, pular o registro ilegível é o certo. No apagamento, pular o
+    deixaria sobreviver ao distrito novo — dado do distrito antigo dentro do
+    seguinte. E apagá-lo às cegas seria apagar o que ninguém conferiu. A única
+    saída honesta é recusar dizendo quantos são.
+  */
+  it('começar um distrito novo recusa enquanto houver registro que não abre', async () => {
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    await gravarIlegivel(banco, chave, 'church')
+
+    const { NewDistrictService } = await import('../district/newDistrict')
+    await expect(new NewDistrictService(banco).preview(CONTA, chave, 'empty')).rejects.toThrow('não abriram neste aparelho')
+  })
+})
