@@ -77,8 +77,59 @@ function fidelityLayoutText(pages: PdfLayoutPage[]): string | null {
   return recognizedPages > 0 ? output.join('\n') : null
 }
 
+/**
+ * O relatório "Dízimo e Oferta Online", do sistema da Associação.
+ *
+ * É outra fonte sobre a mesma pergunta — quem devolve o dízimo —, e chega com
+ * outro formato: lançamento a lançamento, agrupado por data de capitação, com
+ * dízimo e ofertas misturados. Ofertas não entram na fidelidade; só o dízimo.
+ *
+ * O nome vem cortado na largura da coluna. Não dá para consertar isso aqui: o
+ * PDF não guarda o resto. Quem resolve é a revisão manual, adiante.
+ */
+function dizimoOnlineLayoutText(pages: PdfLayoutPage[]): string | null {
+  const saida: string[] = []
+  let reconhecidas = 0
+  let capitacao = ''
+  for (const page of pages) {
+    const rows = layoutRows(page)
+    const titulo = rows.find(({ items }) => {
+      const rotulo = normalizeLabel(rowText(items))
+      return rotulo.includes('dizimo') && rotulo.includes('oferta') && rotulo.includes('online')
+    })
+    const periodo = rows
+      .map(({ items }) => rowText(items).match(/(\d{2}\/\d{2}\/\d{4})\s*at[ée]\s*(\d{2}\/\d{2}\/\d{4})/u))
+      .find(Boolean)
+    if (!titulo && !reconhecidas) continue
+    reconhecidas += 1
+    if (periodo) saida.push(`PERIODO: ${periodo[1]} ${periodo[2]}`)
+
+    for (let posicao = 0; posicao < rows.length; posicao += 1) {
+      const linha = rows[posicao]!
+      const texto = rowText(linha.items)
+      const cabecalho = texto.match(/Capita[çc][ãa]o:\s*(\d{2}\/\d{2}\/\d{4})/u)
+      if (cabecalho) { capitacao = cabecalho[1]!; continue }
+      if (normalizeLabel(rowText(linha.items, 0, page.width * 0.10)) !== 'pago') continue
+
+      const igreja = rowText(linha.items, page.width * 0.10, page.width * 0.30)
+      const nome = rowText(linha.items, page.width * 0.30, page.width * 0.55)
+      const remessa = rowText(linha.items, page.width * 0.55, page.width * 0.70).match(/(\d{2})\/(\d{4})/u)
+      // O tipo do lançamento mora na linha de baixo, ao lado da quantidade.
+      const abaixo = rows[posicao + 1]
+      const tipo = abaixo ? rowText(abaixo.items, page.width * 0.20, page.width * 0.40) : ''
+      if (!igreja || !nome || !tipo) continue
+
+      const mes = remessa ? `${remessa[2]}-${remessa[1]}` : capitacao ? `${capitacao.slice(6)}-${capitacao.slice(3, 5)}` : ''
+      if (!mes) continue
+      const ehDizimo = normalizeLabel(tipo) === 'dizimo'
+      saida.push(`${igreja} | ${nome} | ${mes} | ${ehDizimo ? 'DIZIMO' : 'OFERTA'}`)
+    }
+  }
+  return reconhecidas > 0 && saida.some((linha) => linha.includes('| DIZIMO')) ? `DIZIMO_ONLINE\n${saida.join('\n')}` : null
+}
+
 export function normalizePdfLayout(pages: PdfLayoutPage[]): string {
-  return memberLayoutText(pages) ?? fidelityLayoutText(pages) ?? pages.map((page) => layoutRows(page).map(({ items }) => rowText(items)).join('\n')).join('\n')
+  return memberLayoutText(pages) ?? dizimoOnlineLayoutText(pages) ?? fidelityLayoutText(pages) ?? pages.map((page) => layoutRows(page).map(({ items }) => rowText(items)).join('\n')).join('\n')
 }
 
 export function validatePdfFile(file: Pick<File, 'name' | 'size' | 'type'>): void {

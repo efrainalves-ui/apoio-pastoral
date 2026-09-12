@@ -64,6 +64,19 @@ export interface FidelityImportPreview {
   categories: { tither: number; nonSystematicTither: number; nonTither: number }
   associatedCategories: { tither: number; nonSystematicTither: number; nonTither: number }
   resolvedIssues?: Array<{ issue: ImportIssue; personId: string; automatic: boolean }>
+  /**
+   * De qual relatório esta leitura veio.
+   *
+   * O relatório de fidelidade e o "Dízimo e Oferta Online" respondem a mesma
+   * pergunta por caminhos diferentes, e a comissão de nomeação precisa saber
+   * qual deles está falando. Ausente quer dizer o relatório de fidelidade, que
+   * é o que existia antes.
+   */
+  fonte?: 'dizimo_online'
+  /** Quantos meses o relatório cobre. É a régua em que a faixa é lida. */
+  mesesDoPeriodo?: number
+  /** Lançamentos de oferta que não entraram: a fidelidade olha o dízimo. */
+  ofertasIgnoradas?: number
 }
 
 export type ImportPreview = MemberImportPreview | FidelityImportPreview

@@ -9,12 +9,13 @@ import { Card } from '../components/ui/Card'
 import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
-import { parseFidelityText } from '../imports/parsers'
+import { ehDizimoOnline, parseDizimoOnlineText, parseFidelityText } from '../imports/parsers'
 import { ImportService } from '../imports/service'
 import type { FidelityImportPreview, ImportBatchEntity, ImportIssue } from '../imports/types'
 import { PeopleService } from '../people/service'
 import { isAutomatedTest } from '../sync/config'
 import { FIDELITY_CATEGORY_LABELS, type FidelitySnapshot, type PersonEntity } from '../people/types'
+import { minimoParaSistematico, rotuloDoDizimoOnline, veioDoDizimoOnline } from '../people/dizimoOnline'
 import { fidelityCareSummary, isFaithfulByAge, isFidelityCareCandidate } from '../people/fidelitySummary'
 import { calculateAge } from '../people/dates'
 
@@ -71,9 +72,18 @@ export function FidelityPage() {
   const percent = (count: number, total: number) => total ? `${Math.round(count / total * 100)}%` : '0%'
   const churchName = (id: string) => churches.find((church) => church.id === id)?.name ?? 'Igreja'
 
+  /*
+    Dois relatórios entram por aqui. O de fidelidade fecha o ano e declara a
+    faixa; o "Dízimo e Oferta Online" traz lançamento a lançamento do que já
+    correu. Quem escolhe não é o pastor: o próprio arquivo se identifica, e
+    pedir que ele acerte o tipo antes de enviar seria transferir a ele um
+    trabalho que o aplicativo faz sozinho.
+  */
   async function analyze(text: string, hash: string) {
     if (!account || !masterKey) return
-    setPreview(await imports.previewFidelity(account.id, masterKey, hash, parseFidelityText(text), people, churches, anoDoRelatorio))
+    setPreview(ehDizimoOnline(text)
+      ? await imports.previewDizimoOnline(account.id, masterKey, hash, parseDizimoOnlineText(text), people, churches)
+      : await imports.previewFidelity(account.id, masterKey, hash, parseFidelityText(text), people, churches, anoDoRelatorio))
     setConfirmed(false); setReport(null); setAutoSummary(null); setManualChurches({})
   }
 
@@ -222,6 +232,10 @@ export function FidelityPage() {
       {preview.alreadyImported && <div className="alert alert--success">
         <strong>Este arquivo já foi aplicado como {preview.referenceYear}.</strong> As {preview.parsedRows} pessoas já estão com a leitura deste ano. Para outro ano, escolha o ano acima e envie o arquivo daquele ano.
       </div>}
+      {preview.fonte === 'dizimo_online' && <div className="alert alert--warning" role="status">
+        Dízimo Online de {preview.referenceYear} · {preview.mesesDoPeriodo} meses no período · sistemático a partir de {minimoParaSistematico(preview.mesesDoPeriodo ?? 12)}
+        {preview.ofertasIgnoradas ? ` · ${preview.ofertasIgnoradas} oferta(s) fora da conta` : ''}
+      </div>}
       <h3>Totais gerais do relatório de {preview.referenceYear}</h3>
       <div className="import-metrics"><div><small>Pessoas</small><strong>{preview.parsedRows}</strong></div><div className="fidelidade--nao"><small>Não dizimistas</small><strong>{preview.categories.nonTither}</strong></div><div className="fidelidade--parcial"><small>Dizimistas não sistemáticos</small><strong>{preview.categories.nonSystematicTither}</strong></div><div><small>Dizimistas</small><strong>{preview.categories.tither}</strong></div></div>
       <h3>Associações seguras</h3>
@@ -255,7 +269,7 @@ export function FidelityPage() {
           <label className="field"><span className="field__label">Categoria</span><select className="field__input" value={category} onChange={(event) => setCategory(event.target.value)}><option value="">Todas</option>{Object.entries(FIDELITY_CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         </div>
         <p className="field__hint">{fidelityPeople.length} pessoa(s) neste filtro.</p>
-        {fidelityPeople.length === 0 ? <div className="empty-state"><LockKeyhole /><strong>Nenhuma informação neste filtro</strong></div> : <div className="entity-list">{fidelityPeople.map((person) => <Link className="entity-row" key={person.id} to={`/app/pessoas/${person.id}`}><span className="avatar">{person.name[0]}</span><span><strong>{person.name}</strong><small>{churchName(person.currentChurchId)}</small></span><span className="entity-badge entity-badge--active">{FIDELITY_CATEGORY_LABELS[person.fidelity!.category]}</span><span>{fidelityDetail(person.fidelity!)}</span></Link>)}</div>}
+        {fidelityPeople.length === 0 ? <div className="empty-state"><LockKeyhole /><strong>Nenhuma informação neste filtro</strong></div> : <div className="entity-list">{fidelityPeople.map((person) => <Link className="entity-row" key={person.id} to={`/app/pessoas/${person.id}`}><span className="avatar">{person.name[0]}</span><span><strong>{person.name}</strong><small>{churchName(person.currentChurchId)}</small></span><span className={`entity-badge ${veioDoDizimoOnline(person.fidelity) ? 'entity-badge--dizimo-online' : 'entity-badge--active'}`}>{FIDELITY_CATEGORY_LABELS[person.fidelity!.category]}</span><span>{rotuloDoDizimoOnline(person.fidelity) ?? fidelityDetail(person.fidelity!)}</span></Link>)}</div>}
       </>}
     </Card>
     <Card eyebrow="Acompanhamento" title="Pessoas para avaliar"><div className="filter-bar">{filtroDeIgreja}</div><p className="field__hint">{toEvaluate.length} pessoa(s) a avaliar aqui.</p>{toEvaluate.length === 0 ? <div className="empty-state compact-empty"><CheckCircle2 /><strong>Nenhuma pessoa pendente de avaliação</strong></div> : <div className="entity-list">{toEvaluate.map((person) => <div className="entity-row" key={person.id}><span><strong>{person.name}</strong><small>{churchName(person.currentChurchId)} · {FIDELITY_CATEGORY_LABELS[person.fidelity!.category]} · {calculateAge(person.birthDate)} anos</small></span><Button variant="secondary" onClick={() => { setChurchId(person.currentChurchId); setAssessmentOpen(true) }}>Avaliar</Button></div>)}</div>}</Card>

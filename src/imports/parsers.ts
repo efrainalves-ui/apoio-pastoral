@@ -173,3 +173,76 @@ export function parseFidelityText(text: string): ParsedFidelityRow[] {
   if (rows.length === 0) throw new ImportFormatError('O formato do PDF de fidelidade não foi reconhecido. Nenhuma informação será alterada.')
   return rows
 }
+
+/**
+ * Uma pessoa no relatório "Dízimo e Oferta Online", já somada.
+ *
+ * `meses` são os meses **distintos** em que houve dízimo. Duas devoluções no
+ * mesmo mês contam uma vez: a pergunta é em quantos meses a pessoa devolveu,
+ * não quantas vezes. Ofertas não entram — a fidelidade olha o dízimo.
+ */
+export interface LinhaDoDizimoOnline {
+  churchName: string
+  name: string
+  meses: string[]
+}
+
+export interface DizimoOnlineLido {
+  /** Primeiro e último mês que o relatório cobre, em `AAAA-MM`. */
+  periodo: { de: string; ate: string } | null
+  /** Quantos meses o período abrange. É a escala em que as faixas são lidas. */
+  mesesDoPeriodo: number
+  linhas: LinhaDoDizimoOnline[]
+  ofertasIgnoradas: number
+}
+
+export function ehDizimoOnline(text: string): boolean {
+  return cleanLines(text)[0] === 'DIZIMO_ONLINE'
+}
+
+function mesDaData(valor: string): string {
+  const [, mes, ano] = valor.split('/')
+  return `${ano}-${mes}`
+}
+
+function distanciaEmMeses(de: string, ate: string): number {
+  const [anoDe, mesDe] = de.split('-').map(Number)
+  const [anoAte, mesAte] = ate.split('-').map(Number)
+  return (anoAte! - anoDe!) * 12 + (mesAte! - mesDe!) + 1
+}
+
+export function parseDizimoOnlineText(text: string): DizimoOnlineLido {
+  const lines = cleanLines(text)
+  if (lines.length === 0) throw new ImportFormatError('O PDF está vazio ou não contém texto selecionável. Se for escaneado, gere uma versão com OCR.')
+
+  let periodo: DizimoOnlineLido['periodo'] = null
+  let ofertasIgnoradas = 0
+  const porPessoa = new Map<string, LinhaDoDizimoOnline>()
+
+  for (const line of lines) {
+    if (line === 'DIZIMO_ONLINE') continue
+    const faixa = line.match(/^PERIODO:\s*(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})$/u)
+    if (faixa) { periodo ??= { de: mesDaData(faixa[1]!), ate: mesDaData(faixa[2]!) }; continue }
+
+    const partes = line.split(/\s*\|\s*/u)
+    if (partes.length !== 4) continue
+    const [igreja, nome, mes, tipo] = partes as [string, string, string, string]
+    if (tipo !== 'DIZIMO') { ofertasIgnoradas += 1; continue }
+    if (!/^\d{4}-\d{2}$/u.test(mes)) continue
+
+    const churchName = normalizePdfChurchName(igreja)
+    const chave = `${churchName}|${nome.trim().toLocaleLowerCase('pt-BR')}`
+    const atual = porPessoa.get(chave) ?? { churchName, name: nome.trim(), meses: [] }
+    if (!atual.meses.includes(mes)) atual.meses.push(mes)
+    porPessoa.set(chave, atual)
+  }
+
+  if (!porPessoa.size) throw new ImportFormatError('Nenhum dízimo foi encontrado neste PDF. Confira se é o relatório "Dízimo e Oferta Online".')
+
+  return {
+    periodo,
+    mesesDoPeriodo: periodo ? distanciaEmMeses(periodo.de, periodo.ate) : 12,
+    linhas: [...porPessoa.values()].map((linha) => ({ ...linha, meses: [...linha.meses].sort() })),
+    ofertasIgnoradas,
+  }
+}

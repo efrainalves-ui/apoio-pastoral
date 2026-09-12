@@ -6,11 +6,31 @@ import { type ChurchEntity } from '../district/types'
 import { type FamilyData } from '../families/types'
 import { fidelityCategory, FIDELITY_CATEGORY_LABELS, IMPORT_STATUS_LABELS, type FidelityCategory, type FidelitySnapshot, type PersonData, type PersonEntity, type PersonHistoryEntry } from '../people/types'
 import { leituraDoAno, mesclarFidelidade } from '../people/leiturasDeFidelidade'
+import { faixaDoDizimoOnline, somarComOQueJaExiste } from '../people/dizimoOnline'
+import type { DizimoOnlineLido } from './parsers'
 import { normalizePersonName } from '../people/validation'
 import type { FidelityImportPreview, ImportApplyResult, ImportBatchData, ImportBatchEntity, ImportIssue, MemberImportPreview, ParsedFidelityRow, ParsedMemberRow, PlannedPersonChange } from './types'
 import { readPayload } from '../db/corrupted'
 
 function storedPerson(person: PersonEntity): PersonData { const { id: _id, ...data } = person; void _id; return data }
+/**
+ * Acha a pessoa de um nome que pode ter vindo cortado.
+ *
+ * O relatório online corta o nome na largura da coluna: "Kedima Mo" é o que
+ * cabe. O nome inteiro casa primeiro; só quando ele não casa é que o corte
+ * vale como começo de nome — e apenas se identificar uma pessoa só. Prefixo
+ * curto demais não identifica ninguém e por isso não é aceito: atribuir dízimo
+ * por adivinhação é pior do que pedir uma conferência.
+ */
+const PREFIXO_MINIMO = 5
+
+function porNomeOuPrefixo(nome: string, people: PersonEntity[]): PersonEntity[] {
+  const procurado = normalizePersonName(nome)
+  const exatos = people.filter((person) => normalizePersonName(person.name) === procurado)
+  if (exatos.length || procurado.length < PREFIXO_MINIMO) return exatos
+  return people.filter((person) => normalizePersonName(person.name).startsWith(procurado))
+}
+
 function personKey(name: string, birthDate: string | null): string { return `${normalizePersonName(name)}|${birthDate ?? '?'}` }
 function churchByName(churches: ChurchEntity[]): Map<string, ChurchEntity> { return new Map(churches.map((church) => [normalizePersonName(church.name), church])) }
 function issue(kind: ImportIssue['kind'], churchName: string, displayName: string, message: string, sourceRow?: ParsedFidelityRow): ImportIssue { return { id: crypto.randomUUID(), kind, churchName, displayName, message, ...(sourceRow ? { sourceRow } : {}) } }
@@ -167,6 +187,59 @@ export class ImportService {
     return { kind: 'fidelity', fileHash, referenceYear, parsedRows: rows.length, churchCounts, changes, unchanged, issues, alreadyImported, categories, associatedCategories }
   }
 
+  /**
+   * A prévia do relatório "Dízimo e Oferta Online".
+   *
+   * Duas coisas o separam do relatório de fidelidade. A régua acompanha o
+   * período que o arquivo cobre — de janeiro a agosto são oito meses, e
+   * sistemático passa a ser seis. E o nome vem cortado na largura da coluna:
+   * quando o corte identifica uma pessoa só, vale; quando identifica mais de
+   * uma, vira divergência para o pastor resolver, porque adivinhar aqui é
+   * atribuir dízimo a quem não devolveu.
+   */
+  async previewDizimoOnline(
+    accountId: string, masterKey: CryptoKey, fileHash: string,
+    lido: DizimoOnlineLido, people: PersonEntity[], churches: ChurchEntity[],
+  ): Promise<FidelityImportPreview> {
+    const referenceYear = Number((lido.periodo?.ate ?? `${new Date().getFullYear()}-01`).slice(0, 4))
+    const alreadyImported = (await this.listBatches(accountId, masterKey, 'fidelity')).some((batch) =>
+      batch.fileHash === fileHash && batch.referenceYear === referenceYear && batch.status === 'applied')
+    const issues: ImportIssue[] = []; const churchCounts: Record<string, number> = {}; const changes: PlannedPersonChange[] = []; let unchanged = 0
+    const categories = { tither: 0, nonSystematicTither: 0, nonTither: 0 }
+    const associatedCategories = { tither: 0, nonSystematicTither: 0, nonTither: 0 }
+    const now = new Date().toISOString()
+
+    for (const linha of lido.linhas) {
+      churchCounts[linha.churchName] = (churchCounts[linha.churchName] ?? 0) + 1
+      const category = faixaDoDizimoOnline(linha.meses.length, lido.mesesDoPeriodo)
+      if (category === 'tither') categories.tither += 1; else if (category === 'non_systematic_tither') categories.nonSystematicTither += 1; else categories.nonTither += 1
+
+      const candidatos = porNomeOuPrefixo(linha.name, people)
+      if (candidatos.length === 0) {
+        const similar = similarNames(linha.name, people)
+        issues.push(issue('person_not_found', linha.churchName, linha.name, similar.length ? 'Há pessoa(s) com nome semelhante; nenhuma associação será presumida.' : 'Pessoa não encontrada no distrito.'))
+        continue
+      }
+      if (candidatos.length > 1) {
+        issues.push(issue('ambiguous_person', linha.churchName, linha.name, 'O nome vem cortado no relatório e serve a mais de uma pessoa do distrito.'))
+        continue
+      }
+      const person = candidatos[0]!; const previousData = storedPerson(person)
+      if (category === 'tither') associatedCategories.tither += 1; else if (category === 'non_systematic_tither') associatedCategories.nonSystematicTither += 1; else associatedCategories.nonTither += 1
+
+      const snapshot = somarComOQueJaExiste(person, { meses: linha.meses, mesesDoPeriodo: lido.mesesDoPeriodo, referenceYear, importedAt: now, importBatchId: '' })
+      if (sameFidelity(leituraDoAno(person, referenceYear), snapshot)) { unchanged += 1; continue }
+      const history: PersonHistoryEntry[] = [...person.history, { id: crypto.randomUUID(), at: now, event: 'fidelity_updated', from: person.fidelity ? FIDELITY_CATEGORY_LABELS[person.fidelity.category] : 'Sem informação', to: FIDELITY_CATEGORY_LABELS[snapshot.category], source: `Dízimo Online ${referenceYear}` }]
+      changes.push({ personId: person.id, previousData, nextData: { ...previousData, ...mesclarFidelidade(person, snapshot), history, updatedAt: now }, churchName: churches.find((item) => item.id === person.currentChurchId)?.name ?? 'Igreja' })
+    }
+
+    return {
+      kind: 'fidelity', fonte: 'dizimo_online', fileHash, referenceYear,
+      parsedRows: lido.linhas.length, mesesDoPeriodo: lido.mesesDoPeriodo, ofertasIgnoradas: lido.ofertasIgnoradas,
+      churchCounts, changes, unchanged, issues, alreadyImported, categories, associatedCategories,
+    }
+  }
+
   resolveFidelityIssue(preview: FidelityImportPreview, issueId: string, personId: string, people: PersonEntity[], churches: ChurchEntity[], automatic = false): FidelityImportPreview {
     const currentIssue = preview.issues.find(({ id }) => id === issueId)
     const row = currentIssue?.sourceRow; const person = people.find(({ id }) => id === personId)
@@ -209,7 +282,7 @@ export class ImportService {
     const changes = preview.kind === 'members' ? [...preview.newPeople, ...preview.updatedPeople, ...preview.missingPeople] : preview.changes
     const prepared = changes.map((change) => ({ ...change, nextData: { ...change.nextData, updatedAt: appliedAt, ...(preview.kind === 'fidelity' && change.nextData.fidelity ? { fidelity: { ...change.nextData.fidelity, updatedAt: appliedAt, importBatchId: batchId } } : {}) } }))
     const summary = { parsedRows: preview.parsedRows, created: prepared.filter(({ previousData }) => !previousData).length, updated: preview.kind === 'members' ? preview.updatedPeople.length : preview.changes.length, missing: preview.kind === 'members' ? preview.missingPeople.length : 0, unchanged: preview.unchanged, issues: preview.issues.length }
-    const batchData: ImportBatchData = { kind: preview.kind, modelVersion: preview.kind === 'fidelity' ? 3 : 1, fileHash: preview.fileHash, ...(preview.kind === 'fidelity' ? { referenceYear: preview.referenceYear } : {}), source: preview.kind === 'members' ? 'PDF local de membros' : `PDF local de fidelidade ${preview.referenceYear}`, status: 'applied', createdAt: appliedAt, appliedAt, summary, churchCounts: preview.churchCounts, issues: preview.issues, undo: { createdPersonIds: prepared.filter(({ previousData }) => !previousData).map(({ personId }) => personId), previousPeople: prepared.filter(({ previousData }) => previousData).map(({ personId, previousData }) => ({ id: personId, data: previousData! })) } }
+    const batchData: ImportBatchData = { kind: preview.kind, modelVersion: preview.kind === 'fidelity' ? 3 : 1, fileHash: preview.fileHash, ...(preview.kind === 'fidelity' ? { referenceYear: preview.referenceYear } : {}), source: preview.kind === 'members' ? 'PDF local de membros' : preview.fonte === 'dizimo_online' ? `PDF local de Dízimo Online ${preview.referenceYear}` : `PDF local de fidelidade ${preview.referenceYear}`, status: 'applied', createdAt: appliedAt, appliedAt, summary, churchCounts: preview.churchCounts, issues: preview.issues, undo: { createdPersonIds: prepared.filter(({ previousData }) => !previousData).map(({ personId }) => personId), previousPeople: prepared.filter(({ previousData }) => previousData).map(({ personId, previousData }) => ({ id: personId, data: previousData! })) } }
     const mutations: EncryptedMutation[] = await Promise.all(prepared.map(async ({ personId, nextData }) => ({ recordId: personId, recordType: 'person' as const, envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: 'person', data: nextData }, personId) })))
     mutations.push({ recordId: batchId, recordType: 'import_batch', envelope: await encryptPayload(masterKey, { schemaVersion: 1, type: 'import_batch', data: batchData }, batchId) })
     await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)

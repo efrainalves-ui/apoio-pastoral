@@ -4,7 +4,7 @@ import { ApoioDatabase } from '../db/database'
 import type { ChurchEntity } from '../district/types'
 import { PeopleService } from '../people/service'
 import { emptyPersonInput } from '../people/types'
-import { parseFidelityText, parseMemberText } from './parsers'
+import { ehDizimoOnline, parseDizimoOnlineText, parseFidelityText, parseMemberText } from './parsers'
 import { normalizePdfLayout, validatePdfFile } from './pdf'
 import { ImportService } from './service'
 
@@ -302,5 +302,150 @@ describe('importadores locais e idempotentes', () => {
 
     await imports.applyPreview(accountId, masterKey, previa)
     expect((await people.listPeople(accountId, masterKey))[0]!.currentChurchId).toBe('church-b')
+  })
+
+  /*
+    O relatório "Dízimo e Oferta Online" é outra fonte sobre a mesma pergunta,
+    com outro formato: lançamento a lançamento, agrupado por data de capitação,
+    com dízimo e ofertas na mesma lista. As posições abaixo são as do relatório
+    real; os nomes, não.
+  */
+  const linhaDeLancamento = (y: number, igreja: string, nome: string, remessa: string) => [
+    { text: 'Pago', x: 20, y },
+    { text: igreja, x: 80, y },
+    { text: nome, x: 212, y },
+    { text: remessa, x: 346, y },
+    { text: ' 150,00', x: 436, y },
+  ]
+  const linhaDeTipo = (y: number, tipo: string) => [{ text: ' 1', x: 101, y }, { text: tipo, x: 135, y }]
+
+  function paginaDoDizimoOnline(lancamentos: Array<{ nome: string; remessa: string; tipo: string; igreja?: string }>) {
+    const items = [
+      { text: 'Dízimo e Oferta Online', x: 20, y: 820 },
+      { text: 'Dízimos e ofertas importadas por data - 01/01/2026 até 31/08/2026', x: 20, y: 800 },
+      { text: 'Data de Capitação: 03/01/2026', x: 20, y: 770 },
+    ]
+    let y = 740
+    for (const l of lancamentos) {
+      items.push(...linhaDeLancamento(y, l.igreja ?? '75 Igreja Fictícia do Abade', l.nome, l.remessa))
+      items.push(...linhaDeTipo(y - 12, l.tipo))
+      y -= 40
+    }
+    return [{ width: 595, height: 842, items }]
+  }
+
+  it('lê o Dízimo Online, conta meses distintos e descarta as ofertas', () => {
+    const texto = normalizePdfLayout(paginaDoDizimoOnline([
+      { nome: 'Pessoa Ípsilon Fictícia', remessa: '01/2026 - 1', tipo: 'Dízimo' },
+      { nome: 'Pessoa Ípsilon Fictícia', remessa: '01/2026 - 3', tipo: 'Dízimo' },
+      { nome: 'Pessoa Ípsilon Fictícia', remessa: '02/2026 - 1', tipo: 'Dízimo' },
+      { nome: 'Pessoa Ípsilon Fictícia', remessa: '03/2026 - 1', tipo: 'Ofertas' },
+      { nome: 'Pessoa Ômega Fictícia', remessa: '05/2026 - 2', tipo: 'Construção' },
+    ]))
+
+    expect(ehDizimoOnline(texto)).toBe(true)
+    const lido = parseDizimoOnlineText(texto)
+    expect(lido.periodo).toEqual({ de: '2026-01', ate: '2026-08' })
+    expect(lido.mesesDoPeriodo).toBe(8)
+    expect(lido.ofertasIgnoradas).toBe(2)
+    expect(lido.linhas).toHaveLength(1)
+    // Duas devoluções em janeiro contam um mês: a pergunta é em quantos meses.
+    expect(lido.linhas[0]!.meses).toEqual(['2026-01', '2026-02'])
+  })
+
+  it('separa por igreja, porque o mesmo nome pode existir em duas', () => {
+    const texto = normalizePdfLayout(paginaDoDizimoOnline([
+      { nome: 'Pessoa Igual Fictícia', remessa: '01/2026 - 1', tipo: 'Dízimo', igreja: '75 Igreja Fictícia do Abade' },
+      { nome: 'Pessoa Igual Fictícia', remessa: '02/2026 - 1', tipo: 'Dízimo', igreja: '1.046 Ponto Fictício do Abade' },
+    ]))
+    const lido = parseDizimoOnlineText(texto)
+    expect(lido.linhas).toHaveLength(2)
+  })
+
+  /* Só ofertas não é relatório de fidelidade: não vale a pena abrir por engano. */
+  it('não reconhece como Dízimo Online um PDF sem nenhum dízimo', () => {
+    const texto = normalizePdfLayout(paginaDoDizimoOnline([
+      { nome: 'Pessuma Ômega Fictícia', remessa: '01/2026 - 1', tipo: 'Ofertas' },
+    ]))
+    expect(ehDizimoOnline(texto)).toBe(false)
+  })
+
+  /* Sem remessa legível, a data de capitação dá o mês — é ela que agrupa o bloco. */
+  it('cai na data de capitação quando a remessa não traz o mês', () => {
+    const texto = normalizePdfLayout(paginaDoDizimoOnline([
+      { nome: 'Pessoa Teta Fictícia', remessa: 'sem remessa', tipo: 'Dízimo' },
+    ]))
+    expect(parseDizimoOnlineText(texto).linhas[0]!.meses).toEqual(['2026-01'])
+  })
+
+  /*
+    O nome vem cortado na largura da coluna. Quando o corte identifica uma
+    pessoa só, vale; quando serve a duas, vira divergência — adivinhar aqui é
+    atribuir dízimo a quem não devolveu.
+  */
+  it('aceita o nome cortado quando ele identifica uma pessoa só', async () => {
+    const { masterKey, accountId, people, imports } = await fixture()
+    const rows = parseMemberText('IGREJA: Igreja Aurora Fictícia\nKedima Fictícia Moraes | 10/05/1990\nPessoa Outra Fictícia | 11/06/1991')
+    await imports.applyPreview(accountId, masterKey, await imports.previewMembers(accountId, masterKey, 'hash-m', rows, [], churches))
+
+    const texto = normalizePdfLayout(paginaDoDizimoOnline([
+      { nome: 'Kedima Fictícia Mo', remessa: '01/2026 - 1', tipo: 'Dízimo' },
+      { nome: 'Kedima Fictícia Mo', remessa: '02/2026 - 1', tipo: 'Dízimo' },
+    ]))
+    const previa = await imports.previewDizimoOnline(accountId, masterKey, 'hash-d', parseDizimoOnlineText(texto), await people.listPeople(accountId, masterKey), churches)
+    expect(previa.issues).toHaveLength(0)
+    expect(previa.changes).toHaveLength(1)
+    expect(previa.changes[0]!.nextData.fidelity?.months).toBe(2)
+    expect(previa.changes[0]!.nextData.fidelity?.category).toBe('non_systematic_tither')
+  })
+
+  it('o nome cortado que serve a duas pessoas vira divergência', async () => {
+    const { masterKey, accountId, people, imports } = await fixture()
+    const rows = parseMemberText('IGREJA: Igreja Aurora Fictícia\nMariana Fictícia Alfa | 10/05/1990\nMariana Fictícia Beta | 11/06/1991')
+    await imports.applyPreview(accountId, masterKey, await imports.previewMembers(accountId, masterKey, 'hash-m', rows, [], churches))
+
+    const texto = normalizePdfLayout(paginaDoDizimoOnline([{ nome: 'Mariana Fictícia', remessa: '01/2026 - 1', tipo: 'Dízimo' }]))
+    const previa = await imports.previewDizimoOnline(accountId, masterKey, 'hash-d', parseDizimoOnlineText(texto), await people.listPeople(accountId, masterKey), churches)
+    expect(previa.changes).toHaveLength(0)
+    expect(previa.issues[0]?.kind).toBe('ambiguous_person')
+  })
+
+  /* As duas fontes do mesmo ano somam meses distintos, na régua de doze. */
+  it('soma com a leitura que o relatório de fidelidade já tinha deixado', async () => {
+    const { masterKey, accountId, people, imports } = await fixture()
+    const rows = parseMemberText('IGREJA: Igreja Aurora Fictícia\nPessoa Soma Fictícia | 10/05/1990')
+    await imports.applyPreview(accountId, masterKey, await imports.previewMembers(accountId, masterKey, 'hash-m', rows, [], churches))
+
+    const fidelidade = parseFidelityText('IGREJA: Igreja Aurora Fictícia\nPessoa Soma Fictícia | 5')
+    await imports.applyPreview(accountId, masterKey, await imports.previewFidelity(accountId, masterKey, 'hash-f', fidelidade, await people.listPeople(accountId, masterKey), churches, 2026))
+    expect((await people.listPeople(accountId, masterKey))[0]!.fidelity?.months).toBe(5)
+
+    const texto = normalizePdfLayout(paginaDoDizimoOnline([
+      { nome: 'Pessoa Soma Fictícia', remessa: '06/2026 - 1', tipo: 'Dízimo' },
+      { nome: 'Pessoa Soma Fictícia', remessa: '07/2026 - 1', tipo: 'Dízimo' },
+      { nome: 'Pessoa Soma Fictícia', remessa: '08/2026 - 1', tipo: 'Dízimo' },
+    ]))
+    const previa = await imports.previewDizimoOnline(accountId, masterKey, 'hash-d', parseDizimoOnlineText(texto), await people.listPeople(accountId, masterKey), churches)
+    await imports.applyPreview(accountId, masterKey, previa)
+
+    const final = (await people.listPeople(accountId, masterKey))[0]!
+    expect(final.fidelity?.months).toBe(8)
+    expect(final.fidelity?.category).toBe('tither')
+    expect(final.fidelity?.source).toContain('Dízimo Online')
+  })
+
+  /* Aplicar duas vezes o mesmo arquivo não empilha meses. */
+  it('o mesmo arquivo aplicado de novo é recusado', async () => {
+    const { masterKey, accountId, people, imports } = await fixture()
+    const rows = parseMemberText('IGREJA: Igreja Aurora Fictícia\nPessoa Repete Fictícia | 10/05/1990')
+    await imports.applyPreview(accountId, masterKey, await imports.previewMembers(accountId, masterKey, 'hash-m', rows, [], churches))
+    const texto = normalizePdfLayout(paginaDoDizimoOnline([{ nome: 'Pessoa Repete Fictícia', remessa: '01/2026 - 1', tipo: 'Dízimo' }]))
+
+    const primeira = await imports.previewDizimoOnline(accountId, masterKey, 'hash-d', parseDizimoOnlineText(texto), await people.listPeople(accountId, masterKey), churches)
+    await imports.applyPreview(accountId, masterKey, primeira)
+
+    const segunda = await imports.previewDizimoOnline(accountId, masterKey, 'hash-d', parseDizimoOnlineText(texto), await people.listPeople(accountId, masterKey), churches)
+    expect(segunda.alreadyImported).toBe(true)
+    await expect(imports.applyPreview(accountId, masterKey, segunda)).rejects.toThrow('já foi aplicado')
   })
 })

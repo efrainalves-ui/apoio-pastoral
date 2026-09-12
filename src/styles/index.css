@@ -450,6 +450,8 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .entity-badge { min-height: 28px; padding: 5px 9px; border-radius: 999px; font-size: .72rem; font-weight: 750; white-space: nowrap; }
 .entity-badge--active { color: #235c4c; background: #e3f1e9; }
 .entity-badge--archived { color: #59635f; background: #e9eceb; }
+/* Amarelo: a leitura veio do Dízimo Online, não do relatório de fidelidade. */
+.entity-badge--dizimo-online { color: #7a591c; background: #fbf0d7; }
 .filter-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, .42fr); gap: 16px; }
 
 /* Abas de módulo: uma faixa só, que rola no celular em vez de empilhar. */
@@ -1355,6 +1357,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   :root:not([data-tema='claro']) .alert--success { color: #d9eee5; background: #1e3a30; border-color: #4f7565; }
   :root:not([data-tema='claro']) .alert--error { color: #f5c6c2; background: #3b2523; border-color: #744b47; }
   :root:not([data-tema='claro']) .alert--warning { color: #f0dcb4; background: #3a3121; border-color: #6d5c3a; }
+  :root:not([data-tema='claro']) .entity-badge--dizimo-online { color: #f0dcb4; background: #3a3121; }
   :root:not([data-tema='claro']) .dashboard-metrics strong, :root:not([data-tema='claro']) .dashboard-number, :root:not([data-tema='claro']) .district-metrics strong, :root:not([data-tema='claro']) .community-summary strong, :root:not([data-tema='claro']) .reading-metrics strong, :root:not([data-tema='claro']) .missionary-record-groups h3, :root:not([data-tema='claro']) .segmented button.active { color: #d9eee5; }
   :root:not([data-tema='claro']) .segmented button.active { background: rgb(255 255 255 / 12%); box-shadow: none; }
   :root:not([data-tema='claro']) .eyebrow, :root:not([data-tema='claro']) .text-link, :root:not([data-tema='claro']) .commission-type-card__arrow { color: #9ed4bd; }
@@ -1421,6 +1424,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 :root[data-tema='escuro'] .alert--success { color: #d9eee5; background: #1e3a30; border-color: #4f7565; }
 :root[data-tema='escuro'] .alert--error { color: #f5c6c2; background: #3b2523; border-color: #744b47; }
 :root[data-tema='escuro'] .alert--warning { color: #f0dcb4; background: #3a3121; border-color: #6d5c3a; }
+:root[data-tema='escuro'] .entity-badge--dizimo-online { color: #f0dcb4; background: #3a3121; }
 :root[data-tema='escuro'] .dashboard-metrics strong, :root[data-tema='escuro'] .dashboard-number, :root[data-tema='escuro'] .district-metrics strong, :root[data-tema='escuro'] .community-summary strong, :root[data-tema='escuro'] .reading-metrics strong, :root[data-tema='escuro'] .missionary-record-groups h3, :root[data-tema='escuro'] .segmented button.active { color: #d9eee5; }
 :root[data-tema='escuro'] .segmented button.active { background: rgb(255 255 255 / 12%); box-shadow: none; }
 :root[data-tema='escuro'] .eyebrow, :root[data-tema='escuro'] .text-link, :root[data-tema='escuro'] .commission-type-card__arrow { color: #9ed4bd; }
