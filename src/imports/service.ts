@@ -1,5 +1,5 @@
 import { currentDeviceId } from '../auth/device'
-import { decryptPayload, encryptPayload } from '../crypto/vault'
+import { encryptPayload } from '../crypto/vault'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository, type EncryptedMutation } from '../db/repository'
 import { type ChurchEntity } from '../district/types'
@@ -8,6 +8,7 @@ import { fidelityCategory, FIDELITY_CATEGORY_LABELS, IMPORT_STATUS_LABELS, type 
 import { leituraDoAno, mesclarFidelidade } from '../people/leiturasDeFidelidade'
 import { normalizePersonName } from '../people/validation'
 import type { FidelityImportPreview, ImportApplyResult, ImportBatchData, ImportBatchEntity, ImportIssue, MemberImportPreview, ParsedFidelityRow, ParsedMemberRow, PlannedPersonChange } from './types'
+import { readPayload } from '../db/corrupted'
 
 function storedPerson(person: PersonEntity): PersonData { const { id: _id, ...data } = person; void _id; return data }
 function personKey(name: string, birthDate: string | null): string { return `${normalizePersonName(name)}|${birthDate ?? '?'}` }
@@ -52,8 +53,9 @@ export class ImportService {
   async listBatches(accountId: string, masterKey: CryptoKey, kind?: ImportBatchData['kind']): Promise<ImportBatchEntity[]> {
     const batches: ImportBatchEntity[] = []
     for (const record of await this.repository.list(accountId, 'import_batch')) {
-      const payload = await decryptPayload(masterKey, record)
-      if (payload.type !== 'import_batch') continue
+      const payload = await readPayload(masterKey, record, this.database)
+      // Um registro que não abre esconde só a si mesmo, não a lista inteira.
+      if (payload?.type !== 'import_batch') continue
       const data = payload.data as ImportBatchData
       if (!kind || data.kind === kind) batches.push({ id: record.id, ...data })
     }
@@ -194,12 +196,17 @@ export class ImportService {
     const records = await this.database.vaultRecords.bulkGet([...batch.undo.createdPersonIds, ...batch.undo.previousPeople.map(({ id }) => id)])
     for (const record of records) {
       if (!record || record.deletedAt) throw new Error('A importação não pode ser desfeita com segurança porque há alterações posteriores.')
-      const payload = await decryptPayload(masterKey, record)
-      if (payload.type !== 'person' || (payload.data as PersonData).updatedAt !== batch.appliedAt) throw new Error('A importação não pode ser desfeita com segurança porque há alterações posteriores.')
+      const payload = await readPayload(masterKey, record, this.database)
+      /*
+        Aqui o nulo é recusa, não omissão: desfazer uma importação sem conseguir
+        ler o que existe agora seria apagar no escuro.
+      */
+      if (!payload || payload.type !== 'person' || (payload.data as PersonData).updatedAt !== batch.appliedAt) throw new Error('A importação não pode ser desfeita com segurança porque há alterações posteriores.')
     }
     if (batch.undo.createdPersonIds.length) {
       for (const record of await this.repository.list(accountId, 'family')) {
-        const payload = await decryptPayload(masterKey, record)
+        const payload = await readPayload(masterKey, record, this.database)
+        if (!payload) throw new Error('Uma família não abriu neste aparelho, e desfazer sem conferi-la seria apagar no escuro.')
         if (payload.type === 'family' && (payload.data as FamilyData).memberIds.some((id) => batch.undo.createdPersonIds.includes(id))) throw new Error('Remova das famílias as pessoas criadas pela importação antes de desfazer.')
       }
     }
