@@ -212,7 +212,7 @@ function useMudancaDosPessoais() {
           O reparo vem antes: enquanto houver um identificador que o serviço
           recusa, nada sai deste aparelho — nem o que a mudança acabou de trazer.
         */
-        const reparo = await new ReparoDeIdentificadores().reparar(account.id)
+        const reparo = await new ReparoDeIdentificadores().reparar(account.id, masterKey)
         const resultado = await new MigracaoDosPessoais().mover(account.id, masterKey)
         if (resultado.movidos > 0 || reparo.reparados > 0) notificarDadosSincronizados()
       } catch {

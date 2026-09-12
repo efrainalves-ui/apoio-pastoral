@@ -1,4 +1,6 @@
 import { currentDeviceId } from '../auth/device'
+import { encryptPayload } from '../crypto/vault'
+import { readPayload } from './corrupted'
 import { db, type ApoioDatabase } from './database'
 import { ehUuid } from './identificadores'
 import { VaultRepository } from './repository'
@@ -13,35 +15,49 @@ import { VaultRepository } from './repository'
  * aparelho, nem o que não tinha defeito nenhum. Era o orçamento e a leitura do
  * pastor parados atrás de um único registro torto.
  *
- * O conteúdo é preservado: ele é regravado sob um identificador válido, que
- * entra na fila normalmente. O registro torto e as operações dele são apagados
- * do aparelho — nunca chegaram ao serviço, então não há o que anunciar lá.
+ * O conteúdo é preservado, e **recifrado** sob o identificador novo. Isso não é
+ * detalhe: o AAD amarra o texto cifrado ao identificador do registro, e copiar
+ * o envelope para outro id produziria exatamente o defeito que ele existe para
+ * impedir — "Registro não confere com o conteúdo guardado". Mover exige a
+ * chave; sem ela não há reparo honesto, só um registro ilegível a mais.
+ *
+ * O registro torto e as operações dele são apagados do aparelho — nunca
+ * chegaram ao serviço, então não há o que anunciar lá.
  */
 export interface ResultadoDoReparo {
   reparados: number
   operacoesDescartadas: number
+  /** Não abriram neste aparelho e ficaram onde estavam, intactos. */
+  ilegiveis: number
 }
 
 export class ReparoDeIdentificadores {
   private readonly repo: VaultRepository
   constructor(private readonly database: ApoioDatabase = db) { this.repo = new VaultRepository(database) }
 
-  async reparar(accountId: string): Promise<ResultadoDoReparo> {
+  async reparar(accountId: string, masterKey: CryptoKey): Promise<ResultadoDoReparo> {
     const registros = await this.database.vaultRecords.where('accountId').equals(accountId).toArray()
     const tortos = registros.filter(({ id }) => !ehUuid(id))
-    if (!tortos.length) return { reparados: 0, operacoesDescartadas: 0 }
+    if (!tortos.length) return { reparados: 0, operacoesDescartadas: 0, ilegiveis: 0 }
 
     const deviceId = currentDeviceId(accountId)
     let descartadas = 0
+    let reparados = 0
+    let ilegiveis = 0
 
     for (const torto of tortos) {
+      const payload = await readPayload(masterKey, torto, this.database)
       /*
-        O envelope viaja como está: o conteúdo é o mesmo, e reabri-lo exigiria a
-        chave — que este reparo não precisa ter.
+        Um registro que não abre fica exatamente onde está. Movê-lo às cegas
+        produziria um registro ilegível sob um identificador novo, e aí nem o
+        original sobraria para tentar de novo em outro aparelho.
       */
+      if (!payload) { ilegiveis += 1; continue }
+
+      const novoId = crypto.randomUUID()
       await this.repo.saveEncrypted(
-        accountId, deviceId, crypto.randomUUID(),
-        { ciphertext: torto.ciphertext, iv: torto.iv, aad: torto.aad, keyVersion: torto.keyVersion, algorithm: torto.algorithm },
+        accountId, deviceId, novoId,
+        await encryptPayload(masterKey, payload, novoId),
         torto.recordType,
       )
 
@@ -49,8 +65,9 @@ export class ReparoDeIdentificadores {
       descartadas += presas.length
       await this.database.outbox.bulkDelete(presas.map(({ id }) => id))
       await this.database.vaultRecords.delete(torto.id)
+      reparados += 1
     }
 
-    return { reparados: tortos.length, operacoesDescartadas: descartadas }
+    return { reparados, operacoesDescartadas: descartadas, ilegiveis }
   }
 }

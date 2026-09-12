@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { encryptPayload, generateMasterKey } from '../crypto/vault'
+import { decryptRecord, encryptPayload, generateMasterKey } from '../crypto/vault'
 import { ApoioDatabase } from './database'
 import { ehUuid } from './identificadores'
 import { ReparoDeIdentificadores } from './repararIdentificadores'
@@ -27,6 +27,14 @@ function novoBanco() {
   return banco
 }
 
+async function gravarTorto(banco: ApoioDatabase, chave: CryptoKey, id: string, tipo: string, dados: unknown) {
+  await new VaultRepository(banco).saveEncrypted(
+    CONTA, 'aparelho-ficticio', id,
+    await encryptPayload(chave, { schemaVersion: 1, type: tipo, data: dados }, id),
+    tipo as never,
+  )
+}
+
 describe('reparo dos identificadores que o serviço recusa', () => {
   /*
     O serviço converte `record_id` para `uuid`, e a conversão que falha derruba o
@@ -34,11 +42,9 @@ describe('reparo dos identificadores que o serviço recusa', () => {
   */
   it('regrava o registro torto sob um identificador válido', async () => {
     const banco = novoBanco(); const chave = await generateMasterKey()
-    const repo = new VaultRepository(banco)
-    await repo.saveEncrypted(CONTA, 'aparelho-ficticio', 'work-config-conta-ficticia',
-      await encryptPayload(chave, { schemaVersion: 1, type: 'work_config', data: { campo: 'Campo Fictício' } }, 'work-config-conta-ficticia'), 'work_config')
+    await gravarTorto(banco, chave, 'work-config-conta-ficticia', 'work_config', { campo: 'Campo Fictício' })
 
-    expect(await new ReparoDeIdentificadores(banco).reparar(CONTA)).toMatchObject({ reparados: 1 })
+    expect(await new ReparoDeIdentificadores(banco).reparar(CONTA, chave)).toMatchObject({ reparados: 1, ilegiveis: 0 })
 
     const guardados = await banco.vaultRecords.where('accountId').equals(CONTA).toArray()
     expect(guardados).toHaveLength(1)
@@ -46,16 +52,23 @@ describe('reparo dos identificadores que o serviço recusa', () => {
     expect(guardados[0]?.recordType).toBe('work_config')
   })
 
-  /* O conteúdo cifrado atravessa como está: o reparo não precisa da chave. */
-  it('o conteúdo é preservado', async () => {
-    const banco = novoBanco(); const chave = await generateMasterKey()
-    const envelope = await encryptPayload(chave, { schemaVersion: 1, type: 'work_config', data: { campo: 'Campo Fictício' } }, 'work-config-conta-ficticia')
-    await new VaultRepository(banco).saveEncrypted(CONTA, 'aparelho-ficticio', 'work-config-conta-ficticia', envelope, 'work_config')
+  /*
+    O teste que importa, e o que faltava antes.
 
-    await new ReparoDeIdentificadores(banco).reparar(CONTA)
+    O AAD amarra o texto cifrado ao identificador do registro. Copiar o envelope
+    para outro id produz exatamente o defeito que ele existe para impedir — e a
+    tela diz "Registro não confere com o conteúdo guardado". Mover é recifrar.
+  */
+  it('o registro reparado continua legível', async () => {
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    await gravarTorto(banco, chave, 'work-config-conta-ficticia', 'work_config', { campo: 'Campo Fictício' })
+
+    await new ReparoDeIdentificadores(banco).reparar(CONTA, chave)
 
     const [guardado] = await banco.vaultRecords.where('accountId').equals(CONTA).toArray()
-    expect(guardado?.ciphertext).toBe(envelope.ciphertext)
+    const payload = await decryptRecord(chave, guardado!)
+    expect(payload?.type).toBe('work_config')
+    expect(payload?.data).toMatchObject({ campo: 'Campo Fictício' })
   })
 
   /*
@@ -64,34 +77,45 @@ describe('reparo dos identificadores que o serviço recusa', () => {
   */
   it('descarta as operações que estavam presas', async () => {
     const banco = novoBanco(); const chave = await generateMasterKey()
-    await new VaultRepository(banco).saveEncrypted(CONTA, 'aparelho-ficticio', 'pessoal-migracao-abc',
-      await encryptPayload(chave, { schemaVersion: 1, type: 'pessoal_migracao', data: { ids: [] } }, 'pessoal-migracao-abc'), 'pessoal_migracao')
+    await gravarTorto(banco, chave, 'pessoal-migracao-abc', 'pessoal_migracao', { ids: [] })
 
     const antes = await banco.outbox.where('recordId').equals('pessoal-migracao-abc').count()
     expect(antes).toBeGreaterThan(0)
 
-    const resultado = await new ReparoDeIdentificadores(banco).reparar(CONTA)
+    const resultado = await new ReparoDeIdentificadores(banco).reparar(CONTA, chave)
     expect(resultado.operacoesDescartadas).toBe(antes)
     expect(await banco.outbox.where('recordId').equals('pessoal-migracao-abc').count()).toBe(0)
+  })
+
+  /*
+    Um registro que não abre fica onde está. Movê-lo às cegas produziria um
+    ilegível sob identificador novo, e nem o original sobraria para tentar de
+    novo em outro aparelho.
+  */
+  it('o que não abre não é movido', async () => {
+    const banco = novoBanco(); const chave = await generateMasterKey()
+    const outraChave = await generateMasterKey()
+    await gravarTorto(banco, outraChave, 'work-config-ilegivel', 'work_config', { campo: 'Não abre' })
+
+    expect(await new ReparoDeIdentificadores(banco).reparar(CONTA, chave)).toMatchObject({ reparados: 0, ilegiveis: 1 })
+    expect(await banco.vaultRecords.get('work-config-ilegivel')).toBeTruthy()
   })
 
   it('não mexe no que já está válido', async () => {
     const banco = novoBanco(); const chave = await generateMasterKey()
     const id = crypto.randomUUID()
-    await new VaultRepository(banco).saveEncrypted(CONTA, 'aparelho-ficticio', id,
-      await encryptPayload(chave, { schemaVersion: 1, type: 'person', data: {} }, id), 'person')
+    await gravarTorto(banco, chave, id, 'person', {})
 
-    expect(await new ReparoDeIdentificadores(banco).reparar(CONTA)).toMatchObject({ reparados: 0, operacoesDescartadas: 0 })
+    expect(await new ReparoDeIdentificadores(banco).reparar(CONTA, chave)).toMatchObject({ reparados: 0, operacoesDescartadas: 0 })
     expect((await banco.vaultRecords.get(id))?.id).toBe(id)
   })
 
   it('rodar de novo não faz nada', async () => {
     const banco = novoBanco(); const chave = await generateMasterKey()
-    await new VaultRepository(banco).saveEncrypted(CONTA, 'aparelho-ficticio', 'work-config-x',
-      await encryptPayload(chave, { schemaVersion: 1, type: 'work_config', data: {} }, 'work-config-x'), 'work_config')
+    await gravarTorto(banco, chave, 'work-config-x', 'work_config', {})
 
     const reparo = new ReparoDeIdentificadores(banco)
-    await reparo.reparar(CONTA)
-    expect(await reparo.reparar(CONTA)).toMatchObject({ reparados: 0 })
+    await reparo.reparar(CONTA, chave)
+    expect(await reparo.reparar(CONTA, chave)).toMatchObject({ reparados: 0 })
   })
 })
