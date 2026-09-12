@@ -273,6 +273,29 @@ export class ConflictService {
     }
   }
 
+  /** Quantas revisões já resolvidas estão guardadas neste aparelho. */
+  async contarResolvidas(accountId: string): Promise<number> {
+    return (await this.listResolved(accountId)).length
+  }
+
+  /**
+   * Esquece as revisões já resolvidas. **Irreversível.**
+   *
+   * Guardar as duas versões de cada revisão nasceu de uma promessa boa — nada
+   * foi apagado —, mas a promessa não tinha fim: a lista só crescia, e uma
+   * lista que só cresce deixa de ser histórico e vira entulho.
+   *
+   * O que sai daqui é a cópia da versão que **não** ficou valendo. O registro
+   * ativo não é tocado: continua onde está, com o conteúdo escolhido. Depois
+   * disso não há mais como consultar a versão recusada, e é por isso que quem
+   * decide é o pastor, num clique que ele dá sabendo disso.
+   */
+  async esquecerResolvidas(accountId: string): Promise<number> {
+    const resolvidas = await this.listResolved(accountId)
+    await this.database.syncConflicts.bulkDelete(resolvidas.map(({ id }) => id))
+    return resolvidas.length
+  }
+
   /**
    * Aplica a escolha do pastor. Nada é descartado: a versão que não ficar
    * ativa continua guardada, cifrada, dentro do próprio conflito resolvido.
@@ -336,6 +359,16 @@ export class ConflictService {
     if (!conflict || conflict.accountId !== accountId) throw new Error('Esta revisão não foi encontrada.')
     if (conflict.status !== 'pending') throw new Error('Esta revisão já foi resolvida.')
 
+    /*
+      Sem diferença visível, não há história para contar.
+
+      As duas versões dizem a mesma coisa em tudo que se pode ler; o que difere
+      é carimbo interno. Guardar isso enche o histórico de linhas que mostram
+      duas metades idênticas e não ajudam ninguém a decidir nada depois. A
+      revisão é aplicada igual — só não deixa rastro.
+    */
+    const semDiferenca = this.semDiferencaReal(await this.preview(conflict, masterKey))
+
     const localRecord = await this.database.vaultRecords.get(conflict.recordId)
     const localPayload: CipherEnvelope | undefined = localRecord
       ? { algorithm: localRecord.algorithm, ciphertext: localRecord.ciphertext, iv: localRecord.iv, aad: localRecord.aad, keyVersion: localRecord.keyVersion }
@@ -380,6 +413,11 @@ export class ConflictService {
       }
     } else {
       await this.publicarVersaoLocal(accountId, masterKey, deviceId, conflict.recordId, recordType, localPayload, localRecord?.deletedAt, conflict.remoteVersion)
+    }
+
+    if (semDiferenca) {
+      await this.database.syncConflicts.delete(conflictId)
+      return
     }
 
     await this.database.syncConflicts.put({

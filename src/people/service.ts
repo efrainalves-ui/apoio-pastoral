@@ -85,9 +85,19 @@ export class PeopleService {
     return { id: personId, ...stored }
   }
 
+  /**
+   * Registra a avaliação de renda — e só quando ela muda.
+   *
+   * Gravar o mesmo valor de novo parecia inofensivo e não era: criava versão
+   * nova do registro, linha nova no histórico da pessoa e operação nova para
+   * sincronizar. Com dois aparelhos, cada gravação dessas é mais uma chance de
+   * os dois lados divergirem e virar revisão pendente — revisão sobre uma
+   * mudança que não houve.
+   */
   async updateIncomeStatus(accountId: string, masterKey: CryptoKey, personId: string, incomeStatus: IncomeStatus): Promise<PersonEntity> {
     const current = await this.getPerson(accountId, masterKey, personId)
     if (!current) throw new Error('Pessoa não encontrada.')
+    if (current.incomeStatus === incomeStatus) return current
     const now = new Date().toISOString()
     const data: PersonData = {
       ...current,

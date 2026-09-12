@@ -381,6 +381,57 @@ describe('revisões sem diferença real', () => {
     expect(await service.listPending(accountId)).toHaveLength(1)
     await database.delete()
   })
+
+  /*
+    Sem diferença visível não há história para contar: as duas metades do
+    histórico seriam idênticas. Guardar isso enchia a lista de linhas que não
+    ajudam a decidir nada depois — e foi assim que centenas de revisões viraram
+    centenas de linhas guardadas para sempre.
+  */
+  it('revisão sem diferença não deixa rastro no histórico', async () => {
+    const { database, key, service } = await cenarioIgual()
+    await service.resolverSemDiferenca(accountId, key)
+    expect(await service.listResolved(accountId)).toHaveLength(0)
+    expect(await service.contarResolvidas(accountId)).toBe(0)
+    await database.delete()
+  })
+
+  /* Diferença de verdade continua no histórico: há o que consultar depois. */
+  it('revisão com diferença real fica guardada', async () => {
+    const { database, key, service } = await cenario()
+    const [pendente] = await service.listPending(accountId)
+    await service.resolve(accountId, key, pendente!.id, 'keep_local')
+    expect(await service.contarResolvidas(accountId)).toBe(1)
+    await database.delete()
+  })
+
+  /*
+    Guardar as duas versões de cada revisão nasceu de uma promessa boa, mas a
+    promessa não tinha fim: a lista só crescia. Esquecer é escolha do pastor, e
+    o que sai é só a cópia recusada — o registro ativo fica.
+  */
+  it('esquecer o histórico não toca no registro ativo', async () => {
+    const { database, key, service } = await cenario()
+    const [pendente] = await service.listPending(accountId)
+    await service.resolve(accountId, key, pendente!.id, 'keep_local')
+    const ativoAntes = await database.vaultRecords.get(pendente!.recordId)
+
+    expect(await service.esquecerResolvidas(accountId)).toBe(1)
+    expect(await service.contarResolvidas(accountId)).toBe(0)
+
+    const ativoDepois = await database.vaultRecords.get(pendente!.recordId)
+    expect(ativoDepois?.ciphertext).toBe(ativoAntes?.ciphertext)
+    await database.delete()
+  })
+
+  /* Esquecer não leva junto o que ainda espera decisão. */
+  it('esquecer o histórico preserva as revisões pendentes', async () => {
+    const { database, key, service } = await cenario()
+    expect(await service.esquecerResolvidas(accountId)).toBe(0)
+    expect(await service.listPending(accountId)).toHaveLength(1)
+    void key
+    await database.delete()
+  })
 })
 
 describe('a diferença de fidelidade fica legível', () => {

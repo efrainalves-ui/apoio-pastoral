@@ -34,6 +34,7 @@ export function SyncConflictsPage() {
   const { account, masterKey } = useAuthVault()
   const [previews, setPreviews] = useState<ConflictPreview[]>([])
   const [resolvedPreviews, setResolvedPreviews] = useState<ConflictPreview[]>([])
+  const [guardadas, setGuardadas] = useState(0)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -51,6 +52,7 @@ export function SyncConflictsPage() {
       ])
       setPreviews(pendingViews)
       setResolvedPreviews(resolvedViews)
+      setGuardadas(resolved.length)
     } catch {
       setError('Não foi possível abrir as revisões guardadas neste aparelho.')
     } finally {
@@ -96,6 +98,29 @@ export function SyncConflictsPage() {
       await load()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível resolver as revisões.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Esquece o histórico já resolvido.
+   *
+   * Guardar as duas versões de cada revisão nasceu de uma promessa boa, mas a
+   * promessa não tinha fim: a lista só crescia. O que sai é a cópia da versão
+   * que não ficou valendo; o registro ativo não é tocado. Não dá para voltar
+   * atrás, e por isso é o pastor que decide.
+   */
+  async function esquecerHistorico() {
+    if (!account) return
+    if (!window.confirm(`Esquecer ${guardadas} ${guardadas === 1 ? 'revisão já resolvida' : 'revisões já resolvidas'}? A versão que não ficou valendo deixa de poder ser consultada. Os registros ativos não mudam.`)) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const quantas = await service.esquecerResolvidas(account.id)
+      setNotice(quantas === 1 ? '1 revisão esquecida.' : `${quantas} revisões esquecidas.`)
+      await load()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível esquecer o histórico.')
     } finally {
       setBusy(false)
     }
@@ -187,8 +212,14 @@ export function SyncConflictsPage() {
       {resolvedPreviews.length > 0 && (
         <Card title="Histórico de revisões">
           <p className="card-copy">
-            {resolvedPreviews.length === 1 ? '1 revisão já resolvida.' : `${resolvedPreviews.length} revisões recentes.`} As duas versões continuam guardadas e protegidas neste aparelho.
+            {guardadas === 1 ? '1 revisão já resolvida.' : `${guardadas} revisões já resolvidas.`}
+            {guardadas > resolvedPreviews.length ? ` ${resolvedPreviews.length} mais recentes abaixo.` : ''} As duas versões continuam guardadas e protegidas neste aparelho.
           </p>
+          <div className="form-actions">
+            <Button variant="danger" disabled={busy} onClick={() => void esquecerHistorico()}>
+              {busy ? 'Esquecendo…' : `Esquecer ${guardadas} ${guardadas === 1 ? 'revisão' : 'revisões'}`}
+            </Button>
+          </div>
           <div className="settings-list">
             {resolvedPreviews.map((preview) => <details key={preview.id}><summary><strong>{preview.kind}</strong> · {shortDate(preview.resolvedAt ?? preview.createdAt)}</summary><p>{preview.choice ? choiceLabels[preview.choice] : 'Revisão concluída'}.</p><div className="conflict-sides"><article><h3><Laptop aria-hidden="true" />Neste aparelho</h3><p className="preserved-text">{preview.local.summary}</p></article><article><h3><Smartphone aria-hidden="true" />No outro aparelho</h3><p className="preserved-text">{preview.remote.summary}</p></article></div></details>)}
           </div>

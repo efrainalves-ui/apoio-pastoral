@@ -47,4 +47,39 @@ describe('pessoas, vínculos, famílias e aniversários', () => {
     // `deletePerson` publicava a lápide e ia embora.
     expect('deletePerson' in people).toBe(false)
   })
+
+  /*
+    Marcar de novo o que já estava marcado parecia inofensivo e não era: criava
+    versão nova do registro, linha nova no histórico e operação nova para
+    sincronizar. Com dois aparelhos, cada gravação dessas é mais uma chance de
+    os dois lados divergirem e virar revisão pendente — revisão sobre uma
+    mudança que não houve.
+  */
+  it('marcar a mesma renda de novo não cria versão nem histórico', async () => {
+    const { database, people, masterKey, accountId } = await fixture()
+    const person = await people.createPerson(accountId, masterKey, { ...emptyPersonInput(), name: 'Pessoa Renda Fictícia', currentChurchId: 'church-a' })
+
+    await people.updateIncomeStatus(accountId, masterKey, person.id, 'has_income')
+    const depoisDaPrimeira = await database.vaultRecords.get(person.id)
+    const historicoDepoisDaPrimeira = (await people.getPerson(accountId, masterKey, person.id))!.history.length
+
+    await people.updateIncomeStatus(accountId, masterKey, person.id, 'has_income')
+    const depoisDaSegunda = await database.vaultRecords.get(person.id)
+
+    expect(depoisDaSegunda!.version).toBe(depoisDaPrimeira!.version)
+    expect((await people.getPerson(accountId, masterKey, person.id))!.history).toHaveLength(historicoDepoisDaPrimeira)
+  })
+
+  it('mudar a renda de verdade continua gravando e registrando', async () => {
+    const { database, people, masterKey, accountId } = await fixture()
+    const person = await people.createPerson(accountId, masterKey, { ...emptyPersonInput(), name: 'Pessoa Renda Fictícia', currentChurchId: 'church-a' })
+
+    await people.updateIncomeStatus(accountId, masterKey, person.id, 'has_income')
+    const antes = await database.vaultRecords.get(person.id)
+    const atualizada = await people.updateIncomeStatus(accountId, masterKey, person.id, 'no_income')
+
+    expect(atualizada.incomeStatus).toBe('no_income')
+    expect((await database.vaultRecords.get(person.id))!.version).toBeGreaterThan(antes!.version)
+    expect(atualizada.history.at(-1)?.event).toBe('income_status_updated')
+  })
 })
