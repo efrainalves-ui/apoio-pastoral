@@ -351,7 +351,7 @@ describe('revisões sem diferença real', () => {
       localVersion: 1, remoteVersion: 2, remoteOperation: 'upsert',
       remotePayload: await encryptPayload(key, { schemaVersion: 1, type: 'person', data: { name: nome, updatedAt: '2026-09-04T00:29:59.000Z' } }, recordId),
       createdAt: new Date().toISOString(), status: 'pending',
-    } as SyncConflictRecord)
+    })
 
     return { database, key, service: new ConflictService(database) }
   }
@@ -379,6 +379,50 @@ describe('revisões sem diferença real', () => {
     expect(await service.contarSemDiferenca(accountId, key)).toBe(0)
     expect(await service.resolverSemDiferenca(accountId, key)).toBe(0)
     expect(await service.listPending(accountId)).toHaveLength(1)
+    await database.delete()
+  })
+})
+
+describe('a diferença de fidelidade fica legível', () => {
+  /*
+    A leitura de fidelidade é um objeto, e objeto caía no genérico "Diferente
+    nas duas versões". O pastor via que algo mudou e não via o quê — escolher
+    virava adivinhação.
+  */
+  it('mostra categoria, meses e ano de cada leitura', async () => {
+    const database = new ApoioDatabase(`fidelidade-${crypto.randomUUID()}`)
+    const key = await generateMasterKey()
+    const repository = new VaultRepository(database)
+    const recordId = crypto.randomUUID()
+
+    const leitura = (category: string, months: number, referenceYear: number) => ({
+      category, months, referenceYear, rangeMin: months, rangeMax: months,
+      precision: 'exact', updatedAt: '2026-09-04T00:29:00.000Z',
+      importedAt: '2026-09-04T00:29:00.000Z', source: 'fictícia', importBatchId: 'lote-ficticio',
+    })
+
+    await repository.saveEncrypted(
+      accountId, deviceId, recordId,
+      await encryptPayload(key, { schemaVersion: 1, type: 'person', data: { name: 'Pessoa Fictícia', fidelity: leitura('tither', 12, 2026) } }, recordId),
+      'person',
+    )
+    await database.syncConflicts.put({
+      id: crypto.randomUUID(), accountId, recordId,
+      localVersion: 1, remoteVersion: 2, remoteOperation: 'upsert',
+      remotePayload: await encryptPayload(key, { schemaVersion: 1, type: 'person', data: { name: 'Pessoa Fictícia', fidelity: leitura('non_systematic_tither', 5, 2025) } }, recordId),
+      createdAt: new Date().toISOString(), status: 'pending',
+    } as SyncConflictRecord)
+
+    const service = new ConflictService(database)
+    const [conflito] = await service.listPending(accountId)
+    const previa = await service.preview(conflito!, key)
+
+    const fidelidade = previa.differences.find(({ field }) => field === 'Leitura de fidelidade')
+    expect(fidelidade?.local).toBe('Dizimista · 12 meses · 2026')
+    expect(fidelidade?.remote).toBe('Dizimista não sistemático · 5 meses · 2025')
+
+    // E não entra na resolução em bloco: aqui há escolha de verdade.
+    expect(await service.contarSemDiferenca(accountId, key)).toBe(0)
     await database.delete()
   })
 })

@@ -55,6 +55,7 @@ const FIELD_LABELS: Record<string, string> = {
   notes: 'Observações', administrativeNotes: 'Observações', address: 'Endereço', location: 'Local',
   whatsapp: 'WhatsApp', email: 'E-mail', phone: 'Telefone', birthDate: 'Data de nascimento',
   status: 'Situação', type: 'Tipo', category: 'Categoria', pastoralStatus: 'Situação pastoral',
+  fidelity: 'Leitura de fidelidade',
   incomeStatus: 'Fidelidade', externalCode: 'Código externo', startAt: 'Início', endAt: 'Término',
   allDay: 'Dia inteiro', date: 'Data', deadline: 'Prazo', responsible: 'Responsável',
   amount: 'Valor', value: 'Valor', reason: 'Motivo', quorum: 'Quórum', author: 'Autor',
@@ -64,6 +65,13 @@ const FIELD_LABELS: Record<string, string> = {
 }
 
 const CODE_LABELS: Record<string, string> = {
+  /*
+    Fidelidade e renda. Sem estes, a diferença aparecia como "Diferente nas duas
+    versões" — o pastor via que algo mudou e não via o quê, e escolher virava
+    adivinhação.
+  */
+  tither: 'Dizimista', non_systematic_tither: 'Dizimista não sistemático', non_tither: 'Não dizimista',
+  has_income: 'Tem renda', no_income: 'Sem renda', unknown: 'Não informado',
   active: 'Ativo', archived: 'Arquivado', pending: 'Pendente', completed: 'Concluído', cancelled: 'Cancelado',
   draft: 'Rascunho', ready: 'Pronto', rescue: 'A resgatar', visitor: 'Visitante', interested: 'Interessado',
   full: 'Completa', quick: 'Rápida', routine: 'Rotina', leadership: 'Liderança', crisis: 'Crise', illness: 'Enfermidade',
@@ -96,6 +104,24 @@ function readableValue(field: string, value: unknown): string | null {
     }
     return `${value.length} item(ns)`
   }
+  /*
+    A leitura de fidelidade é um objeto, e objeto caía no genérico "Diferente
+    nas duas versões" — que não diz nada e deixa a escolha impossível. Aqui ela
+    vira a frase que decide: a categoria, quantos meses e de que ano é a
+    leitura.
+  */
+  if (field === 'fidelity' && value && typeof value === 'object') {
+    const leitura = value as { category?: string; months?: number | null; referenceYear?: number; rangeMin?: number; rangeMax?: number }
+    const categoria = leitura.category ? CODE_LABELS[leitura.category] ?? leitura.category : 'sem categoria'
+    const meses = typeof leitura.months === 'number'
+      ? `${leitura.months} ${leitura.months === 1 ? 'mês' : 'meses'}`
+      : typeof leitura.rangeMin === 'number' && typeof leitura.rangeMax === 'number'
+        ? `de ${leitura.rangeMin} a ${leitura.rangeMax} meses`
+        : null
+    const ano = leitura.referenceYear ? `${leitura.referenceYear}` : null
+    return [categoria, meses, ano].filter(Boolean).join(' · ')
+  }
+
   if (typeof value !== 'string') return null
   if (CODED_FIELDS.has(field)) return CODE_LABELS[value] ?? null
   if (CODE_LABELS[value]) return CODE_LABELS[value]
