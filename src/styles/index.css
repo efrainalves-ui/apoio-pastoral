@@ -450,6 +450,20 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .entity-badge { min-height: 28px; padding: 5px 9px; border-radius: 999px; font-size: .72rem; font-weight: 750; white-space: nowrap; }
 .entity-badge--active { color: #235c4c; background: #e3f1e9; }
 .entity-badge--archived { color: #59635f; background: #e9eceb; }
+/*
+  Tabela larga do Relatório Integrado.
+
+  São oitenta indicadores com rótulos longos: a tabela rola por dentro do seu
+  próprio quadro, para a página nunca rolar de lado no celular.
+*/
+.rolagem-tabela { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+.tabela-simples { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.tabela-simples th, .tabela-simples td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+.tabela-simples th { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.tabela-simples tr:last-child td { border-bottom: 0; }
+.tabela-simples .numero-tabela { text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; white-space: nowrap; }
+.lista-simples { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; font-size: .84rem; color: var(--muted); }
+
 /* Amarelo: a leitura veio do Dízimo Online, não do relatório de fidelidade. */
 .entity-badge--dizimo-online { color: #7a591c; background: #fbf0d7; }
 .filter-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, .42fr); gap: 16px; }

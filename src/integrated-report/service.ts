@@ -116,7 +116,7 @@ export class RelatorioIntegradoService {
       .sort((esquerda, direita) => compararTrimestres(esquerda.trimestre, direita.trimestre))
   }
 
-  async gravar(accountId: string, key: CryptoKey, dados: RelatorioIntegradoData, id = crypto.randomUUID()): Promise<RelatorioIntegradoEntity> {
+  async gravar(accountId: string, key: CryptoKey, dados: RelatorioIntegradoData, id: string = crypto.randomUUID()): Promise<RelatorioIntegradoEntity> {
     if (!dados.churchId) throw new Error('Informe a igreja do relatório.')
     if (!/^\d{4}-[1-4]$/u.test(dados.trimestre)) throw new Error('O trimestre precisa estar no formato 2026-1.')
     const agora = new Date().toISOString()

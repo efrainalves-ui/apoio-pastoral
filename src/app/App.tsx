@@ -28,6 +28,7 @@ import { CommunityGroupsPage } from '../pages/CommunityGroupsPage'
 import { CloseDistrictPage } from '../pages/CloseDistrictPage'
 import { PeoplePage } from '../pages/PeoplePage'
 import { MemberImportPage } from '../pages/MemberImportPage'
+import { RelatorioIntegradoPage } from '../pages/RelatorioIntegradoPage'
 import { PersonDetailPage } from '../pages/PersonDetailPage'
 import { PersonFormPage } from '../pages/PersonFormPage'
 import { SearchPage } from '../pages/SearchPage'
@@ -353,6 +354,7 @@ export function App() {
         <Route path="orcamento/:section" element={<FamilyBudgetPage />} />
         <Route path="materiais" element={<MaterialsPage />} />
         <Route path="metas/acms" element={<AcmsPage />} />
+        <Route path="metas/relatorio-integrado" element={<RelatorioIntegradoPage />} />
         <Route path="links" element={<UsefulLinksPage />} />
         <Route path="visitacao" element={<VisitationPage />} />
         <Route path="visitas" element={<Navigate to="/app/visitacao" replace />} />
