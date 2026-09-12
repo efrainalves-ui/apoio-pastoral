@@ -84,13 +84,25 @@ test('o material é dividido entre as igrejas e entregue, sem passar por zero', 
   }
 
   /*
-    Dividir. A prévia precisa nascer com os números certos: uma tela que mostra
-    zero e corrige depois ensina a desconfiar do que está escrito.
+    Dividir já chega dividido. O pastor disse quanto recebeu ao cadastrar e a
+    regra já está guardada: pedir de novo os dois antes de mostrar qualquer
+    número é pedir o que já foi dito.
   */
   await linha.getByRole('button', { name: 'Distribuir' }).click()
-  const previa = page.locator('.entity-row').filter({ hasText: 'Fictícia Central' }).last()
-  await expect(previa).toContainText(/\d/)
+  await expect(page.getByRole('heading', { name: 'Dividir 120 de ' + MATERIAL })).toBeVisible()
+
+  const daCentral = page.getByLabel('Quantidade para Fictícia Central')
+  await expect(daCentral).not.toHaveValue('0')
   await expect(page.getByRole('button', { name: 'Confirmar divisão' })).toBeEnabled()
+
+  // A regra fica recolhida — quase nunca muda.
+  await expect(page.getByLabel('Igreja organizada recebe')).toBeHidden()
+
+  // Corrigir uma igreja não abandona a regra para as outras.
+  const doPonto = page.getByLabel('Quantidade para Fictícia do Ponto')
+  const antesDoPonto = await doPonto.inputValue()
+  await daCentral.fill('10')
+  await expect(doPonto).toHaveValue(antesDoPonto)
 
   await page.getByRole('button', { name: 'Confirmar divisão' }).click()
   await expect(page.getByText('Distribuição registrada.', { exact: false })).toBeVisible()
@@ -100,12 +112,21 @@ test('o material é dividido entre as igrejas e entregue, sem passar por zero', 
     pastor conclui que o botão não fez nada — foi exatamente o que aconteceu.
   */
   const entrega = page.locator('.entity-row').filter({ hasText: 'Fictícia Central' }).first()
-  await entrega.getByRole('button', { name: 'Confirmar entrega' }).click()
-  await expect(page.getByRole('heading', { name: 'Confirmar entrega' })).toBeInViewport()
+  await entrega.getByRole('button', { name: 'Entregar' }).click()
+  await expect(page.getByRole('heading', { name: 'Entregar em Fictícia Central' })).toBeInViewport()
 
+  /*
+    Entregar pergunta uma coisa só: com quem ficou. A data e a hora são as de
+    agora — pedir que ele confirme isso é pedir confirmação do óbvio.
+  */
+  await expect(page.getByLabel('Data')).toHaveCount(0)
   await page.getByLabel('Nome de quem recebeu').fill('Pessoa Fictícia da Recepção')
-  await page.getByRole('button', { name: 'Confirmar entrega' }).last().click()
+  await page.getByRole('button', { name: 'Confirmar entrega' }).click()
   await expect(page.getByText('Entrega confirmada.')).toBeVisible()
+
+  // E depois de entregue, fica no histórico.
+  await expect(page.getByRole('heading', { name: 'Entregues' })).toBeVisible()
+  await expect(page.locator('.entity-row').filter({ hasText: 'Pessoa Fictícia da Recepção' })).toBeVisible()
 })
 
 /*
@@ -124,7 +145,6 @@ test('quando não dá para dividir, a tela diz por quê em vez de só desligar o
   await linha.getByRole('button', { name: 'Distribuir' }).click()
 
   // Pedir mais do que há: o motivo aparece, e o botão continua desligado.
-  await page.getByLabel('Modo').selectOption('manual')
   await page.getByLabel('Quantidade para Fictícia Central').fill('40')
   await expect(page.getByText(/Faltam \d+ para esta divisão/)).toBeVisible()
   await expect(page.getByRole('button', { name: 'Confirmar divisão' })).toBeDisabled()

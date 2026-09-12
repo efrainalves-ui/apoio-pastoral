@@ -3060,7 +3060,21 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .entity-row--acoes > .entity-row__nome { flex: 1 1 240px; min-width: 0; display: grid; gap: 4px; }
 .entity-row--acoes > .entity-row__numeros { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
 .entity-row--acoes > .entity-row__numeros strong { white-space: nowrap; }
-.entity-row--acoes > .entity-row__botoes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+.entity-row--acoes > .entity-row__botoes { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-left: auto; }
+/* A ação não estica: ela tem o tamanho do que diz. */
+.entity-row--acoes > .entity-row__botoes > * { flex: 0 0 auto; }
+
+/* O número da divisão fica do tamanho de um número, não de um campo de texto. */
+.campo-da-divisao { width: 92px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/*
+  A regra fica recolhida. Ela quase nunca muda, e ocupava o alto da tela pedindo
+  três confirmações antes de o pastor ver qualquer número.
+*/
+.regra-da-divisao { margin-top: 4px; border-top: 1px solid var(--line); padding-top: 12px; }
+.regra-da-divisao > summary { cursor: pointer; font-size: .84rem; color: var(--muted); }
+.regra-da-divisao > summary:focus-visible { outline: 2px solid var(--green-700); outline-offset: 2px; }
+.regra-da-divisao[open] > summary { margin-bottom: 12px; }
 
 .lista-regras { display: grid; gap: 14px; }
 .regra-do-item { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px 10px; margin: 0; min-width: 0; }

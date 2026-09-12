@@ -115,3 +115,26 @@ export function materialsSummary(
     needsToRequest,
   }
 }
+
+/**
+ * A divisão da regra, com os ajustes que o pastor fez à mão.
+ *
+ * A tela tinha um seletor de modo — "por regra" ou "manual" — e escolher um
+ * apagava o outro: para mudar uma igreja era preciso abandonar a regra e
+ * digitar as treze. Editar não é outro modo, é a mesma divisão com uma correção
+ * em cima. A regra continua valendo para quem não foi tocado.
+ */
+export function comAjustes(previa: DistributionPreview, ajustes: Record<string, number>): DistributionPreview {
+  const lines = previa.lines.map((linha) => {
+    const ajuste = ajustes[linha.churchId]
+    return ajuste === undefined ? linha : { ...linha, quantity: Math.max(0, Math.floor(ajuste)) }
+  })
+  const distributed = lines.reduce((total, linha) => total + linha.quantity, 0)
+  return {
+    lines,
+    distributed,
+    available: previa.available,
+    leftover: Math.max(0, previa.available - distributed),
+    missing: Math.max(0, distributed - previa.available),
+  }
+}
