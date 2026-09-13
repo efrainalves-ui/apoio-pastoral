@@ -4,9 +4,14 @@
  * O catálogo é escrito, não deduzido: o rótulo é o que a igreja lê no papel, e
  * mudá-lo por conta própria faria o pastor conferir uma pergunta contra outra.
  *
- * **Batismo não está aqui, de propósito.** Ele pertence a outro relatório, e
+ * **Batismo não está aqui, de propósito.** "O batismo é só pelo relatório do
+ * ACMS que eu envio, e não do relatório integrado", disse o pastor — e isso
+ * vale para tudo que fala de batismo, não só para a contagem: saíram tanto
  * "Número de pessoas levadas ao batismo por influência da Unidade de ação/PG"
- * ficou de fora por decisão do pastor. Um teste guarda essa ausência.
+ * quanto a pergunta sobre as fichas batismais no ACMS.
+ *
+ * Um teste guarda essa ausência, porque quem reconstruir o catálogo a partir do
+ * PDF vai trazê-las de volta sem perceber — elas estão lá no papel.
  */
 export type FormatoDoIndicador = 'numero' | 'sim_nao' | 'por_classe' | 'por_sabado'
 
@@ -105,7 +110,6 @@ export const CATALOGO_DO_RELATORIO: readonly IndicadorDoRelatorio[] = [
   { id: "secretaria--sua-igreja-realizou-o-evangelismo-reencontro-neste-trimestre", rotulo: "Sua igreja realizou o Evangelismo Reencontro neste trimestre?", secao: "Secretaria", formato: 'sim_nao', tratamento: 'atualizar' },
   { id: "secretaria--a-classificacao-dos-membros-foi-analisada-na-comissao", rotulo: "A classificação dos membros foi analisada na Comissão Diretiva neste trimestre?", secao: "Secretaria", formato: 'sim_nao', tratamento: 'atualizar' },
   { id: "secretaria--as-respostas-do-relatorio-integrado-foram-analisadas-na", rotulo: "As respostas do relatório integrado foram analisadas na Comissão Diretiva neste trimestre?", secao: "Secretaria", formato: 'sim_nao', tratamento: 'atualizar' },
-  { id: "secretaria--quando-ha-batismos-as-fichas-batismais-sao-cadastradas", rotulo: "Quando há batismos, as fichas batismais são cadastradas no ACMS pelo(a) secretário(a) da igreja?", secao: "Secretaria", formato: 'sim_nao', tratamento: 'atualizar' },
   { id: "secretaria--o-cadastro-da-lista-de-oficiais-esta-devidamente", rotulo: "O cadastro da lista de oficiais está devidamente atualizado no ACMS?", secao: "Secretaria", formato: 'sim_nao', tratamento: 'atualizar' },
   { id: "secretaria--capacidade-instalada-quantos-adultos-cabem-sentados-nos-bancos", rotulo: "Capacidade instalada: Quantos adultos cabem sentados nos bancos da nave da sua igreja. Se possuem 2 cultos no sábado, multiplique o número por 2. (Não incluir neste cálculo cadeiras de outros ambientes: como sala dos", secao: "Secretaria", formato: 'numero', tratamento: 'atualizar' },
   { id: "children-s-ministries--numero-de-professores-e-lideres-que-concluiram-o", rotulo: "Número de professores e líderes que concluíram o curso de liderança do MC/MA.", secao: "CHILDREN'S MINISTRIES", formato: 'numero', tratamento: 'atualizar' },

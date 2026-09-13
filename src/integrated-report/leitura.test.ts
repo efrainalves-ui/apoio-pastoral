@@ -41,7 +41,8 @@ const igrejaCompleta = (nome: string, pgs: string) => [
     ['Número de pessoas levadas ao batismo por influência da Unidade de ação/PG', '0', '0', '0', '0', '0', '1', '0', '1', '1', '1', '4'],
   ], nome),
   pagina(2, [['Secretaria'], ['Segundo Sábado', 'Sétimo Sábado'],
-    ['Número de presentes na Escola Sabatina (todos os presentes inclusive os não batizados).', '20', '32']]),
+    ['Número de presentes na Escola Sabatina (todos os presentes inclusive os não batizados).', '20', '32'],
+    ['Quando há batismos, as fichas batismais são cadastradas no ACMS pelo(a) secretário(a) da igreja?', 'Sim']]),
   pagina(3, [['Evangelismo'], ['Número de Campanhas evangelísticas em geral.', '-']]),
 ]
 
@@ -86,12 +87,16 @@ describe('leitura do Relatório Integrado', () => {
     expect(igreja?.naoInformados).toContain('evangelismo--numero-de-campanhas-evangelisticas-em-geral')
   })
 
-  /* Batismo sai de propósito, e isso não é falha de reconhecimento. */
+  /*
+    Batismo sai de propósito, e isso não é falha de reconhecimento. Sai tudo que
+    fala dele: a contagem da Unidade de ação e a pergunta das fichas batismais.
+  */
   it('separa o que foi ignorado do que não foi reconhecido', () => {
     const lido = lerRelatorioIntegrado(texto)
     expect(lido.naoReconhecidos).toEqual([])
-    expect(lido.ignorados).toHaveLength(1)
-    expect(lido.ignorados[0]).toContain('batismo')
+    expect(lido.ignorados).toHaveLength(2)
+    expect(lido.ignorados.join(' ')).toContain('batismo')
+    expect(lido.ignorados.join(' ')).toContain('fichas batismais')
   })
 
   it('separa igrejas diferentes', () => {

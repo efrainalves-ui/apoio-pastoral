@@ -20,15 +20,25 @@ function relatorio(churchId: string, trimestre: string, valores: RelatorioIntegr
 }
 
 /*
-  Batismo pertence a outro relatório, e o pastor mandou ignorá-lo por completo.
-  O teste guarda a ausência: quem reconstruir o catálogo do PDF vai trazê-lo de
-  volta sem perceber, porque ele está lá no papel.
+  "O batismo é só pelo relatório do ACMS que eu envio, e não do relatório
+  integrado." Vale para tudo que fala de batismo, não só para a contagem. O
+  teste guarda a ausência: quem reconstruir o catálogo do PDF vai trazê-las de
+  volta sem perceber, porque elas estão lá no papel.
 */
 describe('o catálogo do Relatório Integrado', () => {
-  it('não traz nenhuma contagem de batismo', () => {
-    const comBatismo = CATALOGO_DO_RELATORIO.filter(({ rotulo }) =>
-      /levad[ao]s? ao batismo|batizados por|n[úu]mero de batismos/iu.test(rotulo))
-    expect(comBatismo).toEqual([])
+  it('não traz nenhum indicador cujo assunto seja batismo', () => {
+    const sobreBatismo = /levad[ao]s? ao batismo|fichas batismais|n[úu]mero de batismos|batizados por influ/iu
+    expect(CATALOGO_DO_RELATORIO.filter(({ rotulo }) => sobreBatismo.test(rotulo)).map(({ rotulo }) => rotulo)).toEqual([])
+  })
+
+  /*
+    Citar batismo não é ser sobre batismo. "Curso para os recém-batizados" é
+    discipulado e "presentes inclusive os não batizados" é frequência: tirar as
+    duas por causa da palavra apagaria informação que o pastor quer.
+  */
+  it('mantém o que apenas menciona batizados sem medir batismo', () => {
+    const mencionam = CATALOGO_DO_RELATORIO.filter(({ rotulo }) => /batizad/iu.test(rotulo))
+    expect(mencionam.length).toBeGreaterThan(0)
   })
 
   it('tem identificador único para cada indicador', () => {

@@ -22,11 +22,15 @@ export interface RelatorioLido {
 /**
  * Batismo pertence a outro relatório, por decisão do pastor.
  *
- * A linha é reconhecida e descartada de propósito — não cai em "não
+ * "O batismo é só pelo relatório do ACMS que eu envio" — e isso vale para tudo
+ * que fala de batismo neste papel: a contagem por influência da Unidade de
+ * ação e a pergunta sobre as fichas batismais.
+ *
+ * As linhas são reconhecidas e descartadas de propósito — não caem em "não
  * reconhecido", que é onde vai o que o catálogo ainda não conhece. Confundir as
  * duas faria a conferência acusar uma falha que não existe.
  */
-const IGNORADOS_DE_PROPOSITO = [/levad[ao]s? ao batismo/iu]
+const IGNORADOS_DE_PROPOSITO = [/levad[ao]s? ao batismo/iu, /fichas batismais/iu]
 
 export function ehRelatorioIntegrado(texto: string): boolean {
   return texto.split(/\r?\n/u)[0]?.trim() === 'RELATORIO_INTEGRADO'
