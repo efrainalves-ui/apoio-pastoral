@@ -11,7 +11,10 @@ async function isInsideViewport(page: Page, locator: Locator): Promise<boolean> 
 
 async function clickVisibleLink(page: Page, path: string): Promise<boolean> {
   const links = page.locator(`a[href="${path}"]`)
-  for (let index = 0; index < await links.count(); index += 1) {
+  // A contagem é tirada uma vez: relê-la a cada volta faz os índices deslizarem
+  // se a casca terminar de renderizar no meio do laço.
+  const quantos = await links.count()
+  for (let index = 0; index < quantos; index += 1) {
     const link = links.nth(index)
     if (await link.isVisible() && await isInsideViewport(page, link)) {
       await link.click()
@@ -50,5 +53,16 @@ export async function navigateInsideApp(page: Page, path: string, ready: Locator
   const expected = new URL(path, 'http://apoio-pastoral.local')
   await expect(page).toHaveURL((url) => url.pathname === expected.pathname && url.search === expected.search)
   await expect(page.locator('.app-shell')).toBeVisible()
+
+  /*
+    A rota chega sob demanda. Enquanto o pedaço não carrega, a tela mostra o
+    aviso de carregamento — e afirmar que o título já está visível nesse
+    instante é afirmar algo sobre a rede, não sobre a página. Era esta a corrida
+    que derrubava um teste diferente a cada rodada, sempre no mesmo ajudante:
+    sob carga o pedaço demora mais do que a espera padrão da asserção.
+
+    Esperar o aviso sumir é esperar o sinal certo, em vez de esticar o prazo.
+  */
+  await expect(page.locator('.app-loading')).toHaveCount(0)
   await expect(ready).toBeVisible()
 }

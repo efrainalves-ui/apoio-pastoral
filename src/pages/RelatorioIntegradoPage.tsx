@@ -7,6 +7,9 @@ import { DistrictService } from '../district/service'
 import { GoalsService } from '../goals/service'
 import { GOAL_LABELS } from '../goals/types'
 import { lancamentosDoTrimestre, mesesDoTrimestre, METRICAS_DO_RELATORIO, totalDoDistritoNaMeta } from '../integrated-report/metas'
+import { conferirCampanhas, contarDivergencias } from '../integrated-report/campanhas'
+import { EvangelismPlanningService } from '../evangelism/service'
+import type { EvangelismCampaignEntity } from '../evangelism/types'
 import type { ChurchEntity } from '../district/types'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
 import { CATALOGO_DO_RELATORIO } from '../integrated-report/catalogo'
@@ -22,6 +25,7 @@ import { useReloadOnSync } from '../sync/useReloadOnSync'
 const service = new RelatorioIntegradoService()
 const districtService = new DistrictService()
 const metas = new GoalsService()
+const evangelismo = new EvangelismPlanningService()
 
 function textoDoValor(item: ValorAConferir): string {
   const { valor } = item
@@ -47,6 +51,7 @@ export function RelatorioIntegradoPage() {
   const { account, masterKey } = useAuthVault()
   const [churches, setChurches] = useState<ChurchEntity[]>([])
   const [relatorios, setRelatorios] = useState<RelatorioIntegradoEntity[]>([])
+  const [campanhas, setCampanhas] = useState<EvangelismCampaignEntity[]>([])
   const [conferencia, setConferencia] = useState<ConferenciaDoRelatorio | null>(null)
   const [recusados, setRecusados] = useState<Record<string, string[]>>({})
   const [confirmado, setConfirmado] = useState(false)
@@ -60,12 +65,14 @@ export function RelatorioIntegradoPage() {
     setCarregando(true)
     try {
       const district = await districtService.getDistrict(account.id, masterKey)
-      const [listaIgrejas, listaRelatorios] = await Promise.all([
+      const [listaIgrejas, listaRelatorios, listaCampanhas] = await Promise.all([
         district ? districtService.listChurches(account.id, masterKey, district.id) : [],
         service.listar(account.id, masterKey),
+        evangelismo.listCampaigns(account.id, masterKey),
       ])
       setChurches(listaIgrejas)
       setRelatorios(listaRelatorios)
+      setCampanhas(listaCampanhas)
       setErro('')
     } catch (motivo) {
       setErro(motivo instanceof Error ? motivo.message : 'Não foi possível abrir os relatórios.')
@@ -96,6 +103,26 @@ export function RelatorioIntegradoPage() {
       }))
     return lancamentosDoTrimestre(comoFicaria, conferencia.trimestre)
   }, [conferencia, recusados])
+
+  /*
+    As campanhas não são criadas nem unidas pelo relatório: o pastor pediu que o
+    aplicativo apenas diga se já existe campanha cadastrada para aquela igreja
+    naquele trimestre. Onde o número declarado não bate com o cadastrado, a
+    diferença aparece para ele decidir — comparada por igreja e por data, nunca
+    pelo nome, que se repete entre anos e igrejas.
+  */
+  const conferenciaDeCampanhas = useMemo(() => {
+    if (!conferencia) return []
+    const comoFicaria = conferencia.igrejas
+      .filter((igreja) => igreja.church)
+      .map((igreja) => ({
+        id: 'previa', churchId: igreja.church!.id, trimestre: conferencia.trimestre,
+        ...aplicarRecusas(igreja, recusados[igreja.nomeNoRelatorio] ?? []),
+        origem: { arquivo: conferencia.arquivo, paginas: igreja.paginas },
+        importBatchId: '', createdAt: '', updatedAt: '',
+      }))
+    return conferirCampanhas(comoFicaria, campanhas, conferencia.trimestre)
+  }, [conferencia, recusados, campanhas])
 
   async function escolherArquivo(arquivo: File | undefined) {
     if (!arquivo) return
@@ -237,6 +264,31 @@ export function RelatorioIntegradoPage() {
             <span>{totalDoDistritoNaMeta(paraMetas, 'bible_studies')}, somando as igrejas acima. Reenviar este relatório substitui estes lançamentos, não os duplica.</span>
           </div>}
         </div>
+
+        {/*
+          Cobertura junto dos totais: um total sem saber de quantas igrejas ele
+          veio é um número que parece maior ou menor do que é.
+        */}
+        <div className="import-metrics">
+          <div><small>Igrejas esperadas</small><strong>{ativas.length}</strong></div>
+          <div><small>Enviaram relatório</small><strong>{conferencia.igrejas.filter((igreja) => igreja.church).length}</strong></div>
+          <div><small>Sem informação</small><strong>{pendencias?.semInformacao ?? 0}</strong></div>
+          <div><small>Confirmados</small><strong>{pendencias?.prontos ?? 0}</strong></div>
+          <div><small>Pendentes</small><strong>{pendencias?.confirmar ?? 0}</strong></div>
+          <div><small>Recusados</small><strong>{Object.values(recusados).reduce((total, lista) => total + lista.length, 0)}</strong></div>
+        </div>
+
+        {contarDivergencias(conferenciaDeCampanhas) > 0 && <div className="issue-list">
+          <h3><TriangleAlert />Campanhas: o declarado não bate com o cadastrado</h3>
+          {conferenciaDeCampanhas.filter(({ situacao }) => situacao !== 'confere').map((linha) => <div key={linha.churchId}>
+            <strong>{nomeDaIgrejaPorId(linha.churchId)}</strong>
+            <span>
+              Declarou {linha.declaradas} campanha(s) neste trimestre; há {linha.cadastradas.length} cadastrada(s).
+              {linha.cadastradas.length > 0 ? ` (${linha.cadastradas.map(({ name }) => name).join(', ')})` : ''}
+              {' '}Nada é criado nem unido: confira e cadastre o que faltar.
+            </span>
+          </div>)}
+        </div>}
 
         {conferencia.naoReconhecidos.length > 0 && <div className="issue-list">
           <h3>Indicadores que o catálogo não conhece</h3>

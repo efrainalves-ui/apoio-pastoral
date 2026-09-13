@@ -453,3 +453,48 @@ export function areaComparison(area: GoalArea, goals: GoalEntity[], sources: Are
     legacyValueTarget,
   }
 }
+
+/**
+ * O que o Relatório Integrado lançou numa área, separado do cadastro nominal.
+ *
+ * As duas fontes medem a mesma realidade por caminhos diferentes: o cadastro
+ * conta estudo por estudo, com nome; o relatório traz o número que a igreja
+ * declarou no trimestre. Somar as duas contaria a mesma pessoa duas vezes, e
+ * escolher uma por conta própria seria decidir no lugar do pastor.
+ *
+ * Então elas aparecem lado a lado, cada uma dizendo de onde veio. O progresso
+ * da meta continua saindo do cadastro nominal, como sempre saiu; este número
+ * fica visível ao lado, inclusive quando ainda não há alvo definido — esconder
+ * um resultado porque falta o alvo é esconder justamente o que já se conseguiu.
+ */
+export interface ResultadoDoRelatorio {
+  /** Soma do que o relatório lançou no ano, por igreja. */
+  porIgreja: Array<{ churchId: string; amount: number }>
+  total: number
+  /** Quantos lançamentos vieram do relatório, para a cobertura ficar à vista. */
+  lancamentos: number
+}
+
+export function resultadoDoRelatorioIntegrado(
+  area: GoalArea,
+  entries: readonly GoalEntryEntity[],
+  year: number,
+): ResultadoDoRelatorio {
+  const metrics = AREA_METRICS[area]
+  const ano = String(year)
+  const doRelatorio = entries.filter((entry) =>
+    entry.source === 'pdf'
+    && metrics.includes(entry.metric)
+    && entry.date.startsWith(ano)
+    && entry.reference.startsWith('Relatório Integrado'))
+
+  const porIgreja = new Map<string, number>()
+  for (const entry of doRelatorio) {
+    porIgreja.set(entry.churchId, (porIgreja.get(entry.churchId) ?? 0) + entry.amount)
+  }
+  return {
+    porIgreja: [...porIgreja].map(([churchId, amount]) => ({ churchId, amount })),
+    total: doRelatorio.reduce((soma, entry) => soma + entry.amount, 0),
+    lancamentos: doRelatorio.length,
+  }
+}
