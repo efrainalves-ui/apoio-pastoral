@@ -3061,6 +3061,11 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .entity-row--acoes > .entity-row__numeros { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
 .entity-row--acoes > .entity-row__numeros strong { white-space: nowrap; }
 .entity-row--acoes > .entity-row__botoes { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-left: auto; }
+/* As quatro decisões sobre um valor que destoa, lado a lado. */
+.decisao-do-valor { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 8px; }
+.decisao-do-valor .field--inline { display: flex; align-items: center; gap: 8px; margin: 0; }
+.decisao-do-valor .field__label { font-size: .76rem; white-space: nowrap; }
+
 /*
   O Relatório Integrado por área estratégica.
 

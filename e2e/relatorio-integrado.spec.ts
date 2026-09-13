@@ -67,7 +67,7 @@ test('o Relatório Integrado entra trimestre a trimestre, e o número fora do pa
   await expect(page.getByText('1º trimestre de 2026: 5 · agora: 45')).toBeVisible()
 
   // Recusar o número: ele não é gravado, e o indicador segue valendo o trimestre anterior.
-  await page.getByRole('checkbox', { name: /Não gravar este número/ }).check()
+  await page.getByRole('button', { name: 'Recusar' }).click()
   await page.getByRole('checkbox', { name: /Conferi os números/ }).check()
   await page.getByRole('button', { name: /Gravar 2º trimestre de 2026/ }).click()
   await expect(page.getByText('2º trimestre de 2026 gravado para 1 igreja(s).')).toBeVisible()
@@ -158,11 +158,47 @@ test('o valor recusado não alimenta a meta', async ({ page }) => {
   await expect(page.getByText('Valores fora do padrão')).toBeVisible()
 
   // Recusado, ele sai também da prévia das metas: sobra só a ASA.
-  await page.getByRole('checkbox', { name: /Não gravar este número/ }).check()
+  await page.getByRole('button', { name: 'Recusar' }).click()
   await expect(page.getByText('1 · ', { exact: false }).first()).toBeVisible()
 
   await page.getByRole('checkbox', { name: /Conferi os números/ }).check()
   await page.getByRole('button', { name: /Gravar 2º trimestre de 2026/ }).click()
   await expect(page.getByText('Estudos Bíblicos: 1 no distrito.', { exact: false })).toBeVisible()
 })
+
+/*
+  Os quatro destinos de um valor que destoa. Pendente é o estado em que ele
+  nasce: não grava, não alimenta meta, e continua à vista para não ser esquecido.
+*/
+test('o valor que destoa pode ser aprovado, corrigido, recusado ou deixado para depois', async ({ page }) => {
+  test.setTimeout(240_000)
+  await entrar(page)
+  await cadastrarIgreja(page, NORTE.nome)
+
+  await navigateInsideApp(page, '/app/metas/relatorio-integrado', page.getByRole('heading', { name: 'Relatório Integrado' }))
+  await enviarPdf(page, 'primeiro-ficticio.pdf', relatorioIntegradoFicticio(1, [
+    { ...NORTE, pequenosGrupos: '5', campanhas: '1', estudos: '4', estudosAsa: '1' },
+  ]))
+  await page.getByRole('checkbox', { name: /Conferi os números/ }).check()
+  await page.getByRole('button', { name: /Gravar 1º trimestre de 2026/ }).click()
+  await expect(page.getByText('Estudos Bíblicos: 5 no distrito.', { exact: false })).toBeVisible()
+
+  // 5 vira 45: a conferência para e o valor nasce pendente.
+  await enviarPdf(page, 'segundo-ficticio.pdf', relatorioIntegradoFicticio(2, [
+    { ...NORTE, pequenosGrupos: '45', campanhas: '1', estudos: '4', estudosAsa: '1' },
+  ]))
+  await expect(page.getByText('Valores fora do padrão')).toBeVisible()
+  const decisao = page.getByRole('group', { name: /Decisão sobre Número de Pequenos Grupos/ })
+  await expect(decisao.getByRole('button', { name: 'Aprovar 45' })).toBeVisible()
+  await expect(decisao.getByRole('button', { name: 'Recusar' })).toBeVisible()
+  await expect(decisao.getByRole('button', { name: 'Decidir depois' })).toBeVisible()
+
+  // Corrigir para 4: é o número que fica.
+  await page.getByLabel(/Valor corrigido de Número de Pequenos Grupos/).fill('4')
+  await page.getByRole('checkbox', { name: /Conferi os números/ }).check()
+  await page.getByRole('button', { name: /Gravar 2º trimestre de 2026/ }).click()
+  await expect(page.getByText('2º trimestre de 2026 gravado', { exact: false })).toBeVisible()
+  await expect(page.getByText('4 Pequenos Grupos')).toBeVisible()
+})
+
 

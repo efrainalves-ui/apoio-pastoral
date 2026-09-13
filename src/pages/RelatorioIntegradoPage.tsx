@@ -14,8 +14,9 @@ import type { ChurchEntity } from '../district/types'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
 import { CATALOGO_DO_RELATORIO } from '../integrated-report/catalogo'
 import {
-  aplicarRecusas, conferir, contarPendencias,
-  type ConferenciaDoRelatorio, type IgrejaConferida, type ValorAConferir,
+  aplicarDecisoes, conferir, contarPendencias, estaPendente,
+  type ConferenciaDoRelatorio, type DecisaoSobreValor, type DecisoesDaIgreja,
+  type IgrejaConferida, type ValorAConferir,
 } from '../integrated-report/conferencia'
 import { ehRelatorioIntegrado, lerRelatorioIntegrado } from '../integrated-report/leitura'
 import { numeroDoValor, RelatorioIntegradoService, totalDoDistrito, valorAtual } from '../integrated-report/service'
@@ -53,7 +54,11 @@ export function RelatorioIntegradoPage() {
   const [relatorios, setRelatorios] = useState<RelatorioIntegradoEntity[]>([])
   const [campanhas, setCampanhas] = useState<EvangelismCampaignEntity[]>([])
   const [conferencia, setConferencia] = useState<ConferenciaDoRelatorio | null>(null)
-  const [recusados, setRecusados] = useState<Record<string, string[]>>({})
+  /*
+    A decisão de cada valor que destoa, por igreja. Nasce vazia — o que equivale
+    a pendente —, e pendente não grava.
+  */
+  const [decisoes, setDecisoes] = useState<Record<string, DecisoesDaIgreja>>({})
   const [confirmado, setConfirmado] = useState(false)
   const [busy, setBusy] = useState(false)
   const [carregando, setCarregando] = useState(true)
@@ -86,6 +91,13 @@ export function RelatorioIntegradoPage() {
     [relatorios],
   )
   const pendencias = conferencia ? contarPendencias(conferencia) : null
+  /* Recusado e pendente são estados diferentes, e contam separado. */
+  const contarPorTipo = (tipo: DecisaoSobreValor['tipo']) => !conferencia ? 0 : conferencia.igrejas
+    .reduce((total, igreja) => total + aplicarDecisoes(igreja, decisoes[igreja.nomeNoRelatorio] ?? {})[
+      tipo === 'recusado' ? 'recusados' : tipo === 'corrigido' ? 'corrigidos' : 'pendentes'].length, 0)
+  const recusadosAgora = contarPorTipo('recusado')
+  const pendentesAgora = contarPorTipo('pendente')
+  const corrigidosAgora = contarPorTipo('corrigido')
   const nomeDaIgrejaPorId = (id: string) => churches.find((church) => church.id === id)?.name ?? 'Igreja'
   /*
     A prévia das metas parte da conferência já com as recusas aplicadas: o que o
@@ -97,12 +109,12 @@ export function RelatorioIntegradoPage() {
       .filter((igreja) => igreja.church)
       .map((igreja) => ({
         id: 'previa', churchId: igreja.church!.id, trimestre: conferencia.trimestre,
-        ...aplicarRecusas(igreja, recusados[igreja.nomeNoRelatorio] ?? []),
+        ...aplicarDecisoes(igreja, decisoes[igreja.nomeNoRelatorio] ?? {}),
         origem: { arquivo: conferencia.arquivo, paginas: igreja.paginas },
         importBatchId: '', createdAt: '', updatedAt: '',
       }))
     return lancamentosDoTrimestre(comoFicaria, conferencia.trimestre)
-  }, [conferencia, recusados])
+  }, [conferencia, decisoes])
 
   /*
     As campanhas não são criadas nem unidas pelo relatório: o pastor pediu que o
@@ -117,16 +129,16 @@ export function RelatorioIntegradoPage() {
       .filter((igreja) => igreja.church)
       .map((igreja) => ({
         id: 'previa', churchId: igreja.church!.id, trimestre: conferencia.trimestre,
-        ...aplicarRecusas(igreja, recusados[igreja.nomeNoRelatorio] ?? []),
+        ...aplicarDecisoes(igreja, decisoes[igreja.nomeNoRelatorio] ?? {}),
         origem: { arquivo: conferencia.arquivo, paginas: igreja.paginas },
         importBatchId: '', createdAt: '', updatedAt: '',
       }))
     return conferirCampanhas(comoFicaria, campanhas, conferencia.trimestre)
-  }, [conferencia, recusados, campanhas])
+  }, [conferencia, decisoes, campanhas])
 
   async function escolherArquivo(arquivo: File | undefined) {
     if (!arquivo) return
-    setBusy(true); setErro(''); setAviso(''); setConferencia(null); setRecusados({}); setConfirmado(false)
+    setBusy(true); setErro(''); setAviso(''); setConferencia(null); setDecisoes({}); setConfirmado(false)
     try {
       validatePdfFile(arquivo)
       const bytes = await arquivo.arrayBuffer()
@@ -142,14 +154,12 @@ export function RelatorioIntegradoPage() {
     } finally { setBusy(false) }
   }
 
-  function alternarRecusa(igreja: IgrejaConferida, indicadorId: string) {
+  function decidir(igreja: IgrejaConferida, indicadorId: string, decisao: DecisaoSobreValor) {
     const chave = igreja.nomeNoRelatorio
-    const atuais = recusados[chave] ?? []
-    setRecusados({
-      ...recusados,
-      [chave]: atuais.includes(indicadorId) ? atuais.filter((id) => id !== indicadorId) : [...atuais, indicadorId],
-    })
+    setDecisoes({ ...decisoes, [chave]: { ...(decisoes[chave] ?? {}), [indicadorId]: decisao } })
   }
+  const decisaoDe = (igreja: IgrejaConferida, indicadorId: string): DecisaoSobreValor =>
+    decisoes[igreja.nomeNoRelatorio]?.[indicadorId] ?? { tipo: 'pendente' }
 
   async function gravar() {
     if (!account || !masterKey || !conferencia) return
@@ -159,7 +169,7 @@ export function RelatorioIntegradoPage() {
       let gravadas = 0
       for (const igreja of conferencia.igrejas) {
         if (!igreja.church) continue
-        const { valores, recusados: fora } = aplicarRecusas(igreja, recusados[igreja.nomeNoRelatorio] ?? [])
+        const { valores, recusados: fora } = aplicarDecisoes(igreja, decisoes[igreja.nomeNoRelatorio] ?? {})
         const existente = relatorios.find((item) => item.churchId === igreja.church!.id && item.trimestre === conferencia.trimestre)
         await service.gravar(account.id, masterKey, {
           churchId: igreja.church.id,
@@ -189,7 +199,7 @@ export function RelatorioIntegradoPage() {
 
       const total = totalDoDistritoNaMeta(lancamentos, 'bible_studies')
       setAviso(`${rotuloDoTrimestre(conferencia.trimestre)} gravado para ${gravadas} igreja(s). ${GOAL_LABELS.bible_studies}: ${total} no distrito.`)
-      setConferencia(null); setRecusados({}); setConfirmado(false)
+      setConferencia(null); setDecisoes({}); setConfirmado(false)
       await carregar()
     } catch (motivo) {
       setErro(motivo instanceof Error ? motivo.message : 'Não foi possível gravar o relatório.')
@@ -274,8 +284,9 @@ export function RelatorioIntegradoPage() {
           <div><small>Enviaram relatório</small><strong>{conferencia.igrejas.filter((igreja) => igreja.church).length}</strong></div>
           <div><small>Sem informação</small><strong>{pendencias?.semInformacao ?? 0}</strong></div>
           <div><small>Confirmados</small><strong>{pendencias?.prontos ?? 0}</strong></div>
-          <div><small>Pendentes</small><strong>{pendencias?.confirmar ?? 0}</strong></div>
-          <div><small>Recusados</small><strong>{Object.values(recusados).reduce((total, lista) => total + lista.length, 0)}</strong></div>
+          <div><small>Pendentes</small><strong>{pendentesAgora}</strong></div>
+          <div><small>Corrigidos</small><strong>{corrigidosAgora}</strong></div>
+          <div><small>Recusados</small><strong>{recusadosAgora}</strong></div>
         </div>
 
         {contarDivergencias(conferenciaDeCampanhas) > 0 && <div className="issue-list">
@@ -297,7 +308,7 @@ export function RelatorioIntegradoPage() {
       </Card>
 
       {conferencia.igrejas.map((igreja) => {
-        const foraDaGravacao = recusados[igreja.nomeNoRelatorio] ?? []
+        const decididos = decisoes[igreja.nomeNoRelatorio] ?? {}
         const conferir = igreja.valores.filter(({ precisaConfirmar }) => precisaConfirmar)
         return <Card
           key={igreja.nomeNoRelatorio}
@@ -306,20 +317,48 @@ export function RelatorioIntegradoPage() {
         >
           {conferir.length > 0 && <div className="issue-list">
             <h3><TriangleAlert />Valores fora do padrão</h3>
-            {conferir.map((item) => <div key={item.indicador.id}>
-              <strong>{item.indicador.rotulo}</strong>
-              <span>
-                {rotuloDoTrimestre(item.anterior!.trimestre)}: {item.anterior!.numero} · agora: {item.numero}
-              </span>
-              <label className="confirmation-check">
-                <input
-                  type="checkbox"
-                  checked={foraDaGravacao.includes(item.indicador.id)}
-                  onChange={() => alternarRecusa(igreja, item.indicador.id)}
-                />
-                <span>Não gravar este número. O indicador continua valendo o trimestre anterior.</span>
-              </label>
-            </div>)}
+            {/*
+              Quatro destinos: aprovar o que está no papel, escrever o número
+              certo, recusar, ou deixar para depois. Nasce em "decidir depois",
+              e nesse estado não grava — mas continua à vista.
+            */}
+            {conferir.map((item) => {
+              const decisao = decisaoDe(igreja, item.indicador.id)
+              return <div key={item.indicador.id}>
+                <strong>{item.indicador.rotulo}</strong>
+                <span>
+                  {rotuloDoTrimestre(item.anterior!.trimestre)}: {item.anterior!.numero} · agora: {item.numero}
+                  {' · '}{conferencia.arquivo}, página{igreja.paginas.length > 1 ? 's' : ''} {igreja.paginas.join(', ')}
+                </span>
+                <div className="decisao-do-valor" role="group" aria-label={`Decisão sobre ${item.indicador.rotulo} em ${igreja.church?.name ?? igreja.nomeNoRelatorio}`}>
+                  <Button
+                    variant={decisao.tipo === 'aprovado' ? 'primary' : 'secondary'}
+                    onClick={() => decidir(igreja, item.indicador.id, { tipo: 'aprovado' })}
+                  >Aprovar {item.numero}</Button>
+                  <Button
+                    variant={decisao.tipo === 'recusado' ? 'danger' : 'secondary'}
+                    onClick={() => decidir(igreja, item.indicador.id, { tipo: 'recusado' })}
+                  >Recusar</Button>
+                  <Button
+                    variant={decisao.tipo === 'pendente' ? 'primary' : 'quiet'}
+                    onClick={() => decidir(igreja, item.indicador.id, { tipo: 'pendente' })}
+                  >Decidir depois</Button>
+                  <label className="field field--inline">
+                    <span className="field__label">Corrigir para</span>
+                    <input
+                      className="field__input campo-da-divisao"
+                      type="number"
+                      min="0"
+                      aria-label={`Valor corrigido de ${item.indicador.rotulo} em ${igreja.church?.name ?? igreja.nomeNoRelatorio}`}
+                      value={decisao.tipo === 'corrigido' ? decisao.valor : ''}
+                      onChange={(evento) => decidir(igreja, item.indicador.id, evento.target.value === ''
+                        ? { tipo: 'pendente' }
+                        : { tipo: 'corrigido', valor: Number(evento.target.value) })}
+                    />
+                  </label>
+                </div>
+              </div>
+            })}
           </div>}
 
           <details>
@@ -330,8 +369,11 @@ export function RelatorioIntegradoPage() {
                   <strong>{item.indicador.rotulo}</strong>
                   <small>{item.indicador.secao} · {item.indicador.tratamento === 'somar' ? 'soma no período' : 'situação da igreja'}</small>
                 </span>
-                <span className={foraDaGravacao.includes(item.indicador.id) ? 'valor-pendente' : ''}>
-                  {foraDaGravacao.includes(item.indicador.id) ? 'recusado' : textoDoValor(item)}
+                <span className={estaPendente(item, decididos) || decididos[item.indicador.id]?.tipo === 'recusado' ? 'valor-pendente' : ''}>
+                  {decididos[item.indicador.id]?.tipo === 'recusado' ? 'recusado'
+                    : decididos[item.indicador.id]?.tipo === 'corrigido' ? `corrigido para ${decididos[item.indicador.id]!.tipo === 'corrigido' ? (decididos[item.indicador.id] as { valor: number }).valor : ''}`
+                      : estaPendente(item, decididos) ? 'pendente'
+                        : textoDoValor(item)}
                 </span>
               </div>)}
             </div>

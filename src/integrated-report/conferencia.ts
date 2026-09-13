@@ -120,22 +120,98 @@ export function contarPendencias(conferencia: ConferenciaDoRelatorio): { confirm
 }
 
 /**
- * O que será gravado, depois das recusas.
+ * O que o pastor decidiu sobre um valor que destoa.
  *
- * Um valor recusado não vira zero nem some: ele fica registrado como recusado,
- * e o indicador continua valendo o último trimestre que informou. No trimestre
+ * `aprovado` é o número do papel, conferido. `corrigido` é outro número que ele
+ * digitou — o relatório dizia 45 e eram 4. `recusado` tira o número da
+ * gravação. `pendente` é não ter decidido ainda, e é o estado em que todo valor
+ * que destoa nasce.
+ *
+ * Pendente não é aprovado nem recusado: ele não grava, não alimenta meta e não
+ * entra no total confirmado do distrito — mas continua à vista, para não ser
+ * esquecido.
+ */
+export type DecisaoSobreValor =
+  | { tipo: 'pendente' }
+  | { tipo: 'aprovado' }
+  | { tipo: 'corrigido'; valor: number }
+  | { tipo: 'recusado' }
+
+export type DecisoesDaIgreja = Readonly<Record<string, DecisaoSobreValor>>
+
+/** Um valor que destoa e ainda não foi decidido não pode ser gravado. */
+export function estaPendente(item: ValorAConferir, decisoes: DecisoesDaIgreja): boolean {
+  if (!item.precisaConfirmar) return false
+  return (decisoes[item.indicador.id]?.tipo ?? 'pendente') === 'pendente'
+}
+
+function comNumero(valor: ValorDoIndicador, novo: number): ValorDoIndicador {
+  if (valor.tipo === 'numero') return { tipo: 'numero', valor: novo }
+  if (valor.tipo === 'por_sabado') return { tipo: 'por_sabado', segundo: novo, setimo: null }
+  if (valor.tipo === 'por_classe') return { tipo: 'por_classe', classes: {}, total: novo }
+  return valor
+}
+
+export interface ResultadoDaDecisao {
+  valores: Record<string, ValorDoIndicador>
+  /** Recusados de propósito: ficam registrados, para o trimestre seguinte saber. */
+  recusados: string[]
+  /** Ainda sem decisão: não gravam, e continuam esperando. */
+  pendentes: string[]
+  /** Corrigidos à mão, com o número que o pastor escreveu. */
+  corrigidos: Array<{ id: string; de: number | null; para: number }>
+}
+
+/**
+ * O que será gravado, depois das decisões do pastor.
+ *
+ * Um valor recusado não vira zero nem some: fica registrado como recusado, e o
+ * indicador continua valendo o último trimestre que informou. No trimestre
  * seguinte é preciso saber que aquele número foi visto e rejeitado, e não que
  * ninguém o mandou.
+ *
+ * Um valor pendente também não grava — mas por outro motivo: ninguém decidiu
+ * ainda. Misturar os dois faria "não olhei" parecer "olhei e recusei".
+ */
+export function aplicarDecisoes(
+  igreja: IgrejaConferida,
+  decisoes: DecisoesDaIgreja,
+): ResultadoDaDecisao {
+  const valores: Record<string, ValorDoIndicador> = {}
+  const recusados: string[] = []
+  const pendentes: string[] = []
+  const corrigidos: Array<{ id: string; de: number | null; para: number }> = []
+
+  for (const item of igreja.valores) {
+    const id = item.indicador.id
+    const decisao = decisoes[id] ?? { tipo: item.precisaConfirmar ? 'pendente' : 'aprovado' }
+
+    if (decisao.tipo === 'recusado') { recusados.push(id); continue }
+    if (decisao.tipo === 'pendente' && item.precisaConfirmar) { pendentes.push(id); continue }
+    if (decisao.tipo === 'corrigido') {
+      valores[id] = comNumero(item.valor, decisao.valor)
+      corrigidos.push({ id, de: item.numero, para: decisao.valor })
+      continue
+    }
+    valores[id] = item.valor
+  }
+  return { valores, recusados, pendentes, corrigidos }
+}
+
+/**
+ * Compatibilidade com o caminho antigo, em que só havia recusar.
+ *
+ * Mantida porque a tela e os testes já escritos a usam; ela é a mesma coisa com
+ * todo o resto aprovado.
  */
 export function aplicarRecusas(
   igreja: IgrejaConferida,
   recusados: readonly string[],
 ): { valores: Record<string, ValorDoIndicador>; recusados: string[] } {
-  const valores: Record<string, ValorDoIndicador> = {}
-  const fora: string[] = []
+  const decisoes: Record<string, DecisaoSobreValor> = {}
   for (const item of igreja.valores) {
-    if (recusados.includes(item.indicador.id)) fora.push(item.indicador.id)
-    else valores[item.indicador.id] = item.valor
+    decisoes[item.indicador.id] = recusados.includes(item.indicador.id) ? { tipo: 'recusado' } : { tipo: 'aprovado' }
   }
-  return { valores, recusados: fora }
+  const resultado = aplicarDecisoes(igreja, decisoes)
+  return { valores: resultado.valores, recusados: resultado.recusados }
 }
