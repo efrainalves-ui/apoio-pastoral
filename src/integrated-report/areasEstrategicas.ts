@@ -55,6 +55,19 @@ export const AREA_DO_INDICADOR: Readonly<Record<string, PlanningArea>> = {
   'evangelismo--numero-de-campanhas-evangelisticas-em-geral': 'discipleship',
   'acao-solidaria-adventista--numero-de-projetos-que-foram-realizados-em-favor': 'discipleship',
   'acao-solidaria-adventista--numero-de-pessoas-que-foram-beneficiadas-pelos-projetos': 'discipleship',
+  'ministerio-pessoal--pontos-de-pregacao-de-semana-santa-igreja-pgs': 'discipleship',
+  'ministerio-pessoal--total-de-amigos-presentes-na-semana-santa': 'discipleship',
+  'ministerio-da-saude--quantas-feiras-de-saude-foram-realizadas': 'discipleship',
+  'ministerio-jovem--numero-de-doadores-de-sangue-e-ou-medula': 'new_generations',
+  'children-s-ministries--numero-de-criancas-adventistas-que-participaram-da-ecf': 'new_generations',
+  'children-s-ministries--numero-de-projetos-de-discipulado-em-funcionamento': 'new_generations',
+  'children-s-ministries--numero-de-professores-e-lideres-que-concluiram-o': 'leadership',
+  'ministerio-da-mulher--numero-de-seminarios-de-capacitacao-e-treinamento-realizados': 'leadership',
+  'ministerio-da-mulher--numero-de-retiros-espirituais-e-congressos-realizados-pelo': 'identity',
+  'ministerio-da-mulher--numero-de-mulheres-adventistas-presentes-nos-retiros-espirituais': 'identity',
+  'ministerio-da-mulher--numero-de-mulheres-nao-adventistas-presentes-nos-retiros': 'discipleship',
+  'secretaria--numero-de-presentes-na-escola-sabatina': 'identity',
+  'secretaria--numero-de-presentes-no-culto-divino': 'identity',
 }
 
 export interface PontoDoGrafico {
