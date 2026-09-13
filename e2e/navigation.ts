@@ -38,6 +38,20 @@ async function clickVisibleLink(page: Page, path: string): Promise<boolean> {
   return false
 }
 
+/**
+ * Espera a rota carregar antes de afirmar o que há nela.
+ *
+ * As rotas chegam sob demanda. Enquanto o pedaço não carrega, a tela mostra o
+ * aviso de carregamento — e afirmar que o título já está visível nesse instante
+ * é afirmar algo sobre a rede, não sobre a página. Sob carga, o pedaço demora
+ * mais do que a espera padrão da asserção, e o teste cai.
+ *
+ * Esperar o aviso sumir é esperar o sinal certo, em vez de esticar o prazo.
+ */
+export async function esperarRotaCarregar(page: Page) {
+  await expect(page.locator('.app-loading')).toHaveCount(0)
+}
+
 export async function navigateInsideApp(page: Page, path: string, ready: Locator) {
   await expect(page.locator('.app-shell')).toBeVisible()
   await expect(page.locator('#conteudo')).toBeVisible()
@@ -54,15 +68,6 @@ export async function navigateInsideApp(page: Page, path: string, ready: Locator
   await expect(page).toHaveURL((url) => url.pathname === expected.pathname && url.search === expected.search)
   await expect(page.locator('.app-shell')).toBeVisible()
 
-  /*
-    A rota chega sob demanda. Enquanto o pedaço não carrega, a tela mostra o
-    aviso de carregamento — e afirmar que o título já está visível nesse
-    instante é afirmar algo sobre a rede, não sobre a página. Era esta a corrida
-    que derrubava um teste diferente a cada rodada, sempre no mesmo ajudante:
-    sob carga o pedaço demora mais do que a espera padrão da asserção.
-
-    Esperar o aviso sumir é esperar o sinal certo, em vez de esticar o prazo.
-  */
-  await expect(page.locator('.app-loading')).toHaveCount(0)
+  await esperarRotaCarregar(page)
   await expect(ready).toBeVisible()
 }

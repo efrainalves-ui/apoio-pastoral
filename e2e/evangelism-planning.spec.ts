@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { addDays, futureDate, isoDate, today } from './dates'
-import { navigateInsideApp } from './navigation'
+import { esperarRotaCarregar, navigateInsideApp } from './navigation'
 
 async function registerWithFictitiousDistrict(page: Page) {
   await page.goto('/acesso')
@@ -37,6 +37,8 @@ test('planeja uma meta e uma campanha integradas no computador e no celular', as
 
   // O acompanhamento abre sozinho depois de salvar: a meta é do distrito e as
   // igrejas, o plano, o orçamento e a agenda entram aqui.
+  // O acompanhamento é rota sob demanda: espera o carregamento antes de afirmar.
+  await esperarRotaCarregar(page)
   await expect(page.getByRole('heading', { name: 'Meta Fictícia do Planejamento' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '1. Resumo' })).toBeVisible()
 
