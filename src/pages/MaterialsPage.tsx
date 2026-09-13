@@ -171,6 +171,32 @@ export function MaterialsPage() {
       await pronto('Pedido recebido e lançado no estoque.')
     } catch (motivo) { falhou(motivo) }
   }
+  /**
+   * Devolve ao estoque o que ainda não foi entregue e reabre a divisão.
+   *
+   * Dividir errado acontece — e desfazer exigia cancelar igreja por igreja,
+   * treze vezes. O que já foi entregue não é tocado: aquilo saiu da mão do
+   * pastor e está na igreja.
+   */
+  async function refazerDivisao(material: MaterialEntity) {
+    if (!account || !masterKey) return
+    const pendentes = distributions.filter((item) => item.materialId === material.id && item.status === 'pending')
+    if (!pendentes.length) return
+    const total = pendentes.reduce((soma, item) => soma + item.planned, 0)
+    if (!window.confirm(`Devolver ao estoque ${total} de ${material.name}, que ainda não foram entregues, e dividir de novo? O que já foi entregue não muda.`)) return
+    try {
+      for (const pendente of pendentes) await service.cancelDistribution(account.id, masterKey, pendente.id)
+      const atualizadas = await service.distributions(account.id, masterKey)
+      setDistributions(atualizadas)
+      setDistribuindo(material)
+      setQuantidade(materialStock(material, atualizadas).available)
+      setManual({})
+      setNotice(`${total} devolvido(s) ao estoque. Divida de novo abaixo.`)
+      setError('')
+      irPara('distribuicao')
+    } catch (motivo) { falhou(motivo) }
+  }
+
   async function apagar(id: string, oQue: string) {
     if (!account || !masterKey || !window.confirm(`Apagar ${oQue}?`)) return
     try { await service.remove(account.id, masterKey, id); await pronto('Registro apagado.') } catch (motivo) { falhou(motivo) }
@@ -220,12 +246,24 @@ export function MaterialsPage() {
               <small>Distribuído {estoque.distributed} · a entregar {estoque.pending}</small>
             </span>
             <span className="entity-row__botoes">
-              <Button
+              {/*
+                Botão morto e calado é indistinguível de botão quebrado — e foi
+                isso que eu fiz aqui. Quando não há saldo porque tudo já está
+                dividido esperando entrega, o caminho não é bloquear: é refazer
+                a divisão, devolvendo ao estoque o que ninguém recebeu ainda.
+                Quando tudo já foi entregue, não há o que dividir mesmo, e a
+                linha diz isso em vez de oferecer um botão que não faz nada.
+              */}
+              {estoque.available > 0 && <Button
                 variant="secondary"
                 icon={<Split />}
-                disabled={estoque.available === 0}
                 onClick={() => { setDistribuindo(material); setQuantidade(estoque.available); setManual({}); irPara('distribuicao') }}
-              >Distribuir</Button>
+              >Distribuir</Button>}
+              {estoque.available === 0 && estoque.pending > 0 && <Button
+                variant="secondary"
+                icon={<Split />}
+                onClick={() => void refazerDivisao(material)}
+              >Refazer divisão</Button>}
               <Button variant="quiet" onClick={() => { setMaterialId(material.id); const { id: _id, ...dados } = material; void _id; setMaterialDraft(dados) }}>Editar</Button>
               <Button variant="danger" icon={<Trash2 />} aria-label={`Apagar material ${material.name}`} onClick={() => apagar(material.id, 'este material')} />
             </span>

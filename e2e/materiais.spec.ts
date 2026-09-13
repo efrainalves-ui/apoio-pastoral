@@ -158,3 +158,37 @@ test('quando não dá para dividir, a tela diz por quê em vez de só desligar o
   await expect(page.getByText(/Faltam \d+ para esta divisão/)).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Confirmar divisão' })).toBeEnabled()
 })
+
+/*
+  Depois de dividir tudo, não sobra saldo — e o botão Distribuir ficava morto e
+  calado, que é indistinguível de botão quebrado. Dividir errado acontece, e
+  desfazer exigia cancelar igreja por igreja, treze vezes.
+*/
+test('com tudo dividido, dá para refazer a divisão em vez de ficar travado', async ({ page }) => {
+  test.setTimeout(240_000)
+  await entrar(page)
+  await cadastrarIgreja(page, 'Fictícia Central', 'organized_church')
+  await cadastrarIgreja(page, 'Fictícia do Ponto', 'preaching_point')
+
+  await navigateInsideApp(page, '/app/materiais', page.getByRole('heading', { name: 'Materiais' }))
+  await registrarMaterial(page, MATERIAL, '30')
+
+  const linha = page.locator('.entity-row').filter({ hasText: MATERIAL })
+  await linha.getByRole('button', { name: 'Distribuir' }).click()
+  await page.getByRole('button', { name: 'Confirmar divisão' }).click()
+  await expect(page.getByText('Distribuição registrada.', { exact: false })).toBeVisible()
+
+  // Sem saldo, o Distribuir some e entra o caminho de volta.
+  await navigateInsideApp(page, '/app/materiais?aba=estoque', page.getByRole('heading', { name: 'Estoque' }))
+  const noEstoque = page.locator('.entity-row').filter({ hasText: MATERIAL })
+  await expect(noEstoque.getByRole('button', { name: 'Distribuir', exact: true })).toHaveCount(0)
+
+  page.once('dialog', (dialog) => void dialog.accept())
+  await noEstoque.getByRole('button', { name: 'Refazer divisão' }).click()
+
+  // O que não foi entregue volta ao estoque e a divisão reabre com os 30.
+  await expect(page.getByText('30 devolvido(s) ao estoque.', { exact: false })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Dividir 30 de ' + MATERIAL })).toBeVisible()
+  await expect(page.getByText('Nada esperando entrega.')).toBeVisible()
+})
+
