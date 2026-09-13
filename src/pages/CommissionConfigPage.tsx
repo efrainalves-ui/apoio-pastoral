@@ -132,14 +132,14 @@ export function CommissionConfigPage() {
       </div>
       {organized && <>
         <p>Marque quem é ancião nesta igreja. Só quem estiver marcado aqui pode presidir no lugar do pastor.</p>
-        <div className="checkbox-grid">{options.map((person) => <label className="choice-card" key={`anciao-${person.id}`}><input type="checkbox" disabled={loading} checked={elders.includes(person.id)} onChange={() => setElders(elders.includes(person.id) ? elders.filter((id) => id !== person.id) : [...elders, person.id])} /><span>{person.name}</span></label>)}</div>
+        <div className="checkbox-grid" role="group" aria-label="Anciãos da igreja">{options.map((person) => <label className="choice-card" key={`anciao-${person.id}`}><input type="checkbox" disabled={loading} checked={elders.includes(person.id)} onChange={() => setElders(elders.includes(person.id) ? elders.filter((id) => id !== person.id) : [...elders, person.id])} /><span>{person.name}</span></label>)}</div>
         {presidentMode === 'elder' && <label className="field" htmlFor="commission-elder-president"><span className="field__label">Ancião que vai presidir</span><select id="commission-elder-president" className="field__input" disabled={loading} value={president} onChange={(event) => setPresident(event.target.value)}><option value="">Selecionar</option>{options.filter((person) => elders.includes(person.id)).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>}
       </>}
     </Card>
 
     <Card title="Pessoas responsáveis">
       
-      <div className="checkbox-grid">{options.map((person) => <label className="choice-card" key={person.id}><input type="checkbox" disabled={loading} checked={members.includes(person.id)} onChange={() => setMembers(members.includes(person.id) ? members.filter((id) => id !== person.id) : [...members, person.id])} /><span>{person.name}</span></label>)}</div>
+      <div className="checkbox-grid" role="group" aria-label="Pessoas responsáveis">{options.map((person) => <label className="choice-card" key={person.id}><input type="checkbox" disabled={loading} checked={members.includes(person.id)} onChange={() => setMembers(members.includes(person.id) ? members.filter((id) => id !== person.id) : [...members, person.id])} /><span>{person.name}</span></label>)}</div>
       <label className="field" htmlFor="commission-secretary"><span className="field__label">Secretário(a)</span><select id="commission-secretary" className="field__input" disabled={loading} value={secretary} onChange={(event) => setSecretary(event.target.value)}><option value="">Selecionar</option>{options.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
       <Button disabled={loading || busy} onClick={() => void save()}>{busy ? 'Salvando…' : 'Salvar configuração'}</Button>
     </Card>

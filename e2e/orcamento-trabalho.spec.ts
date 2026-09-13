@@ -34,11 +34,13 @@ test('o Trabalho calcula o reembolso a partir dos parâmetros configurados', asy
   await page.locator('#config-fpe').fill('7000')
   await page.locator('#config-fpe-inicio').fill('2026-01-01')
   await page.locator('#config-fpe-ref').fill('Comunicado fictício 01/2026')
-  await page.getByRole('button', { name: 'Acrescentar' }).first().click()
+  await page.getByRole('button', { name: 'Acrescentar FPE' }).click()
 
   await page.locator('#config-audit').fill('80')
   await page.locator('#config-audit-inicio').fill('2026-01-01')
-  await page.getByRole('button', { name: 'Acrescentar' }).nth(1).click()
+  // Pelo nome, não pela posição: dois botões "Acrescentar" iguais eram ambíguos
+  // para o teste e para quem navega com leitor de tela.
+  await page.getByRole('button', { name: 'Acrescentar Percentual de Audit' }).click()
 
   // 7.000 × 80% = 5.600. O aplicativo calcula; ninguém digita a subsistência.
   await expect(base.getByText('R$ 5.600,00')).toBeVisible()

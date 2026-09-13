@@ -100,7 +100,14 @@ test('jornada completa e confidencial da Comissão de Nomeações', async ({ pag
   await page.getByLabel('Pastor ou líder distrital').selectOption({ label: 'Pessoa Fictícia Alfa' })
   await page.getByLabel('Presidente').selectOption({ label: 'Pessoa Fictícia Alfa' })
   await page.getByLabel('Secretário(a)').selectOption({ label: 'Pessoa Fictícia Beta' })
-  await page.getByRole('checkbox', { name: 'Pessoa Fictícia Beta' }).nth(1).check()
+  /*
+    Pelo grupo, não pela posição. As mesmas pessoas aparecem em duas listas — a
+    Comissão Organizadora e a de Nomeações —, e `.nth(1)` dependia da ordem do
+    DOM e de a página inteira já ter renderizado. Sob carga, a segunda caixa
+    ainda não existia e o clique esperava até estourar.
+  */
+  await page.getByRole('group', { name: 'Membros da Comissão de Nomeações' })
+    .getByRole('checkbox', { name: 'Pessoa Fictícia Beta' }).check()
   await page.getByRole('button', { name: 'Salvar formação' }).click()
   await expect(page.getByText('Formação da comissão salva.')).toBeVisible()
 

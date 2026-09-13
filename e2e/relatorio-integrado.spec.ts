@@ -98,3 +98,71 @@ test('igreja sem relatório não é zerada, e o traço não vira zero', async ({
   await page.getByText(/indicador\(es\) sem informação/).click()
   await expect(page.getByText('Número de Classes Bíblicas em funcionamento.')).toBeVisible()
 })
+
+/*
+  A ponte até as Metas. Um número que entra em meta muda o progresso do ano, e
+  reenviar o mesmo relatório não pode dobrar esse progresso.
+*/
+test('os estudos bíblicos alimentam a meta, e reenviar não duplica o progresso', async ({ page }) => {
+  test.setTimeout(240_000)
+  await entrar(page)
+  await cadastrarIgreja(page, NORTE.nome)
+
+  await navigateInsideApp(page, '/app/metas/relatorio-integrado', page.getByRole('heading', { name: 'Relatório Integrado' }))
+  await enviarPdf(page, 'primeiro-ficticio.pdf', relatorioIntegradoFicticio(1, [
+    { ...NORTE, pequenosGrupos: '5', campanhas: '1', estudos: '12', estudosAsa: '3' },
+  ]))
+
+  // A prévia diz qual meta recebe o quê, antes de gravar.
+  await expect(page.getByText('O que vai para as Metas')).toBeVisible()
+  await expect(page.getByText(`${NORTE.nome} · Estudos Bíblicos`)).toBeVisible()
+  await expect(page.getByText('15 · ', { exact: false })).toBeVisible()
+
+  await page.getByRole('checkbox', { name: /Conferi os números/ }).check()
+  await page.getByRole('button', { name: /Gravar 1º trimestre de 2026/ }).click()
+  await expect(page.getByText('Estudos Bíblicos: 15 no distrito.', { exact: false })).toBeVisible()
+
+  /*
+    Reenviar o mesmo relatório substitui o lançamento em vez de somar. O total do
+    distrito continua 15 — se duplicasse, seria 30. A prova de que o lançamento
+    chegou ao cofre está no teste de integração das metas; aqui prova-se que a
+    tela recalcula a partir do que foi gravado, e não do que estava na memória.
+  */
+  await enviarPdf(page, 'primeiro-ficticio.pdf', relatorioIntegradoFicticio(1, [
+    { ...NORTE, pequenosGrupos: '5', campanhas: '1', estudos: '12', estudosAsa: '3' },
+  ]))
+  await page.getByRole('checkbox', { name: /Conferi os números/ }).check()
+  await page.getByRole('button', { name: /Gravar 1º trimestre de 2026/ }).click()
+  await expect(page.getByText('Estudos Bíblicos: 15 no distrito.', { exact: false })).toBeVisible()
+  await expect(page.getByText('Estudos Bíblicos: 30 no distrito.', { exact: false })).toHaveCount(0)
+})
+
+/* Valor bloqueado na conferência não pode chegar à meta. */
+test('o valor recusado não alimenta a meta', async ({ page }) => {
+  test.setTimeout(240_000)
+  await entrar(page)
+  await cadastrarIgreja(page, NORTE.nome)
+
+  await navigateInsideApp(page, '/app/metas/relatorio-integrado', page.getByRole('heading', { name: 'Relatório Integrado' }))
+  await enviarPdf(page, 'primeiro-ficticio.pdf', relatorioIntegradoFicticio(1, [
+    { ...NORTE, pequenosGrupos: '5', campanhas: '1', estudos: '4', estudosAsa: '1' },
+  ]))
+  await page.getByRole('checkbox', { name: /Conferi os números/ }).check()
+  await page.getByRole('button', { name: /Gravar 1º trimestre de 2026/ }).click()
+  await expect(page.getByText('Estudos Bíblicos: 5 no distrito.', { exact: false })).toBeVisible()
+
+  // Segundo trimestre com salto de 4 para 40: a conferência para.
+  await enviarPdf(page, 'segundo-ficticio.pdf', relatorioIntegradoFicticio(2, [
+    { ...NORTE, pequenosGrupos: '5', campanhas: '1', estudos: '40', estudosAsa: '1' },
+  ]))
+  await expect(page.getByText('Valores fora do padrão')).toBeVisible()
+
+  // Recusado, ele sai também da prévia das metas: sobra só a ASA.
+  await page.getByRole('checkbox', { name: /Não gravar este número/ }).check()
+  await expect(page.getByText('1 · ', { exact: false }).first()).toBeVisible()
+
+  await page.getByRole('checkbox', { name: /Conferi os números/ }).check()
+  await page.getByRole('button', { name: /Gravar 2º trimestre de 2026/ }).click()
+  await expect(page.getByText('Estudos Bíblicos: 1 no distrito.', { exact: false })).toBeVisible()
+})
+

@@ -79,7 +79,7 @@ export function montarPdf(paginas: ReadonlyArray<readonly CelulaDoPdf[]>): Buffe
 
 const CLASSES = ['Bebês', 'Iniciantes', 'Infantis', 'Primários', 'Pré-Adolescentes', 'Adolescentes', 'Jovens', 'Adultos', 'Classes Bíblicas', 'Filiais', 'Total']
 
-interface DadosDaIgreja { nome: string; pequenosGrupos: string; campanhas: string; alunos: readonly string[] }
+interface DadosDaIgreja { nome: string; pequenosGrupos: string; campanhas: string; alunos: readonly string[]; estudos?: string; estudosAsa?: string }
 
 /** Reproduz o desenho do relatório: três páginas por igreja, cabeçalho repetido. */
 export function relatorioIntegradoFicticio(trimestre: number, igrejas: readonly DadosDaIgreja[]): Buffer {
@@ -120,6 +120,10 @@ export function relatorioIntegradoFicticio(trimestre: number, igrejas: readonly 
 
     escrever([
       [distrito], [titulo], [periodo],
+      ['Ministério Pessoal'],
+      ['Número de pessoas recebendo Estudos Bíblicos (por todos os métodos missionários).', igreja.estudos ?? '-'],
+      ['Ação Solidária Adventista (ASA)'],
+      ['Número de pessoas recebendo Estudos Bíblicos pela ASA.', igreja.estudosAsa ?? '-'],
       ['Evangelismo'],
       ['Número de Campanhas evangelísticas em geral.', igreja.campanhas],
       ['Número de Classes Bíblicas em funcionamento.', '-'],

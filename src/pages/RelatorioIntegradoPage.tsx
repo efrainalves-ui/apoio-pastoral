@@ -4,6 +4,9 @@ import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DistrictService } from '../district/service'
+import { GoalsService } from '../goals/service'
+import { GOAL_LABELS } from '../goals/types'
+import { lancamentosDoTrimestre, mesesDoTrimestre, METRICAS_DO_RELATORIO, totalDoDistritoNaMeta } from '../integrated-report/metas'
 import type { ChurchEntity } from '../district/types'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
 import { CATALOGO_DO_RELATORIO } from '../integrated-report/catalogo'
@@ -18,6 +21,7 @@ import { useReloadOnSync } from '../sync/useReloadOnSync'
 
 const service = new RelatorioIntegradoService()
 const districtService = new DistrictService()
+const metas = new GoalsService()
 
 function textoDoValor(item: ValorAConferir): string {
   const { valor } = item
@@ -75,6 +79,23 @@ export function RelatorioIntegradoPage() {
     [relatorios],
   )
   const pendencias = conferencia ? contarPendencias(conferencia) : null
+  const nomeDaIgrejaPorId = (id: string) => churches.find((church) => church.id === id)?.name ?? 'Igreja'
+  /*
+    A prévia das metas parte da conferência já com as recusas aplicadas: o que o
+    pastor bloqueou não pode aparecer aqui como se fosse entrar.
+  */
+  const paraMetas = useMemo(() => {
+    if (!conferencia) return []
+    const comoFicaria = conferencia.igrejas
+      .filter((igreja) => igreja.church)
+      .map((igreja) => ({
+        id: 'previa', churchId: igreja.church!.id, trimestre: conferencia.trimestre,
+        ...aplicarRecusas(igreja, recusados[igreja.nomeNoRelatorio] ?? []),
+        origem: { arquivo: conferencia.arquivo, paginas: igreja.paginas },
+        importBatchId: '', createdAt: '', updatedAt: '',
+      }))
+    return lancamentosDoTrimestre(comoFicaria, conferencia.trimestre)
+  }, [conferencia, recusados])
 
   async function escolherArquivo(arquivo: File | undefined) {
     if (!arquivo) return
@@ -125,7 +146,22 @@ export function RelatorioIntegradoPage() {
         }, existente?.id)
         gravadas += 1
       }
-      setAviso(`${rotuloDoTrimestre(conferencia.trimestre)} gravado para ${gravadas} igreja(s).`)
+      /*
+        As metas saem do que ficou gravado, não do que estava na tela.
+
+        Reler antes de lançar é o que torna o reenvio seguro: `replaceReportEntries`
+        apaga o que este relatório lançou naqueles três meses e lança de novo, então
+        enviar o mesmo arquivo duas vezes não dobra o progresso da meta. E como o
+        cálculo parte do que está guardado, repetir a operação depois de uma falha
+        chega ao mesmo resultado.
+      */
+      const guardados = await service.listar(account.id, masterKey)
+      const lancamentos = lancamentosDoTrimestre(guardados, conferencia.trimestre)
+      const { ano, meses } = mesesDoTrimestre(conferencia.trimestre)
+      await metas.replaceReportEntries(account.id, masterKey, METRICAS_DO_RELATORIO, [{ ano, meses }], lancamentos)
+
+      const total = totalDoDistritoNaMeta(lancamentos, 'bible_studies')
+      setAviso(`${rotuloDoTrimestre(conferencia.trimestre)} gravado para ${gravadas} igreja(s). ${GOAL_LABELS.bible_studies}: ${total} no distrito.`)
       setConferencia(null); setRecusados({}); setConfirmado(false)
       await carregar()
     } catch (motivo) {
@@ -182,6 +218,25 @@ export function RelatorioIntegradoPage() {
             <strong>{nome}</strong><span>Não será gravado. Cadastre a igreja com este nome e envie o PDF de novo.</span>
           </div>)}
         </div>}
+
+        {/*
+          O que vai para as metas, antes de gravar. Um número que entra em meta
+          muda o progresso do ano: o pastor precisa ver qual meta, de qual
+          indicador e quanto, enquanto ainda pode recusar.
+        */}
+        <div className="issue-list">
+          <h3>O que vai para as Metas</h3>
+          {paraMetas.length === 0
+            ? <div><strong>Nada</strong><span>Nenhuma igreja informou os indicadores que alimentam meta neste trimestre.</span></div>
+            : paraMetas.map((linha) => <div key={`${linha.churchId}-${linha.metric}`}>
+                <strong>{nomeDaIgrejaPorId(linha.churchId)} · {GOAL_LABELS[linha.metric]}</strong>
+                <span>{linha.amount} · {linha.reference.split(' · ').slice(3).join(' · ')}</span>
+              </div>)}
+          {paraMetas.length > 0 && <div>
+            <strong>Total do distrito · {GOAL_LABELS.bible_studies}</strong>
+            <span>{totalDoDistritoNaMeta(paraMetas, 'bible_studies')}, somando as igrejas acima. Reenviar este relatório substitui estes lançamentos, não os duplica.</span>
+          </div>}
+        </div>
 
         {conferencia.naoReconhecidos.length > 0 && <div className="issue-list">
           <h3>Indicadores que o catálogo não conhece</h3>

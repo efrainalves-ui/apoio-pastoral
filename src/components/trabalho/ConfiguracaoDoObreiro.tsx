@@ -123,7 +123,7 @@ export function ConfiguracaoDoObreiro({
           <input id="config-fpe-ref" className="field__input" value={referenciaDoFpe} onChange={(evento) => setReferenciaDoFpe(evento.target.value)} />
         </label>
       </div>
-      <div className="form-actions"><Button icon={<Plus />} onClick={acrescentarFpe}>Acrescentar</Button></div>
+      <div className="form-actions"><Button icon={<Plus />} aria-label="Acrescentar FPE" onClick={acrescentarFpe}>Acrescentar</Button></div>
     </Card>
 
     <Card title="Novo Percentual de Audit">
@@ -136,7 +136,7 @@ export function ConfiguracaoDoObreiro({
           <input id="config-audit-ref" className="field__input" value={referenciaDoAudit} onChange={(evento) => setReferenciaDoAudit(evento.target.value)} />
         </label>
       </div>
-      <div className="form-actions"><Button icon={<Plus />} onClick={acrescentarAudit}>Acrescentar</Button></div>
+      <div className="form-actions"><Button icon={<Plus />} aria-label="Acrescentar Percentual de Audit" onClick={acrescentarAudit}>Acrescentar</Button></div>
     </Card>
 
     <Card title="Vínculo">

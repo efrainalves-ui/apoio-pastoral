@@ -36,10 +36,15 @@ async function configureChurch(page: Page) {
   await expect(page.getByText('Em igreja organizada: pode ser escolhido um ancião, quando necessário.')).toBeVisible()
   await page.getByLabel('Quórum da Comissão Diretiva').fill('2')
   await page.getByLabel('Quórum da Reunião Administrativa').fill('3')
-  // Os membros da Comissão Diretiva ficam no segundo grupo; o primeiro é o dos anciãos.
-  await page.getByRole('checkbox', { name: 'Ana Fictícia' }).nth(1).check()
-  await page.getByRole('checkbox', { name: 'Bruno Fictício' }).nth(1).check()
-  await page.getByRole('checkbox', { name: 'Carla Fictícia' }).nth(1).check()
+  /*
+    Pelo grupo, não pela posição. As mesmas pessoas aparecem na lista de anciãos
+    e na de responsáveis, e `.nth(1)` dependia da ordem do DOM e de a página
+    inteira já ter renderizado.
+  */
+  const responsaveis = page.getByRole('group', { name: 'Pessoas responsáveis' })
+  for (const nome of ['Ana Fictícia', 'Bruno Fictício', 'Carla Fictícia']) {
+    await responsaveis.getByRole('checkbox', { name: nome }).check()
+  }
   await page.getByLabel('Secretário(a)').selectOption({ label: 'Bruno Fictício' })
   await page.getByRole('button', { name: 'Salvar configuração' }).click()
 }
