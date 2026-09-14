@@ -261,6 +261,12 @@ export function withoutPerson(payload: VaultPayload, personId: string): VaultPay
         },
       }
     }
+    case 'reminder': {
+      // Lembrete ligado à pessoa: sai só o vínculo; o lembrete é do pastor e continua.
+      const relacionado = dados.relacionado as { personId?: string | null } | undefined
+      if (relacionado?.personId !== personId) return null
+      return { ...payload, data: { ...dados, relacionado: { ...relacionado, personId: null } } }
+    }
     case 'wedding': {
       // Noiva ou noivo ligado ao cadastro: sai o vínculo e o nome; o acompanhamento do outro continua.
       const tirar = (noivo: unknown) => {
@@ -276,7 +282,7 @@ export function withoutPerson(payload: VaultPayload, personId: string): VaultPay
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  person: 'Pessoa', visit: 'Visita', wedding: 'Casamento', prayer_request: 'Pedido de oração', follow_up: 'Acompanhamento',
+  person: 'Pessoa', visit: 'Visita', wedding: 'Casamento', reminder: 'Lembrete', prayer_request: 'Pedido de oração', follow_up: 'Acompanhamento',
   task: 'Tarefa', bible_study: 'Estudo bíblico', family: 'Família', missionary_pair: 'Dupla missionária',
   sabbath_class: 'Classe da Escola Sabatina', small_group: 'Pequeno Grupo', agenda_event: 'Compromisso',
   commission_config: 'Configuração de comissão', commission_meeting: 'Reunião de comissão',
