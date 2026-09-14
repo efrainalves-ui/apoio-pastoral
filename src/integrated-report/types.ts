@@ -42,6 +42,19 @@ export interface RelatorioIntegradoData {
    * que aquele número foi visto e rejeitado, e não que ninguém o mandou.
    */
   recusados?: string[]
+  /**
+   * Valores que destoaram e ainda esperam a decisão do pastor.
+   *
+   * Guardados fora de `valores`: não alimentam meta nem total enquanto ele não
+   * confirmar, mas também não se perdem — antes, "decidir depois" descartava o
+   * número e só um novo envio do PDF o trazia de volta.
+   */
+  pendentes?: Record<string, ValorDoIndicador>
+  /**
+   * Diferenças entre o relatório e o cadastro que o pastor já conferiu, com os
+   * dois números daquele momento. Se um deles mudar, a pendência volta.
+   */
+  conferencias?: Record<string, { relatorio: number; cadastro: number; em: string }>
   importBatchId: string
   createdAt: string
   updatedAt: string
