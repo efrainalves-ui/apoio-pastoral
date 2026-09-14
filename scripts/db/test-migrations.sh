@@ -70,6 +70,7 @@ psql_migracao -f "$migrations/0007_funcao_nova_fechada_up.sql"
 psql_migracao -f "$migrations/0008_revogacao_idempotente_up.sql"
 psql_migracao -f "$migrations/0009_sessoes_fora_de_alcance_up.sql"
 psql_migracao -f "$migrations/0010_lembretes_push_up.sql"
+psql_migracao -f "$migrations/0011_lembretes_push_config_up.sql"
 
 tabelas="$(contar_tabelas)"
 if [ "$tabelas" -ne 10 ]; then
@@ -83,8 +84,10 @@ psql_migracao -f "$testes/01_rls_isolation.sql"
 psql_migracao -f "$testes/02_device_barriers.sql"
 psql_migracao -f "$testes/03_sessao_revogada.sql"
 psql_migracao -f "$testes/04_lembretes_push.sql"
+psql_migracao -f "$testes/05_lembretes_push_config.sql"
 
 echo "==> 5/7 Revertendo as migrations"
+psql_migracao -f "$migrations/0011_lembretes_push_config_down.sql"
 psql_migracao -f "$migrations/0010_lembretes_push_down.sql"
 psql_migracao -f "$migrations/0009_sessoes_fora_de_alcance_down.sql"
 psql_migracao -f "$migrations/0008_revogacao_idempotente_down.sql"
@@ -114,7 +117,8 @@ restos="$(psql_run --tuples-only --no-align -c \
                        'protecao_de_funcao_nova', 'purge_record_history',
                        'funcoes_publicas_abertas',
                        'revoke_all_devices',
-                       'app_environment');")"
+                       'app_environment',
+                       'lembretes_push_config', 'lembretes_push_guardar_vapid');")"
 if [ "$restos" -ne 0 ]; then
   echo "FALHOU: a reversão deixou $restos função(ões) das migrations para trás" >&2
   exit 1
@@ -133,6 +137,7 @@ psql_migracao -f "$migrations/0007_funcao_nova_fechada_up.sql"
 psql_migracao -f "$migrations/0008_revogacao_idempotente_up.sql"
 psql_migracao -f "$migrations/0009_sessoes_fora_de_alcance_up.sql"
 psql_migracao -f "$migrations/0010_lembretes_push_up.sql"
+psql_migracao -f "$migrations/0011_lembretes_push_config_up.sql"
 
 tabelas="$(contar_tabelas)"
 if [ "$tabelas" -ne 10 ]; then
@@ -145,6 +150,7 @@ psql_migracao -f "$testes/01_rls_isolation.sql"
 psql_migracao -f "$testes/02_device_barriers.sql"
 psql_migracao -f "$testes/03_sessao_revogada.sql"
 psql_migracao -f "$testes/04_lembretes_push.sql"
+psql_migracao -f "$testes/05_lembretes_push_config.sql"
 
 echo
 echo "Migration aplicável, reversível e reaplicável; isolamento entre contas comprovado."

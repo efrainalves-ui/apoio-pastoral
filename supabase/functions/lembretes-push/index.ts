@@ -1,18 +1,19 @@
 // Envio das notificações dos lembretes.
 //
 // Duas entradas:
-//   * agendador (pg_cron + pg_net, a cada minuto), com o segredo
-//     LEMBRETES_CRON_SECRET: envia o que venceu;
+//   * agendador (pg_cron + pg_net, a cada minuto), com o segredo do agendamento
+//     no cabeçalho Authorization: envia o que venceu;
 //   * aparelho autenticado, com { acao: 'teste', deviceId }: envia um aviso de
 //     teste só para aquele aparelho da conta.
 //
 // O aviso é sempre genérico. Este código não recebe nem lê conteúdo de
 // lembrete — o banco não tem esse conteúdo.
 //
-// Segredos só por variável de ambiente do Supabase: VAPID_PUBLIC_KEY,
-// VAPID_PRIVATE_KEY, VAPID_SUBJECT, LEMBRETES_CRON_SECRET. SUPABASE_URL e
-// SUPABASE_SERVICE_ROLE_KEY são fornecidas pela própria plataforma e nunca
-// chegam ao navegador.
+// Configuração no Vault do projeto (migration 0011), lida pelo papel do
+// servidor: par VAPID, assunto VAPID e segredo do agendamento. O par VAPID é
+// gerado aqui na primeira execução autorizada e nunca sai do servidor.
+// SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são fornecidas pela própria
+// plataforma e nunca chegam ao navegador.
 
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4'
 import webpush from 'npm:web-push@3.6.7'
@@ -22,6 +23,7 @@ const VALIDADE_S = 12 * 60 * 60
 const MAX_TENTATIVAS = 5
 
 interface Inscricao { id: string; endpoint: string; p256dh: string; auth_secret: string }
+interface Configuracao { lembretes_vapid_public?: string; lembretes_vapid_private?: string; lembretes_vapid_subject?: string; lembretes_cron_secret?: string }
 
 function env(nome: string): string {
   const valor = Deno.env.get(nome)
@@ -32,6 +34,35 @@ function env(nome: string): string {
 const resposta = (corpo: unknown, status = 200) => new Response(JSON.stringify(corpo), {
   status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type, apikey, x-client-info' },
 })
+
+/** Comparação em tempo constante: o tempo da resposta não revela quanto do segredo acertou. */
+function iguais(a: string, b: string): boolean {
+  const x = new TextEncoder().encode(a)
+  const y = new TextEncoder().encode(b)
+  let diferenca = x.length ^ y.length
+  for (let i = 0; i < Math.max(x.length, y.length); i += 1) diferenca |= (x[i] ?? 0) ^ (y[i] ?? 0)
+  return diferenca === 0
+}
+
+async function lerConfiguracao(admin: SupabaseClient): Promise<Configuracao> {
+  const { data, error } = await admin.rpc('lembretes_push_config')
+  if (error) throw error
+  return (data ?? {}) as Configuracao
+}
+
+/** O par VAPID deste projeto; gerado e guardado no Vault se ainda não existe. */
+async function prepararVapid(admin: SupabaseClient, configuracao: Configuracao): Promise<void> {
+  let atual = configuracao
+  if (!atual.lembretes_vapid_public || !atual.lembretes_vapid_private) {
+    const par = webpush.generateVAPIDKeys()
+    const { error } = await admin.rpc('lembretes_push_guardar_vapid', { chave_publica: par.publicKey, chave_privada: par.privateKey })
+    if (error) throw error
+    // Relê: se outra execução gravou primeiro, vale a dela.
+    atual = await lerConfiguracao(admin)
+  }
+  if (!atual.lembretes_vapid_public || !atual.lembretes_vapid_private || !atual.lembretes_vapid_subject) throw new Error('configuração VAPID incompleta')
+  webpush.setVapidDetails(atual.lembretes_vapid_subject, atual.lembretes_vapid_public, atual.lembretes_vapid_private)
+}
 
 async function enviar(admin: SupabaseClient, inscricoes: Inscricao[], dados: Record<string, string>): Promise<{ entregues: number; transitorias: number }> {
   let entregues = 0
@@ -93,19 +124,25 @@ Deno.serve(async (pedido) => {
   if (pedido.method === 'OPTIONS') return resposta({})
   if (pedido.method !== 'POST') return resposta({ erro: 'método' }, 405)
   try {
-    webpush.setVapidDetails(env('VAPID_SUBJECT'), env('VAPID_PUBLIC_KEY'), env('VAPID_PRIVATE_KEY'))
     const admin = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), { auth: { persistSession: false, autoRefreshToken: false } })
+    const configuracao = await lerConfiguracao(admin)
     const autorizacao = pedido.headers.get('authorization') ?? ''
 
-    const segredo = Deno.env.get('LEMBRETES_CRON_SECRET')
-    if (segredo && autorizacao === `Bearer ${segredo}`) return resposta(await enviarVencidos(admin))
+    const segredo = configuracao.lembretes_cron_secret
+    if (segredo && segredo.length >= 32 && iguais(autorizacao, `Bearer ${segredo}`)) {
+      await prepararVapid(admin, configuracao)
+      return resposta(await enviarVencidos(admin))
+    }
 
-    const { data: { user } } = await admin.auth.getUser(autorizacao.replace(/^Bearer\s+/iu, ''))
+    const token = autorizacao.replace(/^Bearer\s+/iu, '')
+    if (!token) return resposta({ erro: 'não autenticado' }, 401)
+    const { data: { user } } = await admin.auth.getUser(token)
     if (!user) return resposta({ erro: 'não autenticado' }, 401)
     const corpo = await pedido.json().catch(() => ({})) as { acao?: string; deviceId?: string }
     if (corpo.acao !== 'teste' || !corpo.deviceId) return resposta({ erro: 'pedido inválido' }, 400)
     const { data: inscricoes } = await admin.from('push_subscriptions').select('id, endpoint, p256dh, auth_secret').eq('owner_id', user.id).eq('device_id', corpo.deviceId)
     if (!inscricoes?.length) return resposta({ erro: 'aparelho sem inscrição' }, 404)
+    await prepararVapid(admin, configuracao)
     const { entregues } = await enviar(admin, inscricoes, { tag: 'apoio-pastoral-teste', url: '/app/lembretes' })
     return resposta({ entregues })
   } catch (falha) {
