@@ -3,21 +3,22 @@
 -- de envio. Roda depois de 01, 02 e 03, no mesmo Postgres descartável.
 --
 -- Nenhuma credencial, nenhum dado real: contas example.invalid, endereço de
--- entrega e chaves inventados.
+-- entrega e chaves inventados. Contas, aparelhos e sessões próprios: os da 03
+-- terminam revogados, e reaproveitá-los faria esta prova falhar pelo motivo errado.
 
 \set ON_ERROR_STOP on
 
-\set conta_e '''eeeeeeee-0000-4000-8000-000000000005'''
-\set conta_f '''ffffffff-0000-4000-8000-000000000006'''
-\set disp_e '''e1000000-0000-4000-8000-00000000000e'''
-\set disp_f '''f1000000-0000-4000-8000-00000000000f'''
+\set conta_e '''71717171-0000-4000-8000-000000000071'''
+\set conta_f '''72727272-0000-4000-8000-000000000072'''
+\set disp_e '''71d00000-0000-4000-8000-000000000071'''
+\set disp_f '''72d00000-0000-4000-8000-000000000072'''
 \set chave_e '''aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'''
 
 reset role;
 
 insert into auth.users (id, email) values
-  (:conta_e, 'conta.e.ficticia@example.invalid'),
-  (:conta_f, 'conta.f.ficticia@example.invalid')
+  (:conta_e, 'conta.lembrete.e@example.invalid'),
+  (:conta_f, 'conta.lembrete.f@example.invalid')
 on conflict (id) do nothing;
 
 set role authenticated;
@@ -26,14 +27,14 @@ set role authenticated;
 -- 1. Cada conta registra o próprio aparelho e a própria inscrição.
 -- ---------------------------------------------------------------------------
 
-set request.jwt.claims = '{"sub":"ffffffff-0000-4000-8000-000000000006","session_id":"f1a00000-0000-4000-8000-00000000000f"}';
+set request.jwt.claims = '{"sub":"72727272-0000-4000-8000-000000000072","session_id":"72a00000-0000-4000-8000-000000000072"}';
 select homologacao_testes.exigir(public.claim_device(:disp_f, 'Celular Fictício F') = 'active', 'F: aparelho ativo');
 insert into public.push_subscriptions (owner_id, device_id, endpoint, p256dh, auth_secret)
 values (:conta_f, :disp_f, 'https://push.example.invalid/f', repeat('f', 87), repeat('f', 22));
 insert into public.notification_schedule (owner_id, occurrence_key, fire_at)
 values (:conta_f, repeat('b', 64), now() + interval '1 day');
 
-set request.jwt.claims = '{"sub":"eeeeeeee-0000-4000-8000-000000000005","session_id":"e1a00000-0000-4000-8000-00000000000e"}';
+set request.jwt.claims = '{"sub":"71717171-0000-4000-8000-000000000071","session_id":"71a00000-0000-4000-8000-000000000071"}';
 select homologacao_testes.exigir(public.claim_device(:disp_e, 'Celular Fictício E') = 'active', 'E: aparelho ativo');
 insert into public.push_subscriptions (owner_id, device_id, endpoint, p256dh, auth_secret)
 values (:conta_e, :disp_e, 'https://push.example.invalid/e', repeat('e', 87), repeat('e', 22));
@@ -92,7 +93,7 @@ select homologacao_testes.exigir_recusa('select count(*) from public.notificatio
 -- ---------------------------------------------------------------------------
 
 set role authenticated;
-set request.jwt.claims = '{"sub":"eeeeeeee-0000-4000-8000-000000000005","session_id":"e1a00000-0000-4000-8000-00000000000e"}';
+set request.jwt.claims = '{"sub":"71717171-0000-4000-8000-000000000071","session_id":"71a00000-0000-4000-8000-000000000071"}';
 delete from public.push_subscriptions where device_id = :disp_e;
 select homologacao_testes.exigir((select count(*) from public.push_subscriptions) = 0, 'E remove a própria inscrição ao sair');
 
