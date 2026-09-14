@@ -377,6 +377,8 @@ select homologacao_testes.exigir(
   = array[
       'active_device_id', 'app_environment', 'approve_device', 'claim_device',
       'current_device_id', 'download_operations', 'funcoes_publicas_abertas',
+      -- Configuração das notificações (0011): só o servidor executa; prova 05.
+      'lembretes_push_config', 'lembretes_push_guardar_vapid',
       'protecao_de_funcao_nova', 'purge_record_history',
       'revoke_all_devices', 'revoke_device', 'session_is_authorized',
       'session_is_not_revoked', 'upload_operations'
