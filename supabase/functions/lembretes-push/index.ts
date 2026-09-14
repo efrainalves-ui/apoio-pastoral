@@ -149,7 +149,9 @@ Deno.serve(async (pedido) => {
     const { entregues } = await enviar(admin, inscricoes, { tag: 'apoio-pastoral-teste', url: '/app/lembretes' })
     return resposta({ entregues })
   } catch (falha) {
-    console.error('lembretes-push', falha instanceof Error ? falha.message : 'falha')
+    // Só a mensagem técnica ou o código do erro do banco; nunca cabeçalhos, corpo ou configuração.
+    const detalhe = falha instanceof Error ? falha.message : typeof falha === 'object' && falha !== null ? String((falha as { code?: unknown; message?: unknown }).code ?? (falha as { message?: unknown }).message ?? 'falha') : 'falha'
+    console.error('lembretes-push', detalhe)
     return resposta({ erro: 'falha no envio' }, 500)
   }
 })

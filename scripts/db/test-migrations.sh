@@ -71,6 +71,7 @@ psql_migracao -f "$migrations/0008_revogacao_idempotente_up.sql"
 psql_migracao -f "$migrations/0009_sessoes_fora_de_alcance_up.sql"
 psql_migracao -f "$migrations/0010_lembretes_push_up.sql"
 psql_migracao -f "$migrations/0011_lembretes_push_config_up.sql"
+psql_migracao -f "$migrations/0012_lembretes_push_servidor_up.sql"
 
 tabelas="$(contar_tabelas)"
 if [ "$tabelas" -ne 10 ]; then
@@ -87,6 +88,7 @@ psql_migracao -f "$testes/04_lembretes_push.sql"
 psql_migracao -f "$testes/05_lembretes_push_config.sql"
 
 echo "==> 5/7 Revertendo as migrations"
+psql_migracao -f "$migrations/0012_lembretes_push_servidor_down.sql"
 psql_migracao -f "$migrations/0011_lembretes_push_config_down.sql"
 psql_migracao -f "$migrations/0010_lembretes_push_down.sql"
 psql_migracao -f "$migrations/0009_sessoes_fora_de_alcance_down.sql"
@@ -138,6 +140,7 @@ psql_migracao -f "$migrations/0008_revogacao_idempotente_up.sql"
 psql_migracao -f "$migrations/0009_sessoes_fora_de_alcance_up.sql"
 psql_migracao -f "$migrations/0010_lembretes_push_up.sql"
 psql_migracao -f "$migrations/0011_lembretes_push_config_up.sql"
+psql_migracao -f "$migrations/0012_lembretes_push_servidor_up.sql"
 
 tabelas="$(contar_tabelas)"
 if [ "$tabelas" -ne 10 ]; then

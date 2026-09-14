@@ -10,6 +10,15 @@
 
 reset role;
 
+-- 0012: o servidor alcança só as duas tabelas das notificações, e só o que o envio usa.
+select homologacao_testes.exigir(has_table_privilege('service_role', 'public.push_subscriptions', 'select'), 'o servidor lê as inscrições');
+select homologacao_testes.exigir(has_table_privilege('service_role', 'public.push_subscriptions', 'delete'), 'o servidor apaga a inscrição recusada');
+select homologacao_testes.exigir(not has_table_privilege('service_role', 'public.push_subscriptions', 'insert'), 'o servidor não cria inscrição');
+select homologacao_testes.exigir(has_column_privilege('service_role', 'public.notification_schedule', 'state', 'update'), 'o servidor marca o envio');
+select homologacao_testes.exigir(not has_column_privilege('service_role', 'public.notification_schedule', 'occurrence_key', 'update'), 'o servidor não troca a chave da ocorrência');
+select homologacao_testes.exigir(not has_column_privilege('service_role', 'public.notification_schedule', 'owner_id', 'update'), 'o servidor não troca o dono do horário');
+select homologacao_testes.exigir(not has_table_privilege('service_role', 'public.encrypted_operations', 'select'), 'o servidor continua sem ler as operações cifradas');
+
 select homologacao_testes.exigir(not has_function_privilege('anon', 'public.lembretes_push_config()', 'execute'), 'anon não lê a configuração do envio');
 select homologacao_testes.exigir(not has_function_privilege('authenticated', 'public.lembretes_push_config()', 'execute'), 'conta autenticada não lê a configuração do envio');
 select homologacao_testes.exigir(not has_function_privilege('anon', 'public.lembretes_push_guardar_vapid(text, text)', 'execute'), 'anon não grava chaves');
