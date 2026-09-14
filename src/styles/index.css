@@ -905,7 +905,10 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .leitura-meta span { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
 .leitura-ano { display: flex; gap: 4px; }
 .reading-page h3 { margin: 18px 0 8px; font-size: 1rem; }
-.reading-history .form-actions { margin-top: 0; }
+.reading-history .form-actions { grid-column: 1 / -1; margin-top: 0; display: flex; flex-direction: row; flex-wrap: nowrap; justify-content: flex-start; gap: 8px; }
+.reading-history .form-actions > * { flex: 0 0 auto; width: auto; }
+.relatorio-orientacao { display: grid; gap: 10px; margin-bottom: 16px; }
+.relatorio-orientacao p, .relatorio-orientacao .alert, .relatorio-orientacao ul { margin: 0; }
 @media (max-width: 720px) {
   .leitura-metas { grid-template-columns: 1fr; }
   .reading-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -931,6 +934,9 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .reading-history article > span:first-child { display: grid; gap: 3px; }
 .reading-history small, .reading-history article > span:nth-child(2) { color: var(--muted); }
 .reading-history p { grid-column: 1 / -1; margin: 0; }
+@media (max-width: 720px) {
+  .reading-history article { grid-template-columns: 1fr; }
+}
 
 .ceremony-people, .ceremony-checklist { margin: 17px 0 0; padding: 15px; border: 1px solid var(--line); border-radius: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 .ceremony-people legend, .ceremony-checklist legend { padding: 0 7px; font-weight: 800; }
