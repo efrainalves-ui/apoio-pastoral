@@ -62,13 +62,21 @@ export function goalsReportLines(year: number, areas: GoalReportArea[], mission:
  * pessoa — um batismo, um casamento, uma dedicação anotados ali. Por isso ele
  * segue a mesma regra do itinerário: sem marcar, saem data e igreja.
  */
-export function sermonReportLines(preachings: AgendaEventEntity[], sermonCount: number, churchName: (id: string | null) => string, includeNames = false): string[] {
+export interface PregacaoSemAgendaDoRelatorio { data: string; churchId: string | null; lugar: string; titulo: string }
+
+export function sermonReportLines(preachings: AgendaEventEntity[], sermonCount: number, churchName: (id: string | null) => string, includeNames = false, anteriores: readonly PregacaoSemAgendaDoRelatorio[] = []): string[] {
+  const semAgenda = [...anteriores].sort((a, b) => (!a.data || !b.data ? Number(!a.data) - Number(!b.data) : b.data.localeCompare(a.data)))
   return [
-    `Pregações: ${preachings.length}`,
+    `Pregações: ${preachings.length + anteriores.length}`,
     ...preachings.map((event) => [
       dataCurta(event.startAt),
       churchName(event.churchId),
       ...(includeNames ? [event.sermonSnapshot?.title ?? event.title] : []),
+    ].join(' · ')),
+    ...semAgenda.map((registro) => [
+      registro.data ? dataCurta(`${registro.data}T12:00:00`) : 'Data não informada',
+      registro.churchId ? churchName(registro.churchId) : registro.lugar,
+      ...(includeNames ? [registro.titulo] : []),
     ].join(' · ')),
     `Sermões no acervo: ${sermonCount}`,
   ]
