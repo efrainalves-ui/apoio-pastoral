@@ -60,7 +60,8 @@ test('pedidos de oração, leitura e cerimônias são acessíveis no computador 
   await openMenuOnMobile(page, testInfo.project.name)
   await mainNavigation(page).getByRole('link', { name: 'Agenda', exact: true }).click()
   await page.getByRole('link', { name: 'Novo', exact: true }).click()
-  const category = page.getByLabel('Categoria')
+  // Pelo papel: a legenda da Agenda também se chama "categorias" e ainda está na tela enquanto o formulário abre.
+  const category = page.getByRole('combobox', { name: 'Categoria' })
   const campoProprio: Record<string, string> = { 'Ceia do Senhor': 'Primeiro diácono', 'Dedicação de criança': 'Nome da criança' }
   // O casamento não tem cartão próprio nem checklist na Agenda: tudo isso mora no acompanhamento do casamento.
   await category.selectOption({ label: 'Casamento' })
