@@ -3115,3 +3115,36 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 
 .status-pill--muted { background: var(--green-50); color: var(--muted); }
 .status-pill--danger { background: var(--ambar-fraca); color: var(--ambar); }
+
+/* Agenda: escolhas, busca por nome, Ceia do Senhor e pautas */
+.form-grid > .escolha-agenda, .form-grid > .busca-nomes, .form-grid > .igrejas-da-pregacao { grid-column: 1 / -1; }
+.escolha-agenda { min-width: 0; margin: 0 0 16px; padding: 0; border: 0; }
+.escolha-agenda legend { margin-bottom: 7px; padding: 0; font-weight: 700; }
+.escolha-agenda__opcoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.escolha-agenda__opcoes label { min-height: 42px; padding: 9px 13px; border: 1px solid var(--line); border-radius: 9px; display: flex; gap: 8px; align-items: center; background: var(--paper); cursor: pointer; }
+.escolha-agenda__opcoes label.ativa { border-color: var(--green-700); background: var(--green-50); font-weight: 700; }
+.escolha-agenda__opcoes label:focus-within { outline: 2px solid var(--green-700); outline-offset: 2px; }
+.busca-nomes { position: relative; min-width: 0; margin-bottom: 16px; }
+.busca-nomes > .field { margin-bottom: 0; }
+.busca-nomes__lista { position: absolute; z-index: 20; left: 0; right: 0; max-height: 260px; margin: 4px 0 0; padding: 4px; overflow-y: auto; list-style: none; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); box-shadow: 0 8px 24px rgb(14 55 40 / 14%); }
+.busca-nomes__lista li { padding: 9px 11px; border-radius: 7px; display: flex; justify-content: space-between; gap: 10px; cursor: pointer; }
+.busca-nomes__lista li.ativa, .busca-nomes__lista li:hover { background: var(--green-50); }
+.busca-nomes__lista small { color: var(--muted); }
+.busca-nomes__escolhidos { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.busca-nomes__escolhidos li { max-width: 100%; padding: 3px 3px 3px 12px; border-radius: 999px; display: flex; align-items: center; gap: 7px; background: var(--green-50); overflow-wrap: anywhere; }
+.busca-nomes__escolhidos .icon-button { width: 32px; height: 32px; min-height: 32px; }
+.marca-vinculo { padding: 1px 7px; border: 1px solid var(--line); border-radius: 999px; font-size: .72rem; font-weight: 700; white-space: nowrap; }
+.igrejas-da-pregacao { margin: 0 0 16px; display: grid; gap: 3px; }
+.ceia-responsaveis, .ceia-materiais, .pautas-comissao { min-width: 0; margin: 17px 0; padding: 15px; border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 10px; }
+.ceia-responsaveis legend, .ceia-materiais legend, .pautas-comissao legend { padding: 0 7px; font-weight: 800; }
+.ceia-responsavel, .ceia-material { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.ceia-material { grid-template-columns: minmax(140px, auto) minmax(0, 1fr) minmax(0, 1fr); }
+.pautas-comissao ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.pautas-comissao li { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.pautas-comissao__acoes { display: flex; gap: 4px; }
+.pautas-comissao__nova { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pautas-comissao__nova .field { flex: 1 1 220px; }
+.anotacao-anterior p { margin: 0; white-space: pre-wrap; }
+@media (max-width: 640px) {
+  .ceia-responsavel, .ceia-material, .pautas-comissao li { grid-template-columns: 1fr; }
+}

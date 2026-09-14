@@ -1,4 +1,5 @@
 import type { AgendaEventEntity } from '../agenda/types'
+import { igrejasDoCompromisso } from '../agenda/detalhes'
 import type { ChurchEntity } from '../district/types'
 
 export interface Preaching {
@@ -51,7 +52,7 @@ export function findExistingPreaching(
     && (event.sermonId === sermonId || event.sermonSnapshot?.id === sermonId)
     && diaLocal(event.startAt) === date
     && (churchId
-      ? event.churchId === churchId
+      ? igrejasDoCompromisso(event).includes(churchId)
       : !event.churchId && event.location.trim().toLowerCase() === place.trim().toLowerCase()),
   )
 }

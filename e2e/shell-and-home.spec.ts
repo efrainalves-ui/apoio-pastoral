@@ -61,7 +61,7 @@ test('barra inferior, atalhos do topo e botão de criar funcionam', async ({ pag
   await page.getByLabel('Categoria').selectOption({ label: 'Pregação' })
   await expect(page.getByLabel('Título')).toHaveCount(0)
   await expect(page.getByLabel('Local')).toHaveCount(0)
-  await expect(page.getByRole('combobox', { name: /^Igreja/ })).toBeVisible()
+  await expect(page.getByRole('radio', { name: 'Uma igreja do distrito' })).toBeVisible()
   await page.getByLabel('Categoria').selectOption({ label: 'Reunião' })
   await expect(page.getByLabel('Título')).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Criar' })).toHaveCount(0)

@@ -1,4 +1,5 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
+import { igrejasDoCompromisso } from '../agenda/detalhes'
 import { Archive, ArrowLeft, CalendarDays, Clock3, FileUp, History, MapPin, Pencil, Plus, Trash2, UsersRound } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -95,7 +96,7 @@ export function ChurchDetailPage() {
       setClasses(nextClasses.filter((item) => item.churchId === churchId))
       setSmallGroups(nextGroups.filter((item) => item.churchId === churchId && item.active))
       setIntegracoes(nextIntegracoes.filter((item) => item.churchId === churchId && item.active))
-      setEvents(nextEvents.filter((event) => event.churchId === churchId).sort((a, b) => a.startAt.localeCompare(b.startAt)))
+      setEvents(nextEvents.filter((event) => igrejasDoCompromisso(event).includes(churchId ?? '')).sort((a, b) => a.startAt.localeCompare(b.startAt)))
       setVisitCount(visits.filter((visit) => visit.churchId === churchId).length)
     } catch (loadError) {
       setError(messageFrom(loadError))

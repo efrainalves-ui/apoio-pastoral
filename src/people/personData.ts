@@ -234,20 +234,30 @@ export function withoutPerson(payload: VaultPayload, personId: string): VaultPay
       }
     }
     case 'agenda_event': {
-      const cerimonia = dados.ceremonyDetails as { involvedPersonIds?: string[]; parentPersonIds?: string[]; childPersonId?: string | null } | null
-      if (!cerimonia) return null
-      const citado = lista(cerimonia.involvedPersonIds).includes(personId) || lista(cerimonia.parentPersonIds).includes(personId) || cerimonia.childPersonId === personId
-      if (!citado) return null
+      const cerimonia = dados.ceremonyDetails as { involvedPersonIds?: string[]; parentPersonIds?: string[]; childPersonId?: string | null } | null | undefined
+      const dedicacao = dados.dedicacao as { responsaveis?: Array<{ personId: string | null; nome: string }> } | null | undefined
+      const ceia = dados.ceia as { responsaveis?: Array<{ personId: string | null; nome: string }> } | null | undefined
+      const naCerimonia = Boolean(cerimonia) && (lista(cerimonia!.involvedPersonIds).includes(personId) || lista(cerimonia!.parentPersonIds).includes(personId) || cerimonia!.childPersonId === personId)
+      const naDedicacao = (dedicacao?.responsaveis ?? []).some((item) => item.personId === personId)
+      const naCeia = (ceia?.responsaveis ?? []).some((item) => item.personId === personId)
+      const visitada = dados.pessoaId === personId
+      if (!naCerimonia && !naDedicacao && !naCeia && !visitada) return null
       return {
         ...payload,
         data: {
           ...dados,
-          ceremonyDetails: {
-            ...cerimonia,
-            involvedPersonIds: lista(cerimonia.involvedPersonIds).filter((id) => id !== personId),
-            parentPersonIds: lista(cerimonia.parentPersonIds).filter((id) => id !== personId),
-            childPersonId: cerimonia.childPersonId === personId ? null : cerimonia.childPersonId ?? null,
-          },
+          ...(naCerimonia ? {
+            ceremonyDetails: {
+              ...cerimonia,
+              involvedPersonIds: lista(cerimonia!.involvedPersonIds).filter((id) => id !== personId),
+              parentPersonIds: lista(cerimonia!.parentPersonIds).filter((id) => id !== personId),
+              childPersonId: cerimonia!.childPersonId === personId ? null : cerimonia!.childPersonId ?? null,
+            },
+          } : {}),
+          ...(naDedicacao ? { dedicacao: { ...dedicacao, responsaveis: dedicacao!.responsaveis!.filter((item) => item.personId !== personId) } } : {}),
+          ...(naCeia ? { ceia: { ...ceia, responsaveis: ceia!.responsaveis!.map((item) => item.personId === personId ? { ...item, personId: null, nome: '' } : item) } } : {}),
+          // "Visita — Nome" leva o nome no título: sai junto com o vínculo.
+          ...(visitada ? { pessoaId: null, visitTarget: 'none', title: typeof dados.title === 'string' ? dados.title.split(' — ')[0] : dados.title } : {}),
         },
       }
     }
@@ -493,10 +503,12 @@ const PROJECOES: Readonly<Record<string, ProjecaoCompartilhada>> = {
   },
   agenda_event: {
     contexto: ['category', 'startAt', 'endAt', 'allDay'],
-    papeis: {},
+    papeis: { pessoaId: 'pessoa do compromisso' },
     listas: {},
     internas: {
       ceremonyDetails: {},
+      dedicacao: { responsaveis: { papel: 'responsável na dedicação de criança', campos: ['nome'] } },
+      ceia: { responsaveis: { papel: 'responsável pela Ceia do Senhor', campos: ['papel', 'nome'] } },
     },
   },
 }

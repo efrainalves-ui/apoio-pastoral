@@ -61,23 +61,16 @@ test('pedidos de oração, leitura e cerimônias são acessíveis no computador 
   await mainNavigation(page).getByRole('link', { name: 'Agenda', exact: true }).click()
   await page.getByRole('link', { name: 'Novo', exact: true }).click()
   const category = page.getByLabel('Categoria')
-  for (const label of ['Batismo', 'Santa Ceia', 'Casamento', 'Dedicação de criança']) {
+  const campoProprio: Record<string, string> = { 'Ceia do Senhor': 'Primeiro diácono', Casamento: 'Noivo', 'Dedicação de criança': 'Nome da criança' }
+  for (const label of ['Batismo', 'Ceia do Senhor', 'Casamento', 'Dedicação de criança']) {
     await category.selectOption({ label })
-    await expect(page.getByRole('heading', { name: `Organização · ${label}` })).toBeVisible()
+    await expect(page.getByRole('heading', { name: label, exact: true })).toBeVisible()
     await expect(page.getByText('Checklist da cerimônia')).toBeVisible()
-
-    /*
-      O batismo fica só com o checklist: o responsável é o próprio pastor, e a
-      lista de envolvidos trazia o distrito inteiro para uma tela em que ele já
-      escolheu igreja, data e título. Nas outras a pergunta é real — quem casa,
-      quem apresenta a criança.
-    */
-    if (label === 'Batismo') {
-      await expect(page.getByLabel('Responsável')).toHaveCount(0)
-      await expect(page.getByText('Pessoas envolvidas já cadastradas')).toHaveCount(0)
-    } else {
-      await expect(page.getByLabel('Responsável')).toBeVisible()
-    }
+    // Nenhuma cerimônia é "o dia todo", e o responsável genérico e as pessoas envolvidas saíram.
+    await expect(page.getByText(/dia todo/i)).toHaveCount(0)
+    await expect(page.getByLabel('Responsável', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Pessoas envolvidas já cadastradas')).toHaveCount(0)
+    if (campoProprio[label]) await expect(page.getByLabel(campoProprio[label], { exact: true })).toBeVisible()
   }
 })
 

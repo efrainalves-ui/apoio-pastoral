@@ -42,6 +42,23 @@ describe('classificação dos registros ligados a uma pessoa', () => {
     expect(isOnlyAboutPerson(cadastro, 'p1', 'p2')).toBe(false)
   })
 
+  it('alcança a pessoa nos campos novos da Agenda: visita, dedicação e Ceia do Senhor', () => {
+    const compromisso = {
+      schemaVersion: 1, type: 'agenda_event',
+      data: {
+        category: 'visit', title: 'Visita — Pessoa Fictícia', pessoaId: 'p1', visitTarget: 'person', ceremonyDetails: null,
+        dedicacao: { crianca: 'Criança Fictícia', responsaveis: [{ personId: 'p1', nome: 'Pessoa Fictícia' }, { personId: null, nome: 'Outro Fictício' }] },
+        ceia: { responsaveis: [{ papel: 'primeiro_diacono', personId: 'p1', nome: 'Pessoa Fictícia' }, { papel: 'primeira_diaconisa', personId: 'p2', nome: 'Outra Fictícia' }] },
+      },
+    } as const
+    const sem = withoutPerson(compromisso, 'p1')!.data as Record<string, unknown>
+    expect(sem.pessoaId).toBeNull()
+    expect(sem.title).toBe('Visita')
+    expect(sem.dedicacao).toEqual({ crianca: 'Criança Fictícia', responsaveis: [{ personId: null, nome: 'Outro Fictício' }] })
+    expect(sem.ceia).toEqual({ responsaveis: [{ papel: 'primeiro_diacono', personId: null, nome: '' }, { papel: 'primeira_diaconisa', personId: 'p2', nome: 'Outra Fictícia' }] })
+    expect(withoutPerson(compromisso, 'p9')).toBeNull()
+  })
+
   it('tira a citação da pessoa sem apagar o registro dos outros', () => {
     const familia = withoutPerson({ schemaVersion: 1, type: 'family', data: { name: 'Família Fictícia', memberIds: ['p1', 'p2'] } }, 'p1')
     expect((familia?.data as { memberIds: string[] }).memberIds).toEqual(['p2'])

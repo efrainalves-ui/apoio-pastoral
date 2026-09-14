@@ -38,11 +38,14 @@ test('agenda, visita versionada e cuidado funcionam no armazenamento offline', a
   await foundation(page)
   const appointment = agendaDate()
   await navigateInsideApp(page, '/app/agenda/novo', page.getByLabel('Categoria'))
-  await page.getByLabel('Título').fill('Visita Agendada Fictícia')
-  await page.getByLabel('Início').fill(isoDateTime(appointment, 14))
-  await page.getByLabel('Término').fill(isoDateTime(appointment, 15))
+  // A visita não tem título: é achada pela pessoa, e o nome vira o texto na agenda.
+  await page.getByRole('combobox', { name: 'Pessoa ou família' }).fill('Pessoa Cuidado')
+  await page.getByRole('option', { name: /Pessoa Cuidado Fictícia/ }).click()
+  await page.getByLabel('Data', { exact: true }).fill(isoDateTime(appointment, 14).slice(0, 10))
+  await page.getByLabel('Início').fill('14:00')
+  await page.getByLabel('Término').fill('15:00')
   await page.getByRole('button', { name: 'Salvar compromisso' }).click()
-  await expect(page.getByRole('link', { name: /Abrir Visita Agendada Fictícia/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: /Abrir Visita — Pessoa Cuidado Fictícia/ }).first()).toBeVisible()
   await navigateInsideApp(page, '/app/visitacao', page.getByRole('heading', { name: 'Visitação', exact: true }))
   const visitChurch = page.getByRole('combobox', { name: /^Igreja(?:$|\s)/ })
   // A tela de destino é reconhecida pelo título: o seletor de igreja também
@@ -57,7 +60,7 @@ test('agenda, visita versionada e cuidado funcionam no armazenamento offline', a
   await page.getByLabel('Buscar membro').fill('Pessoa Cuidado')
   await page.locator('.visit-members__results').getByRole('button', { name: 'Pessoa Cuidado Fictícia' }).click()
   await expect(page.locator('.question-card').first()).toBeVisible()
-  await page.getByLabel('Agendamento vinculado').selectOption({ label: 'Visita Agendada Fictícia' })
+  await page.getByLabel('Agendamento vinculado').selectOption({ label: 'Visita — Pessoa Cuidado Fictícia' })
   // A pergunta é achada pelo texto, como o pastor a lê: o código interno não
   // aparece mais na tela, e responder é tocar no botão.
   const question = page.locator('.question-card').filter({ hasText: 'Você estudou a Bíblia hoje?' })
