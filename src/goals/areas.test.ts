@@ -89,15 +89,16 @@ describe('as quatro metas', () => {
 })
 
 describe('metas que aproveitam o que já está cadastrado', () => {
-  it('conta os estudos bíblicos iniciados no ano, sem lançamento novo', () => {
+  /* Estudos Bíblicos são por número: o cadastro por nome é opcional e não soma. */
+  it('estudos bíblicos contam os números lançados, e não o cadastro nominal', () => {
     const sources: AreaSources = { ...vazio, studies: [
       { churchId: IGREJA_A, startedAt: '2026-02-01T10:00:00.000Z' },
       { churchId: IGREJA_B, startedAt: '2026-02-20T10:00:00.000Z' },
-      { churchId: IGREJA_A, startedAt: '2025-11-01T10:00:00.000Z' },
-    ] }
+    ], entries: [lancamento({ metric: 'bible_studies', amount: 120, date: '2026-03-01' }), lancamento({ metric: 'bible_studies', amount: 9, date: '2025-12-01' })] }
 
-    expect(areaProgress('bible_studies', [], sources, ANO).result).toBe(2)
-    expect(monthlyResults('bible_studies', sources, ANO)[1]).toBe(2)
+    expect(areaProgress('bible_studies', [], sources, ANO).result).toBe(120)
+    expect(monthlyResults('bible_studies', sources, ANO)[2]).toBe(120)
+    expect(areaProgress('bible_studies', [], { ...sources, entries: [] }, ANO).result).toBe(0)
   })
 
   it('conta somente as UAPG ativas do ano', () => {
@@ -110,10 +111,10 @@ describe('metas que aproveitam o que já está cadastrado', () => {
     expect(areaProgress('uapg', [], sources, ANO).result).toBe(1)
   })
 
-  it('não usa lançamentos manuais nas áreas que já têm cadastro', () => {
-    const sources: AreaSources = { ...vazio, entries: [lancamento({ metric: 'bible_studies', amount: 99 })] }
+  it('não usa lançamentos na área de UAPG, que já tem cadastro', () => {
+    const sources: AreaSources = { ...vazio, entries: [lancamento({ metric: 'uapg', amount: 99 })] }
 
-    expect(areaResults('bible_studies', sources, ANO)).toEqual([])
+    expect(areaResults('uapg', sources, ANO)).toEqual([])
   })
 })
 
