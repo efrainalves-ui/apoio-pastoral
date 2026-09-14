@@ -76,6 +76,16 @@ export interface EvangelismCampaignData {
   name: string; objective: CampaignObjective; churchIds: string[]; startDate: string; endDate: string; location: string; address: string; responsibleGeneral: string; mainSpeaker: string; team: TeamAssignment[]; status: CampaignStatus; description: string; notes: string
   goalId: string | null; /** Toda campanha nova se apoia numa meta de estudos bíblicos e numa de batismos. */ studyGoalId?: string | null; baptismGoalId?: string | null; planningAreas: PlanningArea[]; additionalSchedule: AdditionalSchedule; mainAgendaEventId: string | null; additionalAgendaEventIds: string[]
   points: EvangelismPoint[]; tasks: EvangelismTask[]; checklist: CampaignChecklistItem[]; plannedBudget: number; budgetItems: CampaignBudgetItem[]; followUps: CampaignFollowUp[]; learnings: string; history: HistoryEntry[]; createdAt: string; updatedAt: string
+  /**
+   * Campanha declarada no Relatório Integrado e ainda sem os dados obrigatórios.
+   *
+   * O relatório só diz quantas: nome, datas e responsável não são inventados.
+   * Enquanto estiver a completar, não tem Agenda e não conta como realizada;
+   * salvar pelo formulário, com os dados preenchidos, tira a marca.
+   */
+  aCompletar?: boolean
+  /** De qual igreja, trimestre e relatório a campanha veio. */
+  origemRelatorio?: { relatorioId: string; churchId: string; trimestre: string; indice: number }
 }
 export interface EvangelismCampaignEntity extends EvangelismCampaignData { id: string }
 export type EvangelismCampaignInput = Omit<EvangelismCampaignData, 'mainAgendaEventId' | 'additionalAgendaEventIds' | 'history' | 'createdAt' | 'updatedAt'>
