@@ -49,14 +49,16 @@ alter table public.push_subscriptions enable row level security;
 alter table public.notification_schedule enable row level security;
 
 -- Cada conta enxerga só o que é seu, e só com sessão autorizada. Inscrever e
--- trocar a inscrição vale apenas para o aparelho ativo da própria sessão.
+-- trocar a inscrição vale apenas para aparelho ativo da própria conta. A
+-- conferência lê `devices`, que o cliente já alcança pela própria política, em
+-- vez de chamar uma função que não é concedida a `authenticated`.
 create policy push_subscriptions_owner_select on public.push_subscriptions
   for select using (auth.uid() = owner_id and public.session_is_authorized());
 create policy push_subscriptions_device_insert on public.push_subscriptions
-  for insert with check (auth.uid() = owner_id and public.session_is_authorized() and device_id = public.active_device_id());
+  for insert with check (auth.uid() = owner_id and public.session_is_authorized() and exists (select 1 from public.devices d where d.id = device_id and d.owner_id = auth.uid() and d.status = 'active'));
 create policy push_subscriptions_device_update on public.push_subscriptions
-  for update using (auth.uid() = owner_id and public.session_is_authorized() and device_id = public.active_device_id())
-  with check (auth.uid() = owner_id and device_id = public.active_device_id());
+  for update using (auth.uid() = owner_id and public.session_is_authorized() and exists (select 1 from public.devices d where d.id = device_id and d.owner_id = auth.uid() and d.status = 'active'))
+  with check (auth.uid() = owner_id and exists (select 1 from public.devices d where d.id = device_id and d.owner_id = auth.uid() and d.status = 'active'));
 -- Sair remove a inscrição; um aparelho revogado não remove a dos outros.
 create policy push_subscriptions_owner_delete on public.push_subscriptions
   for delete using (auth.uid() = owner_id and public.session_is_authorized());
