@@ -1,4 +1,5 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
+import { AgendaService } from '../agenda/service'
 import { CalendarPlus, Check, ChevronDown, ChevronUp, Copy, FileText, Printer, Send, Trash2 } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -15,6 +16,7 @@ import { PeopleService } from '../people/service'
 import type { PersonEntity } from '../people/types'
 
 const service = new CommissionService()
+const agendaService = new AgendaService()
 const districts = new DistrictService()
 const peopleService = new PeopleService()
 
@@ -33,6 +35,7 @@ export function CommissionMeetingPage() {
   const navigate = useNavigate()
   const { account, masterKey } = useAuthVault()
   const [meeting, setMeeting] = useState<CommissionEntity<CommissionMeetingData> | null>(null)
+  const [eventoDaAgenda, setEventoDaAgenda] = useState<string | null>(null)
   const [config, setConfig] = useState<CommissionEntity<CommissionConfigData> | null>(null)
   const [people, setPeople] = useState<PersonEntity[]>([])
   const [church, setChurch] = useState<ChurchEntity | null>(null)
@@ -52,6 +55,8 @@ export function CommissionMeetingPage() {
     const found = await service.meeting(account.id, masterKey, meetingId)
     if (!found) return
     setMeeting(found)
+    // Ligada à Agenda, a reunião mostra data, horário e local de lá; apagado o compromisso, volta a editar aqui.
+    setEventoDaAgenda(found.agendaEventId && await agendaService.getEvent(account.id, masterKey, found.agendaEventId) ? found.agendaEventId : null)
     const nextConfig = await service.config(account.id, masterKey, found.churchId)
     setConfig(nextConfig)
     setQuorum(found.kind === 'board' ? nextConfig?.boardQuorum ?? 0 : nextConfig?.administrativeQuorum ?? 0)
@@ -182,9 +187,10 @@ export function CommissionMeetingPage() {
     {tab === 'preparar' && <>
       <p className="muted no-print">Prepare tudo antes da reunião: dados, participantes e os assuntos na ordem em que serão tratados. A votação acontece na etapa seguinte.</p>
       <Card title="Dados da reunião"><div className="form-grid">
-        <label className="field"><span className="field__label">Data</span><input className="field__input" disabled={frozen} type="date" value={meeting.date} onChange={(event) => change({ date: event.target.value })} /></label>
-        <label className="field"><span className="field__label">Horário</span><input className="field__input" disabled={frozen} type="time" value={meeting.time} onChange={(event) => change({ time: event.target.value })} /></label>
-        <label className="field"><span className="field__label">Local</span><input className="field__input" disabled={frozen} value={meeting.location} onChange={(event) => change({ location: event.target.value })} /></label>
+        <label className="field"><span className="field__label">Data</span><input className="field__input" disabled={frozen || Boolean(eventoDaAgenda)} type="date" value={meeting.date} onChange={(event) => change({ date: event.target.value })} /></label>
+        <label className="field"><span className="field__label">Horário</span><input className="field__input" disabled={frozen || Boolean(eventoDaAgenda)} type="time" value={meeting.time} onChange={(event) => change({ time: event.target.value })} /></label>
+        <label className="field"><span className="field__label">Local</span><input className="field__input" disabled={frozen || Boolean(eventoDaAgenda)} value={meeting.location} onChange={(event) => change({ location: event.target.value })} /></label>
+        {eventoDaAgenda && <Link className="text-link" to={`/app/agenda/${eventoDaAgenda}/editar`}>Editar data, horário e local na Agenda</Link>}
         <label className="field" htmlFor="meeting-president"><span className="field__label">Presidente</span><select id="meeting-president" className="field__input" disabled={frozen || !organized} value={meeting.presidentId || 'pastor'} onChange={(event) => choosePresident(event.target.value)}><option value="pastor">{pastorLabel(config?.pastorName)} (padrão)</option>{organized && elders.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select><small className="field__hint">{organized ? 'Em igreja organizada, um ancião pode presidir quando necessário.' : 'Quem preside é o pastor.'}</small></label>
         <label className="field"><span className="field__label">Secretário(a)</span><select className="field__input" disabled={frozen} value={meeting.secretaryId} onChange={(event) => change({ secretaryId: event.target.value })}><option value="">Selecionar</option>{memberOptions.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
         <label className="field"><span className="field__label">Oração</span><input className="field__input" disabled={frozen} value={meeting.openingPrayer} onChange={(event) => change({ openingPrayer: event.target.value })} /></label>
