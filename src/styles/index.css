@@ -3153,3 +3153,54 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .ceia-material .confirmation-check { min-width: 0; margin: 0; padding: 11px 13px; align-items: center; }
 .ceia-material .confirmation-check input { margin-top: 0; }
 .ceia-material .field { margin-bottom: 0; }
+
+/* Casamentos: lista, acompanhamento e campos dos noivos */
+.filtros-casamentos { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0 14px; }
+.lista-casamentos { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.cartao-casamento { padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); display: grid; gap: 10px; justify-items: start; }
+.cartao-casamento__topo { width: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.cartao-casamento__topo h3 { margin: 0; overflow-wrap: anywhere; }
+.cartao-casamento__dados { width: 100%; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px 16px; }
+.cartao-casamento__dados div { min-width: 0; }
+.cartao-casamento__dados dt { color: var(--muted); font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.cartao-casamento__dados dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+.noivos-do-casamento { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 14px; }
+.noivo-do-casamento { min-width: 0; margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 12px; }
+.noivo-do-casamento legend { padding: 0 7px; font-weight: 800; }
+.aviso-duplicado { display: grid; gap: 8px; }
+.aviso-duplicado p, .aviso-duplicado ul { margin: 0; }
+.resumo-casamento { display: grid; gap: 12px; justify-items: start; }
+.resumo-casamento > .field { min-width: min(100%, 280px); margin-bottom: 0; }
+.page-casamento section { scroll-margin-top: 90px; }
+.page-casamento .tira-abas a { display: inline-grid; place-items: center; text-decoration: none; }
+.entrevistas-registradas { display: grid; gap: 10px; margin: 12px 0; }
+.entrevista-registrada { padding: 12px 14px; border-radius: 12px; background: var(--green-50); }
+.entrevista-registrada h3 { margin: 0 0 6px; font-size: 1rem; }
+.entrevista-registrada dl { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 4px 14px; }
+.entrevista-registrada dt { color: var(--muted); font-size: .8rem; }
+.entrevista-registrada dd { margin: 0; font-weight: 700; }
+.nova-entrevista { min-width: 0; margin: 16px 0 0; padding: 14px; border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 10px; }
+.nova-entrevista legend { padding: 0 7px; font-weight: 800; }
+.pergunta-do-casamento { padding-top: 10px; border-top: 1px solid var(--line); }
+.pergunta-do-casamento p { margin: 0 0 6px; }
+.orientacoes-casal { margin: 0 0 14px; padding-left: 20px; display: grid; gap: 6px; line-height: 1.5; }
+.recomendacao-da-comissao { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--green-50); font-weight: 700; }
+.checklist-casamento { width: 100%; border-collapse: collapse; }
+.checklist-casamento th, .checklist-casamento td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.checklist-casamento th[scope='row'] { font-weight: 600; }
+.checklist-casamento .field__input { min-width: 140px; }
+.historico-casamento, .pendencias-casamento { margin: 0 0 12px; padding-left: 20px; display: grid; gap: 6px; }
+.historico-casamento li { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.historico-casamento time { min-width: 90px; color: var(--muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .checklist-casamento thead { display: none; }
+  .checklist-casamento tr { display: grid; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .checklist-casamento th, .checklist-casamento td { padding: 0; border: 0; }
+}
+.form-grid > .noivos-do-casamento, .form-grid > .casamento-vinculado, .form-grid > .aviso-duplicado, .form-grid > .alert { grid-column: 1 / -1; }
+.casamento-vinculado { margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+/* A pergunta já tem o título à vista: o rótulo das opções continua para leitores de tela, sem repetir na tela. */
+.pergunta-do-casamento .escolha-agenda legend { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.aviso-atencao { padding: 12px 14px; border-radius: 12px; color: #72551d; background: #fff3d6; }
+:root[data-tema='escuro'] .aviso-atencao { color: #f3dcae; background: rgb(255 214 130 / 12%); }
+@media (prefers-color-scheme: dark) { :root:not([data-tema='claro']) .aviso-atencao { color: #f3dcae; background: rgb(255 214 130 / 12%); } }

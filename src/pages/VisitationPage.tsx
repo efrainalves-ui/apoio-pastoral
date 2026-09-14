@@ -5,6 +5,7 @@ import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { resumoDaVisitacao } from '../care/atencaoDaVisita'
 import { VisitasPorIgreja, type FiltroDaVisitacao } from '../components/VisitasPorIgreja'
+import { CasamentosLista } from '../components/casamentos/CasamentosLista'
 import type { ResumoDaVisitacao } from '../care/atencaoDaVisita'
 
 /** Cada cartão é um número e o filtro daquele número. */
@@ -47,6 +48,7 @@ const today = localDateKey
 const TABS = [
   ['visitas', 'Visitas'],
   ['acompanhamentos', 'Acompanhamentos'],
+  ['casamentos', 'Casamentos'],
   ['oracao', 'Pedidos de oração'],
   ['tarefas', 'Tarefas'],
 ] as const
@@ -88,9 +90,11 @@ export function VisitationPage() {
   const subjectName = (type: 'person' | 'family', id: string | null) => type === 'person'
     ? people.find((person) => person.id === id)?.name ?? 'Cadastro preservado'
     : families.find((family) => family.id === id)?.name ?? 'Cadastro preservado'
-  const targetName = (visit: VisitEntity) => visit.targetType === 'family'
-    ? families.find(({ id }) => id === visit.targetId)?.name
-    : people.find(({ id }) => id === visit.targetId)?.name
+  const targetName = (visit: VisitEntity) => !visit.targetId && visit.casamentoId
+    ? 'Visita de casamento'
+    : visit.targetType === 'family'
+      ? families.find(({ id }) => id === visit.targetId)?.name
+      : people.find(({ id }) => id === visit.targetId)?.name
 
   /**
    * Apagar a visita direto da lista.
@@ -191,6 +195,8 @@ export function VisitationPage() {
           <span><strong>{FOLLOW_UP_LABELS[follow.kind]}</strong><small>{subjectName(follow.subjectType, follow.subjectId)} · {follow.dueAt}</small></span>
         </button>)}</div>}
     </Card>}
+
+    {tab === 'casamentos' && <CasamentosLista churches={churches} />}
 
     {tab === 'oracao' && <PrayerRequestsPage embedded />}
 

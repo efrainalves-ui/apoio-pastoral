@@ -1,4 +1,5 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
+import { CasamentoService } from '../casamentos/service'
 import { textoDasIgrejas } from '../agenda/detalhes'
 import { BookOpen, CalendarDays, ChevronLeft, ChevronRight, Clock3, Download, Edit3, MapPin, Plus, Trash2, TriangleAlert } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
@@ -14,7 +15,7 @@ import type { ChurchEntity } from '../district/types'
 import { dayStart, diasQueAindaImportam, eventOccursOnDay, hoursForDay, moveAgendaAnchor, periodBounds, sameDay, type AgendaView } from '../agenda/calendar'
 import { localDateKey } from '../shared/dates'
 
-const agenda = new AgendaService(); const districts = new DistrictService()
+const agenda = new AgendaService(); const casamentosService = new CasamentoService(); const districts = new DistrictService()
 const VIEWS: Array<{ id: AgendaView; label: string }> = [{ id: 'day', label: 'Dia' }, { id: 'week', label: 'Semana' }, { id: 'month', label: 'Mês' }, { id: 'list', label: 'Lista' }]
 const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 function localDateTime(value: Date, hour = 8): string { return `${localDateKey(value)}T${String(hour).padStart(2, '0')}:00` }
@@ -41,7 +42,7 @@ export function AgendaPage() {
   const days = useMemo(() => { const output: Date[] = []; const cursor = dayStart(from); while (cursor <= to) { output.push(new Date(cursor)); cursor.setDate(cursor.getDate() + 1) } return output }, [from, to])
   const monthDays = useMemo(() => { const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1); const cursor = new Date(first); cursor.setDate(first.getDate() - first.getDay()); return Array.from({ length: 42 }, (_, index) => { const date = new Date(cursor); date.setDate(cursor.getDate() + index); return date }) }, [anchor])
   const label = view === 'day' ? new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(anchor) : view === 'week' || view === 'list' ? faixaDeDias(from, to) : new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(anchor)
-  async function remove(event: AgendaEventEntity) { if (!account || !masterKey || !window.confirm('Remover este compromisso?')) return; try { await agenda.deleteEvent(account.id, masterKey, event.id); await load() } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível remover.') } }
+  async function remove(event: AgendaEventEntity) { const aviso = event.casamentoId && (event.papelNoCasamento === 'cerimonia' || event.category === 'wedding') ? 'Remover só o compromisso da Agenda? O acompanhamento do casamento e o histórico continuam guardados.' : 'Remover este compromisso?'; if (!account || !masterKey || !window.confirm(aviso)) return; try { await agenda.deleteEvent(account.id, masterKey, event.id); if (event.casamentoId && (event.papelNoCasamento === 'cerimonia' || event.category === 'wedding')) { const acompanhamento = await casamentosService.obter(account.id, masterKey, event.casamentoId); if (acompanhamento) await casamentosService.salvar(account.id, masterKey, acompanhamento, 'Compromisso da cerimônia removido da Agenda') } await load() } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível remover.') } }
   function toggle(id: string) { setSelected((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next }) }
   function generatePdf() { const items = itineraryItems(events, from, to, selected, churchName); if (!items.length) { setError('Selecione ao menos um compromisso ou uma segunda-feira de folga.'); return } downloadItineraryPdf(items, view === 'day' ? displayDate(anchor.toISOString(), true) : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(from), comNomes); setError('') }
   const newEvent = (date = anchor, hour = 8) => `/app/agenda/novo?inicio=${encodeURIComponent(localDateTime(date, hour))}`

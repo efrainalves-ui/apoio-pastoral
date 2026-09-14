@@ -61,8 +61,13 @@ test('pedidos de oração, leitura e cerimônias são acessíveis no computador 
   await mainNavigation(page).getByRole('link', { name: 'Agenda', exact: true }).click()
   await page.getByRole('link', { name: 'Novo', exact: true }).click()
   const category = page.getByLabel('Categoria')
-  const campoProprio: Record<string, string> = { 'Ceia do Senhor': 'Primeiro diácono', Casamento: 'Noivo', 'Dedicação de criança': 'Nome da criança' }
-  for (const label of ['Batismo', 'Ceia do Senhor', 'Casamento', 'Dedicação de criança']) {
+  const campoProprio: Record<string, string> = { 'Ceia do Senhor': 'Primeiro diácono', 'Dedicação de criança': 'Nome da criança' }
+  // O casamento não tem cartão próprio nem checklist na Agenda: tudo isso mora no acompanhamento do casamento.
+  await category.selectOption({ label: 'Casamento' })
+  await expect(page.getByRole('radio', { name: 'Criar novo acompanhamento' })).toBeVisible()
+  await expect(page.getByText('Checklist da cerimônia')).toHaveCount(0)
+  await expect(page.getByText(/dia todo/i)).toHaveCount(0)
+  for (const label of ['Batismo', 'Ceia do Senhor', 'Dedicação de criança']) {
     await category.selectOption({ label })
     await expect(page.getByRole('heading', { name: label, exact: true })).toBeVisible()
     await expect(page.getByText('Checklist da cerimônia')).toBeVisible()

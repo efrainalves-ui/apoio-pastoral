@@ -24,10 +24,15 @@ import { FamilyService } from '../families/service'
 import { FAMILY_ROLES, FAMILY_ROLE_LABELS, nomeDaFamilia, type FamilyRole } from '../families/parentesco'
 import { PeopleService } from '../people/service'
 import type { IncomeStatus, PersonEntity } from '../people/types'
+import { possiveisDuplicados } from '../casamentos/core'
+import { CasamentoService } from '../casamentos/service'
+import type { CasamentoEntity } from '../casamentos/types'
+import { AvisoDeDuplicados, EscolhaDoCasamento, type ModoDoCasamento } from '../components/casamentos/CamposDoCasamento'
+import { CamposIniciaisDoCasamento, dadosIniciaisVazios } from './CasamentoNovoPage'
 
 const care = new CareService(); const peopleService = new PeopleService()
 const missionary = new MissionaryService()
-const families = new FamilyService(); const districts = new DistrictService(); const agenda = new AgendaService()
+const families = new FamilyService(); const districts = new DistrictService(); const agenda = new AgendaService(); const casamentosService = new CasamentoService()
 /**
  * A visita pastoral não tem hora de término para o pastor preencher: ele anota
  * quando foi, e o registro guarda a duração padrão. O término continua existindo
@@ -54,7 +59,7 @@ function localDateTime(offsetMinutes = 0): string { return localDateTimeKey(new 
 function reviewDate(): string { const date = new Date(); date.setDate(date.getDate() + 180); return localDateKey(date) }
 
 export function VisitFormPage() {
-  const { account, masterKey } = useAuthVault(); const navigate = useNavigate(); const { visitId } = useParams(); const [searchParams] = useSearchParams(); const agendaVisitId = searchParams.get('agenda'); const [people, setPeople] = useState<PersonEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [events, setEvents] = useState<AgendaEventEntity[]>([]); const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]); const [churchId, setChurchId] = useState(''); const [selectionNotice, setSelectionNotice] = useState(''); const [buscaMembro, setBuscaMembro] = useState(''); const [participants, setParticipants] = useState<VisitParticipant[]>([]); const [guestName, setGuestName] = useState(''); const [reason, setReason] = useState<VisitCompletionInput['reason']>('routine'); const [startAt, setStartAt] = useState(localDateTime()); const endAt = visitEndFrom(startAt); const [scheduledEventId, setScheduledEventId] = useState(''); const [mode, setMode] = useState<'full' | 'quick'>('full'); const [notes, setNotes] = useState(''); const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set()); const [answerValues, setAnswerValues] = useState<Record<string, string>>({}); const [incomeAnswers, setIncomeAnswers] = useState<Record<string, IncomeStatus>>({}); const [prayerText, setPrayerText] = useState(''); const [prayerReviewAt, setPrayerReviewAt] = useState(reviewDate()); const [busy, setBusy] = useState(false); const [error, setError] = useState('')
+  const { account, masterKey } = useAuthVault(); const navigate = useNavigate(); const { visitId } = useParams(); const [searchParams] = useSearchParams(); const agendaVisitId = searchParams.get('agenda'); const [people, setPeople] = useState<PersonEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [events, setEvents] = useState<AgendaEventEntity[]>([]); const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]); const [churchId, setChurchId] = useState(''); const [selectionNotice, setSelectionNotice] = useState(''); const [buscaMembro, setBuscaMembro] = useState(''); const [participants, setParticipants] = useState<VisitParticipant[]>([]); const [guestName, setGuestName] = useState(''); const [reason, setReason] = useState<VisitCompletionInput['reason']>(() => searchParams.get('casamento') ? 'wedding' : 'routine'); const [startAt, setStartAt] = useState(localDateTime()); const endAt = visitEndFrom(startAt); const [scheduledEventId, setScheduledEventId] = useState(''); const [mode, setMode] = useState<'full' | 'quick'>('full'); const [notes, setNotes] = useState(''); const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set()); const [answerValues, setAnswerValues] = useState<Record<string, string>>({}); const [incomeAnswers, setIncomeAnswers] = useState<Record<string, IncomeStatus>>({}); const [prayerText, setPrayerText] = useState(''); const [prayerReviewAt, setPrayerReviewAt] = useState(reviewDate()); const [busy, setBusy] = useState(false); const [error, setError] = useState('')
   const [visitaEmEdicao, setVisitaEmEdicao] = useState<VisitEntity | null>(null)
   const dirty = useRef(false)
   const [nextCareType, setNextCareType] = useState<'' | 'follow_up' | 'task'>('')
@@ -74,7 +79,13 @@ export function VisitFormPage() {
   // lado a lado e o cadastro da família continuava vazio.
   const [papelNaFamilia, setPapelNaFamilia] = useState<Record<string, FamilyRole | ''>>({})
   const editando = Boolean(visitId)
-  const load = useCallback(async () => { if (!account || !masterKey) return; const district = await districts.getDistrict(account.id, masterKey); const [nextPeople, nextChurches, nextEvents, nextVisitas] = await Promise.all([peopleService.listPeople(account.id, masterKey), district ? districts.listChurches(account.id, masterKey, district.id) : [], agenda.listEvents(account.id, masterKey), care.listVisits(account.id, masterKey)]); setVisitasAnteriores(nextVisitas); setPares(await missionary.listPairs(account.id, masterKey)); const visits = nextEvents.filter(({ category }) => category === 'visit'); setPeople(nextPeople); setChurches(nextChurches); setEvents(visits); const planned = visits.find(({ id }) => id === agendaVisitId); if (planned) { setScheduledEventId(planned.id); setStartAt(planned.startAt.slice(0, 16)); setChurchId(planned.churchId ?? ''); if (planned.finalidade) setReason(planned.finalidade) }
+  // Visita de casamento: vale pelo acompanhamento, o mesmo registro que a Agenda e a aba Casamentos abrem.
+  const [casamentos, setCasamentos] = useState<CasamentoEntity[]>([])
+  const [modoCasamento, setModoCasamento] = useState<ModoDoCasamento | null>(() => searchParams.get('casamento') ? 'existente' : null)
+  const [casamentoVinculado, setCasamentoVinculado] = useState<string | null>(() => searchParams.get('casamento'))
+  const [dadosCasamento, setDadosCasamento] = useState(dadosIniciaisVazios)
+  const [duplicados, setDuplicados] = useState<CasamentoEntity[]>([])
+  const load = useCallback(async () => { if (!account || !masterKey) return; const district = await districts.getDistrict(account.id, masterKey); const [nextPeople, nextChurches, nextEvents, nextVisitas] = await Promise.all([peopleService.listPeople(account.id, masterKey), district ? districts.listChurches(account.id, masterKey, district.id) : [], agenda.listEvents(account.id, masterKey), care.listVisits(account.id, masterKey)]); setVisitasAnteriores(nextVisitas); setCasamentos(await casamentosService.listar(account.id, masterKey)); setPares(await missionary.listPairs(account.id, masterKey)); const visits = nextEvents.filter(({ category }) => category === 'visit'); setPeople(nextPeople); setChurches(nextChurches); setEvents(visits); const planned = visits.find(({ id }) => id === agendaVisitId); if (planned) { setScheduledEventId(planned.id); setStartAt(planned.startAt.slice(0, 16)); setChurchId(planned.churchId ?? ''); if (planned.finalidade) setReason(planned.finalidade) }
     if (!visitId) return
     const visita = (await care.listVisits(account.id, masterKey)).find(({ id }) => id === visitId)
     if (!visita) { setError('Visita não encontrada.'); return }
@@ -170,7 +181,24 @@ export function VisitFormPage() {
     return submitNovo()
   }
 
-  async function submitNovo() { if (!account || !masterKey) return; setBusy(true); setError(''); try { const input: VisitCompletionInput = { targetType: 'person', targetId: primaryTargetId, churchId, scheduledEventId: scheduledEventId || null, mode, participants, reason, startAt, endAt, notes, answers: mode === 'quick' ? [] : buildAnswers(), prayerText, prayerReviewAt, followUp: nextCareType === 'follow_up' ? { kind: nextCareKind, dueAt: nextCareDate, notes: nextCareNotes } : null, task: nextCareType === 'task' ? { title: nextCareTitle, description: nextCareNotes, dueAt: nextCareDate, priority: nextCareUrgente ? 'high' : 'normal' } : null, incomeAnswers: Object.entries(incomeAnswers).map(([personId, status]) => ({ personId, status })), roundId: null }; const visit = await care.completeVisit(account.id, masterKey, input); await guardarDuplas(); dirty.current = false; await navigate(`/app/visitas/${visit.id}`) } catch (reasonValue) { setError(reasonValue instanceof Error ? reasonValue.message : 'Não foi possível finalizar a visita.') } finally { setBusy(false) } }
+  /**
+   * O casamento da visita: o escolhido, ou um acompanhamento criado agora.
+   * Criado, a tela passa a apontar para ele — tentar salvar de novo depois de um
+   * erro não cria um segundo. Devolve `undefined` quando parou para mostrar
+   * possíveis duplicados.
+   */
+  async function casamentoDaVisita(mesmoAssim: boolean): Promise<string | null | undefined> {
+    if (reason !== 'wedding' || !account || !masterKey) return null
+    if (modoCasamento === 'existente') { if (!casamentoVinculado) throw new Error('Escolha o casamento da visita.'); return casamentoVinculado }
+    if (modoCasamento !== 'novo') throw new Error('Vincule a visita a um casamento ou crie o acompanhamento.')
+    if (!mesmoAssim) { const encontrados = possiveisDuplicados(dadosCasamento, casamentos); if (encontrados.length) { setDuplicados(encontrados); return undefined } }
+    const dia = startAt.slice(0, 10)
+    const criado = await casamentosService.criar(account.id, masterKey, 'visitacao', { ...dadosCasamento, primeiroContato: dia, dataSolicitacao: dia })
+    setCasamentos((atual) => [criado, ...atual]); setModoCasamento('existente'); setCasamentoVinculado(criado.id); setDuplicados([])
+    return criado.id
+  }
+
+  async function submitNovo(mesmoAssim = false) { if (!account || !masterKey) return; setBusy(true); setError(''); try { const casamentoId = await casamentoDaVisita(mesmoAssim); if (casamentoId === undefined) return; const input: VisitCompletionInput = { targetType: 'person', targetId: primaryTargetId, churchId, scheduledEventId: scheduledEventId || null, casamentoId, mode, participants, reason, startAt, endAt, notes, answers: mode === 'quick' ? [] : buildAnswers(), prayerText, prayerReviewAt, followUp: nextCareType === 'follow_up' ? { kind: nextCareKind, dueAt: nextCareDate, notes: nextCareNotes } : null, task: nextCareType === 'task' ? { title: nextCareTitle, description: nextCareNotes, dueAt: nextCareDate, priority: nextCareUrgente ? 'high' : 'normal' } : null, incomeAnswers: Object.entries(incomeAnswers).map(([personId, status]) => ({ personId, status })), roundId: null }; const visit = await care.completeVisit(account.id, masterKey, input); await guardarDuplas(); dirty.current = false; await navigate(`/app/visitas/${visit.id}`) } catch (reasonValue) { setError(reasonValue instanceof Error ? reasonValue.message : 'Não foi possível finalizar a visita.') } finally { setBusy(false) } }
   return <div className="page-stack"><Link className="text-link back-link" to="/app/visitas"><ArrowLeft />Voltar às visitas</Link><header className="page-hero"><div><h1>{editando ? 'Corrigir visita' : 'Registrar visita pastoral'}</h1></div></header>{error && <div className="alert alert--error" role="alert">{error}</div>}<form onSubmit={(event) => void submit(event)} className="visit-form">
     <Card eyebrow="Contexto" title="Igreja e quem você visitou"><div className="form-grid"><label className="field" htmlFor="visit-church"><span className="field__label">Igreja</span><select id="visit-church" className="field__input" value={churchId} disabled={editando} onChange={(event) => changeChurch(event.target.value)}><option value="">Selecionar…</option>{churches.map((church) => <option key={church.id} value={church.id}>{church.name}</option>)}</select></label><label className="field"><span className="field__label">Motivo</span><select className="field__input" value={reason} onChange={(event) => setReason(event.target.value as VisitCompletionInput['reason'])}>{VISIT_REASONS.map((item) => <option key={item} value={item}>{VISIT_REASON_LABELS[item]}</option>)}</select></label><Field label="Horário da visita" name="visit-start" type="datetime-local" hint={`Duração de ${VISIT_DURATION_MINUTES} minutos, contada a partir daqui.`} value={startAt} onChange={(event) => setStartAt(event.target.value)} /></div>
       <div className="visit-members"><span className="field__label">Membros visitados</span>{!churchId ? <p className="field__hint">Escolha a igreja para ver os membros.</p> : churchPeople.length === 0 ? <p className="field__hint">Esta igreja ainda não tem pessoas cadastradas.</p> : <>
@@ -192,6 +220,12 @@ export function VisitFormPage() {
         <Link to={`/app/visitas/${visitas[0]!.visitaId}`}>Ver a anterior</Link>
       </li>)}</ul>}
       {!editando && <div className="segmented"><button type="button" className={mode === 'full' ? 'active' : ''} onClick={() => setMode('full')}>Entrevista escolhida</button><button type="button" className={mode === 'quick' ? 'active' : ''} onClick={() => setMode('quick')}>Registro rápido</button></div>}</Card>
+    {!editando && reason === 'wedding' && <Card eyebrow="Casamento" title="Acompanhamento do casamento">
+      <EscolhaDoCasamento nome="visita-casamento" modo={modoCasamento} onModo={(modo) => { setModoCasamento(modo); setDuplicados([]) }} casamentos={casamentos} casamentoId={casamentoVinculado} onCasamento={setCasamentoVinculado} />
+      {modoCasamento === 'novo' && <CamposIniciaisDoCasamento valor={dadosCasamento} onChange={(valor) => { setDadosCasamento(valor); setDuplicados([]) }} people={people} churches={churches} />}
+      <AvisoDeDuplicados duplicados={duplicados} onAbrir={(id) => { setModoCasamento('existente'); setCasamentoVinculado(id); setDuplicados([]) }} onCriarMesmoAssim={() => void submitNovo(true)} />
+    </Card>}
+    {visitaEmEdicao?.casamentoId && <Card eyebrow="Casamento" title="Acompanhamento do casamento"><Link className="button button--secondary" to={`/app/casamentos/${visitaEmEdicao.casamentoId}`}>Abrir acompanhamento do casamento</Link></Card>}
     {!editando && <Card eyebrow="Opcional" title="Vínculos e convidado"><div className="form-grid"><label className="field"><span className="field__label">Agendamento vinculado</span><select className="field__input" value={scheduledEventId} onChange={(event) => { setScheduledEventId(event.target.value); const finalidade = events.find(({ id }) => id === event.target.value)?.finalidade; if (finalidade) setReason(finalidade) }}><option value="">Visita espontânea</option>{events.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label></div><div className="inline-form"><Field label="Nome" name="guest-name" value={guestName} onChange={(event) => setGuestName(event.target.value)} /><Button type="button" variant="secondary" onClick={addGuest}>Adicionar</Button></div>{guests.length > 0 && <div className="participant-grid">{guests.map((guest) => <label key={guest.id}><input type="checkbox" checked readOnly /><span>{guest.guestName}<small>Convidado não cadastrado</small></span></label>)}</div>}</Card>}
     {mode === 'full' && <Card eyebrow="Entrevista" title="Perguntas">{questionTargets().length === 0
       ? <div className="empty-state compact-empty"><CheckCircle2 /><strong>Marque quem estava presente</strong></div>

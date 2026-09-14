@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgendaEventEntity, AgendaEventInput } from '../agenda/types'
 import { notificarDadosSincronizados } from '../sync/useReloadOnSync'
+import { casamentoVazio, noivoVazio } from '../casamentos/core'
 import { AgendaFormPage } from './AgendaFormPage'
 
 const estado = vi.hoisted(() => ({
@@ -16,6 +17,10 @@ const estado = vi.hoisted(() => ({
   processos: [] as unknown[],
   eventos: [] as AgendaEventEntity[],
   navegou: [] as string[],
+  params: 'inicio=2026-10-06T10:00',
+  casamentos: [] as unknown[],
+  casamentosCriados: [] as Array<{ origem: string; dados: Record<string, unknown>; id: string }>,
+  sincronizados: [] as string[],
 }))
 
 vi.mock('react-router-dom', async (importarOriginal) => ({
@@ -23,7 +28,7 @@ vi.mock('react-router-dom', async (importarOriginal) => ({
   useParams: () => ({ eventId: estado.eventId }),
   useNavigate: () => (destino: string) => { estado.navegou.push(destino); return Promise.resolve() },
   // Uma terça-feira: a folga de segunda não trava o botão de salvar.
-  useSearchParams: () => [new URLSearchParams('inicio=2026-10-06T10:00'), vi.fn()],
+  useSearchParams: () => [new URLSearchParams(estado.params), vi.fn()],
 }))
 
 vi.mock('../auth/AuthVaultContext', () => ({ useAuthVault: () => ({ accounts: [], account: { id: 'conta-ficticia' }, masterKey: {} as CryptoKey }) }))
@@ -64,6 +69,16 @@ vi.mock('../people/service', () => ({ PeopleService: class { listPeople = vi.fn(
 vi.mock('../families/service', () => ({ FamilyService: class { listFamilies = vi.fn(() => Promise.resolve([{ id: 'familia-1', name: 'Família Fictícia' }])) } }))
 vi.mock('../nominations/service', () => ({ NominationService: class { list = vi.fn(() => Promise.resolve(estado.processos)) } }))
 vi.mock('../evangelism/service', () => ({ EvangelismPlanningService: class { syncFromAgendaEvent = vi.fn() } }))
+vi.mock('../casamentos/service', async (importarOriginal) => ({
+  ...await importarOriginal<Record<string, unknown>>(),
+  CasamentoService: class {
+    listar = vi.fn(() => Promise.resolve(estado.casamentos))
+    criar = vi.fn((_a: string, _k: CryptoKey, origem: string, dados: Record<string, unknown>, id: string) => { estado.casamentosCriados.push({ origem, dados, id }); return Promise.resolve({ id, ...dados }) })
+    sincronizarDaAgenda = vi.fn((_a: string, _k: CryptoKey, event: AgendaEventEntity) => { estado.sincronizados.push(event.casamentoId ?? ''); return Promise.resolve(null) })
+    obter = vi.fn(() => Promise.resolve(null))
+    salvar = vi.fn()
+  },
+}))
 
 function abrir() { return render(<MemoryRouter><AgendaFormPage /></MemoryRouter>) }
 async function escolherCategoria(user: ReturnType<typeof userEvent.setup>, rotulo: string) {
@@ -75,6 +90,7 @@ const salvar = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.g
 beforeEach(() => {
   estado.eventId = undefined; estado.evento = null; estado.apagar.mockClear(); estado.navegou = []
   estado.criados = []; estado.atualizados = []; estado.vinculados = []; estado.processos = []; estado.eventos = []
+  estado.params = 'inicio=2026-10-06T10:00'; estado.casamentos = []; estado.casamentosCriados = []; estado.sincronizados = []
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
@@ -331,23 +347,91 @@ describe('Ceia do Senhor', () => {
 })
 
 describe('casamento e dedicação', () => {
-  it('casamento grava noivos, curso, comissão e datas', async () => {
+  it('casamento novo pela Agenda cria o acompanhamento e o compromisso aponta para ele', async () => {
     const user = userEvent.setup()
     abrir(); await aguardarCarregar()
     await escolherCategoria(user, 'Casamento')
-    expect(screen.queryByLabelText('Responsável')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Título')).not.toBeInTheDocument()
     expect(screen.queryByText(/Pessoas envolvidas/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Checklist da cerimônia')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: 'Criar novo acompanhamento' }))
+    await user.type(screen.getByLabelText('Nome da noiva'), 'Noiva Fictícia')
+    await user.type(screen.getByLabelText('Nome do noivo'), 'Noivo Fictício')
     await user.selectOptions(screen.getByRole('combobox', { name: 'Igreja' }), 'Igreja Central Fictícia')
-    await user.type(screen.getByLabelText('Noivo'), 'Noivo Fictício')
-    await user.type(screen.getByLabelText('Noiva'), 'Noiva Fictícia')
-    await user.click(within(screen.getByRole('group', { name: 'Fez o curso de noivos?' })).getByRole('radio', { name: 'Sim' }))
-    await user.click(within(screen.getByRole('group', { name: 'Passou pela comissão?' })).getByRole('radio', { name: 'Não' }))
-    await user.type(screen.getByLabelText('Data civil'), '2026-10-01')
+    await user.type(screen.getByLabelText('Pastor oficiante'), 'Pastor Fictício')
     await salvar(user)
-    expect(estado.criados[0]).toMatchObject({
-      title: 'Casamento — Noivo Fictício e Noiva Fictícia',
-      casamento: { noivo: 'Noivo Fictício', noiva: 'Noiva Fictícia', cursoDeNoivos: true, passouPelaComissao: false, dataCivil: '2026-10-01', dataReligiosa: '2026-10-06' },
-    })
+    const criado = estado.casamentosCriados[0]
+    expect(criado).toMatchObject({ origem: 'agenda', dados: { pastorOficiante: 'Pastor Fictício', noiva: { nome: 'Noiva Fictícia' }, cerimonia: { data: '2026-10-06', igrejaId: 'igreja-a' } } })
+    expect(estado.criados[0]).toMatchObject({ category: 'wedding', casamentoId: criado?.id, papelNoCasamento: 'cerimonia', title: 'Casamento de Noiva Fictícia e Noivo Fictício', casamento: null, allDay: false })
+  })
+
+  it('noivos já acompanhados: avisa, e só cria outro quando pedido', async () => {
+    estado.casamentos = [{ id: 'c-existente', ...casamentoVazio('casamentos'), noiva: { ...noivoVazio(), nome: 'Noiva Fictícia' }, noivo: { ...noivoVazio(), nome: 'Noivo Fictício' } }]
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Casamento')
+    await user.click(screen.getByRole('radio', { name: 'Criar novo acompanhamento' }))
+    await user.type(screen.getByLabelText('Nome da noiva'), 'noiva ficticia')
+    await user.type(screen.getByLabelText('Nome do noivo'), 'Noivo Fictício')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Igreja' }), 'Igreja Central Fictícia')
+    await salvar(user)
+    expect(screen.getByText('Já existe acompanhamento com estes noivos.')).toBeInTheDocument()
+    expect(estado.criados).toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: 'Criar outro mesmo assim' }))
+    expect(estado.casamentosCriados).toHaveLength(1)
+    expect(estado.criados).toHaveLength(1)
+  })
+
+  it('vincular a casamento existente traz data, igreja e local, e sincroniza o acompanhamento', async () => {
+    estado.casamentos = [{ id: 'c1', ...casamentoVazio('casamentos'), noiva: { ...noivoVazio(), nome: 'Ana Fictícia' }, noivo: { ...noivoVazio(), nome: 'Bruno Fictício' }, dataPretendida: '2026-11-20', igrejaPretendidaId: 'igreja-b', localPretendido: 'Salão fictício', pastorOficiante: 'Pastor Oficiante Fictício' }]
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Casamento')
+    await user.click(screen.getByRole('radio', { name: 'Vincular a casamento existente' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Casamento' }), 'c1')
+    expect(screen.getByLabelText('Data')).toHaveValue('2026-11-20')
+    expect(screen.getByRole('combobox', { name: 'Igreja' })).toHaveValue('igreja-b')
+    expect(screen.getByLabelText('Local')).toHaveValue('Salão fictício')
+    expect(screen.getByLabelText('Pastor oficiante')).toHaveValue('Pastor Oficiante Fictício')
+    await salvar(user)
+    expect(estado.criados[0]).toMatchObject({ casamentoId: 'c1', papelNoCasamento: 'cerimonia', title: 'Casamento de Ana Fictícia e Bruno Fictício' })
+    expect(estado.casamentosCriados).toHaveLength(0)
+    expect(estado.sincronizados).toEqual(['c1'])
+  })
+
+  it('não agenda duas vezes o mesmo casamento', async () => {
+    estado.casamentos = [{ id: 'c1', ...casamentoVazio('casamentos'), noiva: { ...noivoVazio(), nome: 'Ana Fictícia' } }]
+    estado.eventos = [eventoBase({ id: 'cerimonia-existente', category: 'wedding', casamentoId: 'c1', papelNoCasamento: 'cerimonia', startAt: '2026-12-01T16:00', endAt: '2026-12-01T17:00' })]
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Casamento')
+    await user.click(screen.getByRole('radio', { name: 'Vincular a casamento existente' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Casamento' }), 'c1')
+    expect(screen.getByText(/Este casamento já tem compromisso na Agenda/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Abrir compromisso na Agenda' })).toHaveAttribute('href', '/agenda/cerimonia-existente/editar'.replace(/^/, '/app'))
+    await salvar(user)
+    expect(estado.criados).toHaveLength(0)
+  })
+
+  it('aberto a partir do acompanhamento, já vem como casamento vinculado', async () => {
+    estado.params = 'inicio=2026-10-06T10:00&casamento=c1'
+    estado.casamentos = [{ id: 'c1', ...casamentoVazio('casamentos'), noiva: { ...noivoVazio(), nome: 'Ana Fictícia' }, cerimonia: { data: '2026-12-05', inicio: '15:00', fim: '16:30', igrejaId: 'igreja-a', local: 'Templo fictício' } }]
+    abrir(); await aguardarCarregar()
+    expect(screen.getByLabelText('Categoria')).toHaveValue('wedding')
+    expect(screen.getByRole('radio', { name: 'Vincular a casamento existente' })).toBeChecked()
+    expect(await screen.findByDisplayValue('2026-12-05')).toBeInTheDocument()
+    expect(screen.getByLabelText('Início')).toHaveValue('15:00')
+    expect(screen.getByLabelText('Término')).toHaveValue('16:30')
+  })
+
+  it('compromisso já ligado mostra o acompanhamento, e não pede os noivos de novo', async () => {
+    estado.eventId = 'agenda-evento-ficticio'
+    estado.casamentos = [{ id: 'c1', ...casamentoVazio('casamentos'), noiva: { ...noivoVazio(), nome: 'Ana Fictícia' }, noivo: { ...noivoVazio(), nome: 'Bruno Fictício' } }]
+    estado.evento = eventoBase({ category: 'wedding', churchId: 'igreja-a', casamentoId: 'c1', papelNoCasamento: 'cerimonia', title: 'Casamento de Ana Fictícia e Bruno Fictício' })
+    abrir()
+    expect(await screen.findByRole('link', { name: 'Abrir acompanhamento do casamento' })).toHaveAttribute('href', '/app/casamentos/c1')
+    expect(screen.queryByLabelText('Nome da noiva')).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: 'Criar novo acompanhamento' })).not.toBeInTheDocument()
   })
 
   it('dedicação: criança em texto livre, um membro pela busca e um não membro digitado', async () => {

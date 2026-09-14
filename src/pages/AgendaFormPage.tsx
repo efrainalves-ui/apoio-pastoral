@@ -4,7 +4,7 @@ import { type FormEvent, useCallback, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { responsaveisPadraoDaCeia } from '../agenda/ceia'
 import {
-  aplicarEscolhaDeIgreja, casamentoVazio, ceiaVazia, comissaoVazia, dedicacaoDoLegado, detalhesAoTrocarCategoria,
+  aplicarEscolhaDeIgreja, ceiaVazia, comissaoVazia, dedicacaoDoLegado, detalhesAoTrocarCategoria,
   encontroVazio, igrejasDoCompromisso, pedeTitulo, pessoalVazio, tituloGerado, tituloParaGravar, usaObservacoes, usaPessoaOuFamilia,
 } from '../agenda/detalhes'
 import { AgendaService, findAgendaConflicts, isMonday } from '../agenda/service'
@@ -12,10 +12,14 @@ import {
   AGENDA_CATEGORY_LABELS, CATEGORIAS_PESSOAIS, CEREMONY_CHECKLISTS, ITEM_DA_CEIA_LABELS, NEW_EVENT_CATEGORIES,
   categoryDefaults, emptyCeremonyDetails, endFollowingStart, isCeremonyCategory, isEncontroCategory, localDateTime,
   type AgendaCategory, type AgendaEventEntity, type AgendaEventInput, type AndamentoDaPauta, type CeremonyDetails,
-  type ComoDoPessoal, type DetalhesDaCeia, type DetalhesDaComissao, type DetalhesDaDedicacao, type DetalhesDoCasamento,
+  type ComoDoPessoal, type DetalhesDaCeia, type DetalhesDaComissao, type DetalhesDaDedicacao,
   type DetalhesDoPessoal, type EscolhaDeIgreja, type ItemDaCeia, type PapelNaCeia, type TipoDeComissao, type TipoDeConcilio,
 } from '../agenda/types'
 import { VinculoAgendaComissao } from '../agenda/vinculoComissao'
+import { noivoVazio, nomeDoCasal, possiveisDuplicados, tituloDaCerimonia, validarCasamento } from '../casamentos/core'
+import { CasamentoService, eCerimonia } from '../casamentos/service'
+import type { CasamentoEntity } from '../casamentos/types'
+import { AvisoDeDuplicados, CampoDoNoivo, EscolhaDoCasamento, type ModoDoCasamento } from '../components/casamentos/CamposDoCasamento'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { VISIT_REASONS, VISIT_REASON_LABELS, type VisitReason } from '../care/types'
 import { BuscaDeNomes, CamposDeEncontro, Escolha, SeletorDeIgreja, SimNao } from '../components/agenda/CamposDaAgenda'
@@ -35,13 +39,28 @@ import { SermonService } from '../sermons/service'
 import type { SermonEntity } from '../sermons/types'
 
 const agenda = new AgendaService(); const districts = new DistrictService(); const sermonsService = new SermonService(); const peopleService = new PeopleService(); const evangelism = new EvangelismPlanningService()
-const familiesService = new FamilyService(); const nominations = new NominationService(); const vinculo = new VinculoAgendaComissao()
+const familiesService = new FamilyService(); const nominations = new NominationService(); const vinculo = new VinculoAgendaComissao(); const casamentosService = new CasamentoService()
 
 function initialInput(startAt?: string): AgendaEventInput {
   const defaults = categoryDefaults('visit', startAt ? new Date(startAt) : new Date())
   const validStart = startAt && Number.isFinite(new Date(startAt).getTime()) ? startAt : defaults.startAt
   const endAt = localDateTime(new Date(new Date(validStart).getTime() + 60 * 60_000))
   return { title: '', category: 'visit', churchId: null, location: '', address: '', visitTarget: 'none', sermonId: null, sermonSnapshot: null, ceremonyDetails: null, ...defaults, startAt: validStart, endAt, notes: '', mondayException: false }
+}
+
+/** A cerimônia marcada para um casamento já acompanhado começa com o que o acompanhamento sabe: data, horário, igreja e local. */
+function preencherDoCasamento(input: AgendaEventInput, casamento: CasamentoEntity): AgendaEventInput {
+  const dia = casamento.cerimonia.data || casamento.dataPretendida
+  const proximo: AgendaEventInput = {
+    ...input, category: 'wedding',
+    churchId: casamento.cerimonia.igrejaId ?? casamento.igrejaPretendidaId ?? input.churchId,
+    location: casamento.cerimonia.local || casamento.localPretendido || input.location,
+  }
+  if (!dia) return proximo
+  const inicio = casamento.cerimonia.inicio || input.startAt.slice(11, 16)
+  const novoInicio = `${dia}T${inicio}`
+  const endAt = casamento.cerimonia.fim && casamento.cerimonia.fim > inicio ? `${dia}T${casamento.cerimonia.fim}` : endFollowingStart(input.startAt, input.endAt, novoInicio)
+  return { ...proximo, startAt: novoInicio, endAt }
 }
 
 const ESCOLHAS_DE_IGREJA: ReadonlyArray<{ valor: EscolhaDeIgreja; rotulo: string }> = [
@@ -62,29 +81,43 @@ const semAcento = (valor: string) => valor.normalize('NFD').replace(/[̀-ͯ]/g, 
 
 export function AgendaFormPage() {
   const { account, masterKey } = useAuthVault(); const { eventId } = useParams(); const [searchParams] = useSearchParams(); const navigate = useNavigate()
-  const [input, setInput] = useState(() => initialInput(searchParams.get('inicio') ?? undefined))
+  const casamentoDaUrl = searchParams.get('casamento')
+  const [input, setInput] = useState(() => {
+    const base = initialInput(searchParams.get('inicio') ?? undefined)
+    return searchParams.get('casamento') ? { ...base, category: 'wedding' as const, ceremonyDetails: emptyCeremonyDetails('wedding') } : base
+  })
   const [original, setOriginal] = useState<AgendaEventEntity | null>(null)
   const [events, setEvents] = useState<AgendaEventEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [sermons, setSermons] = useState<SermonEntity[]>([])
   const [people, setPeople] = useState<PersonEntity[]>([]); const [families, setFamilies] = useState<FamilyEntity[]>([]); const [processos, setProcessos] = useState<NominationProcessEntity[]>([])
   const [error, setError] = useState(''); const [outraIgreja, setOutraIgreja] = useState(false); const [busy, setBusy] = useState(false)
   const [naoMembro, setNaoMembro] = useState<string | null>(null); const [novaPauta, setNovaPauta] = useState('')
+  const [casamentos, setCasamentos] = useState<CasamentoEntity[]>([])
+  const [modoCasamento, setModoCasamento] = useState<ModoDoCasamento | null>(() => casamentoDaUrl ? 'existente' : null)
+  const [casamentoEscolhido, setCasamentoEscolhido] = useState<string | null>(casamentoDaUrl)
+  const [novoCasal, setNovoCasal] = useState(() => ({ noiva: noivoVazio(), noivo: noivoVazio() }))
+  /** `null` enquanto não foi mexido: vale o oficiante do acompanhamento. */
+  const [oficiante, setOficiante] = useState<string | null>(null)
+  const [duplicados, setDuplicados] = useState<CasamentoEntity[]>([])
   const dirty = useRef(false)
 
   const load = useCallback(async () => {
     if (!account || !masterKey) return
     const district = await districts.getDistrict(account.id, masterKey)
-    const [nextEvents, nextChurches, current, nextSermons, nextPeople, nextFamilies, nextProcessos] = await Promise.all([
+    const [nextEvents, nextChurches, current, nextSermons, nextPeople, nextFamilies, nextProcessos, nextCasamentos] = await Promise.all([
       agenda.listEvents(account.id, masterKey), district ? districts.listChurches(account.id, masterKey, district.id) : [],
       eventId ? agenda.getEvent(account.id, masterKey, eventId) : null, sermonsService.list(account.id, masterKey),
       peopleService.listPeople(account.id, masterKey), familiesService.listFamilies(account.id, masterKey), nominations.list(account.id, masterKey),
+      casamentosService.listar(account.id, masterKey),
     ])
-    setEvents(nextEvents); setChurches(nextChurches); setSermons(nextSermons); setPeople(nextPeople); setFamilies(nextFamilies); setProcessos(nextProcessos)
+    setEvents(nextEvents); setChurches(nextChurches); setSermons(nextSermons); setPeople(nextPeople); setFamilies(nextFamilies); setProcessos(nextProcessos); setCasamentos(nextCasamentos)
+    const casamentoPedido = !eventId && !dirty.current && casamentoDaUrl ? nextCasamentos.find(({ id }) => id === casamentoDaUrl) : undefined
+    if (casamentoPedido) setInput((atual) => preencherDoCasamento(atual, casamentoPedido))
     if (current && !dirty.current) {
       const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...data } = current; void _id; void _createdAt; void _updatedAt
       setOriginal(current); setInput(data)
-      setOutraIgreja(isCeremonyCategory(data.category) && !data.churchId && Boolean(data.location.trim()))
+      setOutraIgreja(isCeremonyCategory(data.category) && data.category !== 'wedding' && !data.churchId && Boolean(data.location.trim()))
     }
-  }, [account, eventId, masterKey])
+  }, [account, casamentoDaUrl, eventId, masterKey])
   const hasUnsavedChanges = useCallback(() => dirty.current, [])
   useReloadOnSync(load, hasUnsavedChanges, () => { if (window.confirm('Chegaram alterações de outro aparelho. Seu preenchimento foi preservado. Deseja descartá-lo e carregar a versão sincronizada?')) { dirty.current = false; void load() } })
   const conflicts = useMemo(() => { try { return findAgendaConflicts(input, events, eventId) } catch { return [] } }, [eventId, events, input])
@@ -163,8 +196,18 @@ export function AgendaFormPage() {
     mudarCeia((atual) => ({ ...atual, responsaveis: atual.responsaveis.map((item, posicao) => posicao === indice ? { ...item, nome, personId: pessoa?.id ?? null } : item) }))
   }
 
-  const casamento = input.casamento ?? casamentoVazio()
-  function mudarCasamento(changes: Partial<DetalhesDoCasamento>) { mudar((current) => ({ ...current, casamento: { ...(current.casamento ?? casamentoVazio()), ...changes } })) }
+  /* Casamento: o compromisso é a cerimônia de um acompanhamento; nomes e oficiante moram lá, e não aqui. */
+  const casamentoAlvo = input.casamentoId
+    ? casamentos.find(({ id }) => id === input.casamentoId)
+    : modoCasamento === 'existente' ? casamentos.find(({ id }) => id === casamentoEscolhido) : undefined
+  const cerimoniaExistente = input.category === 'wedding' && casamentoAlvo
+    ? events.find((item) => item.casamentoId === casamentoAlvo.id && eCerimonia(item) && item.id !== eventId)
+    : undefined
+  function escolherCasamento(id: string | null) {
+    setCasamentoEscolhido(id); setOficiante(null)
+    const alvo = casamentos.find((item) => item.id === id)
+    if (alvo) mudar((current) => preencherDoCasamento(current, alvo))
+  }
 
   const dedicacao = input.dedicacao ?? dedicacaoDoLegado(input.ceremonyDetails, nomeDaPessoa)
   function mudarDedicacao(transformar: (atual: DetalhesDaDedicacao) => DetalhesDaDedicacao) {
@@ -209,11 +252,17 @@ export function AgendaFormPage() {
    */
   async function excluir() {
     if (!account || !masterKey || !eventId) return
-    if (!window.confirm('Remover este compromisso?')) return
+    // Remover a cerimônia não apaga o acompanhamento: o casamento e o histórico continuam.
+    const cerimoniaDoCasamento = original?.casamentoId && eCerimonia(original) ? original.casamentoId : null
+    if (!window.confirm(cerimoniaDoCasamento ? 'Remover só o compromisso da Agenda? O acompanhamento do casamento e o histórico continuam guardados.' : 'Remover este compromisso?')) return
     setBusy(true)
     setError('')
     try {
       await agenda.deleteEvent(account.id, masterKey, eventId)
+      if (cerimoniaDoCasamento) {
+        const acompanhamento = await casamentosService.obter(account.id, masterKey, cerimoniaDoCasamento)
+        if (acompanhamento) await casamentosService.salvar(account.id, masterKey, acompanhamento, 'Compromisso da cerimônia removido da Agenda')
+      }
       await navigate('/app/agenda')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível remover o compromisso.')
@@ -222,7 +271,7 @@ export function AgendaFormPage() {
   }
 
   async function submit(event: FormEvent) { event.preventDefault(); await salvar('/app/agenda') }
-  async function salvar(destino: string) {
+  async function salvar(destino: string, mesmoAssim = false) {
     if (!account || !masterKey) return
     setBusy(true); setError('')
     try {
@@ -231,7 +280,6 @@ export function AgendaFormPage() {
       if (category === 'preaching') paraGravar = { ...paraGravar, escolhaDeIgreja: escolhaDaPregacao, churchIds: escolhaDaPregacao === 'outra' ? [] : igrejasDoCompromisso(paraGravar) }
       if (category === 'committee') paraGravar.comissao = comissao
       if (category === 'communion') paraGravar.ceia = { ...ceia, responsaveis: responsaveisDaCeia }
-      if (category === 'wedding') paraGravar.casamento = { ...casamento, dataReligiosa: data }
       if (category === 'child_dedication') paraGravar.dedicacao = dedicacao
       if (category === 'personal') paraGravar.pessoal = pessoal
       if (isEncontroCategory(category)) paraGravar.encontro = input.encontro ?? encontroVazio(category)
@@ -239,9 +287,38 @@ export function AgendaFormPage() {
       // O título antigo só é mantido quando foi o pastor quem o escreveu.
       const tituloAnterior = original && original.title !== tituloGerado(original, contexto) ? original.title : ''
       paraGravar.title = tituloParaGravar(paraGravar, contexto, tituloAnterior)
+      let novoCasamentoId: string | null = null
+      if (category === 'wedding') {
+        if (!original?.casamento) paraGravar.casamento = null
+        if (!paraGravar.casamentoId) {
+          if (modoCasamento === 'existente') {
+            if (!casamentoEscolhido) throw new Error('Escolha o casamento deste compromisso.')
+            paraGravar.casamentoId = casamentoEscolhido
+          } else if (modoCasamento === 'novo') {
+            validarCasamento(novoCasal)
+            if (!mesmoAssim) { const encontrados = possiveisDuplicados(novoCasal, casamentos); if (encontrados.length) { setDuplicados(encontrados); return } }
+            // O compromisso nasce apontando para o acompanhamento, que é gravado logo depois com este mesmo identificador.
+            novoCasamentoId = crypto.randomUUID()
+            paraGravar.casamentoId = novoCasamentoId
+          } else throw new Error('Vincule o compromisso a um casamento ou crie o acompanhamento.')
+        }
+        paraGravar.papelNoCasamento = 'cerimonia'
+        if (cerimoniaExistente) throw new Error('Este casamento já tem compromisso na Agenda.')
+        const casal = novoCasamentoId ? novoCasal : casamentos.find(({ id }) => id === paraGravar.casamentoId)
+        if (casal) paraGravar.title = tituloDaCerimonia(casal)
+      }
       const saved = eventId ? await agenda.updateEvent(account.id, masterKey, eventId, paraGravar) : await agenda.createEvent(account.id, masterKey, paraGravar)
       if (saved.linkedSource) await evangelism.syncFromAgendaEvent(account.id, masterKey, saved)
       if (saved.category === 'committee') await vinculo.vincular(account.id, masterKey, saved)
+      if (novoCasamentoId) {
+        await casamentosService.criar(account.id, masterKey, 'agenda', {
+          ...novoCasal, pastorOficiante: oficiante ?? '',
+          cerimonia: { data: saved.startAt.slice(0, 10), inicio: saved.startAt.slice(11, 16), fim: saved.endAt.slice(11, 16), igrejaId: saved.churchId, local: saved.location },
+        }, novoCasamentoId)
+      } else if (saved.category === 'wedding' && saved.casamentoId) {
+        const atualizado = await casamentosService.sincronizarDaAgenda(account.id, masterKey, saved)
+        if (atualizado && oficiante !== null && oficiante !== atualizado.pastorOficiante) await casamentosService.salvar(account.id, masterKey, { ...atualizado, pastorOficiante: oficiante }, 'Pastor oficiante alterado na Agenda')
+      }
       dirty.current = false
       await navigate(destino)
     } catch (reason) {
@@ -312,10 +389,24 @@ export function AgendaFormPage() {
           {category === 'travel' && <Field label="Endereço" name="agenda-address" value={input.address} onChange={(changeEvent) => patch({ address: changeEvent.target.value })} maxLength={300} />}
         </>}
 
-        {ceremonyCategory && <>
+        {ceremonyCategory && category !== 'wedding' && <>
           <SeletorDeIgreja churches={churches} valor={input.churchId} obrigatorio outra={outraIgreja} onOutra={escolherOutraIgreja} onChange={escolherIgreja} />
           {outraIgreja && <Field label="Nome da igreja" name="agenda-other-church" value={input.location} onChange={(changeEvent) => patch({ location: changeEvent.target.value })} maxLength={160} required />}
-          {category === 'wedding' && <Field label="Local" name="agenda-address" value={input.address} onChange={(changeEvent) => patch({ address: changeEvent.target.value })} maxLength={300} />}
+        </>}
+
+        {category === 'wedding' && <>
+          {input.casamentoId
+            ? <div className="casamento-vinculado"><strong>{casamentoAlvo ? nomeDoCasal(casamentoAlvo) : 'Casamento'}</strong><Link className="button button--secondary" to={`/app/casamentos/${input.casamentoId}`}>Abrir acompanhamento do casamento</Link></div>
+            : <EscolhaDoCasamento nome="agenda-casamento" modo={modoCasamento} onModo={(modo) => { dirty.current = true; setModoCasamento(modo); setDuplicados([]) }} casamentos={casamentos} casamentoId={casamentoEscolhido} onCasamento={escolherCasamento} />}
+          {!input.casamentoId && modoCasamento === 'novo' && <div className="noivos-do-casamento">
+            <CampoDoNoivo papel="noiva" valor={novoCasal.noiva} onChange={(noiva) => { dirty.current = true; setDuplicados([]); setNovoCasal((atual) => ({ ...atual, noiva })) }} people={people} churches={churches} />
+            <CampoDoNoivo papel="noivo" valor={novoCasal.noivo} onChange={(noivo) => { dirty.current = true; setDuplicados([]); setNovoCasal((atual) => ({ ...atual, noivo })) }} people={people} churches={churches} />
+          </div>}
+          {!input.casamentoId && <AvisoDeDuplicados duplicados={duplicados} onAbrir={(id) => { setModoCasamento('existente'); setDuplicados([]); escolherCasamento(id) }} onCriarMesmoAssim={() => void salvar('/app/agenda', true)} />}
+          {cerimoniaExistente && <div className="alert aviso-atencao" role="alert">Este casamento já tem compromisso na Agenda. <Link className="text-link" to={`/app/agenda/${cerimoniaExistente.id}/editar`}>Abrir compromisso na Agenda</Link></div>}
+          <SeletorDeIgreja churches={churches} valor={input.churchId} onChange={escolherIgreja} />
+          <Field label="Local" name="agenda-location" value={input.location} onChange={(changeEvent) => patch({ location: changeEvent.target.value })} maxLength={160} />
+          <Field label="Pastor oficiante" name="casamento-oficiante" value={oficiante ?? casamentoAlvo?.pastorOficiante ?? ''} onChange={(changeEvent) => { dirty.current = true; setOficiante(changeEvent.target.value) }} maxLength={120} />
         </>}
 
         {category === 'personal' && <>
@@ -328,7 +419,7 @@ export function AgendaFormPage() {
           {pessoal.como === 'outra' && <Field label="Como será?" name="pessoal-como-outro" value={pessoal.comoOutro} onChange={(changeEvent) => mudarPessoal({ comoOutro: changeEvent.target.value })} maxLength={120} required />}
         </>}
 
-        <Field label={category === 'wedding' ? 'Data religiosa' : 'Data'} name="agenda-date" type="date" value={data} required onChange={(changeEvent) => { if (changeEvent.target.value) mudarInicioPara(`${changeEvent.target.value}T${inicio}`) }} />
+        <Field label="Data" name="agenda-date" type="date" value={data} required onChange={(changeEvent) => { if (changeEvent.target.value) mudarInicioPara(`${changeEvent.target.value}T${inicio}`) }} />
         <Field label="Início" name="agenda-start" type="time" value={inicio} required onChange={(changeEvent) => { if (changeEvent.target.value) mudarInicioPara(`${data}T${changeEvent.target.value}`) }} />
         <Field label="Término" name="agenda-end" type="time" value={fim} required onChange={(changeEvent) => { if (changeEvent.target.value) patch({ endAt: `${dataFim}T${changeEvent.target.value}` }) }} />
         {dataFim !== data && <Field label="Data de término" name="agenda-end-date" type="date" value={dataFim} required onChange={(changeEvent) => { if (changeEvent.target.value) patch({ endAt: `${changeEvent.target.value}T${fim}` }) }} />}
@@ -356,7 +447,7 @@ export function AgendaFormPage() {
         </fieldset>}
       </Card>}
 
-      {ceremony && ceremonyCategory && <Card title={AGENDA_CATEGORY_LABELS[ceremonyCategory]}>
+      {ceremony && ceremonyCategory && ceremonyCategory !== 'wedding' && <Card title={AGENDA_CATEGORY_LABELS[ceremonyCategory]}>
         {ceremonyCategory === 'communion' && <>
           <fieldset className="ceia-responsaveis"><legend>Responsáveis</legend>
             <datalist id="ceia-pessoas">{pessoasDaIgreja.map((person) => <option key={person.id} value={person.name} />)}</datalist>
@@ -377,14 +468,6 @@ export function AgendaFormPage() {
             </div> })}
           </fieldset>}
         </>}
-
-        {ceremonyCategory === 'wedding' && <div className="form-grid">
-          <Field label="Noivo" name="casamento-noivo" value={casamento.noivo} maxLength={120} required onChange={(changeEvent) => mudarCasamento({ noivo: changeEvent.target.value })} />
-          <Field label="Noiva" name="casamento-noiva" value={casamento.noiva} maxLength={120} required onChange={(changeEvent) => mudarCasamento({ noiva: changeEvent.target.value })} />
-          <SimNao rotulo="Fez o curso de noivos?" nome="casamento-curso" valor={casamento.cursoDeNoivos} onChange={(cursoDeNoivos) => mudarCasamento({ cursoDeNoivos })} />
-          <SimNao rotulo="Passou pela comissão?" nome="casamento-comissao" valor={casamento.passouPelaComissao} onChange={(passouPelaComissao) => mudarCasamento({ passouPelaComissao })} />
-          <Field label="Data civil" name="casamento-data-civil" type="date" value={casamento.dataCivil} onChange={(changeEvent) => mudarCasamento({ dataCivil: changeEvent.target.value })} />
-        </div>}
 
         {ceremonyCategory === 'child_dedication' && <>
           <Field label="Nome da criança" name="dedicacao-crianca" value={dedicacao.crianca} maxLength={120} required onChange={(changeEvent) => mudarDedicacao((atual) => ({ ...atual, crianca: changeEvent.target.value }))} />
