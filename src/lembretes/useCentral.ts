@@ -4,6 +4,7 @@ import { useAuthVault } from '../auth/AuthVaultContext'
 import { DistrictService } from '../district/service'
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { contadorDoMenu, type ItemDaCentral } from './central'
+import { sincronizarAgendamentos } from './push'
 import { LembreteService } from './service'
 import { fusoDoAparelho } from './tempo'
 import type { ListaDeLembretesEntity } from './types'
@@ -68,6 +69,8 @@ export function useContadorDeLembretes(): number {
   const carregar = useCallback(async () => {
     if (!account || !masterKey) return
     try { setItens((await servicoDeLembretes.carregar(account.id, masterKey)).itens) } catch { /* sem número é melhor que número errado */ }
+    // Os horários de aviso seguem o cofre; sem internet ou sem notificações ativas, não faz nada.
+    try { await sincronizarAgendamentos(account.id, masterKey, await servicoDeLembretes.lembretes(account.id, masterKey)) } catch { /* tenta de novo na próxima carga */ }
   }, [account, masterKey])
 
   useReloadOnSync(carregar)

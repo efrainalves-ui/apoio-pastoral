@@ -28,6 +28,8 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/index.html',
+        // Notificações dos lembretes: recebe o push e abre a tela certa.
+        importScripts: ['push-sw.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         cleanupOutdatedCaches: true,
         clientsClaim: true,

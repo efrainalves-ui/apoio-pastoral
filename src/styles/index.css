@@ -3445,3 +3445,12 @@ html .agenda-page .ponto-categoria.categoria-visual { width: 7px; height: 7px; b
 .lembrete-form__mais[open] { padding-bottom: 4px; }
 .lembrete-form__mais > .field { margin-top: 12px; }
 .lembrete-form .form-actions--sticky { display: flex; justify-content: flex-end; gap: 10px; }
+
+.lembretes-notificacoes { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--lembrete-superficie); }
+.lembretes-notificacoes__estado { margin: 0; display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--ink); }
+.lembretes-notificacoes__estado svg { width: 20px; flex: none; color: var(--muted); }
+.lembretes-notificacoes__estado--ativada svg { color: #18806a; }
+.lembretes-notificacoes__estado--negada svg { color: var(--lembrete-atraso); }
+.lembretes-notificacoes__aviso { margin: 0; color: var(--muted); font-size: .88rem; }
+.lembretes-notificacoes .confirmation-check { margin: 0; }
+.lembretes-notificacoes__acoes { display: flex; flex-wrap: wrap; gap: 10px; }

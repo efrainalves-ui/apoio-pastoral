@@ -69,20 +69,23 @@ psql_migracao -f "$migrations/0006_expurgo_de_historico_up.sql"
 psql_migracao -f "$migrations/0007_funcao_nova_fechada_up.sql"
 psql_migracao -f "$migrations/0008_revogacao_idempotente_up.sql"
 psql_migracao -f "$migrations/0009_sessoes_fora_de_alcance_up.sql"
+psql_migracao -f "$migrations/0010_lembretes_push_up.sql"
 
 tabelas="$(contar_tabelas)"
-if [ "$tabelas" -ne 8 ]; then
-  echo "FALHOU: esperava 8 tabelas em public depois das migrations, encontrei $tabelas" >&2
+if [ "$tabelas" -ne 10 ]; then
+  echo "FALHOU: esperava 10 tabelas em public depois das migrations, encontrei $tabelas" >&2
   exit 1
 fi
-echo "    8 tabelas criadas"
+echo "    10 tabelas criadas"
 
 echo "==> 4/7 Provando o isolamento entre duas contas fictícias"
 psql_migracao -f "$testes/01_rls_isolation.sql"
 psql_migracao -f "$testes/02_device_barriers.sql"
 psql_migracao -f "$testes/03_sessao_revogada.sql"
+psql_migracao -f "$testes/04_lembretes_push.sql"
 
 echo "==> 5/7 Revertendo as migrations"
+psql_migracao -f "$migrations/0010_lembretes_push_down.sql"
 psql_migracao -f "$migrations/0009_sessoes_fora_de_alcance_down.sql"
 psql_migracao -f "$migrations/0008_revogacao_idempotente_down.sql"
 psql_migracao -f "$migrations/0007_funcao_nova_fechada_down.sql"
@@ -129,10 +132,11 @@ psql_migracao -f "$migrations/0006_expurgo_de_historico_up.sql"
 psql_migracao -f "$migrations/0007_funcao_nova_fechada_up.sql"
 psql_migracao -f "$migrations/0008_revogacao_idempotente_up.sql"
 psql_migracao -f "$migrations/0009_sessoes_fora_de_alcance_up.sql"
+psql_migracao -f "$migrations/0010_lembretes_push_up.sql"
 
 tabelas="$(contar_tabelas)"
-if [ "$tabelas" -ne 8 ]; then
-  echo "FALHOU: a reaplicação recriou $tabelas tabela(s) em vez de 8" >&2
+if [ "$tabelas" -ne 10 ]; then
+  echo "FALHOU: a reaplicação recriou $tabelas tabela(s) em vez de 10" >&2
   exit 1
 fi
 
@@ -140,6 +144,7 @@ echo "==> 7/7 Reprovando o isolamento sobre a base reaplicada"
 psql_migracao -f "$testes/01_rls_isolation.sql"
 psql_migracao -f "$testes/02_device_barriers.sql"
 psql_migracao -f "$testes/03_sessao_revogada.sql"
+psql_migracao -f "$testes/04_lembretes_push.sql"
 
 echo
 echo "Migration aplicável, reversível e reaplicável; isolamento entre contas comprovado."

@@ -1,0 +1,115 @@
+// Envio das notificações dos lembretes.
+//
+// Duas entradas:
+//   * agendador (pg_cron + pg_net, a cada minuto), com o segredo
+//     LEMBRETES_CRON_SECRET: envia o que venceu;
+//   * aparelho autenticado, com { acao: 'teste', deviceId }: envia um aviso de
+//     teste só para aquele aparelho da conta.
+//
+// O aviso é sempre genérico. Este código não recebe nem lê conteúdo de
+// lembrete — o banco não tem esse conteúdo.
+//
+// Segredos só por variável de ambiente do Supabase: VAPID_PUBLIC_KEY,
+// VAPID_PRIVATE_KEY, VAPID_SUBJECT, LEMBRETES_CRON_SECRET. SUPABASE_URL e
+// SUPABASE_SERVICE_ROLE_KEY são fornecidas pela própria plataforma e nunca
+// chegam ao navegador.
+
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4'
+import webpush from 'npm:web-push@3.6.7'
+
+const AVISO = { title: 'Apoio Pastoral', body: 'Você tem um lembrete' }
+const VALIDADE_S = 12 * 60 * 60
+const MAX_TENTATIVAS = 5
+
+interface Inscricao { id: string; endpoint: string; p256dh: string; auth_secret: string }
+
+function env(nome: string): string {
+  const valor = Deno.env.get(nome)
+  if (!valor) throw new Error(`variável ${nome} ausente`)
+  return valor
+}
+
+const resposta = (corpo: unknown, status = 200) => new Response(JSON.stringify(corpo), {
+  status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type, apikey, x-client-info' },
+})
+
+async function enviar(admin: SupabaseClient, inscricoes: Inscricao[], dados: Record<string, string>): Promise<{ entregues: number; transitorias: number }> {
+  let entregues = 0
+  let transitorias = 0
+  for (const inscricao of inscricoes) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: inscricao.endpoint, keys: { p256dh: inscricao.p256dh, auth: inscricao.auth_secret } },
+        JSON.stringify({ ...AVISO, ...dados }),
+        { TTL: VALIDADE_S, urgency: 'high' },
+      )
+      entregues += 1
+    } catch (falha) {
+      const status = (falha as { statusCode?: number }).statusCode
+      // Inscrição que o serviço de push não reconhece mais: some daqui.
+      if (status === 404 || status === 410) await admin.from('push_subscriptions').delete().eq('id', inscricao.id)
+      else transitorias += 1
+    }
+  }
+  return { entregues, transitorias }
+}
+
+async function enviarVencidos(admin: SupabaseClient) {
+  const agora = new Date()
+  const agoraIso = agora.toISOString()
+  // Envio interrompido por queda volta à fila depois de dez minutos.
+  await admin.from('notification_schedule').update({ state: 'pending', updated_at: agoraIso })
+    .eq('state', 'sending').lt('updated_at', new Date(agora.getTime() - 10 * 60_000).toISOString())
+  // Reservar e ler numa instrução só: duas execuções não pegam a mesma linha.
+  const { data: devidos, error } = await admin.from('notification_schedule')
+    .update({ state: 'sending', updated_at: agoraIso })
+    .eq('state', 'pending').lte('fire_at', agoraIso)
+    .select('id, owner_id, occurrence_key, fire_at, attempts')
+  if (error) throw error
+
+  let enviados = 0
+  for (const linha of devidos ?? []) {
+    // Muito atrasado (aparelho sem serviço, função parada): o aplicativo já mostra como atrasado.
+    if (new Date(linha.fire_at).getTime() < agora.getTime() - VALIDADE_S * 1000) {
+      await admin.from('notification_schedule').update({ state: 'failed', updated_at: agoraIso }).eq('id', linha.id)
+      continue
+    }
+    const { data: inscricoes } = await admin.from('push_subscriptions').select('id, endpoint, p256dh, auth_secret').eq('owner_id', linha.owner_id)
+    const { entregues, transitorias } = await enviar(admin, inscricoes ?? [], { tag: linha.occurrence_key, chave: linha.occurrence_key, url: '/app/lembretes/bloco/hoje' })
+    if (entregues > 0 || !transitorias) {
+      await admin.from('notification_schedule').update({ state: entregues > 0 ? 'sent' : 'failed', sent_at: entregues > 0 ? agoraIso : null, updated_at: agoraIso }).eq('id', linha.id)
+      enviados += entregues > 0 ? 1 : 0
+    } else {
+      const tentativas = linha.attempts + 1
+      await admin.from('notification_schedule').update({ state: tentativas >= MAX_TENTATIVAS ? 'failed' : 'pending', attempts: tentativas, updated_at: agoraIso }).eq('id', linha.id)
+    }
+  }
+  // Histórico curto: o que já saiu some depois de trinta dias.
+  await admin.from('notification_schedule').delete().in('state', ['sent', 'failed']).lt('fire_at', new Date(agora.getTime() - 30 * 86_400_000).toISOString())
+  return { reservados: devidos?.length ?? 0, enviados }
+}
+
+Deno.serve(async (pedido) => {
+  if (pedido.method === 'OPTIONS') return resposta({})
+  if (pedido.method !== 'POST') return resposta({ erro: 'método' }, 405)
+  try {
+    webpush.setVapidDetails(env('VAPID_SUBJECT'), env('VAPID_PUBLIC_KEY'), env('VAPID_PRIVATE_KEY'))
+    const admin = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), { auth: { persistSession: false, autoRefreshToken: false } })
+    const autorizacao = pedido.headers.get('authorization') ?? ''
+
+    const segredo = Deno.env.get('LEMBRETES_CRON_SECRET')
+    if (segredo && autorizacao === `Bearer ${segredo}`) return resposta(await enviarVencidos(admin))
+
+    const { data: { user } } = await admin.auth.getUser(autorizacao.replace(/^Bearer\s+/iu, ''))
+    if (!user) return resposta({ erro: 'não autenticado' }, 401)
+    const corpo = await pedido.json().catch(() => ({})) as { acao?: string; deviceId?: string }
+    if (corpo.acao !== 'teste' || !corpo.deviceId) return resposta({ erro: 'pedido inválido' }, 400)
+    const { data: inscricoes } = await admin.from('push_subscriptions').select('id, endpoint, p256dh, auth_secret').eq('owner_id', user.id).eq('device_id', corpo.deviceId)
+    if (!inscricoes?.length) return resposta({ erro: 'aparelho sem inscrição' }, 404)
+    const { entregues } = await enviar(admin, inscricoes, { tag: 'apoio-pastoral-teste', url: '/app/lembretes' })
+    return resposta({ entregues })
+  } catch (falha) {
+    console.error('lembretes-push', falha instanceof Error ? falha.message : 'falha')
+    return resposta({ erro: 'falha no envio' }, 500)
+  }
+})
