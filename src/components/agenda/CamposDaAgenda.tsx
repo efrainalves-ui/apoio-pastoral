@@ -87,7 +87,8 @@ export function BuscaDeNomes({ rotulo, opcoes, selecionados, onEscolher, onRemov
   function teclado(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'ArrowDown') { event.preventDefault(); setAberta(true); setAtiva((atual) => Math.min(atual + 1, restantes.length - 1)) }
     if (event.key === 'ArrowUp') { event.preventDefault(); setAtiva((atual) => Math.max(atual - 1, 0)) }
-    if (event.key === 'Enter' && aberta && restantes[ativa]) { event.preventDefault(); escolher(restantes[ativa]) }
+    // Enter numa busca nunca envia o formulário: sem opção para escolher, não faz nada.
+    if (event.key === 'Enter') { event.preventDefault(); if (restantes[ativa]) escolher(restantes[ativa]) }
     if (event.key === 'Escape') setAberta(false)
   }
 
@@ -166,12 +167,13 @@ export function CamposDeEncontro({ input, churches, onChange }: {
       {encontro.alcance === 'departamento' && (
         <BuscaDeNomes
           rotulo="Departamento"
-          opcoes={DEPARTAMENTOS.map((departamento) => ({ id: departamento, nome: departamento }))}
+          opcoes={[...DEPARTAMENTOS, 'Outro'].map((departamento) => ({ id: departamento, nome: departamento }))}
           selecionados={encontro.departamento ? [encontro.departamento] : []}
-          onEscolher={(departamento) => onChange({ encontro: { ...encontro, departamento } })}
-          onRemover={() => onChange({ encontro: { ...encontro, departamento: '' } })}
+          onEscolher={(departamento) => onChange({ encontro: { ...encontro, departamento, departamentoOutro: '' } })}
+          onRemover={() => onChange({ encontro: { ...encontro, departamento: '', departamentoOutro: '' } })}
         />
       )}
+      {encontro.alcance === 'departamento' && encontro.departamento === 'Outro' && <Field label="Qual departamento?" name="agenda-departamento-outro" value={encontro.departamentoOutro ?? ''} onChange={(event) => onChange({ encontro: { ...encontro, departamentoOutro: event.target.value } })} maxLength={120} required />}
     </>
   )
 }

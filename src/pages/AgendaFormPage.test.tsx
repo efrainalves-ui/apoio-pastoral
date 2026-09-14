@@ -14,6 +14,7 @@ const estado = vi.hoisted(() => ({
   atualizados: [] as AgendaEventInput[],
   vinculados: [] as string[],
   processos: [] as unknown[],
+  eventos: [] as AgendaEventEntity[],
   navegou: [] as string[],
 }))
 
@@ -49,7 +50,7 @@ function eventoBase(overrides: Partial<AgendaEventEntity> = {}): AgendaEventEnti
 vi.mock('../agenda/service', async (importarOriginal) => ({
   ...await importarOriginal<Record<string, unknown>>(),
   AgendaService: class {
-    listEvents = vi.fn(() => Promise.resolve([]))
+    listEvents = vi.fn(() => Promise.resolve(estado.eventos))
     getEvent = vi.fn(() => Promise.resolve(estado.eventId ? estado.evento : null))
     deleteEvent = estado.apagar
     updateEvent = vi.fn((_a: string, _k: CryptoKey, id: string, input: AgendaEventInput) => { estado.atualizados.push(input); return Promise.resolve({ id, ...input, createdAt: '', updatedAt: '' }) })
@@ -73,7 +74,7 @@ const salvar = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.g
 
 beforeEach(() => {
   estado.eventId = undefined; estado.evento = null; estado.apagar.mockClear(); estado.navegou = []
-  estado.criados = []; estado.atualizados = []; estado.vinculados = []; estado.processos = []
+  estado.criados = []; estado.atualizados = []; estado.vinculados = []; estado.processos = []; estado.eventos = []
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
@@ -226,6 +227,17 @@ describe('pregação', () => {
     expect(estado.criados[0]).toMatchObject({ escolhaDeIgreja: 'todas', churchIds: ['igreja-a', 'igreja-b'], title: 'Pregação · Todas as igrejas do distrito' })
   })
 
+  it('Enter numa busca sem resultado não salva o compromisso', async () => {
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Pregação')
+    await user.click(screen.getByRole('radio', { name: 'Todas as igrejas — evento distrital' }))
+    await user.click(screen.getByRole('radio', { name: 'Duas ou mais igrejas' }))
+    await user.type(screen.getByRole('combobox', { name: 'Igrejas' }), 'Norte{Enter}')
+    expect(estado.criados).toHaveLength(0)
+    expect(estado.navegou).toHaveLength(0)
+  })
+
   it('duas ou mais igrejas por busca; outra igreja pede o nome', async () => {
     const user = userEvent.setup()
     abrir(); await aguardarCarregar()
@@ -374,6 +386,84 @@ describe('pessoal', () => {
     await user.type(screen.getByLabelText('Como será?'), 'Por mensagem')
     await salvar(user)
     expect(estado.criados[0]).toMatchObject({ category: 'personal', title: 'Limpeza fictícia', pessoal: { categoria: 'saude', subcategoria: 'Dentista', outro: '', como: 'outra', comoOutro: 'Por mensagem' } })
+  })
+})
+
+describe('finalidade da visita, instrutor e departamento', () => {
+  it('visita grava a finalidade; "Outra" abre o texto', async () => {
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    const finalidade = screen.getByLabelText('Finalidade da visita')
+    expect(within(finalidade).getByRole('option', { name: 'Outra' })).toBeInTheDocument()
+    await user.selectOptions(finalidade, 'Outra')
+    await user.type(screen.getByLabelText('Qual finalidade?'), 'Oração fictícia')
+    await user.selectOptions(finalidade, 'Enfermidade')
+    expect(screen.queryByLabelText('Qual finalidade?')).not.toBeInTheDocument()
+    await salvar(user)
+    expect(estado.criados[0]).toMatchObject({ category: 'visit', finalidade: 'illness', finalidadeOutra: '' })
+    expect(screen.queryByLabelText('Título')).not.toBeInTheDocument()
+  })
+
+  it('estudo bíblico: instrutor cadastrado pela busca ou nome escrito, sem título', async () => {
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Estudo Bíblico')
+    expect(screen.queryByLabelText('Título')).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText('Nome do instrutor'), 'Instrutor Escrito Fictício')
+    await salvar(user)
+    expect(estado.criados[0]).toMatchObject({ category: 'bible_study', instrutor: { personId: null, nome: 'Instrutor Escrito Fictício' } })
+
+    cleanup(); estado.criados = []
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Estudo Bíblico')
+    await user.type(screen.getByRole('combobox', { name: 'Instrutor' }), 'joão')
+    await user.keyboard('{Enter}')
+    expect(screen.queryByLabelText('Nome do instrutor')).not.toBeInTheDocument()
+    await salvar(user)
+    expect(estado.criados[0]?.instrutor).toEqual({ personId: 'pessoa-2', nome: 'João Diácono Fictício' })
+  })
+
+  it('reaproveita o instrutor de um estudo anterior com a mesma pessoa', async () => {
+    estado.eventos = [eventoBase({ id: 'estudo-anterior', category: 'bible_study', pessoaId: 'pessoa-1', startAt: '2026-09-01T19:00', endAt: '2026-09-01T20:00', instrutor: { personId: null, nome: 'Instrutora Anterior Fictícia' } })]
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Estudo Bíblico')
+    await user.type(screen.getByRole('combobox', { name: 'Pessoa ou família' }), 'maria')
+    await user.keyboard('{Enter}')
+    expect(screen.getByLabelText('Nome do instrutor')).toHaveValue('Instrutora Anterior Fictícia')
+  })
+
+  it('departamento "Outro" abre o nome do departamento', async () => {
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Evento')
+    await user.click(screen.getByRole('radio', { name: 'Departamento' }))
+    await user.type(screen.getByRole('combobox', { name: 'Departamento' }), 'outro')
+    await user.keyboard('{Enter}')
+    expect(screen.getByLabelText('Qual departamento?')).toBeRequired()
+  })
+
+  it('Nomeações sem processo: avisa e o botão salva antes de abrir Nomeações', async () => {
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Comissão')
+    await user.click(screen.getByRole('radio', { name: 'Nomeações' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Igreja' }), 'Igreja Central Fictícia')
+    expect(screen.getByText(/Sem processo de nomeações aberto nesta igreja/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Abrir ou criar processo em Nomeações' }))
+    expect(estado.criados[0]).toMatchObject({ category: 'committee', churchId: 'igreja-a', comissao: { tipo: 'nomeacoes' } })
+    expect(estado.vinculados).toEqual(['criado'])
+    expect(estado.navegou).toContain('/app/comissoes/nomeacoes?igreja=igreja-a&novo=1')
+  })
+
+  it('com processo aberto, o aviso não aparece', async () => {
+    estado.processos = [{ id: 'processo', churchId: 'igreja-a', period: '2027', status: 'nominating', offices: [], candidates: [] }]
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Comissão')
+    await user.click(screen.getByRole('radio', { name: 'Nomeações' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Igreja' }), 'Igreja Central Fictícia')
+    expect(screen.queryByText(/Sem processo de nomeações/)).not.toBeInTheDocument()
   })
 })
 

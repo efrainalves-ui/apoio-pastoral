@@ -61,6 +61,38 @@ test('comissão marcada na Agenda abre no módulo com a data, o horário e o loc
   await expect(page.getByLabel('Local', { exact: true })).toBeDisabled()
 })
 
+test('a finalidade chega à Visitação, e Nomeações pendente se liga ao criar o processo', async ({ page }) => {
+  page.on('dialog', (dialog) => void dialog.accept())
+  await registerAndEnter(page, 'agenda.pendencias.e2e@example.invalid')
+  await criarIgreja(page, IGREJA)
+
+  await novoCompromisso(page, 'Visita')
+  await page.getByLabel('Finalidade da visita').selectOption({ label: 'Enfermidade' })
+  await page.getByRole('combobox', { name: 'Igreja', exact: true }).selectOption({ label: IGREJA })
+  await preencherHorario(page, 8)
+  await page.getByRole('button', { name: 'Salvar compromisso' }).click()
+  await page.getByRole('tab', { name: 'Lista' }).click()
+  await page.getByRole('link', { name: /Registrar visita/ }).first().click()
+  await expect(page.getByLabel('Motivo')).toHaveValue('illness')
+
+  await novoCompromisso(page, 'Comissão')
+  await page.getByRole('radio', { name: 'Nomeações' }).check()
+  await page.getByRole('combobox', { name: 'Igreja', exact: true }).selectOption({ label: IGREJA })
+  await preencherHorario(page, 19)
+  await expect(page.getByText(/Sem processo de nomeações aberto nesta igreja/)).toBeVisible()
+  // O botão salva o compromisso antes de sair, e Nomeações abre com a igreja escolhida.
+  await page.getByRole('button', { name: 'Abrir ou criar processo em Nomeações' }).click()
+  await expect(page.getByRole('heading', { name: 'Novo processo de nomeações' })).toBeVisible()
+  await page.getByRole('button', { name: 'Criar processo' }).click()
+  await expect(page).toHaveURL(/comissoes\/nomeacoes\/[0-9a-f-]+/)
+
+  const compromisso = page.getByRole('link', { name: /Abrir Comissão de Nomeações/ }).first()
+  await navigateInsideApp(page, '/app/agenda', compromisso)
+  await compromisso.click()
+  await expect(page.getByRole('link', { name: 'Abrir comissão' })).toBeVisible()
+  await expect(page.getByText(/Sem processo de nomeações/)).toHaveCount(0)
+})
+
 test('reunião, Ceia do Senhor e dedicação mostram só o que a escolha pede', async ({ page }) => {
   page.on('dialog', (dialog) => void dialog.accept())
   await registerAndEnter(page, 'agenda.escolhas.e2e@example.invalid')

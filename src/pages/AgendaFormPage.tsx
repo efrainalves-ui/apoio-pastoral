@@ -17,6 +17,7 @@ import {
 } from '../agenda/types'
 import { VinculoAgendaComissao } from '../agenda/vinculoComissao'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { VISIT_REASONS, VISIT_REASON_LABELS, type VisitReason } from '../care/types'
 import { BuscaDeNomes, CamposDeEncontro, Escolha, SeletorDeIgreja, SimNao } from '../components/agenda/CamposDaAgenda'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -184,6 +185,19 @@ export function AgendaFormPage() {
     ...families.map((family) => ({ id: `f:${family.id}`, nome: family.name, detalhe: 'Família' })),
   ], [families, people])
   const quem = input.pessoaId ? `p:${input.pessoaId}` : input.familiaId ? `f:${input.familiaId}` : null
+  function escolherQuem(id: string) {
+    const escolhido = id.startsWith('p:')
+      ? { pessoaId: id.slice(2), familiaId: null, visitTarget: 'person' as const }
+      : { familiaId: id.slice(2), pessoaId: null, visitTarget: 'family' as const }
+    mudar((current) => {
+      if (current.category !== 'bible_study' || current.instrutor) return { ...current, ...escolhido }
+      // Reaproveita o instrutor já registrado num estudo anterior com a mesma pessoa ou família.
+      const anterior = events
+        .filter((item) => item.category === 'bible_study' && item.instrutor && (escolhido.pessoaId ? item.pessoaId === escolhido.pessoaId : item.familiaId === escolhido.familiaId))
+        .sort((a, b) => b.startAt.localeCompare(a.startAt))[0]
+      return { ...current, ...escolhido, instrutor: anterior?.instrutor ?? null }
+    })
+  }
   const igrejasAtivas = churches.filter(({ status }) => status !== 'archived')
   const nomeDaIgreja = (id: string) => churches.find((church) => church.id === id)?.name ?? ''
 
@@ -207,8 +221,9 @@ export function AgendaFormPage() {
     }
   }
 
-  async function submit(event: FormEvent) {
-    event.preventDefault(); if (!account || !masterKey) return
+  async function submit(event: FormEvent) { event.preventDefault(); await salvar('/app/agenda') }
+  async function salvar(destino: string) {
+    if (!account || !masterKey) return
     setBusy(true); setError('')
     try {
       const category = input.category
@@ -228,7 +243,7 @@ export function AgendaFormPage() {
       if (saved.linkedSource) await evangelism.syncFromAgendaEvent(account.id, masterKey, saved)
       if (saved.category === 'committee') await vinculo.vincular(account.id, masterKey, saved)
       dirty.current = false
-      await navigate('/app/agenda')
+      await navigate(destino)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível salvar o compromisso.')
     } finally { setBusy(false) }
@@ -251,8 +266,17 @@ export function AgendaFormPage() {
 
         {usaPessoaOuFamilia(category) && <>
           <BuscaDeNomes rotulo="Pessoa ou família" opcoes={opcoesDeQuem} selecionados={quem ? [quem] : []}
-            onEscolher={(id) => patch(id.startsWith('p:') ? { pessoaId: id.slice(2), familiaId: null, visitTarget: 'person' } : { familiaId: id.slice(2), pessoaId: null, visitTarget: 'family' })}
+            onEscolher={escolherQuem}
             onRemover={() => patch({ pessoaId: null, familiaId: null, visitTarget: 'none' })} />
+          {category === 'visit' && <label className="field"><span className="field__label">Finalidade da visita</span><select className="field__input" value={input.finalidade ?? ''} onChange={(changeEvent) => { const finalidade = (changeEvent.target.value || null) as VisitReason | null; patch({ finalidade, finalidadeOutra: finalidade === 'other' ? input.finalidadeOutra ?? '' : '' }) }}><option value="">Selecione</option>{VISIT_REASONS.map((motivo) => <option key={motivo} value={motivo}>{motivo === 'other' ? 'Outra' : VISIT_REASON_LABELS[motivo]}</option>)}</select></label>}
+          {category === 'visit' && input.finalidade === 'other' && <Field label="Qual finalidade?" name="visita-finalidade-outra" value={input.finalidadeOutra ?? ''} onChange={(changeEvent) => patch({ finalidadeOutra: changeEvent.target.value })} maxLength={120} required />}
+          {category === 'bible_study' && <>
+            <BuscaDeNomes rotulo="Instrutor" opcoes={people.map((person) => ({ id: person.id, nome: person.name }))} selecionados={input.instrutor?.personId ? [input.instrutor.personId] : []}
+              rotuloDoEscolhido={(personId) => nomeDaPessoa(personId) || input.instrutor?.nome || ''}
+              onEscolher={(personId) => patch({ instrutor: { personId, nome: nomeDaPessoa(personId) } })}
+              onRemover={() => patch({ instrutor: null })} />
+            {!input.instrutor?.personId && <Field label="Nome do instrutor" name="estudo-instrutor-nome" value={input.instrutor?.nome ?? ''} maxLength={120} onChange={(changeEvent) => patch({ instrutor: changeEvent.target.value ? { personId: null, nome: changeEvent.target.value } : null })} />}
+          </>}
           <SeletorDeIgreja churches={churches} valor={input.churchId} onChange={escolherIgreja} />
           <Field label="Local" name="agenda-location" value={input.location} onChange={(changeEvent) => patch({ location: changeEvent.target.value })} maxLength={160} />
         </>}
@@ -316,7 +340,7 @@ export function AgendaFormPage() {
       </Card>
 
       {category === 'committee' && (comissao.tipo === 'outra' || (eventId && comissao.meetingId) || semProcessoDeNomeacoes) && <Card title={comissao.tipo === 'outra' ? comissao.outraNome.trim() || 'Comissão' : 'Comissão'}>
-        {semProcessoDeNomeacoes && <div className="alert" role="status">Sem processo de nomeações aberto nesta igreja. <Link className="text-link" to="/app/comissoes/nomeacoes">Abrir Nomeações</Link></div>}
+        {semProcessoDeNomeacoes && <div className="alert aviso-nomeacoes" role="status"><p>Sem processo de nomeações aberto nesta igreja. O compromisso fica pendente até o processo existir.</p><Button type="button" variant="secondary" disabled={busy} onClick={() => void salvar(`/app/comissoes/nomeacoes?igreja=${input.churchId ?? ''}&novo=1`)}>Abrir ou criar processo em Nomeações</Button></div>}
         {eventId && comissao.meetingId && comissao.tipo !== 'outra' && <Link className="button button--secondary" to={comissao.tipo === 'nomeacoes' && comissao.processId ? `/app/comissoes/nomeacoes/${comissao.processId}` : `/app/comissoes/${comissao.meetingId}`}>Abrir comissão</Link>}
         {comissao.tipo === 'outra' && <fieldset className="pautas-comissao"><legend>Pautas</legend>
           {(comissao.pautas ?? []).length > 0 && <ol>{(comissao.pautas ?? []).map((pauta, indice, pautas) => <li key={pauta.id}>

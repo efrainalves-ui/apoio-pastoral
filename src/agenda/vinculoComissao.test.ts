@@ -119,6 +119,22 @@ describe('Agenda e Comissões ligadas', () => {
     expect((await c.agenda.getEvent(c.accountId, c.key, evento.id))?.comissao?.pautas).toEqual([{ id: 'p1', titulo: 'Telhado fictício', andamento: 'em_andamento' }])
   })
 
+  it('Nomeações pendente se liga sozinha quando o processo passa a existir, sem duplicar', async () => {
+    const c = await cenario()
+    const evento = await c.agenda.createEvent(c.accountId, c.key, compromisso(c.churchId, 'nomeacoes'))
+    expect(await c.vinculo.vincularPendentes(c.accountId, c.key)).toBe(0)
+
+    const processo = await c.nominations.create(c.accountId, c.key, c.churchId, '2027')
+    expect(await c.vinculo.vincularPendentes(c.accountId, c.key, c.churchId)).toBe(1)
+    expect(await c.vinculo.vincularPendentes(c.accountId, c.key)).toBe(0)
+
+    const ligado = await c.agenda.getEvent(c.accountId, c.key, evento.id)
+    expect(ligado?.comissao).toMatchObject({ tipo: 'nomeacoes', processId: processo.id })
+    const reunioes = (await c.nominations.get(c.accountId, c.key, processo.id))!.meetings.filter(({ agendaEventId }) => agendaEventId === evento.id)
+    expect(reunioes).toHaveLength(1)
+    expect(reunioes[0]?.id).toBe(ligado?.comissao?.meetingId)
+  })
+
   it('compromisso de comissão antigo, sem tipo, fica como estava', async () => {
     const c = await cenario()
     const evento = await c.agenda.createEvent(c.accountId, c.key, compromisso(c.churchId, 'diretiva', { comissao: null }))

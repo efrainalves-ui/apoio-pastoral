@@ -58,6 +58,23 @@ export class VinculoAgendaComissao {
     return this.vincularReuniao(accountId, masterKey, event, KIND[comissao.tipo])
   }
 
+  /**
+   * Reuniões de Nomeações que ficaram pendentes por falta de processo.
+   *
+   * Chamado quando um processo passa a existir — ao criá-lo, e na abertura do
+   * aplicativo, para o processo que chegou de outro aparelho. Cada compromisso
+   * ganha a sua reunião no processo; rodar de novo não duplica.
+   */
+  async vincularPendentes(accountId: string, masterKey: CryptoKey, churchId?: string): Promise<number> {
+    let vinculados = 0
+    for (const event of await this.agenda.listEvents(accountId, masterKey)) {
+      if (event.category !== 'committee' || event.comissao?.tipo !== 'nomeacoes' || event.comissao.meetingId || !event.churchId) continue
+      if (churchId && event.churchId !== churchId) continue
+      if ((await this.vincular(accountId, masterKey, event)).tipo === 'nomeacoes') vinculados += 1
+    }
+    return vinculados
+  }
+
   private async vincularReuniao(accountId: string, masterKey: CryptoKey, event: AgendaEventEntity, kind: CommissionKind): Promise<SituacaoDoVinculo> {
     const churchId = event.churchId!
     const reunioes = await this.commissions.meetings(accountId, masterKey)

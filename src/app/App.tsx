@@ -218,7 +218,10 @@ function useMudancaDosPessoais() {
         const resultado = await new MigracaoDosPessoais().mover(account.id, masterKey)
         /* PGP deixou de ser tipo: os antigos viram Concílio do tipo PGP, com o mesmo identificador. */
         const pgp = await new MigracaoPgpParaConcilio().migrar(account.id, masterKey)
-        if (resultado.movidos > 0 || reparo.reparados > 0 || pgp.migrados > 0) notificarDadosSincronizados()
+        /* Reunião de Nomeações marcada antes de existir processo: o vínculo se completa quando o processo aparece, inclusive vindo de outro aparelho. */
+        const { VinculoAgendaComissao } = await import('../agenda/vinculoComissao')
+        const nomeacoes = await new VinculoAgendaComissao().vincularPendentes(account.id, masterKey)
+        if (resultado.movidos > 0 || reparo.reparados > 0 || pgp.migrados > 0 || nomeacoes > 0) notificarDadosSincronizados()
       } catch {
         // O lugar antigo continua intacto; a próxima abertura tenta outra vez.
       } finally {

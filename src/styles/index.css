@@ -3148,3 +3148,8 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 @media (max-width: 640px) {
   .ceia-responsavel, .ceia-material, .pautas-comissao li { grid-template-columns: 1fr; }
 }
+.aviso-nomeacoes { display: grid; gap: 10px; justify-items: start; }
+.aviso-nomeacoes p { margin: 0; }
+.ceia-material .confirmation-check { min-width: 0; margin: 0; padding: 11px 13px; align-items: center; }
+.ceia-material .confirmation-check input { margin-top: 0; }
+.ceia-material .field { margin-bottom: 0; }

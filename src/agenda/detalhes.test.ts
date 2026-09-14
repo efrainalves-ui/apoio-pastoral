@@ -214,6 +214,29 @@ describe('cerimônias e pessoal', () => {
   })
 })
 
+describe('finalidade, instrutor e departamento "Outro"', () => {
+  it('visita com finalidade "Outra" pede a descrição; outro tipo limpa a finalidade', () => {
+    expect(() => validarDetalhes(base({ category: 'visit', finalidade: 'other', finalidadeOutra: '' }))).toThrow('finalidade')
+    expect(() => validarDetalhes(base({ category: 'visit', finalidade: 'other', finalidadeOutra: 'Oração fictícia' }))).not.toThrow()
+    const reuniao = detalhesAoTrocarCategoria(base({ finalidade: 'illness' }), 'meeting')
+    expect(reuniao.finalidade).toBeNull()
+  })
+
+  it('instrutor aceita pessoa cadastrada ou nome escrito, e sai quando o tipo muda', () => {
+    expect(() => validarDetalhes(base({ category: 'bible_study', instrutor: { personId: null, nome: ' ' } }))).toThrow('instrutor')
+    expect(() => validarDetalhes(base({ category: 'bible_study', instrutor: { personId: null, nome: 'Instrutor Fictício' } }))).not.toThrow()
+    expect(() => validarDetalhes(base({ category: 'bible_study', instrutor: { personId: 'p1', nome: 'Instrutora Fictícia' } }))).not.toThrow()
+    expect(detalhesAoTrocarCategoria(base({ category: 'bible_study', instrutor: { personId: 'p1', nome: 'X' } }), 'visit').instrutor).toBeNull()
+  })
+
+  it('departamento "Outro" pede o nome, e mudar o alcance apaga', () => {
+    const encontro = { ...encontroVazio('meeting'), formato: 'online' as const, alcance: 'departamento' as const, departamento: 'Outro', departamentoOutro: '' }
+    expect(() => validarDetalhes(base({ category: 'meeting', encontro }))).toThrow('departamento')
+    expect(() => validarDetalhes(base({ category: 'meeting', encontro: { ...encontro, departamentoOutro: 'Capelania Fictícia' } }))).not.toThrow()
+    expect(encontroComAlcance({ ...encontro, departamentoOutro: 'Capelania Fictícia' }, 'distrital').encontro.departamentoOutro).toBe('')
+  })
+})
+
 describe('registro antigo', () => {
   it('PGP antigo abre como Concílio do tipo PGP, sem perder os outros campos', () => {
     const antigo = { ...base({ category: 'pgp', title: 'PGP Fictício', location: 'Sede fictícia', notes: 'Nota fictícia' }), createdAt: 'x', updatedAt: 'y' }

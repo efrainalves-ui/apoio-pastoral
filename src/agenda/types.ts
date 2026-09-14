@@ -1,3 +1,4 @@
+import type { VisitReason } from '../care/types'
 import type { SermonSnapshot } from '../sermons/types'
 export const AGENDA_CATEGORIES = ['visit', 'preaching', 'committee', 'meeting', 'bible_study', 'baptism', 'communion', 'wedding', 'child_dedication', 'training', 'event', 'travel', 'council', 'pgp', 'personal', 'other'] as const
 export type AgendaCategory = (typeof AGENDA_CATEGORIES)[number]
@@ -37,6 +38,8 @@ export interface DetalhesDoEncontro {
   publico: PublicoDistrital | null
   publicoOutro: string
   departamento: string
+  /** Quando o departamento é "Outro". */
+  departamentoOutro?: string
   /** Só em Concílio. */
   tipoConcilio?: TipoDeConcilio | null
 }
@@ -82,6 +85,8 @@ export interface DetalhesDoCasamento {
   /** A data religiosa é o dia do compromisso; fica aqui para a ficha do casal. */
   dataReligiosa: string
 }
+
+export interface InstrutorDoEstudo { personId: string | null; nome: string }
 
 export interface ResponsavelPelaCrianca { personId: string | null; nome: string }
 export interface DetalhesDaDedicacao { crianca: string; responsaveis: ResponsavelPelaCrianca[] }
@@ -136,6 +141,11 @@ export interface AgendaEventData {
   /** Visita e estudo bíblico: com quem. Ausente nos compromissos antigos. */
   pessoaId?: string | null
   familiaId?: string | null
+  /** Visita: a finalidade, com os mesmos motivos da Visitação. */
+  finalidade?: VisitReason | null
+  finalidadeOutra?: string
+  /** Estudo bíblico: quem ministra — pessoa cadastrada ou nome escrito. */
+  instrutor?: InstrutorDoEstudo | null
   /** Pregação: uma, todas, várias ou outra igreja. Ausente nos antigos, que usam `churchId`. */
   escolhaDeIgreja?: EscolhaDeIgreja | null
   churchIds?: string[]

@@ -63,6 +63,8 @@ export function detalhesAoTrocarCategoria(input: AgendaEventInput, category: Age
   if (alvo === 'dedicacao' && !limpo.dedicacao) limpo.dedicacao = dedicacaoVazia()
   if (alvo === 'pessoal' && !limpo.pessoal) limpo.pessoal = pessoalVazio()
   if (!usaPessoaOuFamilia(category)) { limpo.pessoaId = null; limpo.familiaId = null }
+  if (category !== 'visit') { limpo.finalidade = null; limpo.finalidadeOutra = '' }
+  if (category !== 'bible_study') limpo.instrutor = null
   if (!usaObservacoes(category)) limpo.notes = ''
   if (category !== 'preaching') { limpo.escolhaDeIgreja = null; limpo.churchIds = [] }
   return limpo
@@ -95,6 +97,7 @@ export function encontroComAlcance(encontro: DetalhesDoEncontro, alcance: Detalh
       publico: alcance === 'distrital' ? encontro.publico : null,
       publicoOutro: alcance === 'distrital' ? encontro.publicoOutro : '',
       departamento: alcance === 'departamento' ? encontro.departamento : '',
+      departamentoOutro: alcance === 'departamento' ? encontro.departamentoOutro ?? '' : '',
     },
     limparIgreja: alcance !== 'igreja',
   }
@@ -199,6 +202,8 @@ const vazio = (texto: string | undefined | null) => !texto?.trim()
  */
 export function validarDetalhes(input: AgendaEventInput): void {
   if (isEncontroCategory(input.category)) validarEncontro(input)
+  if (input.category === 'visit' && input.finalidade === 'other' && vazio(input.finalidadeOutra)) throw new Error('Descreva a finalidade da visita.')
+  if (input.category === 'bible_study' && input.instrutor && !input.instrutor.personId && vazio(input.instrutor.nome)) throw new Error('Informe o nome do instrutor.')
   if (input.category === 'preaching') {
     const escolha = input.escolhaDeIgreja
     if (escolha === 'uma' && !input.churchId) throw new Error('Escolha a igreja da pregação.')
@@ -244,6 +249,7 @@ export function validarEncontro(input: AgendaEventInput): void {
   if (encontro.alcance === 'distrital' && encontro.publico === 'outro' && vazio(encontro.publicoOutro)) throw new Error('Descreva o público.')
   if (encontro.alcance === 'igreja' && !input.churchId) throw new Error('Escolha a igreja.')
   if (encontro.alcance === 'departamento' && vazio(encontro.departamento)) throw new Error('Escolha o departamento.')
+  if (encontro.alcance === 'departamento' && encontro.departamento === 'Outro' && vazio(encontro.departamentoOutro)) throw new Error('Informe o departamento.')
   if (input.category === 'council' && !encontro.tipoConcilio) throw new Error('Escolha o tipo: Concílio ou PGP.')
 }
 
