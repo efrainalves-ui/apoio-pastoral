@@ -14,16 +14,20 @@ import { sermonReportLines } from '../reports/areaReports'
 import { previewLocalPdf } from '../reports/localPdf'
 import { SermonService } from '../sermons/service'
 import type { SermonEntity } from '../sermons/types'
+import type { PregacaoAnteriorEntity } from '../sermons/jaPregado'
+import { JaPregadoService } from '../sermons/jaPregadoService'
 
 const sermonsService = new SermonService()
 const agendaService = new AgendaService()
 const districtService = new DistrictService()
+const jaPregadoService = new JaPregadoService()
 
 export function SermonsPage() {
   const { account, masterKey } = useAuthVault()
   const [sermons, setSermons] = useState<SermonEntity[]>([])
   const [error, setError] = useState('')
   const [preachings, setPreachings] = useState<AgendaEventEntity[]>([])
+  const [anteriores, setAnteriores] = useState<PregacaoAnteriorEntity[]>([])
   const [churches, setChurches] = useState<ChurchEntity[]>([])
   const [aba, setAba] = useState<'biblioteca' | 'historico'>('biblioteca')
   const [comNomes, setComNomes] = useState(false)
@@ -31,12 +35,14 @@ export function SermonsPage() {
     if (!account || !masterKey) return
     try {
       const district = await districtService.getDistrict(account.id, masterKey)
-      const [lista, eventos, igrejas] = await Promise.all([
+      const [lista, eventos, igrejas, registros] = await Promise.all([
         sermonsService.list(account.id, masterKey),
         agendaService.listEvents(account.id, masterKey),
         district ? districtService.listChurches(account.id, masterKey, district.id) : [],
+        jaPregadoService.listar(account.id, masterKey),
       ])
       setSermons(lista)
+      setAnteriores(registros)
       setPreachings(eventos.filter((event) => event.category === 'preaching').sort((a, b) => b.startAt.localeCompare(a.startAt)))
       setChurches(igrejas)
       setError('')
@@ -63,14 +69,14 @@ export function SermonsPage() {
     </div>
 
     {aba === 'biblioteca'
-      ? <Card className="sermons-catalogue"><BibliotecaDeSermoes sermons={sermons} events={preachings} churches={churches} /></Card>
+      ? <Card className="sermons-catalogue"><BibliotecaDeSermoes sermons={sermons} events={preachings} churches={churches} anteriores={anteriores} /></Card>
       : <Card eyebrow="Relatório local" title="Histórico de pregações">
           <label className="confirmation-check">
             <input type="checkbox" checked={comNomes} onChange={(event) => setComNomes(event.target.checked)} />
             <span><strong>Incluir nomes neste relatório</strong><small>Sem marcar, saem data e igreja. Com nomes, o título da pregação entra e pode conter dados pessoais: compartilhe com cuidado.</small></span>
           </label>
-          <Button icon={<FileText />} onClick={() => previewLocalPdf('Sermões e Pregações', sermonReportLines(preachings, sermons.length, (id) => churches.find((church) => church.id === id)?.name ?? 'Distrito', comNomes))}>Gerar histórico</Button>
-          {!preachings.length && <div className="empty-state"><BookOpen /><strong>Nenhuma pregação registrada</strong></div>}
+          <Button icon={<FileText />} onClick={() => previewLocalPdf('Sermões e Pregações', sermonReportLines(preachings, sermons.length, (id) => churches.find((church) => church.id === id)?.name ?? 'Distrito', comNomes, anteriores.map((registro) => ({ data: registro.data, churchId: registro.churchId, lugar: registro.lugar, titulo: sermons.find(({ id }) => id === registro.sermonId)?.title ?? 'Sermão' }))))}>Gerar histórico</Button>
+          {!preachings.length && !anteriores.length &&<div className="empty-state"><BookOpen /><strong>Nenhuma pregação registrada</strong></div>}
         </Card>}
   </div>
 }

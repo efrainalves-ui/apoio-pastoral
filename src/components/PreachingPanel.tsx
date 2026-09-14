@@ -5,6 +5,8 @@ import type { AgendaEventEntity } from '../agenda/types'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
+import type { PregacaoAnteriorEntity } from '../sermons/jaPregado'
+import { JaPregadoService } from '../sermons/jaPregadoService'
 import { OUTRA_IGREJA, findExistingPreaching, formatPreachingDate, listPreachings } from '../sermons/preachings'
 import type { SermonEntity } from '../sermons/types'
 import { localDateKey } from '../shared/dates'
@@ -13,6 +15,7 @@ import { Field } from './ui/Field'
 
 const agenda = new AgendaService()
 const district = new DistrictService()
+const jaPregado = new JaPregadoService()
 
 const DURACAO_MINUTOS = 90
 
@@ -25,6 +28,7 @@ export function PreachingPanel({ sermon, onClose }: { sermon: SermonEntity; onCl
   const { account, masterKey } = useAuthVault()
   const [events, setEvents] = useState<AgendaEventEntity[]>([])
   const [churches, setChurches] = useState<ChurchEntity[]>([])
+  const [anteriores, setAnteriores] = useState<PregacaoAnteriorEntity[]>([])
   const [churchId, setChurchId] = useState('')
   const [outroLugar, setOutroLugar] = useState('')
   const [date, setDate] = useState(() => localDateKey())
@@ -35,13 +39,15 @@ export function PreachingPanel({ sermon, onClose }: { sermon: SermonEntity; onCl
   const load = useCallback(async () => {
     if (!account || !masterKey) return
     const root = await district.getDistrict(account.id, masterKey)
-    const [nextEvents, nextChurches] = await Promise.all([
+    const [nextEvents, nextChurches, nextAnteriores] = await Promise.all([
       agenda.listEvents(account.id, masterKey),
       root ? district.listChurches(account.id, masterKey, root.id) : [],
+      jaPregado.listar(account.id, masterKey, sermon.id),
     ])
     setEvents(nextEvents)
     setChurches(nextChurches)
-  }, [account, masterKey])
+    setAnteriores(nextAnteriores)
+  }, [account, masterKey, sermon.id])
   useEffect(() => { void load() }, [load])
 
   useEffect(() => {
@@ -50,7 +56,7 @@ export function PreachingPanel({ sermon, onClose }: { sermon: SermonEntity; onCl
     return () => window.removeEventListener('keydown', fechar)
   }, [onClose])
 
-  const preachings = listPreachings(events, churches, sermon.id)
+  const preachings = listPreachings(events, churches, sermon.id, new Date(), anteriores)
   const foraDoDistrito = churchId === OUTRA_IGREJA
   const lugar = foraDoDistrito ? outroLugar.trim() : churches.find(({ id }) => id === churchId)?.name ?? ''
 
