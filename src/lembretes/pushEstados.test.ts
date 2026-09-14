@@ -6,12 +6,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
   permissão negada. Cada caso carrega o módulo de novo, com o ambiente dele.
 */
 
-type Ambiente = { userAgent?: string; standalone?: boolean; push?: boolean; permissao?: NotificationPermission; vapid?: string }
+type Ambiente = { userAgent?: string; standalone?: boolean; push?: boolean; permissao?: NotificationPermission; vapid?: string; servico?: boolean }
 
-async function diagnosticoCom({ userAgent = 'Mozilla/5.0 (X11; Linux x86_64) Chrome/126', standalone = false, push = true, permissao = 'default', vapid = 'BFicticiaChavePublicaDeTeste' }: Ambiente) {
+async function diagnosticoCom({ userAgent = 'Mozilla/5.0 (X11; Linux x86_64) Chrome/126', standalone = false, push = true, permissao = 'default', vapid = '', servico = true }: Ambiente) {
   vi.resetModules()
   vi.stubEnv('VITE_VAPID_PUBLIC_KEY', vapid)
-  vi.doMock('../auth/supabase', () => ({ hasSupabaseConfiguration: true, currentRemoteAccountId: vi.fn(), getSupabaseClient: vi.fn() }))
+  vi.doMock('../auth/supabase', () => ({ hasSupabaseConfiguration: servico, currentRemoteAccountId: vi.fn(), getSupabaseClient: vi.fn() }))
   vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(userAgent)
   Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: push ? { getRegistration: vi.fn() } : undefined })
   if (!push) Reflect.deleteProperty(navigator, 'serviceWorker')
@@ -42,7 +42,11 @@ describe('estados das notificações', () => {
     expect(await diagnosticoCom({ permissao: 'denied' })).toBe('negada')
   })
 
-  it('instalação sem chave pública: indisponível, sem pedir permissão', async () => {
-    expect(await diagnosticoCom({ vapid: '' })).toBe('indisponivel')
+  it('instalação sem serviço: indisponível, sem pedir permissão', async () => {
+    expect(await diagnosticoCom({ servico: false })).toBe('indisponivel')
+  })
+
+  it('sem chave na build, mas com serviço: segue — a chave pública vem da função do ambiente', async () => {
+    expect(await diagnosticoCom({ vapid: '' })).toBe('pronto')
   })
 })

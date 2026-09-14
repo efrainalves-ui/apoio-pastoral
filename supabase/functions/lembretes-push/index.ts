@@ -51,7 +51,7 @@ async function lerConfiguracao(admin: SupabaseClient): Promise<Configuracao> {
 }
 
 /** O par VAPID deste projeto; gerado e guardado no Vault se ainda não existe. */
-async function prepararVapid(admin: SupabaseClient, configuracao: Configuracao): Promise<void> {
+async function prepararVapid(admin: SupabaseClient, configuracao: Configuracao): Promise<string> {
   let atual = configuracao
   if (!atual.lembretes_vapid_public || !atual.lembretes_vapid_private) {
     const par = webpush.generateVAPIDKeys()
@@ -62,6 +62,7 @@ async function prepararVapid(admin: SupabaseClient, configuracao: Configuracao):
   }
   if (!atual.lembretes_vapid_public || !atual.lembretes_vapid_private || !atual.lembretes_vapid_subject) throw new Error('configuração VAPID incompleta')
   webpush.setVapidDetails(atual.lembretes_vapid_subject, atual.lembretes_vapid_public, atual.lembretes_vapid_private)
+  return atual.lembretes_vapid_public
 }
 
 async function enviar(admin: SupabaseClient, inscricoes: Inscricao[], dados: Record<string, string>): Promise<{ entregues: number; transitorias: number }> {
@@ -139,6 +140,8 @@ Deno.serve(async (pedido) => {
     const { data: { user } } = await admin.auth.getUser(token)
     if (!user) return resposta({ erro: 'não autenticado' }, 401)
     const corpo = await pedido.json().catch(() => ({})) as { acao?: string; deviceId?: string }
+    // A chave pública do ambiente, para o navegador se inscrever. Pública por natureza; só a privada fica no servidor.
+    if (corpo.acao === 'chave-publica') return resposta({ chave: await prepararVapid(admin, configuracao) })
     if (corpo.acao !== 'teste' || !corpo.deviceId) return resposta({ erro: 'pedido inválido' }, 400)
     const { data: inscricoes } = await admin.from('push_subscriptions').select('id, endpoint, p256dh, auth_secret').eq('owner_id', user.id).eq('device_id', corpo.deviceId)
     if (!inscricoes?.length) return resposta({ erro: 'aparelho sem inscrição' }, 404)

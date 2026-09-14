@@ -35,7 +35,7 @@ export function pushAtivoNesteAparelho(accountId: string): boolean {
 export function diagnosticar(): Exclude<EstadoDasNotificacoes, 'carregando' | 'ativada' | 'desativada'> | 'pronto' {
   if (ehIOS() && !instalado()) return 'instalar-iphone'
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification === 'undefined') return 'incompativel'
-  if (!VAPID || !hasSupabaseConfiguration) return 'indisponivel'
+  if (!hasSupabaseConfiguration) return 'indisponivel'
   if (Notification.permission === 'denied') return 'negada'
   return 'pronto'
 }
@@ -44,9 +44,29 @@ async function registro(): Promise<ServiceWorkerRegistration | null> {
   return (await navigator.serviceWorker.getRegistration()) ?? null
 }
 
+let chaveDoServidor: string | null = null
+
+/**
+ * A chave pública VAPID deste ambiente.
+ *
+ * Vem da build quando declarada; senão, da própria função de envio, que a gera
+ * e guarda no Vault do projeto. É pública por natureza — é com ela que o
+ * navegador se inscreve — e cada projeto tem a sua.
+ */
+async function chavePublica(): Promise<string> {
+  if (VAPID) return VAPID
+  if (chaveDoServidor) return chaveDoServidor
+  const { data, error } = await getSupabaseClient().functions.invoke('lembretes-push', { body: { acao: 'chave-publica' } }) as { data: { chave?: unknown } | null; error: unknown }
+  if (error || typeof data?.chave !== 'string' || data.chave.length < 40) throw new Error('As notificações ainda não estão disponíveis neste ambiente.')
+  chaveDoServidor = data.chave
+  return chaveDoServidor
+}
+
 export async function estadoDasNotificacoes(accountId: string): Promise<EstadoDasNotificacoes> {
   const diagnostico = diagnosticar()
   if (diagnostico !== 'pronto') return diagnostico
+  // Buscada ao abrir o painel: no toque em "Ativar", a permissão é pedida sem esperar a rede.
+  await chavePublica().catch(() => undefined)
   const inscricao = await (await registro())?.pushManager.getSubscription()
   return inscricao && Notification.permission === 'granted' && pushAtivoNesteAparelho(accountId) ? 'ativada' : 'desativada'
 }
@@ -65,7 +85,7 @@ export async function ativarNotificacoes(accountId: string): Promise<EstadoDasNo
   if (permissao !== 'granted') return permissao === 'denied' ? 'negada' : 'desativada'
   const reg = await registro()
   if (!reg) return 'incompativel'
-  const inscricao = await reg.pushManager.getSubscription() ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveVapid(VAPID!) })
+  const inscricao = await reg.pushManager.getSubscription() ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveVapid(await chavePublica()) })
   const json = inscricao.toJSON()
   const dono = await currentRemoteAccountId()
   if (!dono || !json.endpoint || !json.keys?.p256dh || !json.keys.auth) throw new Error('Entre com a conta conectada ao serviço para ativar as notificações.')

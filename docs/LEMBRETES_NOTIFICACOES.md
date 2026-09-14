@@ -40,12 +40,13 @@ constante, ou sessão do usuário para o teste).
 Habilitar `pg_cron` e `pg_net`. O job chama a função por POST e lê o segredo do
 Vault na hora de cada execução — o texto do job não contém o segredo.
 
-## 5. Chave pública na build
+## 5. Chave pública
 
-Depois da primeira execução, a chave **pública** (`lembretes_vapid_public`) vai
-para a variável `VITE_VAPID_PUBLIC_KEY` do Cloudflare Pages, só no ambiente da
-branch correspondente, seguida de nova publicação. Ela é pública por natureza: é
-a que o navegador usa para se inscrever.
+Nenhuma variável no Cloudflare. O painel de notificações, com a conta logada,
+pede a chave **pública** à função (`{ acao: 'chave-publica' }`), que a lê do
+Vault do próprio projeto. Assim homologação e produção usam cada uma a sua, sem
+copiar nada à mão. `VITE_VAPID_PUBLIC_KEY`, se declarada na build, tem
+prioridade.
 
 ## 6. Teste no iPhone
 
