@@ -1,5 +1,7 @@
 import { useAvisosDeTarefa } from '../tasks/useAvisosDeTarefa'
+import { useContadorDeLembretes } from '../lembretes/useCentral'
 import {
+  ListChecks,
   CalendarDays,
   BookOpen,
   HeartHandshake,
@@ -32,6 +34,7 @@ import { pendingBackupRestore } from '../backup/service'
 const primaryNav = [
   { to: '/app', label: 'Início', icon: Home, end: true },
   { to: '/app/agenda', label: 'Agenda', icon: CalendarDays },
+  { to: '/app/lembretes', label: 'Lembretes', icon: ListChecks },
   { to: '/app/distrito', label: 'Distrito', icon: Church },
   { to: '/app/visitacao', label: 'Visitação', icon: HeartHandshake },
   { to: '/app/sermoes', label: 'Sermões', icon: BookOpen },
@@ -83,6 +86,7 @@ function AvisoDeRestauracao() {
 
 export function AppShell() {
   useAvisosDeTarefa()
+  const contadorDeLembretes = useContadorDeLembretes()
   const { account, lock, signOut } = useAuthVault()
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
@@ -151,6 +155,7 @@ export function AppShell() {
           {primaryNav.map(({ to, label, icon: Icon, end, personal }) => (
             <NavLink key={to} to={to} {...(end ? { end: true } : {})} onClick={() => setOpen(false)} className={({ isActive }) => `nav-item ${personal ? 'nav-item--personal' : ''} ${isActive ? 'nav-item--active' : ''}`}>
               <Icon aria-hidden="true" /> <span>{label}</span>
+              {to === '/app/lembretes' && contadorDeLembretes > 0 && <span className="nav-contador" aria-label={`${contadorDeLembretes} atrasados ou para hoje`}>{contadorDeLembretes}</span>}
             </NavLink>
           ))}
         </nav>
@@ -166,7 +171,7 @@ export function AppShell() {
       {open && <button className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setOpen(false)} />}
       <div className="app-main">
         <header className="app-header">
-          <button ref={menuButtonRef} className="icon-button app-header__menu" aria-label="Abrir menu" aria-expanded={open} onClick={() => setOpen(true)}><Menu /></button>
+          <button ref={menuButtonRef} className="icon-button app-header__menu" aria-label={contadorDeLembretes > 0 ? `Abrir menu, ${contadorDeLembretes} lembretes atrasados ou para hoje` : 'Abrir menu'} aria-expanded={open} onClick={() => setOpen(true)}><Menu />{contadorDeLembretes > 0 && <span className="nav-contador nav-contador--menu" aria-hidden="true">{contadorDeLembretes}</span>}</button>
           <span className="app-header__brand">Apoio Pastoral</span>
           {isHomologationEnvironment && <span className="app-header__env" title="Ambiente de testes com dados fictícios">Homologação</span>}
           <GlobalSearchField />

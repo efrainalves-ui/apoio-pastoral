@@ -72,6 +72,9 @@ const VisitFormPage = lazy(() => import('../pages/VisitFormPage').then((module) 
 const VisitationPage = lazy(() => import('../pages/VisitationPage').then((module) => ({ default: module.VisitationPage })))
 const CasamentoPage = lazy(() => import('../pages/CasamentoPage').then((module) => ({ default: module.CasamentoPage })))
 const CasamentoNovoPage = lazy(() => import('../pages/CasamentoNovoPage').then((module) => ({ default: module.CasamentoNovoPage })))
+const LembretesPage = lazy(() => import('../pages/LembretesPage').then((module) => ({ default: module.LembretesPage })))
+const LembretesListaPage = lazy(() => import('../pages/LembretesListaPage').then((module) => ({ default: module.LembretesListaPage })))
+const LembreteFormPage = lazy(() => import('../pages/LembreteFormPage').then((module) => ({ default: module.LembreteFormPage })))
 const FamilyBudgetPage = lazy(() => import('../pages/FamilyBudgetPage').then((module) => ({ default: module.FamilyBudgetPage })))
 
 const districtService = new DistrictService()
@@ -318,6 +321,10 @@ export function App() {
         <Route path="agenda" element={<AgendaPage />} />
         <Route path="agenda/novo" element={<AgendaFormPage />} />
         <Route path="agenda/:eventId/editar" element={<AgendaFormPage />} />
+        <Route path="lembretes" element={<LembretesPage />} />
+        <Route path="lembretes/novo" element={<LembreteFormPage />} />
+        <Route path="lembretes/:lembreteId/editar" element={<LembreteFormPage />} />
+        <Route path="lembretes/:tipo/:id" element={<LembretesListaPage />} />
         <Route path="sermoes" element={<SermonsPage />} />
         <Route path="sermoes/novo" element={<SermonFormPage />} />
         <Route path="sermoes/:sermonId" element={<SermonDetailPage />} />

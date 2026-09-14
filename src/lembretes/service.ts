@@ -1,4 +1,5 @@
 import { AgendaService } from '../agenda/service'
+import { hasSupabaseConfiguration } from '../auth/supabase'
 import { currentDeviceId } from '../auth/device'
 import { CareService } from '../care/service'
 import { CommissionService } from '../commissions/service'
@@ -58,7 +59,12 @@ export class LembreteService {
   private readonly budget: FamilyBudgetService
   private readonly materials: MaterialsService
 
-  constructor(private readonly database: ApoioDatabase = db, orcamento: FamilyBudgetDatabase = familyBudgetDb) {
+  constructor(
+    private readonly database: ApoioDatabase = db,
+    orcamento: FamilyBudgetDatabase = familyBudgetDb,
+    /** Build que sincroniza espera a primeira sincronização; em modo local ela nunca acontece. */
+    private readonly esperarSincronizacao = hasSupabaseConfiguration,
+  ) {
     this.repository = new VaultRepository(database)
     this.care = new CareService(database)
     this.commissions = new CommissionService(database)
@@ -103,7 +109,7 @@ export class LembreteService {
    * sincronização trazer as que já existem, para não recriar por cima delas.
    */
   async prepararListasIniciais(accountId: string, masterKey: CryptoKey): Promise<number> {
-    if (await firstSyncPending(accountId, this.database)) return 0
+    if (this.esperarSincronizacao && await firstSyncPending(accountId, this.database)) return 0
     let criadas = 0
     for (const semente of LISTAS_INICIAIS) {
       const id = await idDerivado(`apoio-pastoral:${accountId}:lista:${semente.semente}`)
@@ -249,6 +255,16 @@ export class LembreteService {
       return this.gravar(accountId, masterKey, 'reminder', lembreteId, { ...dados, ocorrencias: { ...dados.ocorrencias, [ocorrencia]: { ...registro, alteracao: { ...registro.alteracao, data: para.data, hora: para.hora } } }, updatedAt: agora })
     }
     return this.gravar(accountId, masterKey, 'reminder', lembreteId, { ...dados, data: para.data, hora: para.hora, updatedAt: agora })
+  }
+
+  async sinalizar(accountId: string, masterKey: CryptoKey, id: string, sinalizado: boolean): Promise<LembreteEntity> {
+    const { id: lembreteId, ...dados } = await this.obterLembrete(accountId, masterKey, id)
+    return this.gravar(accountId, masterKey, 'reminder', lembreteId, { ...dados, sinalizado, updatedAt: agoraIso() })
+  }
+
+  async mudarDeLista(accountId: string, masterKey: CryptoKey, id: string, listaId: string | null): Promise<LembreteEntity> {
+    const { id: lembreteId, ...dados } = await this.obterLembrete(accountId, masterKey, id)
+    return this.gravar(accountId, masterKey, 'reminder', lembreteId, { ...dados, listaId, updatedAt: agoraIso() })
   }
 
   // -------------------------------------------------- tarefas de outras áreas

@@ -17,7 +17,7 @@ async function cenario() {
   const orcamento = new FamilyBudgetDatabase(`lembretes-orcamento-${crypto.randomUUID()}`)
   bancos.push(database, orcamento)
   await database.syncState.put({ accountId: 'conta-ficticia', cursor: null, lastSyncedAt: '2026-09-14T12:00:00Z', firstSyncAt: '2026-09-14T12:00:00Z' })
-  return { database, key: await generateMasterKey(), accountId: 'conta-ficticia', servico: new LembreteService(database, orcamento), care: new CareService(database) }
+  return { database, key: await generateMasterKey(), accountId: 'conta-ficticia', servico: new LembreteService(database, orcamento, true), care: new CareService(database) }
 }
 
 describe('listas', () => {
