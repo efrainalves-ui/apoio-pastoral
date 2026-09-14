@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # `homologacao` recebe o trabalho antes de ir para a `main`, que publica em produção sozinha.
+    branches: [main, homologacao]
   pull_request:
   # Para poder repetir uma corrida sem precisar de um commit vazio.
   workflow_dispatch:
