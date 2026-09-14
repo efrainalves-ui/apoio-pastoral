@@ -18,6 +18,14 @@ export function numeroDoValor(valor: ValorDoIndicador | undefined): number | nul
   return null
 }
 
+/** O mesmo valor com outro número, quando o pastor corrige o que o papel dizia. */
+export function comNumero(valor: ValorDoIndicador, novo: number): ValorDoIndicador {
+  if (valor.tipo === 'numero') return { tipo: 'numero', valor: novo }
+  if (valor.tipo === 'por_sabado') return { tipo: 'por_sabado', segundo: novo, setimo: null }
+  if (valor.tipo === 'por_classe') return { tipo: 'por_classe', classes: {}, total: novo }
+  return valor
+}
+
 export interface LeituraDoIndicador {
   trimestre: string
   valor: ValorDoIndicador
@@ -124,6 +132,47 @@ export class RelatorioIntegradoService {
     const envelope = await encryptPayload(key, { schemaVersion: 1, type: 'integrated_report', data: completo }, id)
     await this.repo.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'integrated_report')
     return { id, ...completo }
+  }
+
+  private async abrir(accountId: string, key: CryptoKey, relatorioId: string): Promise<RelatorioIntegradoEntity> {
+    const relatorio = (await this.listar(accountId, key)).find(({ id }) => id === relatorioId)
+    if (!relatorio) throw new Error('Relatório não encontrado.')
+    return relatorio
+  }
+
+  /**
+   * A decisão sobre um valor que esperava confirmação.
+   *
+   * Aprovado ou corrigido, passa a valer e alimenta as metas; recusado fica
+   * registrado como recusado. Depois disto, as metas precisam ser
+   * sincronizadas — é o que a tela faz em seguida.
+   */
+  async decidirPendente(
+    accountId: string,
+    key: CryptoKey,
+    relatorioId: string,
+    indicadorId: string,
+    decisao: { tipo: 'aprovado' } | { tipo: 'corrigido'; valor: number } | { tipo: 'recusado' },
+  ): Promise<RelatorioIntegradoEntity> {
+    const { id, pendentes = {}, recusados = [], ...dados } = await this.abrir(accountId, key, relatorioId)
+    const valor = pendentes[indicadorId]
+    if (!valor) throw new Error('Este valor já foi decidido.')
+    if (decisao.tipo === 'corrigido' && (!Number.isInteger(decisao.valor) || decisao.valor < 0)) throw new Error('Informe um número inteiro, sem valores negativos.')
+    const { [indicadorId]: _decidido, ...restantes } = pendentes; void _decidido
+    const valores = decisao.tipo === 'recusado' ? dados.valores
+      : { ...dados.valores, [indicadorId]: decisao.tipo === 'corrigido' ? comNumero(valor, decisao.valor) : valor }
+    const foraAgora = decisao.tipo === 'recusado' ? [...new Set([...recusados, indicadorId])] : recusados.filter((item) => item !== indicadorId)
+    return this.gravar(accountId, key, {
+      ...dados, valores,
+      ...(foraAgora.length ? { recusados: foraAgora } : {}),
+      ...(Object.keys(restantes).length ? { pendentes: restantes } : {}),
+    }, id)
+  }
+
+  /** Registra que o pastor conferiu a diferença entre o relatório e o cadastro, com os dois números de agora. */
+  async marcarConferido(accountId: string, key: CryptoKey, relatorioId: string, indicadorId: string, numeros: { relatorio: number; cadastro: number }): Promise<RelatorioIntegradoEntity> {
+    const { id, ...dados } = await this.abrir(accountId, key, relatorioId)
+    return this.gravar(accountId, key, { ...dados, conferencias: { ...(dados.conferencias ?? {}), [indicadorId]: { ...numeros, em: new Date().toISOString() } } }, id)
   }
 }
 

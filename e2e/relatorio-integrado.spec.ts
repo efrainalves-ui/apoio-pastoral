@@ -52,8 +52,9 @@ test('o Relatório Integrado entra trimestre a trimestre, e o número fora do pa
   await page.getByRole('button', { name: /Gravar 1º trimestre de 2026/ }).click()
   await expect(page.getByText('1º trimestre de 2026 gravado para 1 igreja(s).')).toBeVisible()
 
-  // O que ficou guardado aparece pelo valor do distrito.
-  await expect(page.getByRole('cell', { name: 'Número de Pequenos Grupos da igreja.' })).toBeVisible()
+  // O que ficou guardado aparece no painel do trimestre.
+  await expect(page.getByRole('tab', { name: '1º trimestre', selected: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Número de Pequenos Grupos da igreja.' })).toBeVisible()
 
   /*
     Segundo trimestre com 45 onde havia 5. É erro de digitação típico, e gravá-lo
@@ -72,7 +73,11 @@ test('o Relatório Integrado entra trimestre a trimestre, e o número fora do pa
   await page.getByRole('button', { name: /Gravar 2º trimestre de 2026/ }).click()
   await expect(page.getByText('2º trimestre de 2026 gravado para 1 igreja(s).')).toBeVisible()
 
-  await expect(page.getByText('5 Pequenos Grupos')).toBeVisible()
+  // No ano, Pequenos Grupos é fotografia: vale o último trimestre confirmado, e o recusado não apaga o 5.
+  await page.getByRole('tab', { name: 'Ano completo' }).click()
+  const pequenosGrupos = page.locator('article.ri-destaque').filter({ hasText: 'Pequenos Grupos' })
+  await expect(pequenosGrupos.locator('strong')).toHaveText('5')
+  await expect(pequenosGrupos).toContainText('Último trimestre · 1º tri')
 })
 
 test('igreja sem relatório não é zerada, e o traço não vira zero', async ({ page }) => {
@@ -87,8 +92,8 @@ test('igreja sem relatório não é zerada, e o traço não vira zero', async ({
   ]))
 
   // A do Sul não entregou: continua ativa, e não passa a ter zero.
-  await expect(page.getByText('Igrejas sem relatório neste trimestre')).toBeVisible()
-  await expect(page.getByText('Continua ativa.', { exact: false })).toBeVisible()
+  const semRelatorio = page.locator('.issue-list').filter({ hasText: 'Igrejas sem relatório neste trimestre' })
+  await expect(semRelatorio.getByText('Fictícia do Sul')).toBeVisible()
 
   /*
     "Classes Bíblicas em funcionamento" veio com traço: fica sem informação, e
@@ -140,9 +145,11 @@ test('os estudos bíblicos alimentam a meta, e reenviar não duplica o progresso
   const tituloDosEstudos = page.getByRole('heading', { name: 'Estudos Bíblicos informados no Relatório Integrado' })
   await navigateInsideApp(page, '/app/metas/bible_studies', tituloDosEstudos)
   const estudos = page.locator('section.card').filter({ has: tituloDosEstudos })
-  await expect(estudos.getByText('Total informado pelo distrito')).toBeVisible()
+  await expect(estudos.getByText('Resultado oficial do relatório')).toBeVisible()
   await expect(estudos.locator('strong').filter({ hasText: /^15$/u })).toBeVisible()
-  await expect(estudos.getByText('Cadastro nominal do aplicativo')).toBeVisible()
+  await expect(estudos.getByText('Cadastro nominal')).toBeVisible()
+  // O número do relatório é o alcançado da meta, e não um número ao lado.
+  await expect(page.locator('.manchete__num')).toHaveText('15')
   await expect(estudos.getByRole('link', { name: 'Abrir o relatório completo' })).toHaveAttribute('href', '/app/metas/relatorio-integrado')
 
   const tituloDaEscola = page.getByRole('heading', { name: 'Dados do Relatório Integrado' })
@@ -161,7 +168,8 @@ test('quem abre Metas encontra o Relatório Integrado, e o arquivo que não é P
 
   const cartao = page.getByRole('heading', { name: 'Relatório Integrado do trimestre' })
   await navigateInsideApp(page, '/app/metas', cartao)
-  await expect(page.getByText('Não envie o formulário vazio.', { exact: false })).toBeVisible()
+  await expect(page.getByText('Envie o Relatório Integrado respondido pelas igrejas e convertido para PDF.')).toBeVisible()
+  await expect(page.getByText('Não envie o formulário vazio.', { exact: false })).toHaveCount(0)
   await page.getByRole('link', { name: 'Enviar Relatório Integrado em PDF' }).click()
   await expect(page.getByRole('heading', { name: 'Relatório Integrado', exact: true })).toBeVisible()
 
@@ -230,7 +238,57 @@ test('o valor que destoa pode ser aprovado, corrigido, recusado ou deixado para 
   await page.getByRole('checkbox', { name: /Conferi os números/ }).check()
   await page.getByRole('button', { name: /Gravar 2º trimestre de 2026/ }).click()
   await expect(page.getByText('2º trimestre de 2026 gravado', { exact: false })).toBeVisible()
-  await expect(page.getByText('4 Pequenos Grupos')).toBeVisible()
+  await expect(page.locator('article.ri-destaque').filter({ hasText: 'Pequenos Grupos' }).locator('strong')).toHaveText('4')
+})
+
+/*
+  "Decidir depois" guarda o valor como pendente: não alimenta nada até o pastor
+  confirmar, e não obriga a enviar o PDF de novo. As campanhas declaradas e não
+  cadastradas viram rascunhos a completar, só depois da confirmação, sem duplicar.
+*/
+test('o pendente fica guardado para confirmar depois, e as campanhas que faltam viram rascunhos', async ({ page }) => {
+  test.setTimeout(240_000)
+  await entrar(page)
+  await cadastrarIgreja(page, NORTE.nome)
+
+  await navigateInsideApp(page, '/app/metas/relatorio-integrado', page.getByRole('heading', { name: 'Relatório Integrado' }))
+  await enviarPdf(page, 'primeiro-ficticio.pdf', relatorioIntegradoFicticio(1, [
+    { ...NORTE, pequenosGrupos: '5', campanhas: '3', estudos: '4', estudosAsa: '1' },
+  ]))
+  await page.getByRole('checkbox', { name: /Conferi os números/ }).check()
+  await page.getByRole('button', { name: /Gravar 1º trimestre de 2026/ }).click()
+  await expect(page.getByText('1º trimestre de 2026 gravado', { exact: false })).toBeVisible()
+
+  await expect(page.getByText('Relatório: 3 campanhas — Cadastradas: 0 — Faltam registrar: 3')).toBeVisible()
+  await page.getByRole('button', { name: 'Cadastrar as que faltam' }).click()
+  await page.getByRole('button', { name: 'Confirmar 3 a completar' }).click()
+  await expect(page.getByText('3 campanha(s) a completar criada(s) no Evangelismo.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Cadastrar as que faltam' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Completar' })).toHaveCount(3)
+
+  await enviarPdf(page, 'segundo-ficticio.pdf', relatorioIntegradoFicticio(2, [
+    { ...NORTE, pequenosGrupos: '45', campanhas: '3', estudos: '4', estudosAsa: '1' },
+  ]))
+  await expect(page.getByText('Valores fora do padrão')).toBeVisible()
+  await page.getByRole('checkbox', { name: /Conferi os números/ }).check()
+  await page.getByRole('button', { name: /Gravar 2º trimestre de 2026/ }).click()
+  await expect(page.getByText('2º trimestre de 2026 gravado', { exact: false })).toBeVisible()
+
+  const pequenosGrupos = page.locator('article.ri-destaque').filter({ hasText: 'Pequenos Grupos' })
+  await expect(pequenosGrupos).toContainText('Aguardando confirmação')
+  await expect(page.getByText('Valores aguardando confirmação')).toBeVisible()
+  await page.getByRole('button', { name: 'Confirmar 45' }).click()
+  await expect(page.getByText('Valor confirmado.')).toBeVisible()
+  await expect(pequenosGrupos.locator('strong')).toHaveText('45')
+  await expect(page.getByText('Valores aguardando confirmação')).toHaveCount(0)
+
+  // O relatório diz 45 e o cadastro tem 0: os dois aparecem, não somam, e a diferença espera conferência.
+  await expect(page.getByText('Relatório (2º tri): 45 · Cadastro: 0')).toBeVisible()
+  await page.getByRole('button', { name: 'Conferido' }).click()
+  await expect(page.getByText('Nenhuma pendência')).toBeVisible()
+
+  await navigateInsideApp(page, '/app/evangelismo', page.getByRole('heading', { name: 'A completar' }))
+  await expect(page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'A completar' }) }).getByRole('link')).toHaveCount(3)
 })
 
 

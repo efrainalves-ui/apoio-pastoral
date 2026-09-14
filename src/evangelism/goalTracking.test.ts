@@ -18,6 +18,9 @@ function meta(partes: Partial<AnnualGoalEntity>): AnnualGoalEntity {
 }
 
 const vazio: AreaSources = { entries: [], studies: [], uapgs: [] }
+// Estudos Bíblicos são por número: cada item é o lançamento de um estudo.
+const numeros = (lista: Array<{ churchId: string; startedAt: string }>): AreaSources['entries'] =>
+  lista.map(({ churchId, startedAt }) => ({ id: crypto.randomUUID(), churchId, metric: 'bible_studies', date: startedAt.slice(0, 10), amount: 1, source: 'pdf', reference: 'Relatório Integrado · fictício', createdAt: '' }))
 
 describe('acompanhamento da meta do planejamento', () => {
   it('usa o que o pastor registrou quando não há vínculo com uma área', () => {
@@ -31,10 +34,10 @@ describe('acompanhamento da meta do planejamento', () => {
 
   // Vinculada a uma área, a meta lê o resultado de lá: nada é lançado duas vezes.
   it('traz o resultado real da área vinculada', () => {
-    const sources: AreaSources = { ...vazio, studies: [
+    const sources: AreaSources = { ...vazio, entries: numeros([
       { churchId: IGREJA_A, startedAt: '2026-03-01T10:00:00.000Z' },
       { churchId: IGREJA_B, startedAt: '2026-04-01T10:00:00.000Z' },
-    ] }
+    ]) }
 
     const acompanhamento = trackGoal(meta({ target: 4, linkedArea: 'bible_studies' }), sources, HOJE)
 
@@ -44,7 +47,7 @@ describe('acompanhamento da meta do planejamento', () => {
   })
 
   it('ignora o registro manual quando existe vínculo', () => {
-    const sources: AreaSources = { ...vazio, studies: [{ churchId: IGREJA_A, startedAt: '2026-03-01T10:00:00.000Z' }] }
+    const sources: AreaSources = { ...vazio, entries: numeros([{ churchId: IGREJA_A, startedAt: '2026-03-01T10:00:00.000Z' }]) }
 
     const acompanhamento = trackGoal(meta({ target: 4, linkedArea: 'bible_studies', progress: [{ month: '2026-01', amount: 99 }] }), sources, HOJE)
 
@@ -71,18 +74,18 @@ describe('acompanhamento da meta do planejamento', () => {
 
   it('distribui o resultado mês a mês nos dois modos', () => {
     const manual = goalMonthlyResults(meta({ progress: [{ month: '2026-02', amount: 4 }] }), vazio)
-    const vinculada = goalMonthlyResults(meta({ linkedArea: 'bible_studies' }), { ...vazio, studies: [{ churchId: IGREJA_A, startedAt: '2026-05-10T10:00:00.000Z' }] })
+    const vinculada = goalMonthlyResults(meta({ linkedArea: 'bible_studies' }), { ...vazio, entries: numeros([{ churchId: IGREJA_A, startedAt: '2026-05-10T10:00:00.000Z' }]) })
 
     expect(manual[1]).toBe(4)
     expect(vinculada[4]).toBe(1)
   })
 
   it('mostra o resultado de cada igreja quando há divisão', () => {
-    const sources: AreaSources = { ...vazio, studies: [
+    const sources: AreaSources = { ...vazio, entries: numeros([
       { churchId: IGREJA_A, startedAt: '2026-03-01T10:00:00.000Z' },
       { churchId: IGREJA_A, startedAt: '2026-04-01T10:00:00.000Z' },
       { churchId: IGREJA_B, startedAt: '2026-04-05T10:00:00.000Z' },
-    ] }
+    ]) }
 
     const porIgreja = goalChurchResults(meta({ linkedArea: 'bible_studies', churchTargets: [{ churchId: IGREJA_A, target: 4 }, { churchId: IGREJA_B, target: 2 }] }), sources)
 

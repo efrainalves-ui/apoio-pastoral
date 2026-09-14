@@ -66,7 +66,8 @@ export function conferirCampanhas(
     const cadastradas = campanhas.filter((campanha) =>
       campanha.churchIds.includes(relatorio.churchId)
       && campanha.status !== 'cancelled'
-      && noTrimestre(campanha, trimestre))
+      && (noTrimestre(campanha, trimestre)
+        || (campanha.origemRelatorio?.churchId === relatorio.churchId && campanha.origemRelatorio.trimestre === trimestre)))
 
     saida.push({
       churchId: relatorio.churchId,

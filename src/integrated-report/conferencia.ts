@@ -2,7 +2,7 @@ import type { ChurchEntity } from '../district/types'
 import { normalizePersonName } from '../people/validation'
 import { indicadorPorId, type IndicadorDoRelatorio } from './catalogo'
 import type { IgrejaDoRelatorio, RelatorioLido } from './leitura'
-import { destoa, numeroDoValor, valorAtual } from './service'
+import { comNumero, destoa, numeroDoValor, valorAtual } from './service'
 import type { RelatorioIntegradoEntity, ValorDoIndicador } from './types'
 
 export interface ValorAConferir {
@@ -145,12 +145,6 @@ export function estaPendente(item: ValorAConferir, decisoes: DecisoesDaIgreja): 
   return (decisoes[item.indicador.id]?.tipo ?? 'pendente') === 'pendente'
 }
 
-function comNumero(valor: ValorDoIndicador, novo: number): ValorDoIndicador {
-  if (valor.tipo === 'numero') return { tipo: 'numero', valor: novo }
-  if (valor.tipo === 'por_sabado') return { tipo: 'por_sabado', segundo: novo, setimo: null }
-  if (valor.tipo === 'por_classe') return { tipo: 'por_classe', classes: {}, total: novo }
-  return valor
-}
 
 export interface ResultadoDaDecisao {
   valores: Record<string, ValorDoIndicador>

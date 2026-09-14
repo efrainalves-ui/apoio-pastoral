@@ -99,16 +99,16 @@ export interface AreaSources {
 export interface AreaResult { churchId: string; date: string; amount: number }
 
 /**
- * Resultados da área no ano. Estudos e UAPG são lidos dos próprios cadastros,
- * para o pastor não precisar lançar a mesma informação duas vezes.
+ * Resultados da área no ano. UAPG é lido do próprio cadastro.
+ *
+ * Estudos Bíblicos são contados por número, e não por nome: "estudo bíblico é
+ * por números e não cadastrado por nome, o de nome é opcional", disse o pastor
+ * em 14/09/2026. O alcançado vem dos lançamentos — o total confirmado do
+ * Relatório Integrado, trimestre a trimestre. O cadastro nominal fica ao lado,
+ * para conferência, e não soma: somar contaria a mesma pessoa duas vezes.
  */
 export function areaResults(area: GoalArea, sources: AreaSources, year: number): AreaResult[] {
   const ano = String(year)
-  if (area === 'bible_studies') {
-    return sources.studies
-      .filter(({ startedAt }) => startedAt.startsWith(ano))
-      .map(({ churchId, startedAt }) => ({ churchId, date: startedAt.slice(0, 10), amount: 1 }))
-  }
   if (area === 'uapg') {
     return sources.uapgs
       .filter(({ active, createdAt }) => active && createdAt.startsWith(ano))
@@ -455,17 +455,10 @@ export function areaComparison(area: GoalArea, goals: GoalEntity[], sources: Are
 }
 
 /**
- * O que o Relatório Integrado lançou numa área, separado do cadastro nominal.
+ * O que o Relatório Integrado lançou numa área.
  *
- * As duas fontes medem a mesma realidade por caminhos diferentes: o cadastro
- * conta estudo por estudo, com nome; o relatório traz o número que a igreja
- * declarou no trimestre. Somar as duas contaria a mesma pessoa duas vezes, e
- * escolher uma por conta própria seria decidir no lugar do pastor.
- *
- * Então elas aparecem lado a lado, cada uma dizendo de onde veio. O progresso
- * da meta continua saindo do cadastro nominal, como sempre saiu; este número
- * fica visível ao lado, inclusive quando ainda não há alvo definido — esconder
- * um resultado porque falta o alvo é esconder justamente o que já se conseguiu.
+ * É o resultado oficial de Estudos Bíblicos (ver `areaResults`); separado aqui
+ * para a tela dizer de onde veio cada número.
  */
 export interface ResultadoDoRelatorio {
   /** Soma do que o relatório lançou no ano, por igreja. */
@@ -496,5 +489,51 @@ export function resultadoDoRelatorioIntegrado(
     porIgreja: [...porIgreja].map(([churchId, amount]) => ({ churchId, amount })),
     total: doRelatorio.reduce((soma, entry) => soma + entry.amount, 0),
     lancamentos: doRelatorio.length,
+  }
+}
+
+/** `2026-1` para uma data de janeiro a março de 2026. */
+export function trimestreDaData(data: string): string {
+  return `${data.slice(0, 4)}-${Math.floor((Number(data.slice(5, 7)) - 1) / 3) + 1}`
+}
+
+export interface OrigemDosEstudos {
+  /** O alcançado da meta: o que foi lançado por número. */
+  resultado: number
+  /** A parte do resultado que veio do Relatório Integrado. */
+  oficial: number
+  /** Estudos cadastrados por nome, iniciados no ano. Não somam na meta. */
+  nominal: number
+  /** Relatório menos cadastro, nos trimestres que o relatório cobre. */
+  diferenca: number | null
+  /** Trimestres com número do Relatório Integrado, na ordem. */
+  incluidos: string[]
+  trimestres: Array<{ trimestre: string; relatorio: number | null; nominal: number }>
+}
+
+/** De onde vêm os números de Estudos Bíblicos no ano, para a tela mostrar cada fonte. */
+export function origemDosEstudos(sources: AreaSources, year: number): OrigemDosEstudos {
+  const ano = String(year)
+  const doRelatorio = sources.entries.filter((entry) => entry.metric === 'bible_studies' && entry.date.startsWith(ano)
+    && entry.source === 'pdf' && entry.reference.startsWith('Relatório Integrado'))
+  const nominais = sources.studies.filter(({ startedAt }) => startedAt.startsWith(ano))
+  const trimestres = [1, 2, 3, 4].map((numero) => {
+    const trimestre = `${ano}-${numero}`
+    const lancados = doRelatorio.filter(({ date }) => trimestreDaData(date) === trimestre)
+    return {
+      trimestre,
+      relatorio: lancados.length ? lancados.reduce((soma, { amount }) => soma + amount, 0) : null,
+      nominal: nominais.filter(({ startedAt }) => trimestreDaData(startedAt) === trimestre).length,
+    }
+  })
+  const cobertos = trimestres.filter(({ relatorio }) => relatorio !== null)
+  const oficial = cobertos.reduce((soma, { relatorio }) => soma + (relatorio ?? 0), 0)
+  return {
+    resultado: areaResults('bible_studies', sources, year).reduce((soma, { amount }) => soma + amount, 0),
+    oficial,
+    nominal: nominais.length,
+    diferenca: cobertos.length ? oficial - cobertos.reduce((soma, { nominal }) => soma + nominal, 0) : null,
+    incluidos: cobertos.map(({ trimestre }) => trimestre),
+    trimestres,
   }
 }
