@@ -13,6 +13,7 @@ import { Button } from '../components/ui/Button'
 import { goalsReportLines } from '../reports/areaReports'
 import { previewLocalPdf } from '../reports/localPdf'
 import { formatGoalValue } from '../goals/format'
+import { AcessoAoRelatorioIntegrado } from '../components/RelatorioIntegradoAcesso'
 
 const missionary = new MissionaryService()
 
@@ -51,6 +52,7 @@ export function GoalsPage() {
         <span className="manchete__num"><CountUp value={GOAL_AREAS.length + 1} /></span>
         <p className="manchete__txt">áreas para acompanhar</p>
       </section>
+      <AcessoAoRelatorioIntegrado />
       <h2 className="rotulo-secao">Metas do distrito</h2>
       <div className="goal-cards">
         {/*

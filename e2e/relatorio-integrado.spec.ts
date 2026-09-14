@@ -135,6 +135,38 @@ test('os estudos bíblicos alimentam a meta, e reenviar não duplica o progresso
   await page.getByRole('button', { name: /Gravar 1º trimestre de 2026/ }).click()
   await expect(page.getByText('Estudos Bíblicos: 15 no distrito.', { exact: false })).toBeVisible()
   await expect(page.getByText('Estudos Bíblicos: 30 no distrito.', { exact: false })).toHaveCount(0)
+
+  // O mesmo relatório, resumido onde o pastor procura, com a fonte de cada número.
+  const tituloDosEstudos = page.getByRole('heading', { name: 'Estudos Bíblicos informados no Relatório Integrado' })
+  await navigateInsideApp(page, '/app/metas/bible_studies', tituloDosEstudos)
+  const estudos = page.locator('section.card').filter({ has: tituloDosEstudos })
+  await expect(estudos.getByText('Total informado pelo distrito')).toBeVisible()
+  await expect(estudos.locator('strong').filter({ hasText: /^15$/u })).toBeVisible()
+  await expect(estudos.getByText('Cadastro nominal do aplicativo')).toBeVisible()
+  await expect(estudos.getByRole('link', { name: 'Abrir o relatório completo' })).toHaveAttribute('href', '/app/metas/relatorio-integrado')
+
+  const tituloDaEscola = page.getByRole('heading', { name: 'Dados do Relatório Integrado' })
+  await navigateInsideApp(page, '/app/metas/uapg', tituloDaEscola)
+  const escola = page.locator('section.card').filter({ has: tituloDaEscola })
+  await expect(escola.getByRole('columnheader', { name: 'Cadastro atual do aplicativo' })).toBeVisible()
+  await expect(escola.getByRole('columnheader', { name: 'Informado no Relatório Integrado do trimestre' })).toBeVisible()
+  await expect(escola.getByRole('row', { name: 'Pequenos Grupos 0 5' })).toBeVisible()
+  await escola.getByRole('link', { name: 'Consultar os detalhes' }).click()
+  await expect(page.getByRole('heading', { name: 'Relatório Integrado', exact: true })).toBeVisible()
+})
+
+test('quem abre Metas encontra o Relatório Integrado, e o arquivo que não é PDF pede conversão', async ({ page }) => {
+  test.setTimeout(240_000)
+  await entrar(page)
+
+  const cartao = page.getByRole('heading', { name: 'Relatório Integrado do trimestre' })
+  await navigateInsideApp(page, '/app/metas', cartao)
+  await expect(page.getByText('Não envie o formulário vazio.', { exact: false })).toBeVisible()
+  await page.getByRole('link', { name: 'Enviar Relatório Integrado em PDF' }).click()
+  await expect(page.getByRole('heading', { name: 'Relatório Integrado', exact: true })).toBeVisible()
+
+  await page.getByLabel('Arquivo').setInputFiles({ name: 'relatorio-respondido.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from('conteúdo fictício') })
+  await expect(page.getByRole('alert')).toHaveText('Converta o Relatório Integrado respondido para PDF e tente novamente.')
 })
 
 /* Valor bloqueado na conferência não pode chegar à meta. */

@@ -20,6 +20,7 @@ import { AREA_PDF_DOCUMENT, ehFinanceira, variacaoNoMesmoPeriodo, ANOS_DE_HISTOR
 import { previaDeBatismos, previaFinanceira, type PreviaDeRelatorio } from '../goals/importacaoAcms'
 import { comparativoDeDoadores } from '../goals/doadores'
 import { MissionaryPage } from './MissionaryPage'
+import { EstudosNoRelatorioIntegrado } from '../components/RelatorioIntegradoAcesso'
 import { PeopleService } from '../people/service'
 import type { PersonEntity } from '../people/types'
 import { useReloadOnSync } from '../sync/useReloadOnSync'
@@ -508,6 +509,7 @@ export function GoalAreaPage() {
         telas separadas, e o pastor tinha de sair da meta para lançar o que a
         meta conta — depois voltar para ver se o número mexeu.
       */}
+      {area === 'bible_studies' && <EstudosNoRelatorioIntegrado />}
       {area === 'bible_studies' && <MissionaryPage embutida />}
     </div>
   )

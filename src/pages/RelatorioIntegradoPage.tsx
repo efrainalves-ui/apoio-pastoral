@@ -19,6 +19,8 @@ import {
   type IgrejaConferida, type ValorAConferir,
 } from '../integrated-report/conferencia'
 import { ehRelatorioIntegrado, lerRelatorioIntegrado } from '../integrated-report/leitura'
+import { arquivoEhPdf, MENSAGEM_DE_FORMATO } from '../integrated-report/resumo'
+import { OrientacaoDoRelatorioIntegrado } from '../components/RelatorioIntegradoAcesso'
 import { numeroDoValor, RelatorioIntegradoService, totalDoDistrito, valorAtual } from '../integrated-report/service'
 import { rotuloDoTrimestre, type RelatorioIntegradoEntity } from '../integrated-report/types'
 import { useReloadOnSync } from '../sync/useReloadOnSync'
@@ -140,11 +142,13 @@ export function RelatorioIntegradoPage() {
     if (!arquivo) return
     setBusy(true); setErro(''); setAviso(''); setConferencia(null); setDecisoes({}); setConfirmado(false)
     try {
+      // Word, planilha e imagem não entram direto; nenhum conversor aqui, só o pedido de converter.
+      if (!arquivoEhPdf(arquivo)) throw new Error(MENSAGEM_DE_FORMATO)
       validatePdfFile(arquivo)
       const bytes = await arquivo.arrayBuffer()
       const [hash, texto] = await Promise.all([pdfHash(bytes), extractPdfText(bytes)])
       if (!ehRelatorioIntegrado(texto)) {
-        throw new Error('Este PDF não parece ser o Relatório Integrado. Nada foi importado.')
+        throw new Error('Este PDF não parece ser o Relatório Integrado respondido. Se ele foi escaneado sem texto ou OCR, não pode ser reconhecido. Nada foi importado.')
       }
       const lido = lerRelatorioIntegrado(texto)
       const jaAplicado = relatorios.some((relatorio) => relatorio.origem.arquivo === arquivo.name && relatorio.trimestre === lido.trimestre)
@@ -217,12 +221,13 @@ export function RelatorioIntegradoPage() {
     {aviso && <div className="alert alert--success" role="status">{aviso}</div>}
 
     <Card eyebrow="Etapa 1" title="Enviar o PDF do trimestre">
+      <OrientacaoDoRelatorioIntegrado />
       <label className="field">
         <span className="field__label">Arquivo</span>
         <input
           className="field__input"
           type="file"
-          accept="application/pdf"
+          accept=".pdf,application/pdf"
           disabled={busy}
           onChange={(evento) => void escolherArquivo(evento.target.files?.[0])}
         />
