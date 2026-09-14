@@ -25,6 +25,6 @@ export const ROTULO_DA_COR: Record<CorDeLista, string> = {
 }
 
 export const ICONE_DA_AREA: Record<AreaDaCentral, LucideIcon> = {
-  visitacao: HeartHandshake, comissoes: ClipboardList, nomeacoes: UserCheck, evangelismo: Megaphone,
+  visitacao: HeartHandshake, comissoes: ClipboardList, nomeacoes: UserCheck, evangelismo: Megaphone, estudos: BookOpen,
   planejamento: CalendarRange, agenda: CalendarDays, orcamento: WalletCards, materiais: Boxes,
 }

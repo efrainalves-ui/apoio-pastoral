@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
-import { Link, Navigate, Route, Routes } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { consumirDestino, guardarDestino } from '../lembretes/destino'
+import { LembreteAvisoPage } from '../pages/LembreteAvisoPage'
 import { currentDeviceId } from '../auth/device'
 import { DeviceApprovalPage } from '../pages/DeviceApprovalPage'
 import { db } from '../db/database'
@@ -269,13 +271,25 @@ function SetupAccess({ children }: { children: ReactNode }) {
   return hasDistrict ? <Navigate to="/app" replace /> : <>{children}</>
 }
 
+/** Cofre fechado: guarda o caminho dos Lembretes (só o caminho) para voltar a ele depois de entrar. */
+function IrParaAcesso() {
+  const { pathname } = useLocation()
+  guardarDestino(pathname)
+  return <Navigate to="/acesso" replace />
+}
+
+function EntrarNoDestino() {
+  const [destino] = useState(() => consumirDestino() ?? '/app')
+  return <Navigate to={destino} replace />
+}
+
 function ProtectedApp() {
   const { masterKey, recoveryCode } = useAuthVault()
   const encerramento = usePendingClosure()
   const { pending, approve } = useCurrentDeviceApproval()
   const hasDistrict = useDistrictPresence()
   const pessoaisProntos = useMudancaDosPessoais()
-  if (!masterKey || recoveryCode) return <Navigate to="/acesso" replace />
+  if (!masterKey || recoveryCode) return <IrParaAcesso />
   if (!pessoaisProntos) return <div className="app-loading" role="status">Preparando sua área…</div>
   if (encerramento.pending === null) return <div className="app-loading" role="status">Preparando sua área…</div>
   if (encerramento.pending) return <ResumeClosurePage onDone={encerramento.done} />
@@ -313,7 +327,7 @@ export function App() {
   return <Suspense fallback={<div className="app-loading" role="status">Abrindo sua área…</div>}>
     <Routes>
       <Route path="/privacidade" element={<PrivacyPage />} />
-      <Route path="/acesso" element={masterKey && !recoveryCode ? <Navigate to="/app" replace /> : <AuthPage />} />
+      <Route path="/acesso" element={masterKey && !recoveryCode ? <EntrarNoDestino /> : <AuthPage />} />
       <Route path="/configuracao-inicial" element={<SetupAccess><InitialSetupPage /></SetupAccess>} />
       <Route path="/restaurar-backup" element={<RestoreAccess><RestoreBackupPage /></RestoreAccess>} />
       <Route path="/app" element={<ProtectedApp />}>
@@ -324,6 +338,7 @@ export function App() {
         <Route path="lembretes" element={<LembretesPage />} />
         <Route path="lembretes/novo" element={<LembreteFormPage />} />
         <Route path="lembretes/:lembreteId/editar" element={<LembreteFormPage />} />
+        <Route path="lembretes/aviso/:chave" element={<LembreteAvisoPage />} />
         <Route path="lembretes/:tipo/:id" element={<LembretesListaPage />} />
         <Route path="sermoes" element={<SermonsPage />} />
         <Route path="sermoes/novo" element={<SermonFormPage />} />

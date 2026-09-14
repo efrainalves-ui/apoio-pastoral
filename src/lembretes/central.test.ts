@@ -97,7 +97,7 @@ describe('pesquisa', () => {
 })
 
 describe('tarefas das áreas', () => {
-  const vazio: DadosDasAreas = { tarefas: [], acompanhamentos: [], pedidos: [], tarefasDeComissao: [], processos: [], campanhas: [], metas: [], eventos: [], contas: [], necessidades: [] }
+  const vazio: DadosDasAreas = { tarefas: [], acompanhamentos: [], pedidos: [], tarefasDeComissao: [], processos: [], campanhas: [], metas: [], eventos: [], contas: [], necessidades: [], estudos: [] }
   const tarefa = { id: 't1', title: 'Ligar para a família', description: '', dueAt: '2026-09-14', priority: 'high', status: 'pending', churchId: 'igreja-a', relatedType: null, relatedId: null, reminderMinutes: null, remindAt: '2026-09-14T15:00', createdAt: '', updatedAt: '' } as const
 
   it('a tarefa da origem vira um item com chave estável, sem cópia; mudar na origem muda o item', () => {
@@ -132,6 +132,15 @@ describe('tarefas das áreas', () => {
     expect(chaves).toEqual(['task:t1', 'agenda_event:e1', 'material_need:n2'])
     const material = itensDasAreas(dados, new Map(), AGORA, FUSO).find(({ chave }) => chave === 'material_need:n2')!
     expect(material).toMatchObject({ podeConcluir: false, link: '/app/materiais', data: null })
+  })
+
+  it('estudo bíblico não vira tarefa; só o próximo passo registrado aparece, mesmo sem data', () => {
+    const estudo = { id: 'b1', interestId: 'i1', churchId: 'igreja-a', startedAt: '2026-08-01', completedAt: null, status: 'in_progress', followUp: '', outcome: null, createdAt: '', updatedAt: '' } as const
+    expect(itensDasAreas({ ...vazio, estudos: [estudo, { ...estudo, id: 'b2', followUp: '   ' }] }, new Map(), AGORA, FUSO)).toEqual([])
+    const [passo] = itensDasAreas({ ...vazio, estudos: [{ ...estudo, id: 'b3', status: 'completed', followUp: 'Levar a lição 5' }] }, new Map(), AGORA, FUSO)
+    expect(passo).toMatchObject({ chave: 'bible_study:b3', area: 'estudos', titulo: 'Levar a lição 5', data: null, podeConcluir: false, link: '/app/metas/bible_studies' })
+    expect(itensDoBloco([passo!], 'todos', AGORA, FUSO)).toHaveLength(1)
+    expect(itensDoBloco([passo!], 'hoje', AGORA, FUSO)).toHaveLength(0)
   })
 
   it('manuais e integrados juntos não se confundem', () => {

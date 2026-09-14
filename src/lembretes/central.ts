@@ -7,6 +7,7 @@ export const AREAS_DA_CENTRAL = {
   comissoes: { rotulo: 'Comissões', descricao: 'Pendências das reuniões' },
   nomeacoes: { rotulo: 'Nomeações', descricao: 'Tarefas dos processos de nomeação' },
   evangelismo: { rotulo: 'Evangelismo', descricao: 'Tarefas das campanhas' },
+  estudos: { rotulo: 'Estudos bíblicos', descricao: 'Próximos passos registrados' },
   planejamento: { rotulo: 'Planejamento Anual', descricao: 'Metas com prazo' },
   agenda: { rotulo: 'Agenda', descricao: 'Compromissos com lembrete' },
   orcamento: { rotulo: 'Orçamento', descricao: 'Contas a pagar' },

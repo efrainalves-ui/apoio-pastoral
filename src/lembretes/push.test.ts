@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { chaveDaOcorrencia, ocorrenciasParaAvisar } from './push'
+import { generateMasterKey } from '../crypto/vault'
+import { chaveDaOcorrencia, chaveDeAgendamento, localizarOcorrencia, ocorrenciasParaAvisar } from './push'
 import type { LembreteEntity } from './types'
 
 const FUSO = 'America/Belem'
@@ -33,6 +34,21 @@ describe('ocorrências que recebem aviso', () => {
     expect(lista.map(({ ocorrencia, instante }) => [ocorrencia, instante.toISOString()])).toEqual([
       ['2026-09-20', '2026-09-20T10:30:00.000Z'],
     ])
+  })
+})
+
+describe('abrir pela notificação', () => {
+  it('a chave opaca leva à ocorrência certa depois do disparo, só com a chave-mestra da conta', async () => {
+    const mestra = await generateMasterKey()
+    const lista = [lembrete({ id: 'itinerario', data: '2026-09-14', hora: '10:00' }), lembrete({ id: 'outro', data: '2026-09-14', hora: '11:00' })]
+    const agendada = ocorrenciasParaAvisar(lista, new Date('2026-09-14T12:00:00Z'), FUSO).find(({ lembreteId }) => lembreteId === 'itinerario')!
+    const chaveOpaca = await chaveDaOcorrencia(await chaveDeAgendamento(mestra), agendada)
+    const depois = new Date('2026-09-14T13:05:00Z')
+
+    expect(await localizarOcorrencia(mestra, lista, chaveOpaca, depois, FUSO)).toMatchObject({ lembreteId: 'itinerario', ocorrencia: null })
+    expect(await localizarOcorrencia(await generateMasterKey(), lista, chaveOpaca, depois, FUSO)).toBeNull()
+    expect(await localizarOcorrencia(mestra, lista, 'não-é-chave', depois, FUSO)).toBeNull()
+    expect(await localizarOcorrencia(mestra, [lembrete({ id: 'itinerario', data: '2026-09-14', hora: '10:00', estado: 'concluido' })], chaveOpaca, depois, FUSO)).toBeNull()
   })
 })
 

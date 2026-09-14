@@ -6,6 +6,7 @@ import { clearAccountSessionLock, lockedAccountId, onAccountSessionLost } from '
 import { useAutoLock } from './autoLock'
 import { resendConfirmationEmail, requestPasswordReset, signOutRemoteAccount } from './supabase'
 import { removerInscricaoDoAparelho } from '../lembretes/push'
+import { esquecerDestino } from '../lembretes/destino'
 import {
   changeVaultPassword,
   completePasswordReset,
@@ -202,6 +203,7 @@ export function AuthVaultProvider({ children }: { children: ReactNode }) {
     setMasterKey(null)
     setSyncKey(null)
     await esquecerSessaoAberta()
+    esquecerDestino()
     // A inscrição de notificação sai com a conta: outro usuário deste aparelho não recebe avisos dela.
     await removerInscricaoDoAparelho().catch(() => undefined)
     await signOutRemoteAccount()

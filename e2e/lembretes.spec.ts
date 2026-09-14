@@ -88,10 +88,77 @@ test('Central de Lembretes: série mensal, listas e pesquisa sem acento', async 
   await page.reload()
   await page.getByRole('textbox', { name: 'Senha' }).fill(password)
   await page.getByRole('button', { name: 'Entrar' }).click()
-  await expect(page.getByRole('heading', { name: 'Visão do distrito' })).toBeVisible()
-  await navigateInsideApp(page, '/app/lembretes', page.getByRole('heading', { name: 'Lembretes', exact: true }))
+  // Recarregou dentro dos Lembretes: depois de entrar, volta para eles.
+  await expect(page).toHaveURL(/\/app\/lembretes$/u)
+  await expect(page.getByRole('heading', { name: 'Lembretes', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Concluídos: 1' })).toBeVisible()
   await expect(page.getByRole('link', { name: /^Pessoal/ })).toHaveCount(1)
   await expect(page.getByRole('link', { name: /^Compras/ })).toHaveCount(1)
   await expect(page.getByRole('link', { name: /^Rotinas/ })).toHaveCount(0)
+})
+
+const LIGAR = 'Ligar para o ancião fictício'
+
+/*
+  O que acontece na hora do lembrete: o aviso dentro do aplicativo, sem
+  internet, uma vez só e sem mexer na tarefa; e o caminho de uma notificação
+  aberta com o cofre fechado, que precisa sobreviver à tela de acesso.
+*/
+test('Lembretes: aviso na hora sem internet, uma vez só; destino da notificação depois de entrar; área do sistema sem editar nem excluir', async ({ page, context }) => {
+  test.setTimeout(240_000)
+  await entrar(page)
+  await navigateInsideApp(page, '/app/lembretes', page.getByRole('heading', { name: 'Lembretes', exact: true }))
+
+  // Área do aplicativo é lista do sistema: não se renomeia nem se exclui.
+  await page.getByRole('region', { name: 'Áreas do aplicativo' }).getByRole('link', { name: /^Visitação/ }).click()
+  await expect(page.getByRole('heading', { name: 'Visitação' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Editar lista' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Excluir lista' })).toHaveCount(0)
+  await page.locator('.lembretes-voltar').click()
+
+  // Um lembrete para agora, criado sem internet.
+  await page.getByRole('link', { name: 'Novo lembrete' }).click()
+  await expect(page.getByLabel('O que devo lembrar?')).toBeVisible()
+  await context.setOffline(true)
+  const agora = await page.evaluate(() => {
+    const d = new Date()
+    const dois = (n: number) => String(n).padStart(2, '0')
+    return { data: `${d.getFullYear()}-${dois(d.getMonth() + 1)}-${dois(d.getDate())}`, hora: `${dois(d.getHours())}:${dois(d.getMinutes())}` }
+  })
+  await page.getByLabel('O que devo lembrar?').fill(LIGAR)
+  await page.getByLabel('Data', { exact: true }).fill(agora.data)
+  await page.getByLabel('Horário', { exact: true }).fill(agora.hora)
+  await page.getByLabel('Notificar no horário').check()
+  await page.getByRole('button', { name: 'Salvar' }).click()
+
+  const aviso = page.getByRole('alert').filter({ hasText: LIGAR })
+  await expect(aviso).toBeVisible()
+  await expect(aviso).toHaveCount(1)
+  await aviso.getByRole('button', { name: `Dispensar aviso de ${LIGAR}` }).click()
+  await expect(aviso).toHaveCount(0)
+  // Dispensar não conclui: o lembrete continua em Hoje.
+  await expect(page.getByRole('link', { name: 'Hoje: 1' })).toBeVisible()
+  await context.setOffline(false)
+
+  // Abrir de novo: a mesma ocorrência não avisa outra vez.
+  await page.reload()
+  await page.getByRole('textbox', { name: 'Senha' }).fill(password)
+  await page.getByRole('button', { name: 'Entrar' }).click()
+  await expect(page.getByRole('link', { name: 'Hoje: 1' })).toBeVisible()
+  await page.waitForTimeout(1_500)
+  await expect(page.getByRole('alert').filter({ hasText: LIGAR })).toHaveCount(0)
+
+  // Notificação aberta com o cofre fechado: a tela de acesso guarda só o caminho e devolve depois de entrar.
+  const caminho = `/app/lembretes/aviso/${'0'.repeat(64)}`
+  await page.goto(caminho)
+  await expect(page).toHaveURL(/\/acesso$/u)
+  const guardado = await page.evaluate(() => sessionStorage.getItem('apoio-pastoral:destino-apos-entrar') ?? '')
+  expect(guardado).toContain(caminho)
+  expect(guardado).not.toContain(LIGAR)
+  await page.getByRole('textbox', { name: 'Senha' }).fill(password)
+  await page.getByRole('button', { name: 'Entrar' }).click()
+  // Chave que este cofre não reconhece: abre Hoje, sem erro.
+  await expect(page).toHaveURL(/\/app\/lembretes\/bloco\/hoje$/u)
+  await expect(page.getByRole('heading', { name: 'Hoje' })).toBeVisible()
+  await expect(page.getByRole('checkbox', { name: `Concluir ${LIGAR}` })).toBeVisible()
 })

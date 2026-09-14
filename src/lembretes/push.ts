@@ -150,7 +150,7 @@ const utf8 = (texto: string) => new TextEncoder().encode(texto)
  * aparelhos da conta. Esse vetor é usado só para este texto, e o resultado
  * nunca sai do aparelho: serve apenas de chave para as chaves opacas.
  */
-async function chaveDeAgendamento(masterKey: CryptoKey): Promise<CryptoKey> {
+export async function chaveDeAgendamento(masterKey: CryptoKey): Promise<CryptoKey> {
   const bruto = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: new Uint8Array(12), additionalData: utf8('apoio-pastoral:push-key:v1') }, masterKey, utf8('apoio-pastoral:chave-de-notificacao:v1'))
   return crypto.subtle.importKey('raw', bruto, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
 }
@@ -182,6 +182,21 @@ export function ocorrenciasParaAvisar(lembretes: readonly LembreteEntity[], agor
 
 export async function chaveDaOcorrencia(chave: CryptoKey, ocorrencia: OcorrenciaParaAvisar): Promise<string> {
   return hex(await crypto.subtle.sign('HMAC', chave, utf8(`${ocorrencia.lembreteId}|${ocorrencia.ocorrencia ?? ''}|${ocorrencia.instante.toISOString()}`)))
+}
+
+/**
+ * A ocorrência de uma chave opaca, recalculada do cofre.
+ *
+ * A notificação traz só a chave. Quem tem a chave-mestra refaz os HMACs das
+ * ocorrências recentes e acha qual é; quem não tem, não acha nada.
+ */
+export async function localizarOcorrencia(masterKey: CryptoKey, lembretes: readonly LembreteEntity[], chaveOpaca: string, agora = new Date(), fuso = Intl.DateTimeFormat().resolvedOptions().timeZone): Promise<OcorrenciaParaAvisar | null> {
+  if (!/^[0-9a-f]{64}$/u.test(chaveOpaca)) return null
+  const chave = await chaveDeAgendamento(masterKey)
+  for (const ocorrencia of ocorrenciasParaAvisar(lembretes, new Date(agora.getTime() - 48 * 3_600_000), fuso)) {
+    if (await chaveDaOcorrencia(chave, ocorrencia) === chaveOpaca) return ocorrencia
+  }
+  return null
 }
 
 /**

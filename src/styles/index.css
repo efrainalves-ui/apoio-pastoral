@@ -3361,6 +3361,22 @@ html .agenda-page .ponto-categoria.categoria-visual { width: 7px; height: 7px; b
   box-shadow: 0 10px 26px rgb(23 105 232 / 38%);
 }
 .lembretes-fab svg { width: 28px; height: 28px; }
+
+.avisos-de-lembretes {
+  position: fixed; z-index: 35; top: calc(12px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  width: min(460px, calc(100% - 32px)); display: grid; gap: 8px;
+}
+.aviso-de-lembrete {
+  display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 16px; border-radius: 16px;
+  color: #fff; background: linear-gradient(135deg, #1769E8, #48A3FF); box-shadow: 0 12px 30px rgb(23 105 232 / 35%);
+}
+.aviso-de-lembrete > svg { flex: none; width: 24px; height: 24px; }
+.aviso-de-lembrete__texto { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.aviso-de-lembrete__texto strong { overflow-wrap: anywhere; }
+.aviso-de-lembrete__texto span { font-size: .85rem; opacity: .92; }
+.aviso-de-lembrete .button { flex: none; color: #0b3f91; background: #fff; border-color: #fff; }
+.aviso-de-lembrete .icon-button { flex: none; color: #fff; background: transparent; }
+.aviso-de-lembrete a:focus-visible, .aviso-de-lembrete button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 .lembretes-fab:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 @media (max-width: 900px) { .lembretes-fab { bottom: calc(92px + env(safe-area-inset-bottom)); } }
 

@@ -11,6 +11,7 @@ import { EvangelismPlanningService } from '../evangelism/service'
 import { familyBudgetDb, type FamilyBudgetDatabase } from '../family-budget/database'
 import { FamilyBudgetService } from '../family-budget/service'
 import { MaterialsService } from '../materials/service'
+import { MissionaryService } from '../missionary/service'
 import { NominationService } from '../nominations/service'
 import { idDerivado } from '../shared/idDerivado'
 import { firstSyncPending } from '../sync/service'
@@ -58,6 +59,7 @@ export class LembreteService {
   private readonly agenda: AgendaService
   private readonly budget: FamilyBudgetService
   private readonly materials: MaterialsService
+  private readonly missionary: MissionaryService
 
   constructor(
     private readonly database: ApoioDatabase = db,
@@ -73,6 +75,7 @@ export class LembreteService {
     this.agenda = new AgendaService(database)
     this.budget = new FamilyBudgetService(orcamento)
     this.materials = new MaterialsService(database)
+    this.missionary = new MissionaryService(database)
   }
 
   private async ler<T>(accountId: string, masterKey: CryptoKey, tipo: TipoDaCentral): Promise<Array<T & { id: string }>> {
@@ -313,16 +316,16 @@ export class LembreteService {
 
   /** Tudo o que a Central mostra, lido agora: manuais, tarefas das áreas e listas. */
   async carregar(accountId: string, masterKey: CryptoKey, agora = new Date(), fuso = fusoDoAparelho()): Promise<{ itens: ItemDaCentral[]; listas: ListaDeLembretesEntity[] }> {
-    const [lembretes, listas, metadados, tarefas, acompanhamentos, pedidos, tarefasDeComissao, processos, campanhas, metas, eventos, contas, necessidades] = await Promise.all([
+    const [lembretes, listas, metadados, tarefas, acompanhamentos, pedidos, tarefasDeComissao, processos, campanhas, metas, eventos, contas, necessidades, estudos] = await Promise.all([
       this.lembretes(accountId, masterKey), this.listas(accountId, masterKey), this.metadados(accountId, masterKey),
       this.care.listTasks(accountId, masterKey), this.care.listFollowUps(accountId, masterKey), this.care.listPrayerRequests(accountId, masterKey),
       this.commissions.tasks(accountId, masterKey), this.nominations.list(accountId, masterKey),
       this.evangelism.listCampaigns(accountId, masterKey), this.evangelism.listGoals(accountId, masterKey), this.agenda.listEvents(accountId, masterKey),
-      this.budget.bills(accountId, masterKey), this.materials.needs(accountId, masterKey),
+      this.budget.bills(accountId, masterKey), this.materials.needs(accountId, masterKey), this.missionary.listStudies(accountId, masterKey),
     ])
     const itens = [
       ...itensDosLembretes(lembretes),
-      ...itensDasAreas({ tarefas, acompanhamentos, pedidos, tarefasDeComissao, processos, campanhas, metas, eventos, contas, necessidades }, metadados, agora, fuso),
+      ...itensDasAreas({ tarefas, acompanhamentos, pedidos, tarefasDeComissao, processos, campanhas, metas, eventos, contas, necessidades, estudos }, metadados, agora, fuso),
     ]
     return { itens, listas }
   }

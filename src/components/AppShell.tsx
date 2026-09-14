@@ -1,5 +1,6 @@
 import { useAvisosDeTarefa } from '../tasks/useAvisosDeTarefa'
 import { useContadorDeLembretes } from '../lembretes/useCentral'
+import { AvisosDeLembretes } from './lembretes/AvisosDeLembretes'
 import {
   ListChecks,
   CalendarDays,
@@ -183,7 +184,7 @@ export function AppShell() {
           <button className="icon-button app-header__leave" aria-label="Bloquear cofre" onClick={bloquear}><LockKeyhole /></button>
           <button className="icon-button app-header__leave app-header__sair" aria-label="Sair" onClick={leave}><LogOut /></button>
         </header>
-        <main id="conteudo" className="content" tabIndex={-1}><AvisoDeRestauracao /><Outlet /></main>
+        <main id="conteudo" className="content" tabIndex={-1}><AvisoDeRestauracao /><AvisosDeLembretes /><Outlet /></main>
         <nav className="bottom-nav" aria-label="Navegação principal móvel">
           {mobileNav.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} {...(end ? { end: true } : {})} className={({ isActive }) => `bottom-nav__item ${isActive || (to === '/app/distrito' && ['/app/distrito', '/app/pessoas', '/app/familias'].some((section) => pathname.startsWith(section))) || (to === '/app/visitacao' && ['/app/visitacao', '/app/visitas'].some((section) => pathname.startsWith(section))) ? 'bottom-nav__item--active' : ''}`}>

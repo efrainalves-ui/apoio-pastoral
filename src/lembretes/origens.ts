@@ -4,6 +4,7 @@ import type { CommissionEntity, CommissionTaskData } from '../commissions/types'
 import type { AnnualGoalEntity, EvangelismCampaignEntity } from '../evangelism/types'
 import type { BudgetBillData } from '../family-budget/types'
 import type { MaterialNeedEntity } from '../materials/types'
+import type { BibleStudyEntity } from '../missionary/types'
 import type { NominationProcessEntity } from '../nominations/types'
 import type { AreaDaCentral, ItemDaCentral } from './central'
 import { dataNoFuso, horaNoFuso } from './tempo'
@@ -21,6 +22,7 @@ export interface DadosDasAreas {
   eventos: readonly AgendaEventEntity[]
   contas: ReadonlyArray<BudgetBillData & { id: string }>
   necessidades: readonly MaterialNeedEntity[]
+  estudos: readonly BibleStudyEntity[]
 }
 
 const deAlta = (prioridade: string | undefined): PrioridadeDoLembrete => prioridade === 'urgent' ? 'urgente' : prioridade === 'high' ? 'importante' : 'normal'
@@ -112,6 +114,16 @@ export function itensDasAreas(dados: DadosDasAreas, metadados: ReadonlyMap<strin
         concluido: tarefa.status === 'completed', podeConcluir: false,
       })
     }
+  }
+
+  // O estudo em si não é tarefa. Só o próximo passo escrito nele, com ou sem data.
+  for (const estudo of dados.estudos) {
+    const passo = estudo.followUp?.trim()
+    if (!passo) continue
+    incluir({
+      origem: `bible_study:${estudo.id}`, area: 'estudos', titulo: passo, detalhe: 'Próximo passo do estudo bíblico', link: '/app/metas/bible_studies',
+      data: null, concluido: false, igrejaId: estudo.churchId, podeConcluir: false,
+    })
   }
 
   for (const meta of dados.metas) {

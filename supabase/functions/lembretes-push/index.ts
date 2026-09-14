@@ -75,7 +75,7 @@ async function enviarVencidos(admin: SupabaseClient) {
       continue
     }
     const { data: inscricoes } = await admin.from('push_subscriptions').select('id, endpoint, p256dh, auth_secret').eq('owner_id', linha.owner_id)
-    const { entregues, transitorias } = await enviar(admin, inscricoes ?? [], { tag: linha.occurrence_key, chave: linha.occurrence_key, url: '/app/lembretes/bloco/hoje' })
+    const { entregues, transitorias } = await enviar(admin, inscricoes ?? [], { tag: linha.occurrence_key, chave: linha.occurrence_key, url: `/app/lembretes/aviso/${linha.occurrence_key}` })
     if (entregues > 0 || !transitorias) {
       await admin.from('notification_schedule').update({ state: entregues > 0 ? 'sent' : 'failed', sent_at: entregues > 0 ? agoraIso : null, updated_at: agoraIso }).eq('id', linha.id)
       enviados += entregues > 0 ? 1 : 0
