@@ -146,6 +146,9 @@ export interface AgendaEventData {
   finalidadeOutra?: string
   /** Estudo bíblico: quem ministra — pessoa cadastrada ou nome escrito. */
   instrutor?: InstrutorDoEstudo | null
+  /** Casamento: o acompanhamento a que o compromisso pertence, e o papel dele — cerimônia, entrevista ou ensaio. */
+  casamentoId?: string | null
+  papelNoCasamento?: 'cerimonia' | 'entrevista' | 'ensaio' | null
   /** Pregação: uma, todas, várias ou outra igreja. Ausente nos antigos, que usam `churchId`. */
   escolhaDeIgreja?: EscolhaDeIgreja | null
   churchIds?: string[]

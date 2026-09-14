@@ -1,8 +1,8 @@
 import type { IncomeStatus } from '../people/types'
 
-export const VISIT_REASONS = ['routine', 'leadership', 'crisis', 'illness', 'mourning', 'newly_baptized', 'rescue', 'interested', 'family', 'other'] as const
+export const VISIT_REASONS = ['routine', 'leadership', 'crisis', 'illness', 'mourning', 'newly_baptized', 'rescue', 'interested', 'family', 'wedding', 'other'] as const
 export type VisitReason = (typeof VISIT_REASONS)[number]
-export const VISIT_REASON_LABELS: Record<VisitReason, string> = { routine: 'Rotina', leadership: 'Liderança', crisis: 'Crise', illness: 'Enfermidade', mourning: 'Luto', newly_baptized: 'Recém-batizado', rescue: 'A resgatar', interested: 'Interessado', family: 'Família', other: 'Outro' }
+export const VISIT_REASON_LABELS: Record<VisitReason, string> = { routine: 'Rotina', leadership: 'Liderança', crisis: 'Crise', illness: 'Enfermidade', mourning: 'Luto', newly_baptized: 'Recém-batizado', rescue: 'A resgatar', interested: 'Interessado', family: 'Família', wedding: 'Casamento', other: 'Outro' }
 
 export type QuestionScope = 'individual' | 'family'
 export type QuestionResponseType = 'choice' | 'multiple' | 'number' | 'text'
@@ -17,7 +17,7 @@ export interface QuestionSnapshot {
 export interface VisitAnswer { id: string; question: QuestionSnapshot; subjectId: string; value: string | string[]; skipped: boolean }
 export interface VisitParticipant { id: string; kind: 'person' | 'guest'; personId?: string; guestName?: string; present: boolean }
 export interface VisitVersion { version: number; correctedAt: string; correctionNote?: string; answers: VisitAnswer[]; participants: VisitParticipant[]; reason: VisitReason; startAt: string; endAt: string; notes: string }
-export interface VisitData { targetType: 'family' | 'person'; targetId: string; churchId: string; scheduledEventId: string | null; mode: 'full' | 'quick'; status: 'completed'; currentVersion: number; versions: VisitVersion[]; createdAt: string; updatedAt: string }
+export interface VisitData { targetType: 'family' | 'person'; targetId: string; churchId: string; scheduledEventId: string | null; /** Visita do acompanhamento de um casamento. */ casamentoId?: string | null; mode: 'full' | 'quick'; status: 'completed'; currentVersion: number; versions: VisitVersion[]; createdAt: string; updatedAt: string }
 export interface VisitEntity extends VisitData { id: string }
 
 export interface PrayerUpdate { id: string; at: string; text: string }
@@ -39,4 +39,4 @@ export interface TaskEntity extends TaskData { id: string }
 export interface VisitRoundData { name: string; churchId: string | null; targetFamilyIds: string[]; visitedFamilyIds: string[]; status: 'active' | 'completed' | 'archived'; startedAt: string; completedAt: string | null; createdAt: string; updatedAt: string }
 export interface VisitRoundEntity extends VisitRoundData { id: string }
 
-export interface VisitCompletionInput { targetType: 'family' | 'person'; targetId: string; churchId: string; scheduledEventId: string | null; mode: 'full' | 'quick'; participants: VisitParticipant[]; reason: VisitReason; startAt: string; endAt: string; notes: string; answers: VisitAnswer[]; prayerText: string; prayerReviewAt: string; followUp: { kind: FollowUpKind; dueAt: string; notes: string } | null; task: { title: string; description: string; dueAt: string; priority: TaskData['priority'] } | null; incomeAnswers: Array<{ personId: string; status: IncomeStatus }>; roundId: string | null }
+export interface VisitCompletionInput { targetType: 'family' | 'person'; targetId: string; churchId: string; scheduledEventId: string | null; casamentoId?: string | null; mode: 'full' | 'quick'; participants: VisitParticipant[]; reason: VisitReason; startAt: string; endAt: string; notes: string; answers: VisitAnswer[]; prayerText: string; prayerReviewAt: string; followUp: { kind: FollowUpKind; dueAt: string; notes: string } | null; task: { title: string; description: string; dueAt: string; priority: TaskData['priority'] } | null; incomeAnswers: Array<{ personId: string; status: IncomeStatus }>; roundId: string | null }

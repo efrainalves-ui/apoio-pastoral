@@ -56,7 +56,7 @@ export function isPersonalRecord(payload: VaultPayload): boolean {
 const TYPE_LABELS: Record<string, string> = {
   district: 'Distrito', church: 'Igrejas', person: 'Pessoas', family: 'Famílias', import_batch: 'Importações',
   agenda_event: 'Agenda do distrito', sermon: 'Sermões', goal: 'Metas', goal_entry: 'Lançamentos de metas',
-  goal_history: 'Resultados de anos anteriores', visit: 'Visitas', prayer_request: 'Pedidos de oração',
+  goal_history: 'Resultados de anos anteriores', visit: 'Visitas', wedding: 'Casamentos', prayer_request: 'Pedidos de oração',
   follow_up: 'Acompanhamentos', task: 'Tarefas', visit_round: 'Rodadas de visitação', interest: 'Interessados',
   bible_study: 'Estudos bíblicos', missionary_pair: 'Duplas missionárias', sabbath_class: 'Escola Sabatina',
   small_group: 'Pequenos Grupos', uapg: 'UAPG', commission_config: 'Configuração de comissões',

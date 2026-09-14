@@ -261,12 +261,22 @@ export function withoutPerson(payload: VaultPayload, personId: string): VaultPay
         },
       }
     }
+    case 'wedding': {
+      // Noiva ou noivo ligado ao cadastro: sai o vínculo e o nome; o acompanhamento do outro continua.
+      const tirar = (noivo: unknown) => {
+        const atual = noivo as { personId?: string | null } | null | undefined
+        return atual?.personId === personId ? { personId: null, nome: '', igrejaId: null, igrejaNome: '' } : noivo
+      }
+      const citado = (dados.noiva as { personId?: string } | undefined)?.personId === personId || (dados.noivo as { personId?: string } | undefined)?.personId === personId
+      if (!citado) return null
+      return { ...payload, data: { ...dados, noiva: tirar(dados.noiva), noivo: tirar(dados.noivo) } }
+    }
     default: return null
   }
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  person: 'Pessoa', visit: 'Visita', prayer_request: 'Pedido de oração', follow_up: 'Acompanhamento',
+  person: 'Pessoa', visit: 'Visita', wedding: 'Casamento', prayer_request: 'Pedido de oração', follow_up: 'Acompanhamento',
   task: 'Tarefa', bible_study: 'Estudo bíblico', family: 'Família', missionary_pair: 'Dupla missionária',
   sabbath_class: 'Classe da Escola Sabatina', small_group: 'Pequeno Grupo', agenda_event: 'Compromisso',
   commission_config: 'Configuração de comissão', commission_meeting: 'Reunião de comissão',

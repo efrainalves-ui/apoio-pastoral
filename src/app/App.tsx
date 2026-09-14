@@ -70,6 +70,8 @@ const FidelityPage = lazy(() => import('../pages/FidelityPage').then((module) =>
 const VisitDetailPage = lazy(() => import('../pages/VisitDetailPage').then((module) => ({ default: module.VisitDetailPage })))
 const VisitFormPage = lazy(() => import('../pages/VisitFormPage').then((module) => ({ default: module.VisitFormPage })))
 const VisitationPage = lazy(() => import('../pages/VisitationPage').then((module) => ({ default: module.VisitationPage })))
+const CasamentoPage = lazy(() => import('../pages/CasamentoPage').then((module) => ({ default: module.CasamentoPage })))
+const CasamentoNovoPage = lazy(() => import('../pages/CasamentoNovoPage').then((module) => ({ default: module.CasamentoNovoPage })))
 const FamilyBudgetPage = lazy(() => import('../pages/FamilyBudgetPage').then((module) => ({ default: module.FamilyBudgetPage })))
 
 const districtService = new DistrictService()
@@ -221,7 +223,10 @@ function useMudancaDosPessoais() {
         /* Reunião de Nomeações marcada antes de existir processo: o vínculo se completa quando o processo aparece, inclusive vindo de outro aparelho. */
         const { VinculoAgendaComissao } = await import('../agenda/vinculoComissao')
         const nomeacoes = await new VinculoAgendaComissao().vincularPendentes(account.id, masterKey)
-        if (resultado.movidos > 0 || reparo.reparados > 0 || pgp.migrados > 0 || nomeacoes > 0) notificarDadosSincronizados()
+        /* Casamentos já marcados na Agenda ganham o acompanhamento, com identificador derivado do compromisso: rodar de novo não duplica. */
+        const { CasamentoService } = await import('../casamentos/service')
+        const casamentos = await new CasamentoService().migrarCompromissosAntigos(account.id, masterKey)
+        if (resultado.movidos > 0 || reparo.reparados > 0 || pgp.migrados > 0 || nomeacoes > 0 || casamentos.vinculados > 0) notificarDadosSincronizados()
       } catch {
         // O lugar antigo continua intacto; a próxima abertura tenta outra vez.
       } finally {
@@ -363,6 +368,9 @@ export function App() {
         <Route path="metas/relatorio-integrado" element={<RelatorioIntegradoPage />} />
         <Route path="links" element={<UsefulLinksPage />} />
         <Route path="visitacao" element={<VisitationPage />} />
+        <Route path="casamentos" element={<Navigate to="/app/visitacao?aba=casamentos" replace />} />
+        <Route path="casamentos/novo" element={<CasamentoNovoPage />} />
+        <Route path="casamentos/:casamentoId" element={<CasamentoPage />} />
         <Route path="visitas" element={<Navigate to="/app/visitacao" replace />} />
         <Route path="visitas/nova" element={<VisitFormPage />} />
         <Route path="visitas/:visitId" element={<VisitDetailPage />} />

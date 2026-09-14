@@ -65,6 +65,7 @@ export function detalhesAoTrocarCategoria(input: AgendaEventInput, category: Age
   if (!usaPessoaOuFamilia(category)) { limpo.pessoaId = null; limpo.familiaId = null }
   if (category !== 'visit') { limpo.finalidade = null; limpo.finalidadeOutra = '' }
   if (category !== 'bible_study') limpo.instrutor = null
+  if (category !== 'wedding' && limpo.papelNoCasamento === 'cerimonia') { limpo.casamentoId = null; limpo.papelNoCasamento = null }
   if (!usaObservacoes(category)) limpo.notes = ''
   if (category !== 'preaching') { limpo.escolhaDeIgreja = null; limpo.churchIds = [] }
   return limpo
@@ -215,7 +216,7 @@ export function validarDetalhes(input: AgendaEventInput): void {
     if (!input.comissao.tipo) throw new Error('Informe qual comissão.')
     if (input.comissao.tipo === 'outra' && vazio(input.comissao.outraNome)) throw new Error('Informe o nome da comissão.')
   }
-  if (input.category === 'wedding' && input.casamento) {
+  if (input.category === 'wedding' && input.casamento && !input.casamentoId) {
     if (vazio(input.casamento.noivo) || vazio(input.casamento.noiva)) throw new Error('Informe o nome do noivo e da noiva.')
   }
   if (input.category === 'child_dedication' && input.dedicacao) {
