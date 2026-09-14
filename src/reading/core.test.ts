@@ -1,95 +1,127 @@
 import { describe, expect, it } from 'vitest'
-import { datasCoerentes, metaAnualDeLivros, readingSummary, sessaoDoRegistroRetroativo } from './core'
-import type { ReadingBookData, ReadingEntity, ReadingGoalData, ReadingSessionData } from './types'
+import {
+  acumuladoAteOMes, datasCoerentes, formatarTempo, mesesDoAno, metaDoAno, propostaDeSoma, relatorioMensal, resumoAnual, revisaoPendente, sessaoDoRegistroRetroativo,
+} from './core'
+import type { ReadingAnnualGoalData, ReadingBookData, ReadingEntity, ReadingGoalRecordData, ReadingSessionData } from './types'
 
-const meta = (month: string, books: number): ReadingEntity<ReadingGoalData> =>
-  ({ id: month, month, books, pages: 0, minutes: 0, createdAt: '', updatedAt: '' })
+const livro = (id: string, extra: Partial<ReadingBookData> = {}): ReadingEntity<ReadingBookData> => ({
+  id, title: `Livro Fictício ${id}`, author: 'Autora Fictícia', category: 'devotional', status: 'reading',
+  totalPages: 300, pagesRead: 0, startDate: '2026-01-05', completedDate: null, notes: '', createdAt: '', updatedAt: '', ...extra,
+})
+const sessao = (id: string, bookId: string, date: string, pages: number, minutes: number): ReadingEntity<ReadingSessionData> =>
+  ({ id, bookId, date, pages, minutes, notes: '', createdAt: `${date}T10:00:00Z`, updatedAt: '' })
+const anual = (year: string, books: number | null, pages: number | null): ReadingEntity<ReadingAnnualGoalData> =>
+  ({ id: `anual-${year}`, tipo: 'anual', year, books, pages, createdAt: '', updatedAt: '' })
+const mensal = (month: string, books: number, pages: number): ReadingEntity<ReadingGoalRecordData> =>
+  ({ id: `mensal-${month}`, month, books, pages, minutes: 300, createdAt: '', updatedAt: '' })
 
-const livro = (completedDate: string): ReadingEntity<ReadingBookData> => ({
-  id: completedDate, title: 'Livro Fictício', author: '', category: 'devotional', status: 'completed',
-  totalPages: 0, pagesRead: 0, startDate: '', completedDate, notes: '', createdAt: '', updatedAt: '',
+/*
+  Um livro de trezentas páginas lido de janeiro a março, concluído em março; outro
+  concluído em fevereiro; e uma sessão de dezembro do ano anterior.
+*/
+const LIVROS = [
+  livro('longo', { status: 'completed', completedDate: '2026-03-10', pagesRead: 300 }),
+  livro('curto', { status: 'completed', completedDate: '2026-02-20', totalPages: 120, pagesRead: 120 }),
+  livro('antigo', { status: 'completed', completedDate: '2025-12-30' }),
+]
+const SESSOES = [
+  sessao('s1', 'longo', '2026-01-31', 100, 95),
+  sessao('s2', 'longo', '2026-02-01', 100, 80),
+  sessao('s3', 'curto', '2026-02-01', 120, 100),
+  sessao('s4', 'longo', '2026-03-10', 100, 60),
+  sessao('s5', 'antigo', '2025-12-31', 50, 40),
+  sessao('ruim', 'curto', '2026-02-02', -30, -10),
+]
+
+describe('meta anual de leitura', () => {
+  it('livros e páginas contra a meta do ano; tempo só como resultado; nada negativo', () => {
+    const resumo = resumoAnual(LIVROS, SESSOES, '2026', anual('2026', 15, 5000))
+    expect(resumo.livros).toEqual({ feito: 2, meta: 15, percentual: 13, faltam: 13, superadaEm: null })
+    expect(resumo.paginas).toEqual({ feito: 420, meta: 5000, percentual: 8, faltam: 4580, superadaEm: null })
+    expect(resumo.minutos).toBe(335)
+    expect(formatarTempo(2555)).toBe('42h 35min')
+    expect(formatarTempo(420)).toBe('7h')
+    expect(formatarTempo(35)).toBe('35min')
+  })
+
+  it('meta superada mostra o valor real, acima de 100%; sem meta, continua mostrando o resultado', () => {
+    const superada = resumoAnual(LIVROS, SESSOES, '2026', anual('2026', 1, 400))
+    expect(superada.livros).toMatchObject({ feito: 2, percentual: 200, faltam: 0, superadaEm: 1 })
+    expect(superada.paginas).toMatchObject({ feito: 420, percentual: 105, superadaEm: 20 })
+    expect(resumoAnual(LIVROS, SESSOES, '2026', null).livros).toEqual({ feito: 2, meta: null, percentual: null, faltam: null, superadaEm: null })
+    // Só páginas: o campo de livros fica sem meta.
+    expect(resumoAnual(LIVROS, SESSOES, '2026', anual('2026', null, 1000)).livros.meta).toBeNull()
+  })
+
+  it('uma meta por ano; anos diferentes não se emprestam', () => {
+    const metas = [anual('2025', 10, 3000), anual('2026', 15, 5000)]
+    expect(metaDoAno(metas, '2026')).toMatchObject({ books: 15 })
+    expect(metaDoAno(metas, '2027')).toBeNull()
+  })
 })
 
-describe('a meta de livros é do ano', () => {
-  it('vale para o ano inteiro, escrita em qualquer mês', () => {
-    // Livro não se lê por mês: um de trezentas páginas atravessa três.
-    // Escrevê-la em janeiro basta para valer em setembro.
-    expect(metaAnualDeLivros([meta('2026-01', 12)], '2026')).toBe(12)
+describe('relatório mensal', () => {
+  it('páginas e tempo pela data da sessão; o livro conta só no mês da conclusão; virada de mês e de ano', () => {
+    const janeiro = relatorioMensal(LIVROS, SESSOES, '2026-01')
+    expect(janeiro).toMatchObject({ paginas: 100, minutos: 95, sessoes: 1, dias: 1 })
+    expect(janeiro.livrosConcluidos).toHaveLength(0)
+    expect(janeiro.livrosLidos.map(({ id }) => id)).toEqual(['longo'])
+
+    const fevereiro = relatorioMensal(LIVROS, SESSOES, '2026-02')
+    expect(fevereiro).toMatchObject({ paginas: 220, minutos: 180, sessoes: 3, dias: 2 })
+    expect(fevereiro.livrosConcluidos.map(({ id }) => id)).toEqual(['curto'])
+    expect(fevereiro.livrosLidos.map(({ id }) => id).sort()).toEqual(['curto', 'longo'])
+
+    expect(relatorioMensal(LIVROS, SESSOES, '2026-03').livrosConcluidos.map(({ id }) => id)).toEqual(['longo'])
+    expect(relatorioMensal(LIVROS, SESSOES, '2025-12')).toMatchObject({ paginas: 50, minutos: 40 })
   })
 
-  it('a última escrita do ano é a que vale', () => {
-    expect(metaAnualDeLivros([meta('2026-01', 12), meta('2026-06', 18)], '2026')).toBe(18)
-  })
+  it('editar ou excluir a sessão recalcula; o acumulado vai de janeiro até o mês; os meses são resultado', () => {
+    const semA = SESSOES.filter(({ id }) => id !== 's2')
+    expect(relatorioMensal(LIVROS, semA, '2026-02').paginas).toBe(120)
+    const editada = SESSOES.map((item) => item.id === 's3' ? { ...item, pages: 60 } : item)
+    expect(relatorioMensal(LIVROS, editada, '2026-02').paginas).toBe(160)
 
-  it('não empresta a meta de outro ano', () => {
-    expect(metaAnualDeLivros([meta('2025-01', 12)], '2026')).toBe(0)
+    expect(acumuladoAteOMes(LIVROS, SESSOES, '2026-02')).toEqual({ livros: 1, paginas: 320, minutos: 275 })
+    const meses = mesesDoAno(LIVROS, SESSOES, '2026')
+    expect(meses).toHaveLength(12)
+    expect(meses[2]).toEqual({ mes: '2026-03', livros: 1, paginas: 100, minutos: 60 })
+    expect(meses[11]).toEqual({ mes: '2026-12', livros: 0, paginas: 0, minutos: 0 })
   })
 })
 
-describe('o resumo de leitura', () => {
-  it('compara os livros concluídos no ano com a meta do ano', () => {
-    const livros = [livro('2026-02-10'), livro('2026-07-03'), livro('2025-12-01')]
-    const sessoes: Array<ReadingEntity<ReadingSessionData>> = []
+describe('metas mensais antigas', () => {
+  const antigas = [mensal('2026-01', 12, 300), mensal('2026-02', 12, 400), mensal('2026-06', 18, 500), mensal('2025-11', 10, 200)]
 
-    const resumo = readingSummary(livros, sessoes, null, '2026-09', [meta('2026-01', 12)])
+  it('revisão só com meta antiga e sem decisão registrada', () => {
+    expect(revisaoPendente([])).toBe(false)
+    expect(revisaoPendente(antigas)).toBe(true)
+    expect(revisaoPendente([...antigas, { id: 'r', tipo: 'revisao', decisao: 'ignorar', createdAt: '', updatedAt: '' }])).toBe(false)
+  })
 
-    expect(resumo.goalBooks).toBe(12)
-    expect(resumo.booksCompletedYear).toBe(2)
-    expect(resumo.booksCompletedMonth).toBe(0)
+  it('somar: páginas dos meses, livros da última meta do ano, minutos fora; ano com meta anual fica como está', () => {
+    expect(propostaDeSoma(antigas)).toEqual([
+      { year: '2025', books: 10, pages: 200 },
+      { year: '2026', books: 18, pages: 1200 },
+    ])
+    expect(propostaDeSoma([...antigas, anual('2026', 20, 6000)])).toEqual([{ year: '2025', books: 10, pages: 200 }])
   })
 })
 
 describe('registrar leitura que já aconteceu', () => {
-  const livro = { startDate: '2026-02-03', completedDate: '2026-02-20', pagesRead: 180 }
+  const lido = { startDate: '2026-02-03', completedDate: '2026-02-20', pagesRead: 180 }
 
-  /*
-    O pastor registra em setembro um livro que leu em fevereiro, e quer que ele
-    conte em fevereiro. A sessão nasce na data da conclusão, não na de hoje.
-  */
-  it('a sessão nasce na data da conclusão', () => {
-    expect(sessaoDoRegistroRetroativo(livro, 420, 'livro-ficticio')).toMatchObject({
-      bookId: 'livro-ficticio', date: '2026-02-20', pages: 180, minutes: 420,
-    })
-  })
-
-  it('sem conclusão, usa a data de início', () => {
-    expect(sessaoDoRegistroRetroativo({ ...livro, completedDate: null }, 60, 'l')?.date).toBe('2026-02-03')
-  })
-
-  /*
-    Sem tempo e sem páginas não há leitura a registrar — criar uma sessão vazia
-    encheria o histórico de linhas que não dizem nada.
-  */
-  it('sem tempo e sem páginas não cria sessão', () => {
-    expect(sessaoDoRegistroRetroativo({ ...livro, pagesRead: 0 }, 0, 'l')).toBeNull()
-  })
-
-  it('só o tempo já basta', () => {
-    expect(sessaoDoRegistroRetroativo({ ...livro, pagesRead: 0 }, 90, 'l')).toMatchObject({ minutes: 90, pages: 0 })
-  })
-
-  it('sem data nenhuma, não cria sessão', () => {
+  it('a sessão nasce na data da conclusão, ou do início; sem páginas e sem tempo, nada', () => {
+    expect(sessaoDoRegistroRetroativo(lido, 420, 'livro-ficticio')).toMatchObject({ bookId: 'livro-ficticio', date: '2026-02-20', pages: 180, minutes: 420 })
+    expect(sessaoDoRegistroRetroativo({ ...lido, completedDate: null }, 60, 'l')?.date).toBe('2026-02-03')
+    expect(sessaoDoRegistroRetroativo({ ...lido, pagesRead: 0 }, 0, 'l')).toBeNull()
     expect(sessaoDoRegistroRetroativo({ startDate: '', completedDate: null, pagesRead: 10 }, 30, 'l')).toBeNull()
+    expect(sessaoDoRegistroRetroativo({ ...lido, pagesRead: -5 }, 90, 'l')).toMatchObject({ pages: 0, minutes: 90 })
   })
 
-  it('nada positivo, nada a registrar', () => {
-    expect(sessaoDoRegistroRetroativo({ ...livro, pagesRead: -5 }, -10, 'l')).toBeNull()
-  })
-
-  /* Um número ruim num campo não pode contaminar o total do mês. */
-  it('páginas negativas não viram total negativo quando há tempo', () => {
-    expect(sessaoDoRegistroRetroativo({ ...livro, pagesRead: -5 }, 90, 'l')).toMatchObject({ pages: 0, minutes: 90 })
-  })
-})
-
-describe('coerência das datas', () => {
   it('a conclusão não pode ser antes do começo', () => {
     expect(datasCoerentes('2026-02-03', '2026-02-02')).toBe(false)
-    expect(datasCoerentes('2026-02-03', '2026-02-03')).toBe(true)
     expect(datasCoerentes('2026-02-03', '2026-02-20')).toBe(true)
-  })
-
-  it('sem conclusão, nada a conferir', () => {
     expect(datasCoerentes('2026-02-03', null)).toBe(true)
   })
 })

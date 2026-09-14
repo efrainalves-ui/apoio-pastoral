@@ -895,7 +895,21 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .reading-metrics span { color: var(--muted); font-size: .75rem; }
 .reading-metrics strong { color: var(--green-900); font-size: 1.35rem; }
 .reading-goal-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
-.reading-goal-actions { margin-top: 16px; }
+.reading-goal-actions { margin-top: 16px; align-items: center; flex-wrap: wrap; }
+.reading-goal-actions .field__hint { width: 100%; margin: 0; }
+.leitura-metas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.leitura-meta { padding: 16px; border: 1px solid var(--line); border-radius: 15px; display: grid; align-content: start; gap: 8px; background: var(--paper); min-width: 0; }
+.leitura-meta small { color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+.leitura-meta strong { color: var(--ink); font-size: 1.2rem; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.leitura-meta progress { width: 100%; height: 8px; accent-color: var(--green-700, #1f6f55); }
+.leitura-meta span { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.leitura-ano { display: flex; gap: 4px; }
+.reading-page h3 { margin: 18px 0 8px; font-size: 1rem; }
+.reading-history .form-actions { margin-top: 0; }
+@media (max-width: 720px) {
+  .leitura-metas { grid-template-columns: 1fr; }
+  .reading-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .reading-list > div { border-bottom: 1px solid var(--line); }
 .reading-list > div:last-child { border-bottom: 0; }
 .reading-list .entity-row { border-bottom: 0; }

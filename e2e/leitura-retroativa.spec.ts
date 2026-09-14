@@ -54,9 +54,8 @@ test('um livro lido meses atrás entra no mês em que foi lido', async ({ page }
     E a leitura pode ser reencontrada: o histórico tem mês próprio. Sem isso,
     ela existia, contava no ano, e sumia da tela para sempre.
   */
-  await page.getByRole('button', { name: 'Histórico de leituras' }).click()
-  await page.locator('#reading-history-month').fill('2026-02')
-  await expect(page.getByText('420 minuto(s)', { exact: false })).toBeVisible()
+  await page.locator('#reading-report-month').fill('2026-02')
+  await expect(page.getByText('180 página(s) · 7h')).toBeVisible()
 })
 
 test('a conclusão não pode ser antes do começo', async ({ page }) => {

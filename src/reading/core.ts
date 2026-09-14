@@ -1,45 +1,139 @@
-import type { ReadingBookData, ReadingEntity, ReadingGoalData, ReadingSessionData } from './types'
+import type {
+  ReadingAnnualGoalData, ReadingBookData, ReadingEntity, ReadingGoalData, ReadingGoalRecordData, ReadingGoalReviewData, ReadingSessionData,
+} from './types'
+
+type Livro = ReadingEntity<ReadingBookData>
+type Sessao = ReadingEntity<ReadingSessionData>
+type Meta = ReadingEntity<ReadingGoalRecordData>
 
 export const readingMonth = (value: string | Date) => typeof value === 'string' ? value.slice(0, 7) : `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}`
-/**
- * Quantos livros o pastor quer ler no ano.
- *
- * Livro não se lê por mês: um de trezentas páginas atravessa três. A meta de
- * livros vale o ano inteiro, e vem da última vez em que foi escrita naquele
- * ano — escrevê-la em janeiro basta para valer em setembro.
- *
- * Páginas e minutos continuam mensais: esses, sim, se contam por mês.
- */
-export function metaAnualDeLivros(metas: ReadingEntity<ReadingGoalData>[], ano: string): number {
+
+/** Um número digitado errado não pode deixar total negativo. */
+const positivo = (numero: number) => Number.isFinite(numero) && numero > 0 ? numero : 0
+const somar = (sessoes: readonly Sessao[], campo: 'pages' | 'minutes') => sessoes.reduce((total, sessao) => total + positivo(sessao[campo]), 0)
+
+export const ehMetaAnual = (meta: ReadingGoalRecordData): meta is ReadingAnnualGoalData => 'tipo' in meta && meta.tipo === 'anual'
+export const ehRevisao = (meta: ReadingGoalRecordData): meta is ReadingGoalReviewData => 'tipo' in meta && meta.tipo === 'revisao'
+export const ehMetaMensalAntiga = (meta: ReadingGoalRecordData): meta is ReadingGoalData => !('tipo' in meta) && typeof meta.month === 'string'
+
+export function metaDoAno(metas: readonly Meta[], ano: string): ReadingEntity<ReadingAnnualGoalData> | null {
   return metas
-    .filter(({ month, books }) => month.slice(0, 4) === ano && books > 0)
-    .sort((esquerda, direita) => esquerda.month.localeCompare(direita.month))
-    .at(-1)?.books ?? 0
+    .filter((meta): meta is ReadingEntity<ReadingAnnualGoalData> => ehMetaAnual(meta) && meta.year === ano)
+    .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
+    .at(-1) ?? null
 }
 
-export function readingSummary(books: ReadingEntity<ReadingBookData>[], sessions: ReadingEntity<ReadingSessionData>[], goal: ReadingEntity<ReadingGoalData> | null, month: string, metasDoAno: ReadingEntity<ReadingGoalData>[] = []) {
-  const monthSessions = sessions.filter(({ date }) => readingMonth(date) === month)
-  const year = month.slice(0, 4)
-  const booksCompletedMonth = books.filter(({ status, completedDate }) => status === 'completed' && completedDate?.slice(0, 7) === month).length
-  const booksCompletedYear = books.filter(({ status, completedDate }) => status === 'completed' && completedDate?.slice(0, 4) === year).length
-  const yearSessions = sessions.filter(({ date }) => date.slice(0, 4) === year)
-  const pages = monthSessions.reduce((total, session) => total + session.pages, 0); const minutes = monthSessions.reduce((total, session) => total + session.minutes, 0)
-  const minutesYear = yearSessions.reduce((total, session) => total + session.minutes, 0)
-  return { reading: books.filter(({ status }) => status === 'reading').length, booksCompletedMonth, booksCompletedYear, pages, minutes, minutesYear, goalBooks: metaAnualDeLivros(metasDoAno, year) || (goal?.books ?? 0), goalPages: goal?.pages ?? 0, goalMinutes: goal?.minutes ?? 0 }
+export interface ProgressoDaMeta { feito: number; meta: number | null; percentual: number | null; faltam: number | null; superadaEm: number | null }
+
+/** O resultado contra a meta, sem esconder o que passou de 100%. */
+export function progresso(feito: number, meta: number | null | undefined): ProgressoDaMeta {
+  if (!meta || meta <= 0) return { feito, meta: null, percentual: null, faltam: null, superadaEm: null }
+  return { feito, meta, percentual: Math.round((feito / meta) * 100), faltam: Math.max(0, meta - feito), superadaEm: feito > meta ? feito - meta : null }
 }
-export function bookProgress(book: ReadingEntity<ReadingBookData>) { return book.totalPages && book.totalPages > 0 ? Math.min(100, Math.round(book.pagesRead / book.totalPages * 100)) : null }
+
+/**
+ * Livro conta no mês e no ano da conclusão: é um registro só, então editar ou
+ * sincronizar não o conta de novo. Reler é outro registro, aberto de propósito.
+ */
+const concluidoEm = (livro: Livro, prefixo: string) => livro.status === 'completed' && Boolean(livro.completedDate?.startsWith(prefixo))
+
+/** O ano: livros e páginas contra a meta; tempo só como resultado. */
+export function resumoAnual(livros: readonly Livro[], sessoes: readonly Sessao[], ano: string, meta: ReadingAnnualGoalData | null) {
+  const doAno = sessoes.filter(({ date }) => date.startsWith(ano))
+  return {
+    livros: progresso(livros.filter((livro) => concluidoEm(livro, ano)).length, meta?.books),
+    paginas: progresso(somar(doAno, 'pages'), meta?.pages),
+    minutos: somar(doAno, 'minutes'),
+  }
+}
+
+/**
+ * O que foi lido num mês.
+ *
+ * Páginas e tempo pertencem à data de cada sessão: um livro lido de janeiro a
+ * março reparte as páginas pelos três meses, e só conta como concluído no mês
+ * em que terminou.
+ */
+export function relatorioMensal(livros: readonly Livro[], sessoes: readonly Sessao[], mes: string) {
+  const doMes = sessoes
+    .filter(({ date }) => readingMonth(date) === mes)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
+  const concluidos = livros.filter((livro) => concluidoEm(livro, mes))
+  const lidos = new Set([...doMes.map(({ bookId }) => bookId), ...concluidos.map(({ id }) => id)])
+  return {
+    livrosConcluidos: concluidos,
+    paginas: somar(doMes, 'pages'),
+    minutos: somar(doMes, 'minutes'),
+    sessoes: doMes.length,
+    dias: new Set(doMes.map(({ date }) => date)).size,
+    livrosLidos: livros.filter(({ id }) => lidos.has(id)),
+    historico: doMes,
+  }
+}
+
+/** Progresso anual acumulado até o mês escolhido: de janeiro até ele, no mesmo ano. */
+export function acumuladoAteOMes(livros: readonly Livro[], sessoes: readonly Sessao[], mes: string) {
+  const ano = mes.slice(0, 4)
+  const dentro = (data: string) => data.startsWith(ano) && data.slice(0, 7) <= mes
+  const doPeriodo = sessoes.filter(({ date }) => dentro(date))
+  return {
+    livros: livros.filter((livro) => livro.status === 'completed' && Boolean(livro.completedDate) && dentro(livro.completedDate!)).length,
+    paginas: somar(doPeriodo, 'pages'),
+    minutos: somar(doPeriodo, 'minutes'),
+  }
+}
+
+/** Os doze meses do ano, como resultado. */
+export function mesesDoAno(livros: readonly Livro[], sessoes: readonly Sessao[], ano: string) {
+  return Array.from({ length: 12 }, (_, indice) => {
+    const mes = `${ano}-${String(indice + 1).padStart(2, '0')}`
+    const relatorio = relatorioMensal(livros, sessoes, mes)
+    return { mes, livros: relatorio.livrosConcluidos.length, paginas: relatorio.paginas, minutos: relatorio.minutos }
+  })
+}
+
+export function formatarTempo(minutos: number): string {
+  const total = Math.round(positivo(minutos))
+  const horas = Math.floor(total / 60)
+  const resto = total % 60
+  return horas && resto ? `${horas}h ${resto}min` : horas ? `${horas}h` : `${resto}min`
+}
+
+export const metasMensaisAntigas = (metas: readonly Meta[]) => metas.filter((meta): meta is ReadingEntity<ReadingGoalData> => ehMetaMensalAntiga(meta))
+
+/** A revisão só aparece para quem tem meta mensal antiga e ainda não decidiu. */
+export const revisaoPendente = (metas: readonly Meta[]) => metasMensaisAntigas(metas).length > 0 && !metas.some(ehRevisao)
+
+/**
+ * Como ficaria a meta anual somando as mensais, para o pastor ver antes de escolher.
+ *
+ * Páginas somam os meses. Livros já eram do ano nas metas antigas — somar doze
+ * vezes a mesma meta inventaria um alvo impossível —, então vale a última
+ * escrita naquele ano. Minutos ficam de fora: tempo não é meta. Ano que já tem
+ * meta anual não é tocado.
+ */
+export function propostaDeSoma(metas: readonly Meta[]): Array<{ year: string; books: number | null; pages: number | null }> {
+  const antigas = metasMensaisAntigas(metas)
+  return [...new Set(antigas.map(({ month }) => month.slice(0, 4)))].sort()
+    .filter((ano) => !metaDoAno(metas, ano))
+    .map((ano) => {
+      const doAno = antigas.filter(({ month }) => month.startsWith(ano)).sort((a, b) => a.month.localeCompare(b.month))
+      const livros = doAno.filter(({ books }) => positivo(books) > 0).at(-1)?.books ?? 0
+      const paginas = doAno.reduce((total, meta) => total + positivo(meta.pages), 0)
+      return { year: ano, books: livros || null, pages: paginas || null }
+    })
+    .filter(({ books, pages }) => books !== null || pages !== null)
+}
+
+export function bookProgress(book: Livro) { return book.totalPages && book.totalPages > 0 ? Math.min(100, Math.round(book.pagesRead / book.totalPages * 100)) : null }
 
 /**
  * A leitura que já aconteceu.
  *
  * O pastor registra em setembro um livro que leu em fevereiro, e quer que ele
- * conte em fevereiro. Duas coisas vinham do lugar errado para isso funcionar: a
- * conclusão era sempre carimbada com a data de hoje, e o tempo de leitura só
- * existia dentro de uma sessão que ele não tinha como criar no passado.
- *
- * Páginas e minutos continuam vindo **só das sessões** — é de lá que os totais
- * do mês e do ano saem. Guardar minutos também no livro criaria dois números
- * para a mesma pergunta, e eles divergiriam no primeiro mês.
+ * conte em fevereiro. Páginas e minutos vêm **só das sessões** — é de lá que os
+ * totais do mês e do ano saem —, então o registro retroativo abre a sessão na
+ * data da leitura.
  */
 export function sessaoDoRegistroRetroativo(
   livro: { startDate: string; completedDate: string | null; pagesRead: number },
