@@ -44,6 +44,7 @@ import { MissionaryPairsPage } from '../pages/MissionaryPairsPage'
 import { GoalAreaPage } from '../pages/GoalAreaPage'
 import { BackupPage } from '../pages/BackupPage'
 import { MigracaoDosPessoais } from '../db/migrarPessoais'
+import { MigracaoPgpParaConcilio } from '../agenda/migrarPgp'
 import { ReparoDeIdentificadores } from '../db/repararIdentificadores'
 import { notificarDadosSincronizados } from '../sync/useReloadOnSync'
 import { RestoreBackupPage } from '../pages/RestoreBackupPage'
@@ -215,7 +216,9 @@ function useMudancaDosPessoais() {
         */
         const reparo = await new ReparoDeIdentificadores().reparar(account.id, masterKey)
         const resultado = await new MigracaoDosPessoais().mover(account.id, masterKey)
-        if (resultado.movidos > 0 || reparo.reparados > 0) notificarDadosSincronizados()
+        /* PGP deixou de ser tipo: os antigos viram Concílio do tipo PGP, com o mesmo identificador. */
+        const pgp = await new MigracaoPgpParaConcilio().migrar(account.id, masterKey)
+        if (resultado.movidos > 0 || reparo.reparados > 0 || pgp.migrados > 0) notificarDadosSincronizados()
       } catch {
         // O lugar antigo continua intacto; a próxima abertura tenta outra vez.
       } finally {

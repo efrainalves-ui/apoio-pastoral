@@ -5,6 +5,7 @@ import { VaultRepository } from '../db/repository'
 import type { VaultRecord } from '../db/types'
 import type { AgendaConflict, AgendaEventData, AgendaEventEntity, AgendaEventInput, ItineraryItem } from './types'
 import { isCeremonyCategory } from './types'
+import { normalizarLegado, validarDetalhes } from './detalhes'
 
 const FIVE_MINUTES = 5 * 60 * 1000
 
@@ -20,15 +21,18 @@ export function validateAgendaEvent(input: AgendaEventInput): void {
   if (input.location.trim().length > 160 || input.address.trim().length > 300) throw new Error('Local ou endereço excede o limite permitido.')
   if (isCeremonyCategory(input.category)) {
     /*
-      O batismo não pede responsável: é o próprio pastor, e a tela deixou de
-      perguntar. Exigir aqui o que a tela não pergunta trava o salvamento com um
-      erro que o pastor não tem como resolver.
+      Nenhuma cerimônia pede mais um "responsável" digitado. O batismo é o
+      próprio pastor; a Ceia do Senhor tem primeiro diácono e primeira
+      diaconisa, que podem ficar pendentes; o casamento tem os noivos; a
+      dedicação, a criança e os responsáveis. Exigir aqui o que a tela não
+      pergunta trava o salvamento com um erro que o pastor não tem como resolver.
     */
-    if (input.category !== 'baptism' && !input.ceremonyDetails?.responsible.trim()) throw new Error('Informe o responsável pela cerimônia.')
-    if (input.category !== 'wedding' && !input.churchId) throw new Error('Escolha a igreja da cerimônia.')
+    if (input.category !== 'wedding' && !input.churchId && !input.location.trim()) throw new Error('Escolha a igreja da cerimônia.')
     if (input.category === 'wedding' && !input.churchId && !input.location.trim()) throw new Error('Informe a igreja ou o local do casamento.')
-    if (input.category === 'child_dedication' && !input.ceremonyDetails?.childPersonId) throw new Error('Escolha a criança da dedicação.')
+    /* Dedicação antiga escolhia a criança no cadastro; a nova escreve o nome. As duas valem. */
+    if (input.category === 'child_dedication' && !input.dedicacao?.crianca.trim() && !input.ceremonyDetails?.childPersonId) throw new Error('Informe o nome da criança.')
   }
+  validarDetalhes(input)
   // A folga de segunda-feira é um lembrete, não uma trava: quem marca um
   // compromisso nesse dia sabe o que está fazendo.
 }
@@ -61,7 +65,8 @@ export class AgendaService {
   private async decode(record: VaultRecord, masterKey: CryptoKey): Promise<AgendaEventEntity | null> {
     const payload = await decryptRecord(masterKey, record)
     if (payload?.type !== 'agenda_event') return null
-    const data = payload.data as Partial<AgendaEventData>
+    /* PGP antigo, deste aparelho ou de outro ainda não migrado, abre como Concílio. */
+    const data = normalizarLegado(payload.data as Partial<AgendaEventData> & Pick<AgendaEventData, 'category'>)
     return { id: record.id, ...data, location: data.location ?? '', address: data.address ?? '', visitTarget: data.visitTarget ?? 'none', sermonId: data.sermonId ?? null, sermonSnapshot: data.sermonSnapshot ?? null, ceremonyDetails: data.ceremonyDetails ?? null, linkedSource: data.linkedSource ?? null } as AgendaEventEntity
   }
 

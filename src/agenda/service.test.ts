@@ -46,7 +46,7 @@ describe('agenda cifrada', () => {
 
   it('aplica padrões e inclui folgas no PDF sem selecionar pessoal por padrão', () => {
     expect(categoryDefaults('visit', new Date('2026-08-18T12:00:00Z')).reminderMinutes).toBe(15)
-    expect(categoryDefaults('council', new Date('2026-08-18T12:00:00Z')).allDay).toBe(true)
+    expect(categoryDefaults('council', new Date('2026-08-18T12:00:00Z')).allDay).toBe(false)
     expect(mondayRestItems(new Date('2026-08-17T00:00:00'), new Date('2026-08-23T23:59:59'))).toHaveLength(1)
     const timestamps = { createdAt: '2026-08-01T00:00:00Z', updatedAt: '2026-08-01T00:00:00Z' }
     const events = [{ id: 'public-fixture', ...input(), ...timestamps }, { id: 'private-fixture', ...input({ title: 'Pessoal fictício', category: 'personal', includeInItinerary: false }), ...timestamps }]
@@ -106,12 +106,17 @@ describe('batismo sem responsável', () => {
     expect(salvo.category).toBe('baptism')
   })
 
-  /* Casamento continua pedindo: ali a pergunta é real. */
-  it('casamento sem responsável continua recusado', async () => {
+  /* O casamento deixou de pedir responsável; o que pergunta agora é quem casa. */
+  it('casamento sem noivo e noiva é recusado', async () => {
     const database = new ApoioDatabase(`agenda-casamento-${crypto.randomUUID()}`); databases.push(database)
     const service = new AgendaService(database); const key = await generateMasterKey()
+    const casamento = { noivo: 'Noivo Fictício', noiva: '', cursoDeNoivos: true, passouPelaComissao: false, dataCivil: '2026-08-10', dataReligiosa: '2026-08-18' }
     await expect(service.createEvent('account-fixture', key, input({
-      category: 'wedding', churchId: 'igreja-ficticia', ceremonyDetails: cerimonia,
-    }))).rejects.toThrow('responsável')
+      category: 'wedding', churchId: 'igreja-ficticia', ceremonyDetails: cerimonia, casamento,
+    }))).rejects.toThrow('noiva')
+    const salvo = await service.createEvent('account-fixture', key, input({
+      category: 'wedding', churchId: 'igreja-ficticia', ceremonyDetails: cerimonia, casamento: { ...casamento, noiva: 'Noiva Fictícia' },
+    }))
+    expect((await service.getEvent('account-fixture', key, salvo.id))?.casamento).toMatchObject({ noivo: 'Noivo Fictício', noiva: 'Noiva Fictícia', cursoDeNoivos: true, passouPelaComissao: false, dataCivil: '2026-08-10' })
   })
 })

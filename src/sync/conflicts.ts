@@ -80,7 +80,7 @@ const CODE_LABELS: Record<string, string> = {
   talk_family: 'Conversar com familiar', talk_leader: 'Falar com líder', schedule_study: 'Agendar estudo',
   follow_decision: 'Acompanhar decisão', follow_prayer: 'Acompanhar pedido de oração', refer_help: 'Encaminhar para ajuda',
   visit: 'Visita', preaching: 'Pregação', committee: 'Comissão', meeting: 'Reunião', bible_study: 'Estudo bíblico',
-  baptism: 'Batismo', communion: 'Santa Ceia', wedding: 'Casamento', training: 'Treinamento', event: 'Evento',
+  baptism: 'Batismo', communion: 'Ceia do Senhor', wedding: 'Casamento', training: 'Treinamento', event: 'Evento',
   travel: 'Viagem', council: 'Concílio', personal: 'Pessoal', low: 'Baixa', normal: 'Normal', high: 'Alta',
   organized_church: 'Igreja organizada', preaching_point: 'Ponto de pregação',
 }
