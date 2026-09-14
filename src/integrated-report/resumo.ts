@@ -12,7 +12,8 @@ import { compararTrimestres, type RelatorioIntegradoEntity } from './types'
  */
 
 export const ROTA_DO_RELATORIO_INTEGRADO = '/app/metas/relatorio-integrado'
-export const MENSAGEM_DE_FORMATO = 'Converta o Relatório Integrado respondido para PDF e tente novamente.'
+export const FRASE_DO_ENVIO = 'Envie o Relatório Integrado respondido pelas igrejas e convertido para PDF.'
+export const MENSAGEM_DE_FORMATO ='Converta o Relatório Integrado respondido para PDF e tente novamente.'
 
 /** Word, planilha e imagem não entram direto: só PDF. */
 export function arquivoEhPdf(arquivo: Pick<File, 'name' | 'type'>): boolean {

@@ -16,7 +16,7 @@ import { GoalsService, parseGoalsPdf } from '../goals/service'
 import { HISTORY_AREAS, type GoalHistoryData, type GoalImportPreview } from '../goals/types'
 import { useGoalSources } from '../goals/useGoalSources'
 import { extractPdfText, pdfHash, validatePdfFile } from '../imports/pdf'
-import { AREA_PDF_DOCUMENT, ehFinanceira, variacaoNoMesmoPeriodo, ANOS_DE_HISTORICO, PERCENT_TARGET_AREAS, anosComResultado, comparacaoMensal, resultadoDoRelatorioIntegrado, resumoPorAno, resumoPorIgrejaEAno } from '../goals/areas'
+import { AREA_PDF_DOCUMENT, ehFinanceira, variacaoNoMesmoPeriodo, ANOS_DE_HISTORICO, PERCENT_TARGET_AREAS, anosComResultado, comparacaoMensal, resumoPorAno, resumoPorIgrejaEAno } from '../goals/areas'
 import { previaDeBatismos, previaFinanceira, type PreviaDeRelatorio } from '../goals/importacaoAcms'
 import { comparativoDeDoadores } from '../goals/doadores'
 import { MissionaryPage } from './MissionaryPage'
@@ -72,16 +72,6 @@ export function GoalAreaPage() {
   if (!ready) return <div className="app-loading" role="status">Abrindo a meta…</div>
 
   const progresso = areaComparison(area, goals, sources, year)
-  /*
-    O que o Relatório Integrado lançou nesta área, separado do cadastro nominal.
-
-    As duas fontes medem a mesma realidade por caminhos diferentes — o cadastro
-    conta estudo por estudo, com nome; o relatório traz o número que a igreja
-    declarou no trimestre. Somá-las contaria a mesma pessoa duas vezes, e
-    escolher uma por conta própria seria decidir no lugar do pastor. Então
-    aparecem lado a lado, e ele decide.
-  */
-  const doRelatorioIntegrado = resultadoDoRelatorioIntegrado(area, sources.entries, year)
   const guardaHistorico = HISTORY_AREAS.includes(area as GoalHistoryData['area'])
   const anosDisponiveis = anosComResultado(area, sources, year)
   const anosResumidos = resumoPorAno(area, sources, year)
@@ -237,10 +227,6 @@ export function GoalAreaPage() {
         </div>
         <div className="goal-bar" role="img" aria-label={`${progresso.percent}% da meta`}><span style={{ width: `${progresso.percent}%` }} /></div>
         <p className="goal-card__percent">{progresso.target > 0 ? `${progresso.percent}% alcançado` : 'Defina a meta do ano para acompanhar'}</p>
-        {doRelatorioIntegrado.lancamentos > 0 && <div className="alert" role="status">
-          Relatório Integrado: {formatGoalValue(area, doRelatorioIntegrado.total)} em {doRelatorioIntegrado.porIgreja.length} igreja(s).
-          Contado à parte do cadastro nominal, para a mesma pessoa não entrar duas vezes.
-        </div>}
         <AreaChart valores={comparacao.meses.map((mes) => mes.atual)} rotulos={comparacao.meses.map((mes) => MONTH_LABELS[mes.mes - 1]!)} label={`Evolução mensal de ${GOAL_AREA_LABELS[area]} em ${year}`} formatar={(valor) => formatGoalValue(area, valor)} />
         {/*
           O resultado aparece mesmo sem alvo definido: esconder o que já se

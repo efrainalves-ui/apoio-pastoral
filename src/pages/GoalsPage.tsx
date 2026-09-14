@@ -52,7 +52,6 @@ export function GoalsPage() {
         <span className="manchete__num"><CountUp value={GOAL_AREAS.length + 1} /></span>
         <p className="manchete__txt">áreas para acompanhar</p>
       </section>
-      <AcessoAoRelatorioIntegrado />
       <h2 className="rotulo-secao">Metas do distrito</h2>
       <div className="goal-cards">
         {/*
@@ -124,6 +123,8 @@ export function GoalsPage() {
           <Link className="entity-row entity-row--link" to="/app/metas/missao/duplas"><UsersRound aria-hidden="true" /><span><strong>Duplas missionárias</strong></span><span>Abrir</span></Link>
         </div>
       </Card>
+
+      <AcessoAoRelatorioIntegrado />
     </div>
   )
 }
