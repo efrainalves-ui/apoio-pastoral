@@ -1,5 +1,6 @@
 import type { AgendaEventEntity } from '../agenda/types'
 import type { ChurchEntity } from '../district/types'
+import type { PregacaoAnteriorEntity } from './jaPregado'
 import { lastPreaching, listPreachings } from './preachings'
 import type { SermonEntity } from './types'
 
@@ -23,11 +24,12 @@ export function historicosPorSermao(
   eventos: readonly AgendaEventEntity[],
   igrejas: readonly ChurchEntity[],
   agora = new Date(),
+  anteriores: readonly PregacaoAnteriorEntity[] = [],
 ): Map<string, HistoricoDoSermao> {
   const pregacoes = eventos.filter(({ category }) => category === 'preaching')
   const mapa = new Map<string, HistoricoDoSermao>()
   for (const sermon of sermons) {
-    const doSermao = listPreachings([...pregacoes], [...igrejas], sermon.id, agora)
+    const doSermao = listPreachings([...pregacoes], [...igrejas], sermon.id, agora, anteriores)
     const feitas = doSermao.filter(({ scheduled }) => !scheduled)
     const ultima = lastPreaching(feitas)
     mapa.set(sermon.id, { vezes: feitas.length, ultimoLugar: ultima?.place ?? '', ultimaData: ultima?.date ?? '' })

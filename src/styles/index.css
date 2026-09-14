@@ -3596,3 +3596,20 @@ html .agenda-page .ponto-categoria.categoria-visual { width: 7px; height: 7px; b
 .ri-secao > summary { padding: 12px 0; font-weight: 700; cursor: pointer; }
 .ri-secao[open] > summary { padding-bottom: 8px; }
 .ri-secao .rolagem-tabela { margin-bottom: 12px; }
+
+/* Marcar como já pregado */
+.ja-pregado-igrejas { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.ja-pregado-igrejas legend { margin-bottom: 6px; font-weight: 600; font-size: .9rem; }
+.ja-pregado-igrejas label { display: flex; gap: 10px; align-items: center; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.ja-pregado-igrejas label small { margin-left: auto; color: var(--muted); font-size: .82rem; white-space: nowrap; }
+.ja-pregado-resumo { display: grid; gap: 8px; margin: 0; }
+.ja-pregado-resumo dt { font-size: .82rem; color: var(--muted); }
+.ja-pregado-resumo dd { margin: 2px 0 0; }
+.ja-pregado-data { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.ja-pregado-data .field { flex: 1 1 180px; }
+.ja-pregado-check { display: flex; gap: 8px; align-items: center; min-height: 44px; }
+.alert p { margin: 0; }
+.sermon-preaching-list li { flex-wrap: wrap; }
+.sermon-preaching-list__acoes { display: flex; gap: 4px; margin-left: auto; }
+.sermon-preaching-list .sermon-preaching-edicao { display: grid; gap: 10px; flex-basis: 100%; padding: 6px 0 4px; }
+.alert.ja-pregado-aviso { flex-direction: column; align-items: flex-start; gap: 4px; }

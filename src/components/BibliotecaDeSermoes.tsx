@@ -8,6 +8,7 @@ import {
   contarPorFiltro, FILTRO_LABELS, FILTROS_DA_BIBLIOTECA, historicosPorSermao, ordenar,
   ORDENACAO_LABELS, ORDENACOES, passaNoFiltro, type FiltroDaBiblioteca, type Ordenacao,
 } from '../sermons/biblioteca'
+import type { PregacaoAnteriorEntity } from '../sermons/jaPregado'
 import { abreviacaoDoLivro } from '../sermons/livros'
 import { formatPreachingDate } from '../sermons/preachings'
 import { SERMON_STATUS_LABELS, type SermonEntity } from '../sermons/types'
@@ -19,7 +20,10 @@ interface BibliotecaDeSermoesProps {
   sermons: SermonEntity[]
   events: AgendaEventEntity[]
   churches: ChurchEntity[]
+  anteriores?: PregacaoAnteriorEntity[]
 }
+
+const SEM_ANTERIORES: PregacaoAnteriorEntity[] = []
 
 /**
  * A biblioteca de sermões: busca, filtro com contagem, ordenação e lista.
@@ -29,7 +33,7 @@ interface BibliotecaDeSermoesProps {
  * nova só por esta tela — ela desenha trinta por vez e cresce ao chegar no fim.
  * Quinhentos sermões nunca viram quinhentas linhas no documento.
  */
-export function BibliotecaDeSermoes({ sermons, events, churches }: BibliotecaDeSermoesProps) {
+export function BibliotecaDeSermoes({ sermons, events, churches, anteriores = SEM_ANTERIORES }: BibliotecaDeSermoesProps) {
   const [filtro, setFiltro] = useState<FiltroDaBiblioteca>('todos')
   const [ordenacao, setOrdenacao] = useState<Ordenacao>('recentes')
   const [busca, setBusca] = useState('')
@@ -37,7 +41,7 @@ export function BibliotecaDeSermoes({ sermons, events, churches }: BibliotecaDeS
   const [limite, setLimite] = useState(PAGINA)
   const sentinela = useRef<HTMLButtonElement>(null)
 
-  const historicos = useMemo(() => historicosPorSermao(sermons, events, churches), [sermons, events, churches])
+  const historicos = useMemo(() => historicosPorSermao(sermons, events, churches, new Date(), anteriores), [sermons, events, churches, anteriores])
   const contagens = useMemo(() => contarPorFiltro(sermons, historicos), [sermons, historicos])
 
   const visiveis = useMemo(() => {

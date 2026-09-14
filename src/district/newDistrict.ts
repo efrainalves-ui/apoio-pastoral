@@ -18,9 +18,9 @@ export interface NewDistrictResult {
   technicalHistoryId: string | null
 }
 
-const technicalSourceTypes = new Set(['goal', 'goal_entry', 'goal_history', 'sermon', 'transfer_indicators_aggregate', 'technical_history'])
+const technicalSourceTypes = new Set(['goal', 'goal_entry', 'goal_history', 'sermon', 'sermon_preaching', 'transfer_indicators_aggregate', 'technical_history'])
 const typeLabels: Record<string, string> = {
-  district: 'Distrito', church: 'Igrejas', person: 'Pessoas', family: 'Famílias', import_batch: 'Importações', wedding: 'Casamentos', reminder: 'Lembretes', reminder_list: 'Listas de lembretes', reminder_meta: 'Marcações de tarefas', agenda_event: 'Agenda', sermon: 'Histórico de sermões', goal: 'Metas', goal_entry: 'Lançamentos de metas', goal_history: 'Resultados do ano anterior', visit: 'Visitas', prayer_request: 'Pedidos de oração', follow_up: 'Acompanhamentos', task: 'Tarefas', visit_round: 'Rodadas de visitação', interest: 'Interessados', bible_study: 'Estudos bíblicos', missionary_pair: 'Duplas missionárias', sabbath_class: 'Escola Sabatina', small_group: 'Pequenos Grupos', uapg: 'UAPG', transfer_indicators_aggregate: 'Indicadores agregados', technical_history: 'Histórico técnico anterior',
+  district: 'Distrito', church: 'Igrejas', person: 'Pessoas', family: 'Famílias', import_batch: 'Importações', wedding: 'Casamentos', reminder: 'Lembretes', reminder_list: 'Listas de lembretes', reminder_meta: 'Marcações de tarefas', agenda_event: 'Agenda', sermon: 'Histórico de sermões', sermon_preaching: 'Histórico de sermões', goal: 'Metas', goal_entry: 'Lançamentos de metas', goal_history: 'Resultados do ano anterior', visit: 'Visitas', prayer_request: 'Pedidos de oração', follow_up: 'Acompanhamentos', task: 'Tarefas', visit_round: 'Rodadas de visitação', interest: 'Interessados', bible_study: 'Estudos bíblicos', missionary_pair: 'Duplas missionárias', sabbath_class: 'Escola Sabatina', small_group: 'Pequenos Grupos', uapg: 'UAPG', transfer_indicators_aggregate: 'Indicadores agregados', technical_history: 'Histórico técnico anterior',
 }
 
 function namesFor(types: string[]): string[] {

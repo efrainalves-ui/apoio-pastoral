@@ -10,7 +10,7 @@ export type ConflictChoice = 'keep_local' | 'keep_remote' | 'keep_both'
 
 export const RECORD_LABELS: Record<string, string> = {
   district: 'Distrito', church: 'Igreja', person: 'Pessoa', family: 'Família',
-  agenda_event: 'Compromisso', sermon: 'Sermão', goal: 'Meta', goal_entry: 'Registro de meta', goal_history: 'Resultado do ano anterior',
+  agenda_event: 'Compromisso', sermon: 'Sermão', sermon_preaching: 'Pregação já feita', goal: 'Meta', goal_entry: 'Registro de meta', goal_history: 'Resultado do ano anterior',
   visit: 'Visita', wedding: 'Casamento', reminder: 'Lembrete', reminder_list: 'Lista de lembretes', reminder_meta: 'Marcação de tarefa', prayer_request: 'Pedido de oração', follow_up: 'Acompanhamento',
   task: 'Tarefa', visit_round: 'Rodada de visitas', interest: 'Interessado',
   bible_study: 'Estudo bíblico', missionary_pair: 'Dupla missionária',

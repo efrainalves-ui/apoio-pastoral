@@ -27,8 +27,13 @@ import {
   WEEKDAY_LABELS,
   type ChurchEntity,
 } from '../district/types'
+import { DATA_NAO_INFORMADA, type PregacaoAnteriorEntity } from '../sermons/jaPregado'
+import { JaPregadoService } from '../sermons/jaPregadoService'
+import { SermonService } from '../sermons/service'
 import { MemberImportPage } from './MemberImportPage'
 
+const jaPregado = new JaPregadoService()
+const sermonService = new SermonService()
 const service = new DistrictService()
 const agenda = new AgendaService()
 const peopleService = new PeopleService()
@@ -66,6 +71,7 @@ export function ChurchDetailPage() {
   const [smallGroups, setSmallGroups] = useState<SmallGroupEntity[]>([])
   const [integracoes, setIntegracoes] = useState<UapgEntity[]>([])
   const [events, setEvents] = useState<AgendaEventEntity[]>([])
+  const [anteriores, setAnteriores] = useState<Array<PregacaoAnteriorEntity & { titulo: string }>>([])
   const [visitCount, setVisitCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -97,6 +103,8 @@ export function ChurchDetailPage() {
       setSmallGroups(nextGroups.filter((item) => item.churchId === churchId && item.active))
       setIntegracoes(nextIntegracoes.filter((item) => item.churchId === churchId && item.active))
       setEvents(nextEvents.filter((event) => igrejasDoCompromisso(event).includes(churchId ?? '')).sort((a, b) => a.startAt.localeCompare(b.startAt)))
+      const [registros, sermoes] = await Promise.all([jaPregado.listar(account.id, masterKey), sermonService.list(account.id, masterKey)])
+      setAnteriores(registros.filter((registro) => registro.churchId === churchId).map((registro) => ({ ...registro, titulo: sermoes.find(({ id }) => id === registro.sermonId)?.title ?? 'Sermão' })))
       setVisitCount(visits.filter((visit) => visit.churchId === churchId).length)
     } catch (loadError) {
       setError(messageFrom(loadError))
@@ -148,7 +156,7 @@ export function ChurchDetailPage() {
       <dl className="estrato">
         <div><dt>Famílias</dt><dd>{families.length}</dd></div>
         <div><dt>Visitas</dt><dd>{visitCount}</dd></div>
-        <div><dt>Pregações</dt><dd>{preachings.length}</dd></div>
+        <div><dt>Pregações</dt><dd>{preachings.length + anteriores.length}</dd></div>
       </dl>
 
       {error && <div className="alert alert--error" role="alert">{error}</div>}
@@ -222,10 +230,13 @@ export function ChurchDetailPage() {
           </ol>
         </Card>
         <Card title="Pregações nesta igreja">
-          {preachings.length === 0
+          {preachings.length + anteriores.length === 0
             ? <div className="empty-state compact-empty"><strong>Ainda não há pregação registrada aqui</strong><span>Registre a pregação no sermão ou crie um compromisso de pregação.</span></div>
             : <div className="entity-list">{preachings.map((event) => <Link className="entity-row" key={event.id} to={event.sermonId ? `/app/sermoes/${event.sermonId}` : `/app/agenda/${event.id}/editar`}>
               <span><strong>{event.sermonSnapshot?.title ?? event.title}</strong><small>{dataCurta(event.startAt)}</small></span>
+              <span>Abrir</span>
+            </Link>)}{anteriores.map((registro) => <Link className="entity-row" key={registro.id} to={`/app/sermoes/${registro.sermonId}`}>
+              <span><strong>{registro.titulo}</strong><small>{registro.data ? dataCurta(`${registro.data}T12:00:00`) : DATA_NAO_INFORMADA}</small></span>
               <span>Abrir</span>
             </Link>)}</div>}
         </Card>
@@ -252,7 +263,7 @@ export function ChurchDetailPage() {
         <div><small>A resgatar</small><strong>{members.filter(({ pastoralStatus }) => pastoralStatus === 'rescue').length}</strong></div>
         <div><small>Famílias</small><strong>{families.length}</strong></div>
         <div><small>Visitas registradas</small><strong>{visitCount}</strong></div>
-        <div><small>Pregações</small><strong>{preachings.length}</strong></div>
+        <div><small>Pregações</small><strong>{preachings.length + anteriores.length}</strong></div>
       </section>}
     </div>
   )
