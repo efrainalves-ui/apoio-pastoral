@@ -23,7 +23,8 @@ export function sameDay(left: Date, right: Date): boolean {
 export function periodBounds(view: AgendaView, anchor: Date): [Date, Date] {
   const from = dayStart(anchor)
   if (view === 'day') return [from, dayEnd(from)]
-  if (view === 'week' || view === 'list') {
+  // A Lista mostra o mês inteiro: não repete a Semana.
+  if (view === 'week') {
     from.setDate(from.getDate() - from.getDay())
     const to = new Date(from)
     to.setDate(to.getDate() + 6)
@@ -38,7 +39,7 @@ export function moveAgendaAnchor(value: Date, view: AgendaView, direction: numbe
     next.setDate(next.getDate() + direction)
     return next
   }
-  if (view === 'week' || view === 'list') {
+  if (view === 'week') {
     next.setDate(next.getDate() + direction * 7)
     return next
   }

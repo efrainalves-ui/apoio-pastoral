@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgendaEventEntity } from './types'
-import { eventOccursOnDay, hoursForDay, moveAgendaAnchor } from './calendar'
+import { eventOccursOnDay, hoursForDay, moveAgendaAnchor, periodBounds } from './calendar'
 
 function event(startAt: string, endAt: string): AgendaEventEntity {
   return { id: 'evento-ficticio', title: 'Evento fictício', category: 'event', churchId: null, location: '', address: '', visitTarget: 'none', sermonId: null, sermonSnapshot: null, startAt, endAt, allDay: false, reminderMinutes: null, notes: '', includeInItinerary: false, mondayException: true, createdAt: startAt, updatedAt: startAt }
@@ -11,6 +11,16 @@ describe('calendário civil local', () => {
     expect(moveAgendaAnchor(new Date(2026, 0, 31), 'month', 1)).toEqual(new Date(2026, 1, 28))
     expect(moveAgendaAnchor(new Date(2024, 1, 29), 'month', 1)).toEqual(new Date(2024, 2, 29))
     expect(moveAgendaAnchor(new Date(2026, 11, 31), 'month', 1)).toEqual(new Date(2027, 0, 31))
+  })
+
+  it('a Lista cobre o mês inteiro e anda de mês em mês, como o Mês', () => {
+    const [inicio, fim] = periodBounds('list', new Date(2026, 8, 14))
+    expect(inicio).toEqual(new Date(2026, 8, 1))
+    expect(fim.getDate()).toBe(30)
+    expect(fim.getMonth()).toBe(8)
+    expect(moveAgendaAnchor(new Date(2026, 8, 14), 'list', 1)).toEqual(new Date(2026, 9, 14))
+    expect(moveAgendaAnchor(new Date(2026, 8, 14), 'list', -1)).toEqual(new Date(2026, 7, 14))
+    expect(moveAgendaAnchor(new Date(2026, 8, 14), 'week', 1)).toEqual(new Date(2026, 8, 21))
   })
 
   it('inclui eventos que atravessam o dia consultado', () => {

@@ -3204,3 +3204,75 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .aviso-atencao { padding: 12px 14px; border-radius: 12px; color: #72551d; background: #fff3d6; }
 :root[data-tema='escuro'] .aviso-atencao { color: #f3dcae; background: rgb(255 214 130 / 12%); }
 @media (prefers-color-scheme: dark) { :root:not([data-tema='claro']) .aviso-atencao { color: #f3dcae; background: rgb(255 214 130 / 12%); } }
+
+/*
+  Identidade das categorias da Agenda.
+  As cores vêm só de src/agenda/identidade.ts, pelas variáveis --cat-* que cada
+  elemento recebe; aqui se escolhe o tom do tema e a forma, nunca a cor.
+*/
+.categoria-visual {
+  --cat-largura: 4px;
+  --cat-faixa-atual: var(--cat-faixa); --cat-fundo-atual: var(--cat-fundo); --cat-texto-atual: var(--cat-texto); --cat-icone-atual: var(--cat-icone);
+}
+.categoria-visual[data-destaque='forte'] { --cat-largura: 6px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) .categoria-visual { --cat-faixa-atual: var(--cat-faixa-escuro); --cat-fundo-atual: var(--cat-fundo-escuro); --cat-texto-atual: var(--cat-texto-escuro); --cat-icone-atual: var(--cat-icone-escuro); }
+}
+:root[data-tema='escuro'] .categoria-visual { --cat-faixa-atual: var(--cat-faixa-escuro); --cat-fundo-atual: var(--cat-fundo-escuro); --cat-texto-atual: var(--cat-texto-escuro); --cat-icone-atual: var(--cat-icone-escuro); }
+
+.selo-categoria { min-width: 0; display: inline-flex; align-items: center; gap: 5px; color: var(--cat-texto-atual); font-size: .74rem; font-weight: 700; line-height: 1.25; }
+.selo-categoria__nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selo-categoria__icone { width: 15px; height: 15px; flex: none; color: var(--cat-icone-atual); }
+
+/* Dia */
+html .agenda-page .agenda-category.categoria-visual { color: var(--ink); background: var(--cat-fundo-atual); border: 0; border-left: var(--cat-largura) solid var(--cat-faixa-atual); border-radius: 9px; }
+html .agenda-page .agenda-category.categoria-visual .selo-categoria { font-size: .7rem; }
+html .agenda-page .agenda-category.categoria-visual:focus-visible { outline: 2px solid var(--cat-faixa-atual); outline-offset: 2px; }
+
+/* Semana e dias abaixo do Mês: a mesma linha, com fundo suave e faixa */
+html .agenda-page .compromisso.categoria-visual { grid-template-columns: auto minmax(0, 1fr); gap: 10px; margin-bottom: 6px; padding: 10px 12px 10px calc(var(--cat-largura) + 12px); border-bottom: 0; border-radius: 10px; background: var(--cat-fundo-atual); box-shadow: inset var(--cat-largura) 0 0 var(--cat-faixa-atual); }
+html .agenda-page .compromisso.categoria-visual:hover { background: color-mix(in srgb, var(--cat-fundo-atual) 88%, var(--ink)); }
+html .agenda-page .compromisso.categoria-visual:focus-visible { outline: 2px solid var(--cat-faixa-atual); outline-offset: 2px; }
+html .agenda-page .compromisso.categoria-visual .compromisso__faixa { display: none; }
+html .agenda-page .compromisso.categoria-visual .compromisso__hora { color: var(--ink); }
+html .agenda-page .compromisso.categoria-visual .compromisso__corpo small { color: var(--ink); }
+html .agenda-page .compromisso.categoria-visual .compromisso__corpo strong { overflow-wrap: anywhere; }
+
+/* Mês: os pontos do calendário */
+html .agenda-page .ponto-categoria.categoria-visual { width: 7px; height: 7px; background: var(--cat-faixa-atual); }
+
+/* Lista do mês */
+.lista-mes { display: grid; gap: 18px; }
+.lista-mes__resumo { margin: 0; color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.lista-mes__dia { display: grid; gap: 8px; scroll-margin-top: 90px; }
+.lista-mes__data { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; font-size: .95rem; font-weight: 700; }
+.lista-mes__data small { padding: 2px 9px; border-radius: 999px; color: var(--sobre-acento); background: var(--acento-dado); font-size: .72rem; font-weight: 700; }
+.lista-mes__itens { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.linha-compromisso { display: grid; grid-template-columns: minmax(96px, auto) minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 8px 8px 8px calc(var(--cat-largura) + 12px); border-radius: 10px; background: var(--cat-fundo-atual); box-shadow: inset var(--cat-largura) 0 0 var(--cat-faixa-atual); }
+.linha-compromisso__hora { color: var(--ink); font-size: .82rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.linha-compromisso__corpo { min-width: 0; display: grid; gap: 2px; }
+.linha-compromisso__titulo { color: var(--ink); font-weight: 650; text-decoration: none; overflow-wrap: anywhere; }
+.linha-compromisso__titulo:hover { text-decoration: underline; }
+.linha-compromisso__titulo:focus-visible { border-radius: 4px; outline: 2px solid var(--cat-faixa-atual); outline-offset: 2px; }
+.linha-compromisso__onde { min-width: 0; display: flex; align-items: center; gap: 4px; color: var(--ink); font-size: .78rem; overflow-wrap: anywhere; }
+.linha-compromisso__onde svg { width: 13px; height: 13px; flex: none; }
+.linha-compromisso__acoes { display: flex; gap: 2px; }
+.linha-compromisso__acoes .icon-button { width: 36px; min-width: 36px; height: 36px; min-height: 36px; }
+@media (max-width: 640px) {
+  .linha-compromisso { grid-template-columns: minmax(0, 1fr) auto; }
+  .linha-compromisso__hora { grid-column: 1 / -1; }
+}
+
+/* Legenda */
+.legenda-agenda { display: grid; gap: 8px; }
+.legenda-agenda__alternar { display: none; justify-self: start; min-height: 36px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: transparent; font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; }
+.legenda-agenda__alternar:focus-visible { outline: 2px solid var(--acento-dado); outline-offset: 2px; }
+.legenda-agenda__lista { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.legenda-agenda__item { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); font-size: .76rem; }
+.legenda-agenda__amostra { width: 12px; height: 12px; flex: none; border-radius: 3px; background: var(--cat-faixa-atual); }
+.legenda-agenda__item .selo-categoria__icone { width: 13px; height: 13px; }
+@media (max-width: 720px) {
+  .legenda-agenda__alternar { display: inline-flex; align-items: center; }
+  .legenda-agenda__lista { display: none; }
+  .legenda-agenda--aberta .legenda-agenda__lista { display: flex; }
+}

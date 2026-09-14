@@ -1,13 +1,16 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { CasamentoService } from '../casamentos/service'
 import { textoDasIgrejas } from '../agenda/detalhes'
-import { BookOpen, CalendarDays, ChevronLeft, ChevronRight, Clock3, Download, Edit3, MapPin, Plus, Trash2, TriangleAlert } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { BookOpen, CalendarDays, ChevronLeft, ChevronRight, Download, Edit3, MapPin, Plus, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AgendaService, mondayRestItems } from '../agenda/service'
 import { downloadItineraryPdf, itineraryItems } from '../agenda/itineraryPdf'
-import { AGENDA_CATEGORY_LABELS, type AgendaCategory, type AgendaEventEntity } from '../agenda/types'
+import { identidadeDoCompromisso } from '../agenda/identidade'
+import { listaDoMes, resumoDoMes, tituloDoMes } from '../agenda/listaDoMes'
+import type { AgendaEventEntity } from '../agenda/types'
 import { useAuthVault } from '../auth/AuthVaultContext'
+import { LegendaDaAgenda, SeloDaCategoria, atributosDaCategoria } from '../components/agenda/IdentidadeDaCategoria'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DistrictService } from '../district/service'
@@ -18,20 +21,23 @@ import { localDateKey } from '../shared/dates'
 const agenda = new AgendaService(); const casamentosService = new CasamentoService(); const districts = new DistrictService()
 const VIEWS: Array<{ id: AgendaView; label: string }> = [{ id: 'day', label: 'Dia' }, { id: 'week', label: 'Semana' }, { id: 'month', label: 'Mês' }, { id: 'list', label: 'Lista' }]
 const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+const horaCurta = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
 function localDateTime(value: Date, hour = 8): string { return `${localDateKey(value)}T${String(hour).padStart(2, '0')}:00` }
 const localKey = localDateKey
 const moveAnchor = moveAgendaAnchor
 function displayDate(value: string, allDay: boolean): string { return new Intl.DateTimeFormat('pt-BR', allDay ? { weekday: 'short', day: '2-digit', month: 'short' } : { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) }
-function eventTime(event: AgendaEventEntity): string { return event.allDay ? 'Dia todo' : new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(event.startAt)) }
+function eventTime(event: AgendaEventEntity): string { return event.allDay ? 'Dia todo' : horaCurta.format(new Date(event.startAt)) }
+function faixaDeHorario(event: AgendaEventEntity): string { return event.allDay ? 'Dia todo' : `${horaCurta.format(new Date(event.startAt))}–${horaCurta.format(new Date(event.endAt))}` }
 function faixaDeDias(inicio: Date, fim: Date): string {
   const mesLongo = new Intl.DateTimeFormat('pt-BR', { month: 'long' })
   const diaEMes = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' })
   return inicio.getMonth() === fim.getMonth() ? `${inicio.getDate()} — ${fim.getDate()} de ${mesLongo.format(fim)}` : `${diaEMes.format(inicio)} — ${diaEMes.format(fim)}`
 }
-function categoryClass(category: AgendaCategory | 'rest'): string { return `agenda-category agenda-category--${category}` }
 
+/* Dia: cada compromisso na grade das horas, com a identidade da categoria. */
 function EventChip({ event, compact = false }: { event: AgendaEventEntity; compact?: boolean }) {
-  return <Link className={`${categoryClass(event.category)} ${compact ? 'agenda-category--compact' : ''}`} to={`/app/agenda/${event.id}/editar`} aria-label={`Abrir ${event.title}, ${AGENDA_CATEGORY_LABELS[event.category]}`}><span>{eventTime(event)}</span><strong>{event.title}</strong>{event.category === 'preaching' && event.sermonSnapshot && <small><BookOpen />{event.sermonSnapshot.title}</small>}</Link>
+  const identidade = identidadeDoCompromisso(event.category)
+  return <Link className={`agenda-category categoria-visual ${compact ? 'agenda-category--compact' : ''}`} {...atributosDaCategoria(identidade)} to={`/app/agenda/${event.id}/editar`} aria-label={`Abrir ${event.title}, ${identidade.rotulo}`}><span>{eventTime(event)}</span><SeloDaCategoria categoria={event.category} /><strong>{event.title}</strong>{event.category === 'preaching' && event.sermonSnapshot && <small><BookOpen />{event.sermonSnapshot.title}</small>}</Link>
 }
 
 export function AgendaPage() {
@@ -41,7 +47,7 @@ export function AgendaPage() {
   const [from, to] = useMemo(() => periodBounds(view, anchor), [anchor, view]); const periodEvents = events.filter((event) => new Date(event.startAt) <= to && new Date(event.endAt) >= from); const visibleEvents = periodEvents; const restItems = mondayRestItems(from, to); const churchName = (id: string | null) => churches.find((church) => church.id === id)?.name
   const days = useMemo(() => { const output: Date[] = []; const cursor = dayStart(from); while (cursor <= to) { output.push(new Date(cursor)); cursor.setDate(cursor.getDate() + 1) } return output }, [from, to])
   const monthDays = useMemo(() => { const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1); const cursor = new Date(first); cursor.setDate(first.getDate() - first.getDay()); return Array.from({ length: 42 }, (_, index) => { const date = new Date(cursor); date.setDate(cursor.getDate() + index); return date }) }, [anchor])
-  const label = view === 'day' ? new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(anchor) : view === 'week' || view === 'list' ? faixaDeDias(from, to) : new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(anchor)
+  const label = view === 'day' ? new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(anchor) : view === 'week' ? faixaDeDias(from, to) : tituloDoMes(anchor)
   async function remove(event: AgendaEventEntity) { const aviso = event.casamentoId && (event.papelNoCasamento === 'cerimonia' || event.category === 'wedding') ? 'Remover só o compromisso da Agenda? O acompanhamento do casamento e o histórico continuam guardados.' : 'Remover este compromisso?'; if (!account || !masterKey || !window.confirm(aviso)) return; try { await agenda.deleteEvent(account.id, masterKey, event.id); if (event.casamentoId && (event.papelNoCasamento === 'cerimonia' || event.category === 'wedding')) { const acompanhamento = await casamentosService.obter(account.id, masterKey, event.casamentoId); if (acompanhamento) await casamentosService.salvar(account.id, masterKey, acompanhamento, 'Compromisso da cerimônia removido da Agenda') } await load() } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível remover.') } }
   function toggle(id: string) { setSelected((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next }) }
   function generatePdf() { const items = itineraryItems(events, from, to, selected, churchName); if (!items.length) { setError('Selecione ao menos um compromisso ou uma segunda-feira de folga.'); return } downloadItineraryPdf(items, view === 'day' ? displayDate(anchor.toISOString(), true) : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(from), comNomes); setError('') }
@@ -49,14 +55,23 @@ export function AgendaPage() {
   const eventsOn = (date: Date) => visibleEvents.filter((event) => eventOccursOnDay(event, date))
   const hoje = useMemo(() => new Date(), [])
   const eventosDoDia = (date: Date) => events.filter((event) => eventOccursOnDay(event, date)).sort((a, b) => a.startAt.localeCompare(b.startAt))
-  const categoriasDoDia = (date: Date) => [...new Set(eventosDoDia(date).map(({ category }) => category))].slice(0, 4)
+  const categoriasDoDia = (date: Date) => [...new Set(eventosDoDia(date).map(({ category }) => identidadeDoCompromisso(category).id))].slice(0, 4)
   const semanaDe = (base: Date) => { const inicio = dayStart(base); inicio.setDate(inicio.getDate() - inicio.getDay()); return Array.from({ length: 7 }, (_, index) => { const date = new Date(inicio); date.setDate(inicio.getDate() + index); return date }) }
   const tituloDoDia = (date: Date) => new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(date)
   const ondeAcontece = (event: AgendaEventEntity) => event.category === 'preaching' ? textoDasIgrejas(event, churches) : event.location || churchName(event.churchId)
 
+  // Na Lista, o mês de hoje abre já no dia de hoje, quando há compromisso nele.
+  useEffect(() => {
+    if (view !== 'list') return
+    const alvo = document.getElementById(`lista-dia-${localKey(new Date())}`)
+    try { alvo?.scrollIntoView({ block: 'start' }) } catch { /* navegador sem rolagem programada: a lista continua do topo */ }
+  }, [view, anchor, events])
+
+  /* Semana e os dias abaixo do Mês: a mesma linha de sempre, agora com a identidade da categoria. */
   function renderCompromisso(event: AgendaEventEntity) {
     const onde = ondeAcontece(event)
-    return <Link className={`compromisso ${new Date(event.endAt) < hoje ? 'compromisso--passado' : ''}`} key={event.id} to={`/app/agenda/${event.id}/editar`} aria-label={`Abrir ${event.title}, ${AGENDA_CATEGORY_LABELS[event.category]}`}><span className="compromisso__hora">{eventTime(event)}</span><span className={`compromisso__faixa ponto-categoria--${event.category}`} /><span className="compromisso__corpo"><strong>{event.title}</strong><small>{AGENDA_CATEGORY_LABELS[event.category]}{onde ? ` · ${onde}` : ''}</small></span></Link>
+    const identidade = identidadeDoCompromisso(event.category)
+    return <Link className={`compromisso categoria-visual ${new Date(event.endAt) < hoje ? 'compromisso--passado' : ''}`} {...atributosDaCategoria(identidade)} key={event.id} to={`/app/agenda/${event.id}/editar`} aria-label={`Abrir ${event.title}, ${identidade.rotulo}`}><span className="compromisso__hora">{eventTime(event)}</span><span className="compromisso__faixa" aria-hidden="true" /><span className="compromisso__corpo"><SeloDaCategoria categoria={event.category} /><strong>{event.title}</strong>{onde && <small>{onde}</small>}</span></Link>
   }
 
   function renderDias(dias: Date[], comVazios: boolean) {
@@ -65,15 +80,49 @@ export function AgendaPage() {
     return <div className="dias-abaixo">{mostrados.map((day) => { const doDia = eventosDoDia(day); return <section key={localKey(day)} aria-label={tituloDoDia(day)}><header className="dia-abaixo__topo"><strong>{tituloDoDia(day)}</strong>{sameDay(day, hoje) && <small>Hoje</small>}<span className="dia-abaixo__linha" />{!doDia.length && <Link className="dia-abaixo__mais" to={newEvent(day)} aria-label={`Criar compromisso em ${tituloDoDia(day)}`}><Plus /></Link>}</header>{Boolean(doDia.length) && <div className="dia-abaixo__lista">{doDia.map(renderCompromisso)}</div>}</section> })}</div>
   }
 
-  function renderList() { return <div className="agenda-list">{[...restItems, ...visibleEvents].sort((a, b) => a.startAt.localeCompare(b.startAt)).map((item) => { const rest = item.category === 'rest'; const event = rest ? null : item as AgendaEventEntity; return <article className={`agenda-item ${rest ? 'agenda-item--rest' : ''}`} key={item.id}><div className="agenda-item__date"><CalendarDays /><span>{displayDate(item.startAt, item.allDay)}</span></div><div className="agenda-item__body"><span className={categoryClass(item.category)}>{rest ? 'Folga de segunda-feira' : AGENDA_CATEGORY_LABELS[event!.category]}</span><h3>{event ? <Link to={`/app/agenda/${event.id}/editar`}>{event.title}</Link> : item.title}</h3>{event && <div className="agenda-item__meta">{event.allDay ? <span><Clock3 />Dia todo</span> : <span><Clock3 />até {new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(event.endAt))}</span>}{ondeAcontece(event) && <span><MapPin />{ondeAcontece(event)}</span>}{event.sermonSnapshot && <span><BookOpen />{event.sermonSnapshot.title}</span>}</div>}</div>{event ? <div className="agenda-item__actions">{event.category === 'visit' && <Link className="icon-button" aria-label={`Registrar visita ${event.title}`} to={`/app/visitas/nova?agenda=${event.id}`}><CalendarDays /></Link>}{event.sermonId && <Link className="icon-button" aria-label={`Abrir sermão de ${event.title}`} to={`/app/sermoes/${event.sermonId}`}><BookOpen /></Link>}<Link className="icon-button" aria-label={`Editar ${event.title}`} to={`/app/agenda/${event.id}/editar`}><Edit3 /></Link><button className="icon-button danger-icon" aria-label={`Remover ${event.title}`} onClick={() => void remove(event)}><Trash2 /></button></div> : <div className="agenda-rest-note"><TriangleAlert />Exige exceção explícita</div>}</article> })}</div> }
+  /* Lista: o mês inteiro, um grupo por dia com compromisso, em linhas compactas. */
+  function renderList() {
+    const dias = listaDoMes(events, anchor)
+    const mesDeHoje = anchor.getMonth() === hoje.getMonth() && anchor.getFullYear() === hoje.getFullYear()
+    if (!dias.length) return <div className="empty-state"><CalendarDays /><strong>Nenhum compromisso neste mês</strong><Link className="button" to={newEvent(mesDeHoje ? hoje : new Date(anchor.getFullYear(), anchor.getMonth(), 1))}><Plus />Criar compromisso</Link></div>
+    return <section className="lista-mes" aria-label={`Compromissos de ${tituloDoMes(anchor)}`}>
+      <p className="lista-mes__resumo">{resumoDoMes(dias)}</p>
+      {dias.map((grupo) => {
+        const ehHoje = sameDay(grupo.data, hoje)
+        return <section key={grupo.chave} id={`lista-dia-${grupo.chave}`} className={`lista-mes__dia ${ehHoje ? 'lista-mes__dia--hoje' : ''}`} aria-labelledby={`lista-titulo-${grupo.chave}`}>
+          <h3 className="lista-mes__data" id={`lista-titulo-${grupo.chave}`}>{tituloDoDia(grupo.data)}{ehHoje && <small>Hoje</small>}</h3>
+          <ul className="lista-mes__itens">{grupo.eventos.map((event) => {
+            const identidade = identidadeDoCompromisso(event.category)
+            const onde = ondeAcontece(event)
+            return <li key={event.id} className="linha-compromisso categoria-visual" {...atributosDaCategoria(identidade)}>
+              <span className="linha-compromisso__hora">{faixaDeHorario(event)}</span>
+              <span className="linha-compromisso__corpo">
+                <SeloDaCategoria categoria={event.category} />
+                <Link className="linha-compromisso__titulo" to={`/app/agenda/${event.id}/editar`} aria-label={`Abrir ${event.title}, ${identidade.rotulo}`}>{event.title}</Link>
+                {onde && <small className="linha-compromisso__onde"><MapPin aria-hidden="true" />{onde}</small>}
+                {event.sermonSnapshot && <small className="linha-compromisso__onde"><BookOpen aria-hidden="true" />{event.sermonSnapshot.title}</small>}
+              </span>
+              <span className="linha-compromisso__acoes">
+                {event.category === 'visit' && <Link className="icon-button" aria-label={`Registrar visita ${event.title}`} to={`/app/visitas/nova?agenda=${event.id}`}><CalendarDays /></Link>}
+                {event.sermonId && <Link className="icon-button" aria-label={`Abrir sermão de ${event.title}`} to={`/app/sermoes/${event.sermonId}`}><BookOpen /></Link>}
+                <Link className="icon-button" aria-label={`Editar ${event.title}`} to={`/app/agenda/${event.id}/editar`}><Edit3 /></Link>
+                <button type="button" className="icon-button danger-icon" aria-label={`Remover ${event.title}`} onClick={() => void remove(event)}><Trash2 /></button>
+              </span>
+            </li>
+          })}</ul>
+        </section>
+      })}
+    </section>
+  }
+
   function renderDay() { const dayEvents = eventsOn(anchor); return <section className="agenda-day" aria-label="Grade do dia">{hoursForDay(dayEvents, anchor).map((hour) => { const hourEvents = dayEvents.filter((event) => { if (event.allDay) return false; const start = new Date(event.startAt); return (sameDay(start, anchor) ? start.getHours() : 0) === hour }); return <div className="agenda-time-row" key={hour}><time>{String(hour).padStart(2, '0')}:00</time><Link className="agenda-time-slot" to={newEvent(anchor, hour)} aria-label={`Criar compromisso às ${String(hour).padStart(2, '0')}:00`}><span>+</span></Link><div className="agenda-time-events">{hourEvents.map((event) => <EventChip event={event} key={event.id} />)}</div></div> })}{dayEvents.filter(({ allDay }) => allDay).map((event) => <EventChip event={event} key={event.id} />)}</section> }
   function renderWeek() { return renderDias(diasQueAindaImportam(days, hoje), true) }
   function renderMonth() {
     const noMesDeHoje = hoje.getMonth() === anchor.getMonth() && hoje.getFullYear() === anchor.getFullYear()
     const gradeDoMes = monthDays.slice(0, monthDays.slice(35).some((day) => day.getMonth() === anchor.getMonth()) ? 42 : 35)
     const diasAbaixo = dia ? [new Date(`${dia}T12:00:00`)] : noMesDeHoje ? diasQueAindaImportam(semanaDe(hoje), hoje) : monthDays.filter((day) => day.getMonth() === anchor.getMonth())
-    return <><Card><section className="calendario" aria-label="Calendário mensal">{WEEKDAY_LABELS.map((day) => <span className="calendario__semana" key={day}>{day}</span>)}{gradeDoMes.map((day) => { const chave = localKey(day); const quantos = eventosDoDia(day).length; return <button type="button" key={chave} className={`calendario__dia ${day.getMonth() === anchor.getMonth() ? '' : 'calendario__dia--fora'} ${sameDay(day, hoje) ? 'calendario__dia--hoje' : ''} ${dia === chave ? 'calendario__dia--escolhido' : ''}`} aria-pressed={dia === chave} aria-label={`${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(day)}, ${quantos} compromisso(s)`} onClick={() => setDia((atual) => (atual === chave ? null : chave))}><span>{day.getDate()}</span><span className="calendario__pontos">{categoriasDoDia(day).map((categoria) => <span className={`ponto-categoria ponto-categoria--${categoria}`} key={categoria} />)}</span></button> })}</section></Card>{renderDias(diasAbaixo, Boolean(dia))}</>
+    return <><Card><section className="calendario" aria-label="Calendário mensal">{WEEKDAY_LABELS.map((day) => <span className="calendario__semana" key={day}>{day}</span>)}{gradeDoMes.map((day) => { const chave = localKey(day); const quantos = eventosDoDia(day).length; return <button type="button" key={chave} className={`calendario__dia ${day.getMonth() === anchor.getMonth() ? '' : 'calendario__dia--fora'} ${sameDay(day, hoje) ? 'calendario__dia--hoje' : ''} ${dia === chave ? 'calendario__dia--escolhido' : ''}`} aria-pressed={dia === chave} aria-label={`${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(day)}, ${quantos} compromisso(s)`} onClick={() => setDia((atual) => (atual === chave ? null : chave))}><span>{day.getDate()}</span><span className="calendario__pontos">{categoriasDoDia(day).map((categoria) => <span className={`ponto-categoria ponto-categoria--${categoria} categoria-visual`} {...atributosDaCategoria(categoria)} key={categoria} />)}</span></button> })}</section></Card>{renderDias(diasAbaixo, Boolean(dia))}</>
   }
 
-  return <div className="page-stack agenda-page"><header className="page-hero agenda-hero"><h1>Agenda</h1><div className="acoes-do-topo"><button type="button" className="botao-itinerario" aria-label="Itinerário" onClick={() => setPdfOpen((value) => !value)}><Download aria-hidden="true" /></button><Link className="botao-novo" to={newEvent()}>Novo</Link></div></header>{error && <div className="alert alert--error" role="alert">{error}</div>}<Card className="agenda-controls"><div className="agenda-view-tabs" role="tablist" aria-label="Visualização da agenda">{VIEWS.map((item) => <button key={item.id} type="button" role="tab" aria-selected={view === item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}>{item.label}</button>)}</div><div className="agenda-toolbar"><Button variant="secondary" aria-label="Período anterior" onClick={() => { setDia(null); setAnchor((current) => moveAnchor(current, view, -1)) }} icon={<ChevronLeft />}>Anterior</Button><h2 aria-live="polite">{label}</h2><Button variant="secondary" aria-label="Próximo período" onClick={() => { setDia(null); setAnchor((current) => moveAnchor(current, view, 1)) }} icon={<ChevronRight />}>Próximo</Button><Button variant="secondary" className="agenda-today-button" onClick={() => { setDia(null); setAnchor(new Date()) }}>Hoje</Button></div></Card>{pdfOpen && <Card eyebrow="Itinerário local" title="Selecionar compromissos"><div className="itinerary-selection">{visibleEvents.map((event) => <label key={event.id}><input type="checkbox" checked={selected.has(event.id)} onChange={() => toggle(event.id)} /><span><strong>{event.title}</strong><small>{AGENDA_CATEGORY_LABELS[event.category]} · {displayDate(event.startAt, event.allDay)}</small></span></label>)}</div><div className="alert alert--success">As {restItems.length} segunda(s)-feira(s) de folga entram automaticamente.</div><label className="confirmation-check"><input type="checkbox" checked={comNomes} onChange={(event) => setComNomes(event.target.checked)} /><span><strong>Incluir nomes neste relatório</strong><small>Sem marcar, saem data, tipo e local. Com nomes, o arquivo pode conter dados pessoais: compartilhe com cuidado.</small></span></label><Button onClick={generatePdf} icon={<Download />}>Baixar itinerário</Button></Card>}{view === 'day' ? renderDay() : view === 'week' ? renderWeek() : view === 'month' ? renderMonth() : renderList()}{!visibleEvents.length && (view === 'day' || view === 'list') && <div className="empty-state"><CalendarDays /><strong>Nenhum compromisso neste período</strong><p>Nenhum compromisso nesta semana. Crie uma visita, pregação ou reunião.</p><Link className="button" to={newEvent()}><Plus />Criar compromisso</Link></div>}</div>
+  return <div className="page-stack agenda-page"><header className="page-hero agenda-hero"><h1>Agenda</h1><div className="acoes-do-topo"><button type="button" className="botao-itinerario" aria-label="Itinerário" onClick={() => setPdfOpen((value) => !value)}><Download aria-hidden="true" /></button><Link className="botao-novo" to={newEvent()}>Novo</Link></div></header>{error && <div className="alert alert--error" role="alert">{error}</div>}<Card className="agenda-controls"><div className="agenda-view-tabs" role="tablist" aria-label="Visualização da agenda">{VIEWS.map((item) => <button key={item.id} type="button" role="tab" aria-selected={view === item.id} className={view === item.id ? 'active' : ''} onClick={() => setView(item.id)}>{item.label}</button>)}</div><div className="agenda-toolbar"><Button variant="secondary" aria-label="Período anterior" onClick={() => { setDia(null); setAnchor((current) => moveAnchor(current, view, -1)) }} icon={<ChevronLeft />}>Anterior</Button><h2 aria-live="polite">{label}</h2><Button variant="secondary" aria-label="Próximo período" onClick={() => { setDia(null); setAnchor((current) => moveAnchor(current, view, 1)) }} icon={<ChevronRight />}>Próximo</Button><Button variant="secondary" className="agenda-today-button" onClick={() => { setDia(null); setAnchor(new Date()) }}>Hoje</Button></div><LegendaDaAgenda /></Card>{pdfOpen && <Card eyebrow="Itinerário local" title="Selecionar compromissos"><div className="itinerary-selection">{visibleEvents.map((event) => <label key={event.id}><input type="checkbox" checked={selected.has(event.id)} onChange={() => toggle(event.id)} /><span><strong>{event.title}</strong><small>{identidadeDoCompromisso(event.category).rotulo} · {displayDate(event.startAt, event.allDay)}</small></span></label>)}</div><div className="alert alert--success">As {restItems.length} segunda(s)-feira(s) de folga entram automaticamente.</div><label className="confirmation-check"><input type="checkbox" checked={comNomes} onChange={(event) => setComNomes(event.target.checked)} /><span><strong>Incluir nomes neste relatório</strong><small>Sem marcar, saem data, tipo e local. Com nomes, o arquivo pode conter dados pessoais: compartilhe com cuidado.</small></span></label><Button onClick={generatePdf} icon={<Download />}>Baixar itinerário</Button></Card>}{view === 'day' ? renderDay() : view === 'week' ? renderWeek() : view === 'month' ? renderMonth() : renderList()}{!visibleEvents.length && view === 'day' && <div className="empty-state"><CalendarDays /><strong>Nenhum compromisso neste dia</strong><Link className="button" to={newEvent()}><Plus />Criar compromisso</Link></div>}</div>
 }
