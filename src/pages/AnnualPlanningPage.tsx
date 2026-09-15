@@ -4,47 +4,153 @@ import type { RelatorioIntegradoEntity } from '../integrated-report/types'
 import { areasEstrategicas } from '../integrated-report/areasEstrategicas'
 import { RelatorioPorArea } from '../components/RelatorioPorArea'
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import { CalendarRange, ClipboardCopy, Plus, Target, TriangleAlert } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { CalendarRange, ClipboardCopy, Megaphone, Plus, Target, TriangleAlert } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
-import { localDateKey } from '../shared/dates'
 import { AgendaService } from '../agenda/service'
 import type { AgendaEventEntity } from '../agenda/types'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
+import { RevisarCorrecoes } from '../components/RevisarCorrecoes'
+import { campanhaDeCadaMeta, metasDaCampanha, type GrupoDeCorrecao } from '../evangelism/consolidacao'
 import { annualSummary } from '../evangelism/core'
 import { GOAL_STATUS_LABELS, trackGoal } from '../evangelism/goalTracking'
+import {
+  alcanceDaCampanha, anoDaCampanha, campanhasEmAndamento, campanhasSemData, fimDaCampanha, hojeLocal, mesesDaCampanha, periodoCurto, proximasCampanhas,
+  ROTULOS_DA_SITUACAO, situacaoDaCampanha, textoDoPeriodo,
+} from '../evangelism/periodo'
 import { useGoalSources } from '../goals/useGoalSources'
 import { EvangelismPlanningService } from '../evangelism/service'
-import { PLANNING_AREAS, PLANNING_AREA_LABELS, type AnnualGoalEntity, type EvangelismCampaignEntity } from '../evangelism/types'
+import { CAMPAIGN_OBJECTIVE_LABELS, PLANNING_AREAS, PLANNING_AREA_LABELS, type AnnualGoalEntity, type EvangelismCampaignEntity } from '../evangelism/types'
 
 const formatDate = (valor: string) => new Intl.DateTimeFormat('pt-BR').format(new Date(`${valor}T12:00:00`))
 const service = new EvangelismPlanningService(); const districtService = new DistrictService(); const relatorioIntegrado = new RelatorioIntegradoService(); const agendaService = new AgendaService(); const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+const rotuloDaMeta = (meta: AnnualGoalEntity) => meta.linkedArea === 'bible_studies' ? 'Estudos' : meta.linkedArea === 'baptisms' ? 'Batismos' : meta.title
+
+/**
+ * Planejamento Anual.
+ *
+ * As campanhas vêm do Evangelismo e são mostradas uma vez, pelo identificador
+ * delas. As metas de estudos e de batismos de uma campanha aparecem dentro dela,
+ * e não como outros cartões com o mesmo nome. As datas e a situação saem do
+ * período da campanha e do dia de hoje do aparelho.
+ */
 export function AnnualPlanningPage() {
   const { account, masterKey } = useAuthVault(); const { sources } = useGoalSources(); const [year, setYear] = useState(new Date().getFullYear()); const [goals, setGoals] = useState<AnnualGoalEntity[]>([]); const [campaigns, setCampaigns] = useState<EvangelismCampaignEntity[]>([]); const [events, setEvents] = useState<AgendaEventEntity[]>([]); const [churches, setChurches] = useState<ChurchEntity[]>([]); const [copyOpen, setCopyOpen] = useState(false); const [targetYear, setTargetYear] = useState(year + 1); const [selected, setSelected] = useState<string[]>([]); const [notice, setNotice] = useState(''); const [error, setError] = useState(''); const [relatoriosIntegrados, setRelatoriosIntegrados] = useState<RelatorioIntegradoEntity[]>([])
-  const load = useCallback(async () => { if (!account || !masterKey) return; try { const district = await districtService.getDistrict(account.id, masterKey); const [nextGoals, nextCampaigns, nextEvents, nextChurches, nextRelatorios] = await Promise.all([service.listGoals(account.id, masterKey), service.listCampaigns(account.id, masterKey), agendaService.listEvents(account.id, masterKey), district ? districtService.listChurches(account.id, masterKey, district.id) : [], relatorioIntegrado.listar(account.id, masterKey)]); setGoals(nextGoals); setCampaigns(nextCampaigns); setEvents(nextEvents); setChurches(nextChurches); setRelatoriosIntegrados(nextRelatorios) } catch { setError('Não foi possível abrir o planejamento anual.') } }, [account, masterKey])
-  useReloadOnSync(load); const yearGoals = goals.filter((goal) => goal.year === year); const yearCampaigns = campaigns.filter((campaign) => campaign.startDate.startsWith(String(year))); const yearEvents = events.filter((event) => event.startAt.startsWith(String(year)) && !event.linkedSource); const summary = annualSummary(goals, campaigns, year)
-  const upcoming = useMemo(() => [...yearGoals.map((goal) => ({ date: goal.dueDate, title: goal.title, type: 'Meta', to: `/app/planejamento/${goal.id}` })), ...yearCampaigns.map((campaign) => ({ date: campaign.startDate, title: campaign.name, type: 'Campanha', to: `/app/evangelismo/${campaign.id}` })), ...yearEvents.map((event) => ({ date: event.startAt.slice(0, 10), title: event.title, type: 'Agenda', to: `/app/agenda/${event.id}/editar` }))].filter(({ date }) => date >= localDateKey()).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6), [yearCampaigns, yearEvents, yearGoals])
+  const [grupos, setGrupos] = useState<GrupoDeCorrecao[]>([]); const [ultimaLimpeza, setUltimaLimpeza] = useState<ReturnType<EvangelismPlanningService['ultimaLimpeza']>>(null); const [avisoDaRevisao, setAvisoDaRevisao] = useState(''); const [revisando, setRevisando] = useState(false)
+  const { hash } = useLocation()
+  const load = useCallback(async () => {
+    if (!account || !masterKey) return
+    try {
+      // Só a análise roda ao abrir: nada é gravado sem a confirmação na revisão.
+      setGrupos(await service.analisarCorrecoes(account.id, masterKey).catch(() => []))
+      setUltimaLimpeza(service.ultimaLimpeza(account.id))
+      const district = await districtService.getDistrict(account.id, masterKey)
+      const [nextGoals, nextCampaigns, nextEvents, nextChurches, nextRelatorios] = await Promise.all([service.listGoals(account.id, masterKey), service.listCampaigns(account.id, masterKey), agendaService.listEvents(account.id, masterKey), district ? districtService.listChurches(account.id, masterKey, district.id) : [], relatorioIntegrado.listar(account.id, masterKey)])
+      setGoals(nextGoals); setCampaigns(nextCampaigns); setEvents(nextEvents); setChurches(nextChurches); setRelatoriosIntegrados(nextRelatorios)
+    } catch { setError('Não foi possível abrir o planejamento anual.') }
+  }, [account, masterKey])
+  useReloadOnSync(load)
+
+  const hoje = hojeLocal()
+  const nomeDaIgreja = (id: string) => churches.find((church) => church.id === id)?.name
+  const campanhaDaMeta = campanhaDeCadaMeta(campaigns, goals)
+  const yearGoals = goals.filter((goal) => goal.year === year)
+  const metasSoltas = yearGoals.filter((goal) => !campanhaDaMeta.has(goal.id))
+  const yearCampaigns = campaigns.filter((campaign) => anoDaCampanha(campaign) === year)
+  // Compromissos que a campanha projetou na Agenda já estão representados por ela.
+  const yearEvents = events.filter((event) => event.startAt.startsWith(String(year)) && !event.linkedSource)
+  const summary = annualSummary(goals, campaigns, year)
   const tracked = yearGoals.map((goal) => trackGoal(goal, sources))
+  const emAndamento = campanhasEmAndamento(yearCampaigns, hoje)
+  const semData = campanhasSemData(yearCampaigns)
+  const upcoming = [
+    ...proximasCampanhas(yearCampaigns, hoje).map((campaign) => ({ key: `campanha-${campaign.id}`, date: campaign.startDate, when: periodoCurto(campaign.startDate, fimDaCampanha(campaign)), title: campaign.name, type: `Campanha · ${alcanceDaCampanha(campaign.churchIds, nomeDaIgreja)}`, to: `/app/evangelismo/${campaign.id}` })),
+    ...yearEvents.filter((event) => event.startAt.slice(0, 10) > hoje).map((event) => ({ key: `agenda-${event.id}`, date: event.startAt.slice(0, 10), when: periodoCurto(event.startAt.slice(0, 10)), title: event.title, type: 'Agenda', to: `/app/agenda/${event.id}/editar` })),
+  ].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6)
   const areasDoRelatorio = useMemo(
     () => areasEstrategicas(relatoriosIntegrados, churches.filter(({ status }) => status === 'active').map(({ id }) => id)),
     [relatoriosIntegrados, churches],
   )
+
+  useEffect(() => {
+    if (hash === '#revisar-correcoes' && grupos.length) document.getElementById('revisar-correcoes')?.scrollIntoView({ block: 'start' })
+  }, [hash, grupos.length])
+
+  async function revisar(acao: (accountId: string, key: CryptoKey) => Promise<string>) {
+    if (!account || !masterKey) return
+    setRevisando(true); setError('')
+    try { setAvisoDaRevisao(await acao(account.id, masterKey)); await load() } catch (motivo) { setError(motivo instanceof Error ? motivo.message : 'Não foi possível concluir a revisão.') } finally { setRevisando(false) }
+  }
+  const aplicarCorrecoes = (chaves: string[]) => revisar(async (accountId, key) => {
+    const feito = await service.aplicarCorrecoes(accountId, key, chaves)
+    return `Correção aplicada: ${feito.metasRemovidas} meta(s) removida(s), ${feito.metasLigadas + feito.metasPreservadas} ligada(s), ${feito.copiasDeCampanha} campanha(s) repetida(s) unida(s), ${feito.datasCorrigidas} data(s) alinhada(s).`
+  })
+  const manterSeparados = (chave: string) => revisar(async (accountId, key) => { await service.manterSeparados(accountId, key, chave); return 'Registros mantidos separados.' })
+  const desfazerLimpeza = () => revisar(async (accountId, key) => {
+    const feito = await service.desfazerUltimaLimpeza(accountId, key)
+    return `Limpeza desfeita: ${feito.restaurados} registro(s) restaurado(s)${feito.ignorados ? `; ${feito.ignorados} alterado(s) depois ficaram como estão` : ''}.`
+  })
+
   async function copy() { if (!account || !masterKey || !selected.length || targetYear === year) return; try { const copied = await service.copyGoals(account.id, masterKey, selected, targetYear); setNotice(`${copied.length} meta(s) copiada(s). Revise as datas e a quantidade esperada antes de usar.`); setCopyOpen(false); setSelected([]); setYear(targetYear); await load() } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível copiar o planejamento.') } }
-  return <div className="page-stack planning-page"><header className="page-hero"><div><p className="eyebrow">Direção do distrito</p><h1>Planejamento Anual</h1></div><div className="page-actions"><Button variant="secondary" icon={<ClipboardCopy />} onClick={() => { setCopyOpen(true); setSelected(yearGoals.map(({ id }) => id)); setTargetYear(year + 1) }}>Copiar planejamento</Button><Link className="button" to={`/app/planejamento/nova?ano=${year}`}><Plus />Nova meta do planejamento</Link></div></header>{notice && <div className="alert alert--success" role="status">{notice}</div>}{error && <div className="alert alert--error" role="alert">{error}</div>}
+
+  const linhaDaCampanha = (campaign: EvangelismCampaignEntity) => {
+    const situacao = situacaoDaCampanha(campaign, hoje)
+    const metas = metasDaCampanha(campaign, goals).map((meta) => { const acompanhamento = trackGoal(meta, sources); return `${rotuloDaMeta(meta)} ${acompanhamento.result} de ${acompanhamento.target || '—'}${acompanhamento.status === 'reached' ? ' · Alcançada' : ''}` })
+    return <Link className="task-attention-row planning-campaign-row" to={`/app/evangelismo/${campaign.id}`} key={campaign.id}>
+      <span><strong>{campaign.name}</strong><small>{textoDoPeriodo(campaign)} · {alcanceDaCampanha(campaign.churchIds, nomeDaIgreja)}</small>{metas.length > 0 && <small>{metas.join(' · ')}</small>}</span>
+      <span className={`entity-badge situacao--${situacao}`}>{ROTULOS_DA_SITUACAO[situacao]}</span>
+    </Link>
+  }
+  const itemDoCalendario = (campaign: EvangelismCampaignEntity) => {
+    const situacao = situacaoDaCampanha(campaign, hoje)
+    return <Link className={`calendario-item calendario-item--${situacao}`} to={`/app/evangelismo/${campaign.id}`} key={campaign.id}>
+      <Megaphone aria-hidden="true" />
+      <span><strong>{campaign.name}</strong><small className="calendario-item__periodo">{textoDoPeriodo(campaign)}</small><small>{ROTULOS_DA_SITUACAO[situacao]} · {CAMPAIGN_OBJECTIVE_LABELS[campaign.objective]} · {alcanceDaCampanha(campaign.churchIds, nomeDaIgreja)}</small></span>
+    </Link>
+  }
+
+  return <div className="page-stack planning-page"><header className="page-hero"><div><p className="eyebrow">Direção do distrito</p><h1>Planejamento Anual</h1></div><div className="page-actions"><Button variant="secondary" icon={<ClipboardCopy />} onClick={() => { setCopyOpen(true); setSelected(metasSoltas.map(({ id }) => id)); setTargetYear(year + 1) }}>Copiar planejamento</Button><Link className="button" to={`/app/planejamento/nova?ano=${year}`}><Plus />Nova meta do planejamento</Link></div></header>{notice && <div className="alert alert--success" role="status">{notice}</div>}{error && <div className="alert alert--error" role="alert">{error}</div>}
+    <RevisarCorrecoes grupos={grupos} nomeDaIgreja={nomeDaIgreja} ultimaLimpeza={ultimaLimpeza} aviso={avisoDaRevisao} ocupado={revisando} aoAplicar={aplicarCorrecoes} aoManter={manterSeparados} aoDesfazer={desfazerLimpeza} />
     <Card className="planning-year-selector"><label className="field"><span className="field__label">Ano do planejamento</span><select className="field__input" value={year} onChange={(event) => setYear(Number(event.target.value))}>{Array.from({ length: 7 }, (_, index) => new Date().getFullYear() - 2 + index).map((item) => <option value={item} key={item}>{item}</option>)}</select></label></Card>
     <section className="dashboard-metrics" aria-label="Resumo do planejamento"><div><small>Metas</small><strong>{yearGoals.length}</strong><span>no ano</span></div><div><small>Em andamento</small><strong>{tracked.filter(({ status }) => status === 'in_progress').length}</strong><span>dentro do prazo</span></div><div><small>Alcançadas</small><strong>{tracked.filter(({ status }) => status === 'reached').length}</strong><span>resultado atingido</span></div><div><small>Não alcançadas</small><strong>{tracked.filter(({ status }) => status === 'missed').length}</strong><span>prazo encerrado</span></div></section>
-    {copyOpen && <Card title="Revisar cópia do planejamento" eyebrow="Nada será alterado no ano atual"><div className="planning-copy-list">{yearGoals.map((goal) => <label key={goal.id}><input type="checkbox" checked={selected.includes(goal.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, goal.id] : current.filter((id) => id !== goal.id))} /><span><strong>{goal.title}</strong><small>até {formatDate(goal.dueDate)}</small></span></label>)}</div><label className="field"><span className="field__label">Copiar para o ano</span><input className="field__input" type="number" min={year + 1} value={targetYear} onChange={(event) => setTargetYear(Number(event.target.value))} /></label><div className="form-actions"><Button onClick={copy} disabled={!selected.length || targetYear === year}>Copiar metas para revisão</Button><Button variant="secondary" onClick={() => setCopyOpen(false)}>Cancelar</Button></div></Card>}
-    <div className="planning-layout"><div className="planning-areas">{PLANNING_AREAS.map((area) => <Card key={area} eyebrow={PLANNING_AREA_LABELS[area]} title={`${yearGoals.filter((goal) => goal.area === area).length} meta(s)`}><div className="planning-goal-list">{yearGoals.filter((goal) => goal.area === area).map((goal) => { const acompanhamento = trackGoal(goal, sources); return <div className="task-attention-row" key={goal.id}><span><strong>{goal.title}</strong><small>{goal.startDate ? `${formatDate(goal.startDate)} a ${formatDate(goal.dueDate)}` : `até ${formatDate(goal.dueDate)}`} · {GOAL_STATUS_LABELS[acompanhamento.status]}</small></span><Link className="button button--secondary" to={`/app/planejamento/${goal.id}`}>Acompanhar</Link></div> })}{!yearGoals.some((goal) => goal.area === area) && <div className="empty-state compact-empty"><Target /><strong>Nenhuma meta nesta área</strong></div>}</div></Card>)}</div><aside className="planning-aside"><Card title="Próximas ações e eventos" action={<CalendarRange />}>{upcoming.length ? <div className="planning-upcoming">{upcoming.map((item) => <Link key={`${item.type}-${item.to}`} to={item.to}><time>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(`${item.date}T12:00:00`))}</time><span><strong>{item.title}</strong><small>{item.type}</small></span></Link>)}</div> : <div className="empty-state compact-empty"><CalendarRange /><strong>Nenhuma data próxima</strong></div>}</Card><Card title="Resumo por igreja">{churches.map((church) => <div className="planning-church-summary" key={church.id}><span>{church.name}</span><strong>{yearGoals.filter(({ churchIds }) => churchIds.includes(church.id)).length} meta(s) · {yearCampaigns.filter(({ churchIds }) => churchIds.includes(church.id)).length} campanha(s)</strong></div>)}</Card></aside></div>
+    {copyOpen && <Card title="Revisar cópia do planejamento" eyebrow="Nada será alterado no ano atual"><div className="planning-copy-list">{metasSoltas.map((goal) => <label key={goal.id}><input type="checkbox" checked={selected.includes(goal.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, goal.id] : current.filter((id) => id !== goal.id))} /><span><strong>{goal.title}</strong><small>até {formatDate(goal.dueDate)}</small></span></label>)}</div><label className="field"><span className="field__label">Copiar para o ano</span><input className="field__input" type="number" min={year + 1} value={targetYear} onChange={(event) => setTargetYear(Number(event.target.value))} /></label><div className="form-actions"><Button onClick={copy} disabled={!selected.length || targetYear === year}>Copiar metas para revisão</Button><Button variant="secondary" onClick={() => setCopyOpen(false)}>Cancelar</Button></div></Card>}
+    <div className="planning-layout"><div className="planning-areas">{PLANNING_AREAS.map((area) => {
+      const soltas = metasSoltas.filter((goal) => goal.area === area)
+      const campanhasDaArea = yearCampaigns.filter((campaign) => metasDaCampanha(campaign, goals).some((goal) => goal.area === area))
+      return <Card key={area} eyebrow={PLANNING_AREA_LABELS[area]} title={`${soltas.length} meta(s)${campanhasDaArea.length ? ` · ${campanhasDaArea.length} campanha(s)` : ''}`}><div className="planning-goal-list">
+        {campanhasDaArea.map(linhaDaCampanha)}
+        {soltas.map((goal) => { const acompanhamento = trackGoal(goal, sources); return <div className="task-attention-row" key={goal.id}><span><strong>{goal.title}</strong><small>{goal.startDate ? `${formatDate(goal.startDate)} a ${formatDate(goal.dueDate)}` : `até ${formatDate(goal.dueDate)}`} · {GOAL_STATUS_LABELS[acompanhamento.status]}</small></span><Link className="button button--secondary" to={`/app/planejamento/${goal.id}`}>Acompanhar</Link></div> })}
+        {!soltas.length && !campanhasDaArea.length && <div className="empty-state compact-empty"><Target /><strong>Nenhuma meta nesta área</strong></div>}
+      </div></Card>
+    })}</div><aside className="planning-aside">
+      <Card title="Em andamento agora" action={<Megaphone />}>{emAndamento.length ? <div className="planning-upcoming">{emAndamento.map((campaign) => <Link key={campaign.id} to={`/app/evangelismo/${campaign.id}`}><time>{periodoCurto(campaign.startDate, fimDaCampanha(campaign))}</time><span><strong>{campaign.name}</strong><small>Campanha · {alcanceDaCampanha(campaign.churchIds, nomeDaIgreja)}</small></span></Link>)}</div> : <div className="empty-state compact-empty"><Megaphone /><strong>Nenhuma campanha em andamento</strong></div>}</Card>
+      <Card title="Próximos eventos" action={<CalendarRange />}>{upcoming.length ? <div className="planning-upcoming">{upcoming.map((item) => <Link key={item.key} to={item.to}><time>{item.when}</time><span><strong>{item.title}</strong><small>{item.type}</small></span></Link>)}</div> : <div className="empty-state compact-empty"><CalendarRange /><strong>Nenhuma data próxima</strong></div>}</Card>
+      <Card title="Resumo por igreja">{churches.map((church) => <div className="planning-church-summary" key={church.id}><span>{church.name}</span><strong>{metasSoltas.filter(({ churchIds }) => churchIds.includes(church.id)).length} meta(s) · {yearCampaigns.filter(({ churchIds }) => churchIds.includes(church.id)).length} campanha(s)</strong></div>)}</Card>
+    </aside></div>
     {/*
       O Relatório Integrado visto pelas quatro áreas do planejamento. O relatório
       vem organizado por departamento; o pastor acompanha o distrito por área.
     */}
     <RelatorioPorArea areas={areasDoRelatorio} />
-    <Card title="Calendário Anual" eyebrow={`${year}`}><div className="annual-calendar">{monthLabels.map((label, index) => { const month = `${year}-${String(index + 1).padStart(2, '0')}`; const monthGoals = yearGoals.filter(({ dueDate }) => dueDate.startsWith(month)); const monthCampaigns = yearCampaigns.filter(({ startDate }) => startDate.startsWith(month)); const monthEvents = yearEvents.filter(({ startAt }) => startAt.startsWith(month)); return <section key={month}><h3>{label}</h3>{monthCampaigns.map((campaign) => <Link to={`/app/evangelismo/${campaign.id}`} key={campaign.id}><CalendarRange /><span>{campaign.name}</span></Link>)}{monthGoals.map((goal) => <Link to={`/app/planejamento/${goal.id}`} key={goal.id}><Target /><span>{goal.title}</span></Link>)}{monthEvents.map((event) => <Link to={`/app/agenda/${event.id}/editar`} key={event.id}><CalendarRange /><span>{event.title}</span></Link>)}{!monthGoals.length && !monthCampaigns.length && !monthEvents.length && <small>Sem ações</small>}</section> })}</div></Card>
+    <Card title="Calendário Anual" eyebrow={`${year}`}>
+      <div className="annual-calendar">{monthLabels.map((label, index) => {
+        const month = `${year}-${String(index + 1).padStart(2, '0')}`
+        const monthCampaigns = yearCampaigns.filter((campaign) => mesesDaCampanha(campaign, year).includes(index + 1))
+        const monthGoals = metasSoltas.filter(({ dueDate }) => dueDate.startsWith(month))
+        const monthEvents = yearEvents.filter(({ startAt }) => startAt.startsWith(month))
+        return <section key={month} aria-label={`Calendário de ${label}`}><h3>{label}</h3>
+          {monthCampaigns.map(itemDoCalendario)}
+          {monthGoals.map((goal) => <Link className="calendario-item calendario-item--meta" to={`/app/planejamento/${goal.id}`} key={goal.id}><Target aria-hidden="true" /><span><strong>{goal.title}</strong><small className="calendario-item__periodo">até {periodoCurto(goal.dueDate)}</small><small>Meta do planejamento</small></span></Link>)}
+          {monthEvents.map((event) => <Link className="calendario-item calendario-item--agenda" to={`/app/agenda/${event.id}/editar`} key={event.id}><CalendarRange aria-hidden="true" /><span><strong>{event.title}</strong><small className="calendario-item__periodo">{periodoCurto(event.startAt.slice(0, 10))}</small><small>Agenda</small></span></Link>)}
+          {!monthGoals.length && !monthCampaigns.length && !monthEvents.length && <small>Sem ações</small>}
+        </section>
+      })}</div>
+      {semData.length > 0 && <section className="annual-calendar__sem-data" aria-label="Campanhas sem data definida"><h3>Campanhas sem data definida</h3><div>{semData.map(itemDoCalendario)}</div></section>}
+    </Card>
     <Card title="Resumo do ano" eyebrow="Acompanhamento"><div className="private-summary"><div><span>Metas planejadas</span><strong>{summary.planned}</strong></div><div><span>Concluídas</span><strong>{summary.completed}</strong></div><div><span>Campanhas realizadas</span><strong>{summary.campaigns}</strong></div><div><span>Para o próximo ano</span><strong>{summary.carryOver.length}</strong></div></div>{summary.carryOver.length > 0 && <p className="muted"><TriangleAlert /> Revise as metas pendentes antes de preparar o próximo ano.</p>}</Card>
   </div>
 }
