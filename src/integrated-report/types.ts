@@ -36,24 +36,20 @@ export interface RelatorioIntegradoData {
   valores: Record<string, ValorDoIndicador>
   origem: OrigemDoRelatorio
   /**
-   * Indicadores que o pastor recusou na conferência — um 45 que era 4.
+   * Legado: indicadores recusados na conferência antiga, que não existe mais.
    *
-   * Ficam registrados em vez de sumirem: no trimestre seguinte é preciso saber
-   * que aquele número foi visto e rejeitado, e não que ninguém o mandou.
+   * O número recusado não foi guardado, então não há o que restaurar; o campo
+   * fica só para não apagar o registro de que houve recusa.
    */
   recusados?: string[]
   /**
-   * Valores que destoaram e ainda esperam a decisão do pastor.
+   * Legado: valores que esperavam confirmação na conferência antiga.
    *
-   * Guardados fora de `valores`: não alimentam meta nem total enquanto ele não
-   * confirmar, mas também não se perdem — antes, "decidir depois" descartava o
-   * número e só um novo envio do PDF o trazia de volta.
+   * São o que a igreja escreveu e valem como tal: `aceitarValoresGuardados`
+   * os leva para `valores`, e a leitura já os considera antes disso.
    */
   pendentes?: Record<string, ValorDoIndicador>
-  /**
-   * Diferenças entre o relatório e o cadastro que o pastor já conferiu, com os
-   * dois números daquele momento. Se um deles mudar, a pendência volta.
-   */
+  /** Legado: diferenças para o cadastro marcadas como conferidas. Não são mais usadas. */
   conferencias?: Record<string, { relatorio: number; cadastro: number; em: string }>
   importBatchId: string
   createdAt: string

@@ -3,7 +3,7 @@ import { generateMasterKey } from '../crypto/vault'
 import { ApoioDatabase } from '../db/database'
 import { CATALOGO_DO_RELATORIO, CLASSES_DA_ESCOLA_SABATINA, indicadorPorId } from './catalogo'
 import {
-  destoa, numeroDoValor, RelatorioIntegradoService, semRelatorio, totalDoDistrito, valorAtual,
+  numeroDoValor, possivelErroDeDigitacao, RelatorioIntegradoService, semRelatorio, totalDoDistrito, valorAtual,
 } from './service'
 import type { RelatorioIntegradoEntity } from './types'
 
@@ -123,27 +123,23 @@ describe('igrejas que não entregaram', () => {
   })
 })
 
-describe('valores que destoam', () => {
-  it('interrompe quando o número triplica ou despenca', () => {
-    expect(destoa(5, 45)).toBe(true)
-    expect(destoa(27, 0)).toBe(true)
-    expect(destoa(523, 95)).toBe(true)
+describe('possível erro de digitação', () => {
+  it('marca a mudança extrema: cinco vezes ou mais, com diferença de pelo menos vinte', () => {
+    expect(possivelErroDeDigitacao(5, 45)).toBe(true)
+    expect(possivelErroDeDigitacao(523, 95)).toBe(true)
+    expect(possivelErroDeDigitacao(4, 30)).toBe(true)
   })
 
-  it('deixa passar a variação comum', () => {
-    expect(destoa(5, 4)).toBe(false)
-    expect(destoa(3, 5)).toBe(false)
-  })
-
-  /* Base pequena varia muito por natureza; interromper ali só ensina a ignorar o aviso. */
-  it('não interrompe quando a base é pequena demais para comparar', () => {
-    expect(destoa(1, 4)).toBe(false)
-    expect(destoa(2, 9)).toBe(false)
+  it('zero, redução comum, crescimento possível e base pequena não recebem asterisco', () => {
+    expect(possivelErroDeDigitacao(27, 0)).toBe(false)
+    expect(possivelErroDeDigitacao(5, 4)).toBe(false)
+    expect(possivelErroDeDigitacao(5, 20)).toBe(false)
+    expect(possivelErroDeDigitacao(2, 12)).toBe(false)
   })
 
   it('sem os dois lados, não há o que comparar', () => {
-    expect(destoa(null, 45)).toBe(false)
-    expect(destoa(5, null)).toBe(false)
+    expect(possivelErroDeDigitacao(null, 45)).toBe(false)
+    expect(possivelErroDeDigitacao(5, null)).toBe(false)
   })
 })
 

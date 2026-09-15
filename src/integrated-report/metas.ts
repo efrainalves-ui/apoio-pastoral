@@ -1,6 +1,6 @@
 import type { GoalEntryData, GoalMetric } from '../goals/types'
 import { indicadorPorId } from './catalogo'
-import { numeroDoValor } from './service'
+import { numeroDoValor, valorGuardado } from './service'
 import { rotuloDoTrimestre, type RelatorioIntegradoEntity } from './types'
 
 /**
@@ -64,8 +64,8 @@ export type LancamentoDeMeta = Omit<GoalEntryData, 'createdAt' | 'source'>
  * mesmo que gerar zero. Zero informado gera lançamento de zero, porque zero é
  * resposta; ausência não gera nada, porque ninguém disse.
  *
- * O que o pastor recusou na conferência não está em `valores` e por isso não
- * chega aqui: valor bloqueado não alimenta meta.
+ * Todo valor informado entra como veio, inclusive os que ficaram guardados
+ * esperando confirmação antes desta etapa.
  */
 export function lancamentosDoTrimestre(
   relatorios: readonly RelatorioIntegradoEntity[],
@@ -79,7 +79,7 @@ export function lancamentosDoTrimestre(
     if (relatorio.trimestre !== trimestre) continue
     for (const ligacao of LIGACOES_COM_METAS) {
       const parcelas = ligacao.indicadores
-        .map((id) => ({ id, numero: numeroDoValor(relatorio.valores[id]) }))
+        .map((id) => ({ id, numero: numeroDoValor(valorGuardado(relatorio, id)) }))
         .filter((parcela): parcela is { id: string; numero: number } => parcela.numero !== null)
       if (!parcelas.length) continue
 
