@@ -1,4 +1,4 @@
-import { areaProgress, areaResults, type AreaSources, type GoalArea } from '../goals/areas'
+import { areaResults, type AreaResult, type AreaSources, type GoalArea } from '../goals/areas'
 import type { AnnualGoalEntity, GoalBudgetItem, GoalProgressEntry } from './types'
 
 export interface GoalTracking {
@@ -18,6 +18,20 @@ function totalManual(progress: GoalProgressEntry[] | undefined): number {
 }
 
 /**
+ * O que conta para a meta: só o que aconteceu dentro do período dela.
+ *
+ * A meta de uma campanha de dez dias em setembro contava os estudos do ano
+ * inteiro e do distrito inteiro, e aparecia "Alcançada" antes de a campanha
+ * terminar. Meta de campanha conta também só as igrejas da campanha.
+ */
+function resultadosNoPeriodo(goal: AnnualGoalEntity, sources: AreaSources): AreaResult[] {
+  if (!goal.linkedArea) return []
+  const daCampanha = (goal.campaignIds ?? []).length > 0 && goal.churchIds.length > 0
+  return areaResults(goal.linkedArea, sources, goal.year).filter(({ date, churchId }) =>
+    (!goal.startDate || date >= goal.startDate) && (!goal.dueDate || date <= goal.dueDate) && (!daCampanha || goal.churchIds.includes(churchId)))
+}
+
+/**
  * Resultado da meta. Se ela estiver ligada a Financeiro, Batismos, Estudos ou
  * UAPG, o número vem da própria área — o pastor não lança a mesma coisa duas
  * vezes. Sem vínculo, vale o que ele registrou mês a mês.
@@ -26,7 +40,7 @@ export function trackGoal(goal: AnnualGoalEntity, sources: AreaSources, hoje: Da
   const target = goal.target ?? 0
   const automatic = Boolean(goal.linkedArea)
   const result = goal.linkedArea
-    ? areaProgress(goal.linkedArea, [], sources, goal.year).result
+    ? resultadosNoPeriodo(goal, sources).reduce((soma, item) => soma + item.amount, 0)
     : totalManual(goal.progress)
 
   const churchTargetsSum = (goal.churchTargets ?? []).reduce((soma, item) => soma + item.target, 0)

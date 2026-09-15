@@ -10,6 +10,11 @@ import { DEFAULT_CAMPAIGN_CHECKLIST, type AnnualGoalData, type AnnualGoalEntity,
 import { readPayload } from '../db/corrupted'
 import { nomeDaCampanhaDoRelatorio, objetivoDoNome } from '../integrated-report/campanhas'
 import { idDerivado } from '../shared/idDerivado'
+import { metasDaCampanha, metaTemDadosProprios, planejarConsolidacao, planoVazio, unirCampanhas, type ResultadoDaConsolidacao } from './consolidacao'
+
+/** Quantos estudos bíblicos e batismos a campanha espera; as metas nascem e mudam junto com ela. */
+export interface MetasDaCampanha { bible_studies?: number; baptisms?: number }
+type TipoApagavel = 'agenda_event' | 'annual_goal' | 'evangelism_campaign'
 
 /** Campanhas que o Relatório Integrado informou para uma igreja num trimestre e que faltam cadastrar. */
 export interface PedidoDeCampanhaDoRelatorio {
@@ -37,7 +42,7 @@ function assertGoal(input: AnnualGoalInput) {
   if (input.startDate && input.dueDate < input.startDate) throw new Error('A data de fim não pode ser antes do início.')
   if (input.title.length > 160 || input.description.length > 800 || input.notes.length > 2_000) throw new Error('Revise o tamanho dos textos da meta.')
 }
-function assertCampaign(input: EvangelismCampaignInput, isNew = false) {
+function assertCampaign(input: EvangelismCampaignInput, isNew = false, metas?: MetasDaCampanha) {
   // A campanha informada no Relatório Integrado aconteceu, mas o relatório não traz data nem responsável: ela salva sem eles até alguém completar.
   const doRelatorio = Boolean(input.origemRelatorio)
   if (!input.name.trim()) throw new Error(doRelatorio ? 'Informe o nome da campanha.' : 'Informe nome e período válido para a campanha.')
@@ -45,7 +50,7 @@ function assertCampaign(input: EvangelismCampaignInput, isNew = false) {
   if (!input.churchIds.length) throw new Error('Escolha ao menos uma igreja envolvida.')
   if (!doRelatorio && !input.responsibleGeneral.trim()) throw new Error('Informe o responsável geral.')
   // Campanhas antigas continuam salvando; as novas nascem ligadas às metas.
-  if (isNew && (!input.studyGoalId || !input.baptismGoalId)) throw new Error('Ligue a campanha a uma meta de estudos bíblicos e a uma meta de batismos.')
+  if (isNew && ((!input.studyGoalId && !((metas?.bible_studies ?? 0) > 0)) || (!input.baptismGoalId && !((metas?.baptisms ?? 0) > 0)))) throw new Error('Ligue a campanha a uma meta de estudos bíblicos e a uma meta de batismos.')
   if (input.name.length > 160 || input.description.length > 1_000 || input.notes.length > 2_000 || input.learnings.length > 2_000) throw new Error('Revise o tamanho dos textos da campanha.')
   if (input.points.some((point) => !point.name.trim() || !point.responsible.trim())) throw new Error('Informe nome e responsável de cada ponto.')
   if (input.tasks.some((task) => !task.title.trim() || !task.dueDate)) throw new Error('Informe título e prazo de cada tarefa.')
@@ -163,8 +168,8 @@ export class EvangelismPlanningService {
     return { goal: { id, ...goalData }, eventId, reused: false }
   }
 
-  async saveCampaign(accountId: string, key: CryptoKey, input: EvangelismCampaignInput, id?: string, createGoal?: AnnualGoalInput): Promise<{ campaign: EvangelismCampaignEntity; goal: AnnualGoalEntity | null; createdAgendaEvents: number }> {
-    assertCampaign(input, !id); if (createGoal) assertGoal(createGoal)
+  async saveCampaign(accountId: string, key: CryptoKey, input: EvangelismCampaignInput, id?: string, createGoal?: AnnualGoalInput, metas?: MetasDaCampanha): Promise<{ campaign: EvangelismCampaignEntity; goal: AnnualGoalEntity | null; createdAgendaEvents: number }> {
+    assertCampaign(input, !id, metas); if (createGoal) assertGoal(createGoal)
     const current = id ? await this.getCampaign(accountId, key, id) : null; if (id && !current) throw new Error('Campanha não encontrada.')
     const goals = await this.listGoals(accountId, key); const campaignId = id ?? crypto.randomUUID(); const now = timestamp()
     let goalId = input.goalId; let goal = goalId ? goals.find((item) => item.id === goalId) ?? null : null
@@ -176,6 +181,29 @@ export class EvangelismPlanningService {
     const byId = new Map(agendaEvents.map((event) => [event.id, event])); const mutations: EncryptedMutation[] = []; const desiredAgendaIds = new Set<string>()
     // Sem data não há compromisso: a campanha informada no relatório não vira evento futuro na Agenda.
     const semData = !input.startDate; const endDate = input.endDate || input.startDate
+
+    // As metas de estudos e de batismos são da campanha: nascem e mudam com ela, na mesma gravação.
+    // Antes eram gravadas pela tela antes de a campanha ser conferida, e cada tentativa recusada deixava cópias.
+    const vinculos = { studyGoalId: input.studyGoalId ?? null, baptismGoalId: input.baptismGoalId ?? null }
+    const derivadas: EncryptedMutation[] = []
+    for (const area of ['bible_studies', 'baptisms'] as const) {
+      const campo = area === 'bible_studies' ? 'studyGoalId' : 'baptismGoalId'
+      const alvo = metas?.[area] ?? 0
+      const ligadaId = vinculos[campo]
+      const existente = ligadaId ? goals.find((item) => item.id === ligadaId) ?? null : null
+      if (!(alvo > 0) && existente?.linkedArea !== area) continue
+      // Sem data não há período para a meta, e nenhum dia é inventado.
+      if (semData) { if (alvo > 0 && !existente) throw new Error('Informe as datas da campanha para ligar as metas.'); continue }
+      const metaId = existente?.id ?? await idDerivado(`campanha:${campaignId}:meta:${area}`)
+      const base: AnnualGoalData = existente
+        ? (({ id: _metaId, ...resto }) => { void _metaId; return resto })(existente)
+        : { title: '', description: '', area: 'discipleship', year: 0, churchIds: [], responsible: '', dueDate: '', priority: 'normal', status: 'planned', notes: '', campaignIds: [], agendaEventIds: [], references: [], history: [history('Meta criada junto com a campanha.')], createdAt: now, updatedAt: now }
+      derivadas.push(await this.goalMutation(accountId, key, metaId, {
+        ...base, title: input.name.trim(), linkedArea: area, year: Number(input.startDate.slice(0, 4)), startDate: input.startDate, dueDate: endDate,
+        target: alvo > 0 ? alvo : base.target ?? 0, churchIds: [...new Set(input.churchIds)], campaignIds: [...new Set([...base.campaignIds, campaignId])], updatedAt: now,
+      }))
+      vinculos[campo] = metaId
+    }
     const mainAgendaEventId = semData ? current?.mainAgendaEventId ?? null : current?.mainAgendaEventId ?? crypto.randomUUID(); if (mainAgendaEventId && !semData) desiredAgendaIds.add(mainAgendaEventId)
     if (mainAgendaEventId && !semData) mutations.push(await this.agendaMutation(key, mainAgendaEventId, this.agendaData(byId.get(mainAgendaEventId) ?? null, { type: 'evangelism_campaign', id: campaignId, campaignId }, input.name.trim(), localDateTime(input.startDate, '19:00'), localDateTime(input.startDate, '21:00'), input.churchIds[0] ?? null, input.location, input.address, input.description)))
 
@@ -194,18 +222,18 @@ export class EvangelismPlanningService {
 
     // Sem data, a campanha do relatório continua a completar; com data, deixa de estar.
     const { aCompletar: _aCompletar, ...semMarca } = input; void _aCompletar
-    const data: EvangelismCampaignData = { ...semMarca, ...(input.origemRelatorio && semData ? { aCompletar: true } : {}), endDate, name: input.name.trim(), description: input.description.trim(), notes: input.notes.trim(), responsibleGeneral: input.responsibleGeneral.trim(), mainSpeaker: input.mainSpeaker.trim(), goalId, churchIds: [...new Set(input.churchIds)], planningAreas: [...new Set(input.planningAreas)], mainAgendaEventId, additionalAgendaEventIds, points, tasks, checklist: input.checklist.length ? input.checklist : defaultCampaignChecklist(), budgetItems: input.budgetItems.map((item) => ({ ...item, id: item.id || crypto.randomUUID() })), followUps: input.followUps.map((item) => ({ ...item, id: item.id || crypto.randomUUID() })), history: [...(current?.history ?? []), history(current ? 'Campanha atualizada e Agenda conferida.' : 'Campanha criada e adicionada à Agenda.')], createdAt: current?.createdAt ?? now, updatedAt: now }
+    const data: EvangelismCampaignData = { ...semMarca, studyGoalId: vinculos.studyGoalId, baptismGoalId: vinculos.baptismGoalId, ...(input.origemRelatorio && semData ? { aCompletar: true } : {}), endDate, name: input.name.trim(), description: input.description.trim(), notes: input.notes.trim(), responsibleGeneral: input.responsibleGeneral.trim(), mainSpeaker: input.mainSpeaker.trim(), goalId, churchIds: [...new Set(input.churchIds)], planningAreas: [...new Set(input.planningAreas)], mainAgendaEventId, additionalAgendaEventIds, points, tasks, checklist: input.checklist.length ? input.checklist : defaultCampaignChecklist(), budgetItems: input.budgetItems.map((item) => ({ ...item, id: item.id || crypto.randomUUID() })), followUps: input.followUps.map((item) => ({ ...item, id: item.id || crypto.randomUUID() })), history: [...(current?.history ?? []), history(current ? 'Campanha atualizada e Agenda conferida.' : 'Campanha criada e adicionada à Agenda.')], createdAt: current?.createdAt ?? now, updatedAt: now }
     mutations.push(await this.campaignMutation(key, campaignId, data))
 
     // As metas ligadas guardam de quais campanhas vieram, sem repetir vínculo.
-    const outrasMetas = [input.studyGoalId, input.baptismGoalId].filter((value): value is string => Boolean(value) && value !== goalId)
+    const outrasMetas = [vinculos.studyGoalId, vinculos.baptismGoalId].filter((value): value is string => Boolean(value) && value !== goalId && !derivadas.some(({ recordId }) => recordId === value))
     for (const linkedId of [...new Set(outrasMetas)]) {
       const alvo = goals.find(({ id: goalItemId }) => goalItemId === linkedId)
       if (!alvo) continue
       const { id: alvoId, ...alvoData } = alvo
       mutations.push(await this.goalMutation(accountId, key, alvoId, { ...alvoData, campaignIds: [...new Set([...alvoData.campaignIds, campaignId])], updatedAt: now, history: alvoData.campaignIds.includes(campaignId) ? alvoData.history : [...alvoData.history, history('Campanha vinculada à meta.')] }))
     }
-    const antigas = [current?.studyGoalId, current?.baptismGoalId].filter((value): value is string => Boolean(value) && ![input.studyGoalId, input.baptismGoalId, goalId].includes(value))
+    const antigas = [current?.studyGoalId, current?.baptismGoalId].filter((value): value is string => Boolean(value) && ![vinculos.studyGoalId, vinculos.baptismGoalId, goalId ?? null].includes(value ?? null))
     for (const linkedId of [...new Set(antigas)]) {
       const alvo = goals.find(({ id: goalItemId }) => goalItemId === linkedId)
       if (!alvo) continue
@@ -214,12 +242,136 @@ export class EvangelismPlanningService {
     }
     if (current?.goalId && current.goalId !== goalId) { const previous = goals.find(({ id: goalItemId }) => goalItemId === current.goalId); if (previous) { const { id: previousId, ...previousData } = previous; mutations.push(await this.goalMutation(accountId, key, previousId, { ...previousData, campaignIds: previousData.campaignIds.filter((value) => value !== campaignId), updatedAt: now, history: [...previousData.history, history('Campanha desvinculada da meta.')] })) } }
     if (goal) { const { id: savedGoalId, ...goalData } = goal; const savedGoal: AnnualGoalData = { ...goalData, campaignIds: [...new Set([...goalData.campaignIds, campaignId])], agendaEventIds: [...new Set([...goalData.agendaEventIds, ...(mainAgendaEventId ? [mainAgendaEventId] : []), ...additionalAgendaEventIds])], updatedAt: now, history: goalData.history.some(({ message }) => message === 'Campanha vinculada à meta.') ? goalData.history : [...goalData.history, history('Campanha vinculada à meta.')] }; mutations.push(await this.goalMutation(accountId, key, savedGoalId, savedGoal)); goal = { id: savedGoalId, ...savedGoal } }
-    const unique = new Map<string, EncryptedMutation>(); for (const mutation of mutations) unique.set(mutation.recordId, mutation); await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), [...unique.values()])
+    const unique = new Map<string, EncryptedMutation>(); for (const mutation of [...mutations, ...derivadas]) unique.set(mutation.recordId, mutation); await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), [...unique.values()])
     return { campaign: { id: campaignId, ...data }, goal, createdAgendaEvents: desiredAgendaIds.size }
   }
 
   async deleteGoal(accountId: string, key: CryptoKey, goalId: string) { const goal = await this.getGoal(accountId, key, goalId); if (!goal) throw new Error('Meta anual não encontrada.'); const campaigns = (await this.listCampaigns(accountId, key)).filter((item) => item.goalId === goalId || item.studyGoalId === goalId || item.baptismGoalId === goalId); const now = timestamp(); const mutations: EncryptedMutation[] = [{ recordId: goalId, recordType: 'annual_goal', operation: 'delete', envelope: await encryptPayload(key, { schemaVersion: 1, type: 'annual_goal_tombstone', data: { deletedAt: now } }, goalId) }]; for (const campaign of campaigns) { const { id, ...data } = campaign; mutations.push(await this.campaignMutation(key, id, { ...data, goalId: data.goalId === goalId ? null : data.goalId, studyGoalId: data.studyGoalId === goalId ? null : data.studyGoalId ?? null, baptismGoalId: data.baptismGoalId === goalId ? null : data.baptismGoalId ?? null, updatedAt: now, history: [...data.history, history('Meta anual removida; campanha preservada.')] })) } await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations) }
-  async deleteCampaign(accountId: string, key: CryptoKey, campaignId: string) { const campaign = await this.getCampaign(accountId, key, campaignId); if (!campaign) throw new Error('Campanha não encontrada.'); const ids = [campaign.mainAgendaEventId, ...campaign.additionalAgendaEventIds, ...campaign.points.flatMap((point) => point.schedules.map(({ agendaEventId }) => agendaEventId)), ...campaign.tasks.map(({ agendaEventId }) => agendaEventId)].filter(Boolean) as string[]; const existingIds = new Set((await this.repository.list(accountId, 'agenda_event')).map(({ id }) => id)); const now = timestamp(); const mutations: EncryptedMutation[] = [{ recordId: campaignId, recordType: 'evangelism_campaign', operation: 'delete', envelope: await encryptPayload(key, { schemaVersion: 1, type: 'evangelism_campaign_tombstone', data: { deletedAt: now } }, campaignId) }]; for (const eventId of ids) if (existingIds.has(eventId)) mutations.push({ recordId: eventId, recordType: 'agenda_event', operation: 'delete', envelope: await encryptPayload(key, { schemaVersion: 1, type: 'agenda_event_tombstone', data: { deletedAt: now } }, eventId) }); if (campaign.goalId) { const goal = await this.getGoal(accountId, key, campaign.goalId); if (goal) { const { id, ...data } = goal; mutations.push(await this.goalMutation(accountId, key, id, { ...data, campaignIds: data.campaignIds.filter((value) => value !== campaignId), agendaEventIds: data.agendaEventIds.filter((value) => !ids.includes(value)), updatedAt: now, history: [...data.history, history('Campanha removida; meta preservada.')] })) } } await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations) }
+  private async listarEventos(accountId: string, key: CryptoKey): Promise<AgendaEventEntity[]> { return (await Promise.all((await this.repository.list(accountId, 'agenda_event')).map(async (record) => { const payload = await readPayload(key, record, this.database); return payload?.type === 'agenda_event' ? ({ id: record.id, ...(payload.data as object) } as AgendaEventEntity) : null }))).filter((event): event is AgendaEventEntity => Boolean(event)) }
+  private async tombstone(key: CryptoKey, tipo: TipoApagavel, id: string, deletedAt: string): Promise<EncryptedMutation> { return { recordId: id, recordType: tipo, operation: 'delete', envelope: await encryptPayload(key, { schemaVersion: 1, type: `${tipo}_tombstone`, data: { deletedAt } }, id) } }
+
+  /**
+   * O que sai junto com a campanha.
+   *
+   * Sai o que só existia por causa dela: os compromissos que ela projetou na
+   * Agenda e as metas de estudos e batismos criadas pelo formulário dela, desde
+   * que ninguém tenha escrito nada nelas. Metas com vida própria ficam, só sem o
+   * vínculo. Compromisso comum da Agenda ligado a uma dessas metas não é
+   * projeção: só sai se o pastor confirmar.
+   */
+  private async exclusaoDaCampanha(accountId: string, key: CryptoKey, campaignId: string) {
+    const campaign = await this.getCampaign(accountId, key, campaignId); if (!campaign) throw new Error('Campanha não encontrada.')
+    const [goals, events] = await Promise.all([this.listGoals(accountId, key), this.listarEventos(accountId, key)])
+    const projecoes = new Set([campaign.mainAgendaEventId, ...campaign.additionalAgendaEventIds, ...campaign.points.flatMap((point) => point.schedules.map(({ agendaEventId }) => agendaEventId)), ...campaign.tasks.map(({ agendaEventId }) => agendaEventId), ...events.filter(({ linkedSource }) => linkedSource?.campaignId === campaignId).map(({ id }) => id)].filter((id): id is string => Boolean(id)))
+    const ligadas = metasDaCampanha(campaign, goals)
+    const derivada = (goal: AnnualGoalEntity) => (goal.linkedArea === 'bible_studies' || goal.linkedArea === 'baptisms') && (goal.id === campaign.studyGoalId || goal.id === campaign.baptismGoalId)
+      && goal.campaignIds.every((id) => id === campaignId) && !metaTemDadosProprios({ ...goal, agendaEventIds: goal.agendaEventIds.filter((id) => !projecoes.has(id)) })
+    const independentes = events.filter((event) => !projecoes.has(event.id) && !event.linkedSource && ligadas.some(({ agendaEventIds }) => agendaEventIds.includes(event.id)))
+    return { campaign, ligadas, projecoes, derivada, independentes, existentes: new Set(events.map(({ id }) => id)) }
+  }
+
+  async planejarExclusaoDaCampanha(accountId: string, key: CryptoKey, campaignId: string): Promise<{ metasRemovidas: number; metasPreservadas: number; compromissosIndependentes: Array<{ id: string; title: string; startAt: string }> }> {
+    const { ligadas, derivada, independentes } = await this.exclusaoDaCampanha(accountId, key, campaignId)
+    return { metasRemovidas: ligadas.filter(derivada).length, metasPreservadas: ligadas.filter((goal) => !derivada(goal)).length, compromissosIndependentes: independentes.map(({ id, title, startAt }) => ({ id, title, startAt })) }
+  }
+
+  async deleteCampaign(accountId: string, key: CryptoKey, campaignId: string, apagarCompromissos: readonly string[] = []) {
+    const { campaign, ligadas, projecoes, derivada, independentes, existentes } = await this.exclusaoDaCampanha(accountId, key, campaignId)
+    const now = timestamp()
+    const apagar = new Set([...projecoes].filter((id) => existentes.has(id)))
+    for (const event of independentes) if (apagarCompromissos.includes(event.id)) apagar.add(event.id)
+    const mutations: EncryptedMutation[] = [await this.tombstone(key, 'evangelism_campaign', campaign.id, now)]
+    for (const id of apagar) mutations.push(await this.tombstone(key, 'agenda_event', id, now))
+    for (const goal of ligadas) {
+      if (derivada(goal)) { mutations.push(await this.tombstone(key, 'annual_goal', goal.id, now)); continue }
+      const { id, ...data } = goal
+      mutations.push(await this.goalMutation(accountId, key, id, { ...data, campaignIds: data.campaignIds.filter((value) => value !== campaignId), agendaEventIds: data.agendaEventIds.filter((value) => !apagar.has(value)), updatedAt: now, history: [...data.history, history('Campanha removida; meta preservada.')] }))
+    }
+    await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
+  }
+
+  /**
+   * Junta o que estava repetido entre Evangelismo e Planejamento Anual.
+   *
+   * Segura e repetível: o plano (ver consolidacao.ts) só aponta cópias técnicas;
+   * a campanha principal fica, recebe o que só a cópia tinha, e os vínculos são
+   * refeitos antes de qualquer cópia sair. Executada de novo, não encontra nada.
+   */
+  async consolidarCampanhasEMetas(accountId: string, key: CryptoKey): Promise<ResultadoDaConsolidacao> {
+    const [campanhas, metas, eventos] = await Promise.all([this.listCampaigns(accountId, key), this.listGoals(accountId, key), this.listarEventos(accountId, key)])
+    const plano = planejarConsolidacao(campanhas, metas, eventos)
+    const contar = (acao: 'ligar' | 'remover' | 'manter') => plano.metasOrfas.filter((orfa) => orfa.acao === acao).length
+    const resultado: ResultadoDaConsolidacao = {
+      campanhasExaminadas: plano.campanhasExaminadas, metasExaminadas: plano.metasExaminadas,
+      copiasDeCampanha: plano.campanhasDuplicadas.reduce((soma, { copiaIds }) => soma + copiaIds.length, 0),
+      metasRepetidas: plano.metasOrfas.length, metasRemovidas: contar('remover'), metasLigadas: contar('ligar'), metasPreservadas: contar('manter'),
+      datasCorrigidas: plano.ajustes.length, campanhas: [],
+    }
+    if (planoVazio(plano)) return resultado
+
+    const now = timestamp()
+    const campanhasPorId = new Map(campanhas.map((campanha) => [campanha.id, campanha])); const metasPorId = new Map(metas.map((meta) => [meta.id, meta]))
+    const campanhasMudadas = new Set<string>(); const metasMudadas = new Set<string>(); const apagar: Array<{ tipo: TipoApagavel; id: string }> = []
+    const notas = new Map<string, string[]>(); const anotar = (id: string, texto: string) => notas.set(id, [...(notas.get(id) ?? []), texto])
+    const rotulo = (area: 'bible_studies' | 'baptisms') => area === 'bible_studies' ? 'estudos bíblicos' : 'batismos'
+
+    for (const { principalId, copiaIds } of plano.campanhasDuplicadas) {
+      let principal = campanhasPorId.get(principalId)!
+      for (const copiaId of copiaIds) {
+        principal = unirCampanhas(principal, campanhasPorId.get(copiaId)!)
+        apagar.push({ tipo: 'evangelism_campaign', id: copiaId }); campanhasPorId.delete(copiaId)
+        for (const meta of metasPorId.values()) if (meta.campaignIds.includes(copiaId)) { metasPorId.set(meta.id, { ...meta, campaignIds: [...new Set(meta.campaignIds.map((id) => id === copiaId ? principalId : id))] }); metasMudadas.add(meta.id) }
+      }
+      campanhasPorId.set(principalId, principal); campanhasMudadas.add(principalId); anotar(principalId, `${copiaIds.length} cópia(s) técnica(s) unida(s) a esta campanha.`)
+    }
+    for (const id of plano.compromissosDaCopia) apagar.push({ tipo: 'agenda_event', id })
+    // Encontros de pontos e tarefas que vieram da cópia passam a apontar para a principal.
+    const eventosMudados = eventos.flatMap((evento) => {
+      const origem = evento.linkedSource; const grupo = origem ? plano.campanhasDuplicadas.find(({ copiaIds }) => copiaIds.includes(origem.campaignId)) : undefined
+      return origem && grupo && !plano.compromissosDaCopia.includes(evento.id) ? [{ ...evento, linkedSource: { ...origem, campaignId: grupo.principalId } }] : []
+    })
+
+    for (const orfa of plano.metasOrfas) {
+      const meta = metasPorId.get(orfa.metaId); const campanha = campanhasPorId.get(orfa.campanhaId); if (!meta || !campanha) continue
+      const campo = orfa.area === 'bible_studies' ? 'studyGoalId' : 'baptismGoalId'
+      if (orfa.acao === 'remover') {
+        // A quantidade esperada é o único dado que a cópia pode ter; passa para a meta ligada, se lá faltar.
+        const ligada = campanha[campo] ? metasPorId.get(campanha[campo]) : undefined
+        if (ligada && !((ligada.target ?? 0) > 0) && (meta.target ?? 0) > 0) { metasPorId.set(ligada.id, { ...ligada, target: meta.target ?? 0 }); metasMudadas.add(ligada.id) }
+        apagar.push({ tipo: 'annual_goal', id: meta.id }); metasPorId.delete(meta.id); metasMudadas.delete(meta.id)
+        anotar(campanha.id, `meta repetida de ${rotulo(orfa.area)} removida.`)
+        continue
+      }
+      metasPorId.set(meta.id, { ...meta, campaignIds: [...new Set([...meta.campaignIds.filter((id) => campanhasPorId.has(id)), campanha.id])] }); metasMudadas.add(meta.id)
+      if (orfa.acao === 'ligar') { campanhasPorId.set(campanha.id, { ...campanha, [campo]: meta.id }); campanhasMudadas.add(campanha.id); anotar(campanha.id, `meta de ${rotulo(orfa.area)} ligada a esta campanha.`) }
+      else anotar(campanha.id, `meta de ${rotulo(orfa.area)} com anotações próprias preservada e ligada a esta campanha.`)
+    }
+
+    for (const ajuste of plano.ajustes) {
+      const meta = metasPorId.get(ajuste.metaId); if (!meta) continue
+      if (meta.dueDate !== ajuste.dueDate || (meta.startDate ?? '') !== ajuste.startDate) anotar(ajuste.campanhaId, 'datas da meta alinhadas com as da campanha.')
+      metasPorId.set(meta.id, { ...meta, title: ajuste.title, startDate: ajuste.startDate, dueDate: ajuste.dueDate, year: ajuste.year, churchIds: ajuste.churchIds, campaignIds: [...new Set([...meta.campaignIds.filter((id) => campanhasPorId.has(id)), ajuste.campanhaId])] })
+      metasMudadas.add(meta.id)
+    }
+
+    const mutations: EncryptedMutation[] = []
+    for (const id of new Set([...campanhasMudadas, ...notas.keys()])) {
+      const campanha = campanhasPorId.get(id); if (!campanha) continue
+      const { id: _id, ...dados } = campanha; void _id
+      mutations.push(await this.campaignMutation(key, id, { ...dados, updatedAt: now, history: [...dados.history, ...(notas.get(id) ?? []).map((texto) => history(`Consolidação: ${texto}`))] }))
+    }
+    for (const id of metasMudadas) {
+      const meta = metasPorId.get(id); if (!meta) continue
+      const { id: _id, ...dados } = meta; void _id
+      mutations.push(await this.goalMutation(accountId, key, id, { ...dados, updatedAt: now, history: [...dados.history, history('Consolidada com a campanha do Evangelismo.')] }))
+    }
+    for (const evento of eventosMudados) { const { id, ...dados } = evento; mutations.push(await this.agendaMutation(key, id, { ...dados, updatedAt: now })) }
+    for (const { tipo, id } of apagar) mutations.push(await this.tombstone(key, tipo, id, now))
+    const unicas = new Map<string, EncryptedMutation>(); for (const mutation of mutations) unicas.set(mutation.recordId, mutation)
+    await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), [...unicas.values()])
+    resultado.campanhas = [...notas.keys()].map((id) => campanhasPorId.get(id)?.name ?? '').filter(Boolean)
+    return resultado
+  }
   async copyGoals(accountId: string, key: CryptoKey, goalIds: string[], targetYear: number): Promise<AnnualGoalEntity[]> { const sources = (await this.listGoals(accountId, key)).filter(({ id }) => goalIds.includes(id)); const copies: AnnualGoalEntity[] = []; for (const source of sources) { const due = source.dueDate ? `${targetYear}${source.dueDate.slice(4)}` : `${targetYear}-12-31`; copies.push(await this.saveGoal(accountId, key, { title: source.title, description: source.description, area: source.area, year: targetYear, churchIds: source.churchIds, responsible: source.responsible, dueDate: due, priority: source.priority, status: 'planned', notes: source.notes, references: source.references, ...(source.startDate ? { startDate: `${targetYear}${source.startDate.slice(4)}` } : {}), ...(source.target === undefined ? {} : { target: source.target }), linkedArea: source.linkedArea ?? null })) } return copies }
   async agendaConflicts(accountId: string, key: CryptoKey, startAt: string, endAt: string, editingId?: string): Promise<AgendaConflict[]> { const events = (await Promise.all((await this.repository.list(accountId, 'agenda_event')).map(async (record) => { const payload = await readPayload(key, record, this.database); return payload?.type === 'agenda_event' ? ({ id: record.id, ...(payload.data as object) } as AgendaEventEntity) : null }))).filter((event): event is AgendaEventEntity => Boolean(event)); const candidate = { title: 'Conferência de horário', category: 'event' as const, churchId: null, location: '', address: '', visitTarget: 'none' as const, sermonId: null, sermonSnapshot: null, ceremonyDetails: null, linkedSource: null, startAt, endAt, allDay: false, reminderMinutes: null, notes: '', includeInItinerary: true, mondayException: true }; return findAgendaConflicts(candidate, events, editingId) }
   async teamScheduleWarnings(accountId: string, key: CryptoKey, personId: string, campaign: Pick<EvangelismCampaignInput, 'startDate' | 'endDate'>, editingCampaignId?: string): Promise<string[]> { const campaigns = await this.listCampaigns(accountId, key); return campaigns.filter((item) => item.id !== editingCampaignId && item.status !== 'completed' && item.status !== 'cancelled' && item.startDate <= campaign.endDate && item.endDate >= campaign.startDate && (item.team.some((assignment) => assignment.personId === personId) || item.points.some((point) => point.teamPersonIds.includes(personId)))).map((item) => item.name) }
