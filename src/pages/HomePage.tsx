@@ -1,5 +1,5 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
-import { BookHeart, Cake, TriangleAlert, CalendarDays, ChevronRight, Church, HeartHandshake, Megaphone, ShieldCheck, SquareCheck, UsersRound } from 'lucide-react'
+import { BookHeart, Cake, TriangleAlert, CalendarDays, ChevronRight, Church, Megaphone, ShieldCheck, SquareCheck, UsersRound } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
@@ -7,10 +7,11 @@ import { localDateKey } from '../shared/dates'
 import { AgendaService } from '../agenda/service'
 import type { AgendaEventEntity } from '../agenda/types'
 import { CareService } from '../care/service'
-import type { FollowUpEntity, PrayerRequestEntity, TaskEntity } from '../care/types'
+import type { PrayerRequestEntity, TaskEntity } from '../care/types'
 import { GoalsSummary } from '../components/GoalsSummary'
 import { MetaFinanceiraResumo } from '../components/MetaFinanceiraResumo'
-import { VisitAnswersSummary } from '../components/VisitAnswersSummary'
+import { ResumoDeVisitacao } from '../components/ResumoDeVisitacao'
+import { PlanoEstrategicoInicio } from '../components/plano/PlanoEstrategicoInicio'
 import { Card } from '../components/ui/Card'
 import { MetricLink } from '../components/ui/MetricLink'
 import { CountUp } from '../components/ui/CountUp'
@@ -44,7 +45,6 @@ export function HomePage() {
   const [todayEvents, setTodayEvents] = useState<AgendaEventEntity[]>([])
   const [tasks, setTasks] = useState<TaskEntity[]>([])
   const [prayers, setPrayers] = useState<PrayerRequestEntity[]>([])
-  const [followUps, setFollowUps] = useState<FollowUpEntity[]>([])
   const [campaigns, setCampaigns] = useState<EvangelismCampaignEntity[]>([])
   const [interests, setInterests] = useState<InterestEntity[]>([])
   const [studies, setStudies] = useState<BibleStudyEntity[]>([])
@@ -72,11 +72,11 @@ export function HomePage() {
     async function carregarTudo() {
     if (!account || !masterKey) return
     const district = await districtService.getDistrict(account.id, masterKey)
-    const [nextPeople, nextFamilies, nextChurches, nextEvents, nextTasks, nextPrayers, nextFollowUps, , nextCampaigns, nextInterests, nextStudies] = await Promise.all([
-      peopleService.listPeople(account.id, masterKey), familyService.listFamilies(account.id, masterKey), district ? districtService.listChurches(account.id, masterKey, district.id) : [], agendaService.listEvents(account.id, masterKey), careService.listTasks(account.id, masterKey), careService.listPrayerRequests(account.id, masterKey), careService.listFollowUps(account.id, masterKey), careService.listRounds(account.id, masterKey), evangelismService.listCampaigns(account.id, masterKey), missionaryService.listInterests(account.id, masterKey), missionaryService.listStudies(account.id, masterKey),
+    const [nextPeople, nextFamilies, nextChurches, nextEvents, nextTasks, nextPrayers, , nextCampaigns, nextInterests, nextStudies] = await Promise.all([
+      peopleService.listPeople(account.id, masterKey), familyService.listFamilies(account.id, masterKey), district ? districtService.listChurches(account.id, masterKey, district.id) : [], agendaService.listEvents(account.id, masterKey), careService.listTasks(account.id, masterKey), careService.listPrayerRequests(account.id, masterKey), careService.listRounds(account.id, masterKey), evangelismService.listCampaigns(account.id, masterKey), missionaryService.listInterests(account.id, masterKey), missionaryService.listStudies(account.id, masterKey),
     ])
     const today = localDateKey()
-    setPeople(nextPeople); setFamilies(nextFamilies.length); setChurches(nextChurches); setTodayBirthdays(upcomingBirthdays(nextPeople, new Date(), 0)); setEvents(nextEvents); setTodayEvents(nextEvents.filter(({ startAt }) => startAt.slice(0, 10) === today)); setTasks(nextTasks); setPrayers(nextPrayers); setFollowUps(nextFollowUps); setCampaigns(nextCampaigns); setInterests(nextInterests); setStudies(nextStudies)
+    setPeople(nextPeople); setFamilies(nextFamilies.length); setChurches(nextChurches); setTodayBirthdays(upcomingBirthdays(nextPeople, new Date(), 0)); setEvents(nextEvents); setTodayEvents(nextEvents.filter(({ startAt }) => startAt.slice(0, 10) === today)); setTasks(nextTasks); setPrayers(nextPrayers); setCampaigns(nextCampaigns); setInterests(nextInterests); setStudies(nextStudies)
     }
   }, [account, masterKey])
 
@@ -85,7 +85,6 @@ export function HomePage() {
   const today = localDateKey()
   const overdueTasks = tasks.filter(({ status, dueAt }) => status === 'pending' && dueAt < today)
   const prayersInPrayer = prayers.filter(({ status }) => status === 'active' || status === 'needs_follow_up')
-  const pendingFollowUps = followUps.filter(({ status }) => status === 'pending')
   const fidelityCounts = {
     tither: people.filter((person) => person.fidelity?.category === 'tither').length,
     nonSystematic: people.filter((person) => person.fidelity?.category === 'non_systematic_tither').length,
@@ -183,18 +182,15 @@ export function HomePage() {
       </Link>
     </section>}
 
+    <PlanoEstrategicoInicio />
+
     <div className="home-grid"><Card eyebrow="Hoje" title="Agenda" action={<Link className="icon-button" to="/app/agenda" aria-label="Abrir agenda"><CalendarDays className="accent-icon" /></Link>}>{!todayEvents.length ? <div className="empty-state compact-empty"><CalendarDays /><strong>Nenhum compromisso hoje</strong><span>Reserve um horário para uma visita, reunião ou pregação.</span></div> : <div className="breakdown-list">{todayEvents.map((event) => <div key={event.id}><span>{event.title}</span><strong>{event.allDay ? 'Dia todo' : new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(event.startAt))}</strong></div>)}</div>}</Card><Card eyebrow="Hoje" title="Aniversariantes" action={<Link className="icon-button" to="/app/aniversarios" aria-label="Ver próximos aniversários"><Cake className="accent-icon" /></Link>}>{todayBirthdays.length === 0 ? <div className="empty-state compact-empty"><Cake /><strong>Nenhum aniversariante hoje</strong></div> : <ul className="tira-pessoas">{todayBirthdays.map(({ person, turningAge }) => <li key={person.id}><Link to={`/app/aniversarios`}><span className="inicial-redonda" aria-hidden="true">{person.name[0]}</span><strong>{primeiroEUltimo(person.name)}</strong><small>{turningAge} anos</small></Link></li>)}</ul>}</Card></div>
-    <div className="home-grid"><Card eyebrow="Atenção pastoral" title="Visitas e cuidados" action={<Link className="icon-button" to="/app/visitacao" aria-label="Abrir visitas e cuidados"><HeartHandshake className="accent-icon" /></Link>}>
-      {/*
-        O número é o caminho. Havia os números e, embaixo, uma fileira de links
-        de texto dizendo a mesma coisa. Tarefas saiu daqui porque tem cartão
-        próprio: o mesmo dado em dois lugares faz duvidar de qual é o certo.
-      */}
-      <div className="metrics-link-row">
-        <MetricLink label="Pedidos de oração" value={prayersInPrayer.length} to="/app/visitacao?aba=oracao" />
-        <MetricLink label="Acompanhamentos" value={pendingFollowUps.length} to="/app/visitacao?aba=acompanhamentos" />
-      </div>
-    </Card></div>
+    {/*
+      Visitação na tela inicial é um cartão curto. As perguntas, as respostas e
+      as porcentagens moram na página de Visitação, aba Respostas; os pedidos
+      em oração continuam no número "Em oração" logo acima.
+    */}
+    <ResumoDeVisitacao />
     <div className="home-grid">
       {/*
         A tarefa de hoje é o que se faz agora, e por isso ela manda no cartão.
@@ -260,7 +256,6 @@ export function HomePage() {
 
     <Card eyebrow="Missão" title="Evangelismo" action={<Link className="icon-button" to="/app/evangelismo" aria-label="Abrir evangelismo"><Megaphone className="accent-icon" /></Link>}><div className="metrics-link-row"><MetricLink label="Em preparação" value={campaignSummary.preparing} to="/app/evangelismo" /><MetricLink label="Acontecendo" value={campaignSummary.happening} to="/app/evangelismo" tone={campaignSummary.happening > 0 ? 'ok' : 'neutro'} /><MetricLink label="Tarefas urgentes" value={campaigns.flatMap(({ tasks: campanhaTarefas }) => campanhaTarefas).filter((task) => isTaskUrgent(task, today)).length} to="/app/evangelismo" tone="atencao" /></div>{nextCampaign ? <Link className="entity-row" to={`/app/evangelismo/${nextCampaign.id}`}><span className="avatar"><Megaphone /></span><span><strong>{nextCampaign.name}</strong><small>Próxima ação em {new Intl.DateTimeFormat('pt-BR').format(new Date(`${nextCampaign.startDate}T12:00:00`))}</small></span><ChevronRight /></Link> : <div className="empty-state compact-empty"><Megaphone /><strong>Nenhuma campanha futura</strong><span>Planeje a próxima ação evangelística quando estiver pronto.</span></div>}</Card>
     <Card eyebrow="Distrito" title="Pessoas por igreja">{churches.length === 0 ? <div className="empty-state compact-empty"><UsersRound /><strong>Nenhuma igreja cadastrada</strong><span>Cadastre as igrejas do distrito para organizar as pessoas.</span></div> : <div className="breakdown-list">{churches.map((church) => <div key={church.id}><span>{church.name}</span><strong>{people.filter(({ currentChurchId, importStatus }) => currentChurchId === church.id && importStatus !== 'archived').length}</strong></div>)}</div>}<Link className="text-link" to="/app/distrito">Abrir distrito e igrejas <ChevronRight /></Link></Card>
-    <VisitAnswersSummary />
 
   </div>
 }

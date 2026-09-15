@@ -20,6 +20,10 @@ vi.mock('../care/service', () => ({ CareService: class { listTasks = services.li
 vi.mock('../goals/service', () => ({ GoalsService: class { listGoals = vi.fn(() => Promise.resolve([])); listEntries = vi.fn(() => Promise.resolve([])); listHistory = vi.fn(() => Promise.resolve([])) } }))
 vi.mock('../evangelism/service', () => ({ EvangelismPlanningService: class { listCampaigns = services.listCampaigns } }))
 vi.mock('../missionary/service', () => ({ MissionaryService: class { listInterests = vi.fn(() => Promise.resolve([])); listStudies = vi.fn(() => Promise.resolve([])); listUapgs = vi.fn(() => Promise.resolve([])) } }))
+vi.mock('../integrated-report/service', async (importarOriginal) => ({
+  ...await importarOriginal<Record<string, unknown>>(),
+  RelatorioIntegradoService: class { listar = vi.fn(() => Promise.resolve([])) },
+}))
 
 /* Sem isto, o DOM de um teste sobra para o seguinte e os localizadores duplicam. */
 afterEach(cleanup)
@@ -54,9 +58,27 @@ describe('painel inicial', () => {
       O número sobe animado. Conferi-lo sem esperar pega o meio da contagem — o
       que o teste media era a animação, não o dado.
     */
-    await waitFor(() => expect(screen.getByText('Pedidos de oração').parentElement).toHaveTextContent('Pedidos de oração1'))
+    await waitFor(() => expect(screen.getByText('Em oração').parentElement).toHaveTextContent('Em oração1'))
     expect(screen.queryByText('Conteúdo reservado fictício')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Evangelismo' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Abrir Evangelismo/i })).toHaveAttribute('href', '/app/evangelismo')
+  })
+
+  it('mostra o Plano Estratégico em quatro cartões e a visitação só em resumo', async () => {
+    render(<MemoryRouter><HomePage /></MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: 'Plano Estratégico da Divisão Sul-Americana — 2026–2030' })).toBeInTheDocument()
+    const cartoes = [
+      ['Identidade Adventista', 'identidade'], ['Liderança', 'lideranca'], ['Novas Gerações', 'novas-geracoes'], ['Discipulado', 'discipulado'],
+    ] as const
+    for (const [nome, slug] of cartoes) {
+      const cartao = screen.getByRole('link', { name: new RegExp(`^${nome}\\. .*: sem informação\\. Sem relatório em \\d{4}\\. Ver detalhes$`, 'u') })
+      expect(cartao).toHaveAttribute('href', `/app/plano-estrategico/${slug}`)
+      expect(cartao).toHaveTextContent('—')
+    }
+    expect(screen.getByText('Envolver as crianças, adolescentes e jovens ativamente na vida da igreja e na proclamação do evangelho.')).toBeInTheDocument()
+
+    expect(screen.getByRole('link', { name: 'Resumo de Visitação' })).toHaveAttribute('href', '/app/visitacao?aba=respostas')
+    expect(screen.queryByRole('heading', { name: 'Respostas das visitas' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Visitas e cuidados' })).not.toBeInTheDocument()
   })
 })

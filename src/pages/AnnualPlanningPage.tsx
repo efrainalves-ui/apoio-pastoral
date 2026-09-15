@@ -3,6 +3,8 @@ import { RelatorioIntegradoService } from '../integrated-report/service'
 import type { RelatorioIntegradoEntity } from '../integrated-report/types'
 import { areasEstrategicas } from '../integrated-report/areasEstrategicas'
 import { RelatorioPorArea } from '../components/RelatorioPorArea'
+import { SimboloDaArea } from '../components/plano/SimboloDaArea'
+import { areaDoPlanejamento } from '../plano-estrategico/areas'
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { CalendarRange, ClipboardCopy, Megaphone, Plus, Target, TriangleAlert } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -121,7 +123,7 @@ export function AnnualPlanningPage() {
     <div className="planning-layout"><div className="planning-areas">{PLANNING_AREAS.map((area) => {
       const soltas = metasSoltas.filter((goal) => goal.area === area)
       const campanhasDaArea = yearCampaigns.filter((campaign) => metasDaCampanha(campaign, goals).some((goal) => goal.area === area))
-      return <Card key={area} eyebrow={PLANNING_AREA_LABELS[area]} title={`${soltas.length} meta(s)${campanhasDaArea.length ? ` · ${campanhasDaArea.length} campanha(s)` : ''}`}><div className="planning-goal-list">
+      return <Card key={area} className={`area-marcada area--${areaDoPlanejamento(area).slug}`} action={<SimboloDaArea simbolo={areaDoPlanejamento(area).simbolo} />} eyebrow={PLANNING_AREA_LABELS[area]} title={`${soltas.length} meta(s)${campanhasDaArea.length ? ` · ${campanhasDaArea.length} campanha(s)` : ''}`}><div className="planning-goal-list">
         {campanhasDaArea.map(linhaDaCampanha)}
         {soltas.map((goal) => { const acompanhamento = trackGoal(goal, sources); return <div className="task-attention-row" key={goal.id}><span><strong>{goal.title}</strong><small>{goal.startDate ? `${formatDate(goal.startDate)} a ${formatDate(goal.dueDate)}` : `até ${formatDate(goal.dueDate)}`} · {GOAL_STATUS_LABELS[acompanhamento.status]}</small></span><Link className="button button--secondary" to={`/app/planejamento/${goal.id}`}>Acompanhar</Link></div> })}
         {!soltas.length && !campanhasDaArea.length && <div className="empty-state compact-empty"><Target /><strong>Nenhuma meta nesta área</strong></div>}

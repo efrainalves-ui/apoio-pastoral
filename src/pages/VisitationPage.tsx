@@ -6,6 +6,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { resumoDaVisitacao } from '../care/atencaoDaVisita'
 import { VisitasPorIgreja, type FiltroDaVisitacao } from '../components/VisitasPorIgreja'
 import { CasamentosLista } from '../components/casamentos/CasamentosLista'
+import { VisitAnswersSummary } from '../components/VisitAnswersSummary'
 import type { ResumoDaVisitacao } from '../care/atencaoDaVisita'
 
 /** Cada cartão é um número e o filtro daquele número. */
@@ -47,6 +48,7 @@ const today = localDateKey
 /** Uma área só para o pastoreio: visitas, acompanhamentos, orações e tarefas. */
 const TABS = [
   ['visitas', 'Visitas'],
+  ['respostas', 'Respostas'],
   ['acompanhamentos', 'Acompanhamentos'],
   ['casamentos', 'Casamentos'],
   ['oracao', 'Pedidos de oração'],
@@ -184,6 +186,8 @@ export function VisitationPage() {
 
       <VisitasPorIgreja visits={visits} followUps={followUps} tasks={tasks} churches={churches} nomeDoAlvo={targetName} filtro={filtro} busca={busca} />
     </>}
+
+    {tab === 'respostas' && <VisitAnswersSummary />}
 
     {tab === 'acompanhamentos' && <Card title="Acompanhamentos" action={<Button variant="secondary" icon={<Plus />} onClick={() => setSearch({ aba: 'acompanhamentos', novo: '1' })}>Novo acompanhamento</Button>}>
       {search.get('novo') === '1' && <form className="compact-task-form" onSubmit={createFollowUp}><label className="field"><span className="field__label">Acompanhar</span><select className="field__input" value={followSubjectType} onChange={(event) => { setFollowSubjectType(event.target.value as typeof followSubjectType); setFollowSubjectId('') }}><option value="person">Pessoa</option><option value="family">Família</option></select></label><label className="field"><span className="field__label">Igreja</span><select className="field__input" value={followChurch} onChange={(event) => { setFollowChurch(event.target.value); setFollowSubjectId('') }} required><option value="">Selecione</option>{churches.map((church) => <option key={church.id} value={church.id}>{church.name}</option>)}</select></label><label className="field"><span className="field__label">{followSubjectType === 'person' ? 'Pessoa' : 'Família'}</span><select className="field__input" value={followSubjectId} onChange={(event) => setFollowSubjectId(event.target.value)} required><option value="">Selecione</option>{(followSubjectType === 'person' ? people.filter((person) => person.currentChurchId === followChurch) : families.filter((family) => family.primaryChurchId === followChurch)).map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label><label className="field"><span className="field__label">Próximo cuidado</span><select className="field__input" value={followKind} onChange={(event) => setFollowKind(event.target.value as FollowUpKind)}>{FOLLOW_UP_KINDS.map((kind) => <option key={kind} value={kind}>{FOLLOW_UP_LABELS[kind]}</option>)}</select></label><Field label="Data" name="follow-due" type="date" value={followDue} onChange={(event) => setFollowDue(event.target.value)} required /><label className="field full-span"><span className="field__label">Observação opcional</span><textarea className="field__input" rows={2} maxLength={2000} value={followNotes} onChange={(event) => setFollowNotes(event.target.value)} /></label><div className="form-actions"><Button type="submit" disabled={!followChurch || !followSubjectId || !followDue}>Criar acompanhamento</Button><Button type="button" variant="secondary" onClick={() => setSearch({ aba: 'acompanhamentos' })}>Cancelar</Button></div></form>}

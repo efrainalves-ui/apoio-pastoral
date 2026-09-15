@@ -79,7 +79,12 @@ export function montarPdf(paginas: ReadonlyArray<readonly CelulaDoPdf[]>): Buffe
 
 const CLASSES = ['Bebês', 'Iniciantes', 'Infantis', 'Primários', 'Pré-Adolescentes', 'Adolescentes', 'Jovens', 'Adultos', 'Classes Bíblicas', 'Filiais', 'Total']
 
-interface DadosDaIgreja { nome: string; pequenosGrupos: string; campanhas: string; alunos: readonly string[]; estudos?: string; estudosAsa?: string; semanaSanta?: string }
+interface DadosDaIgreja {
+  nome: string; pequenosGrupos: string; campanhas: string; alunos: readonly string[]; estudos?: string; estudosAsa?: string; semanaSanta?: string
+  /** Perguntas do Planejamento Estratégico: só entram no PDF quando informadas. */
+  membrosEmIdentidade?: string
+  ministrandoEstudos?: string
+}
 
 /** Reproduz o desenho do relatório: três páginas por igreja, cabeçalho repetido. */
 export function relatorioIntegradoFicticio(trimestre: number, igrejas: readonly DadosDaIgreja[]): Buffer {
@@ -129,6 +134,9 @@ export function relatorioIntegradoFicticio(trimestre: number, igrejas: readonly 
       ['Número de Classes Bíblicas em funcionamento.', '-'],
       ['Ministério Pessoal'],
       ['Total de amigos (interessados) presentes na Semana Santa.', igreja.semanaSanta ?? '-'],
+      ...(igreja.membrosEmIdentidade !== undefined || igreja.ministrandoEstudos !== undefined ? [['Planejamento Estratégico']] : []),
+      ...(igreja.membrosEmIdentidade !== undefined ? [['Quantos membros participaram de programas relacionados à Identidade profética da IASD, neste trimestre? {Ancionato}', igreja.membrosEmIdentidade]] : []),
+      ...(igreja.ministrandoEstudos !== undefined ? [['Número de pessoas que estão ministrando Estudos Bíblicos. (individual, em duplas, etc.). {Ministério Pessoal}', igreja.ministrandoEstudos]] : []),
     ], indice * 3 + 3)
   })
 
