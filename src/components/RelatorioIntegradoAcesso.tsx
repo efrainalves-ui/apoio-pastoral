@@ -2,7 +2,8 @@ import { FileText } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { origemDosEstudos } from '../goals/areas'
 import { useGoalSources } from '../goals/useGoalSources'
-import { coberturaDoTrimestre, FRASE_DO_ENVIO, linhasDaEscolaSabatina, ROTA_DO_RELATORIO_INTEGRADO, ultimoTrimestre } from '../integrated-report/resumo'
+import { areaDaLinhaDaEscolaSabatina, coberturaDoTrimestre, FRASE_DO_ENVIO, linhasDaEscolaSabatina, ROTA_DO_RELATORIO_INTEGRADO, ultimoTrimestre } from '../integrated-report/resumo'
+import { MarcaDaArea } from './plano/MarcaDaArea'
 import { rotuloCurtoDoTrimestre } from '../integrated-report/painel'
 import { rotuloDoTrimestre } from '../integrated-report/types'
 import { useRelatorioIntegrado } from '../integrated-report/useRelatorioIntegrado'
@@ -26,6 +27,12 @@ export function AcessoAoRelatorioIntegrado() {
 }
 
 /** Na Escola Sabatina: o que o relatório diz, ao lado do que está cadastrado, sem misturar. */
+/** A área de cada informação da Escola Sabatina, que é compartilhada entre as quatro. */
+function MarcaDaLinha({ rotulo }: { rotulo: string }) {
+  const area = areaDaLinhaDaEscolaSabatina(rotulo)
+  return area ? <MarcaDaArea area={area} compacta /> : null
+}
+
 export function DadosDoRelatorioNaEscolaSabatina({ cadastro }: { cadastro: { classes: number; pequenosGrupos: number } }) {
   const { relatorios, ativas, pronto } = useRelatorioIntegrado()
   if (!pronto) return null
@@ -45,7 +52,7 @@ export function DadosDoRelatorioNaEscolaSabatina({ cadastro }: { cadastro: { cla
       <table className="tabela-simples">
         <thead><tr><th scope="col">Indicador</th><th scope="col">Cadastro atual do aplicativo</th><th scope="col">Informado no Relatório Integrado do trimestre</th></tr></thead>
         <tbody>{linhasDaEscolaSabatina(relatorios, ativas, cadastro).map((linha) => <tr key={linha.rotulo}>
-          <td>{linha.rotulo}</td>
+          <td>{linha.rotulo} <MarcaDaLinha rotulo={linha.rotulo} /></td>
           <td className="numero-tabela">{linha.cadastro ?? '—'}</td>
           <td className="numero-tabela">{linha.informado ?? '—'}</td>
         </tr>)}</tbody>

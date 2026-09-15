@@ -299,10 +299,26 @@ describe('reunião, treinamento, evento e concílio', () => {
     })
   })
 
-  it('Reunião e Evento podem ter prioridade estratégica escolhida; as demais categorias não perguntam', async () => {
+  it('Treinamento começa sem prioridade e grava a escolhida', async () => {
     const user = userEvent.setup()
     abrir(); await aguardarCarregar()
-    for (const categoria of ['Visita', 'Pregação', 'Treinamento', 'Concílio', 'Ceia do Senhor', 'Casamento', 'Pessoal', 'Outro']) {
+    await escolherCategoria(user, 'Treinamento')
+    const prioridade = screen.getByLabelText('Prioridade estratégica')
+    expect(prioridade).toHaveValue('')
+    expect(within(prioridade).getByRole('option', { selected: true })).toHaveTextContent('Sem prioridade definida')
+    await user.type(screen.getByLabelText('Título'), 'Treinamento fictício de líderes')
+    await user.click(screen.getByRole('radio', { name: 'Online' }))
+    await user.click(screen.getByRole('radio', { name: 'Distrital' }))
+    await user.click(screen.getByRole('radio', { name: 'Todos os líderes' }))
+    await salvar(user)
+    expect(estado.criados[0]).toMatchObject({ category: 'training', title: 'Treinamento fictício de líderes' })
+    expect(estado.criados[0]?.prioridadeEstrategica ?? null).toBeNull()
+  })
+
+  it('Reunião, Evento e Treinamento podem ter prioridade estratégica escolhida; as demais categorias não perguntam', async () => {
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    for (const categoria of ['Visita', 'Pregação', 'Comissão', 'Concílio', 'Ceia do Senhor', 'Casamento', 'Pessoal', 'Outro']) {
       await escolherCategoria(user, categoria)
       expect(screen.queryByLabelText('Prioridade estratégica'), categoria).not.toBeInTheDocument()
     }

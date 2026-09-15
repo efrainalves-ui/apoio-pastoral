@@ -15,7 +15,6 @@ describe('prioridade estratégica dos compromissos', () => {
   it('as categorias com ligação clara têm a sua área', () => {
     expect(prioridadeDoCompromisso({ category: 'preaching' })).toBe('identity')
     expect(prioridadeDoCompromisso({ category: 'committee' })).toBe('leadership')
-    expect(prioridadeDoCompromisso({ category: 'training' })).toBe('leadership')
     expect(prioridadeDoCompromisso({ category: 'visit' })).toBe('discipleship')
     expect(prioridadeDoCompromisso({ category: 'bible_study' })).toBe('discipleship')
     expect(prioridadeDoCompromisso({ category: 'baptism' })).toBe('discipleship')
@@ -28,12 +27,22 @@ describe('prioridade estratégica dos compromissos', () => {
     }
   })
 
-  it('Reunião e Evento só têm prioridade quando ela está no registro, e nunca pelo título', () => {
-    expect(usaPrioridadeEscolhida('meeting')).toBe(true)
-    expect(usaPrioridadeEscolhida('event')).toBe(true)
-    expect(AGENDA_CATEGORIES.filter(usaPrioridadeEscolhida)).toEqual(['meeting', 'event'])
+  it('Reunião, Evento e Treinamento só têm prioridade quando ela está no registro, e nunca pelo título', () => {
+    expect(AGENDA_CATEGORIES.filter(usaPrioridadeEscolhida)).toEqual(['meeting', 'training', 'event'])
     expect(prioridadeDoCompromisso(base({ title: 'Reunião de jovens e discipulado' }))).toBeNull()
+    expect(prioridadeDoCompromisso(base({ category: 'training', title: 'Treinamento de líderes' }))).toBeNull()
+    expect(prioridadeDoCompromisso(base({ category: 'training', prioridadeEstrategica: 'leadership' }))).toBe('leadership')
+    expect(prioridadeDoCompromisso(base({ category: 'training', prioridadeEstrategica: 'new_generations' }))).toBe('new_generations')
     expect(prioridadeDoCompromisso(base({ category: 'event', prioridadeEstrategica: 'new_generations' }))).toBe('new_generations')
+  })
+
+  it('o compromisso criado por uma campanha evangelística é Discipulado sem escolher; o manual continua sem prioridade', () => {
+    const daCampanha = { type: 'evangelism_campaign' as const, id: 'campanha-ficticia', campaignId: 'campanha-ficticia' }
+    expect(prioridadeDoCompromisso(base({ category: 'event', linkedSource: daCampanha }))).toBe('discipleship')
+    expect(prioridadeDoCompromisso(base({ category: 'meeting', linkedSource: { ...daCampanha, type: 'evangelism_task' } }))).toBe('discipleship')
+    expect(prioridadeDoCompromisso(base({ category: 'other', linkedSource: { ...daCampanha, type: 'evangelism_point' } }))).toBe('discipleship')
+    expect(prioridadeDoCompromisso(base({ category: 'event', linkedSource: null }))).toBeNull()
+    expect(prioridadeDoCompromisso(base({ category: 'meeting' }))).toBeNull()
   })
 
   it('trocar para uma categoria sem escolha apaga a prioridade escolhida', () => {

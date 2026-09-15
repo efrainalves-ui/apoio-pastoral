@@ -4,7 +4,7 @@ import { areaDoPlanejamento, nomeCurtoDaArea } from '../../plano-estrategico/are
 import { SimboloDaArea } from '../plano/SimboloDaArea'
 import { SeloDaCategoria } from './IdentidadeDaCategoria'
 
-type Compromisso = Pick<AgendaEventData, 'category' | 'prioridadeEstrategica'>
+type Compromisso = Pick<AgendaEventData, 'category' | 'prioridadeEstrategica'> & Partial<Pick<AgendaEventData, 'linkedSource'>>
 
 /** O trecho que entra no nome acessível de quem abre o compromisso. */
 export function rotuloDaPrioridade(event: Compromisso): string {

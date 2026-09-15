@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arquivoEhPdf, coberturaDoTrimestre, estudosDoTrimestre, linhasDaEscolaSabatina, ultimoTrimestre } from './resumo'
+import { INDICADORES_DA_ESCOLA_SABATINA, areaDaLinhaDaEscolaSabatina, arquivoEhPdf, coberturaDoTrimestre, estudosDoTrimestre, linhasDaEscolaSabatina, ultimoTrimestre } from './resumo'
 import type { RelatorioIntegradoEntity, ValorDoIndicador } from './types'
 
 const GERAL = 'ministerio-pessoal--numero-de-pessoas-recebendo-estudos-biblicos'
@@ -47,5 +47,24 @@ describe('resumo do Relatório Integrado para as outras telas', () => {
     for (const [name, type] of [['relatorio.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'], ['relatorio.xlsx', ''], ['relatorio.jpg', 'image/jpeg'], ['relatorio.pdf', 'image/png']]) {
       expect(arquivoEhPdf({ name: name!, type: type! })).toBe(false)
     }
+  })
+})
+
+describe('Escola Sabatina: a prioridade de cada informação', () => {
+  it('reúne as quatro áreas, uma por linha, sem classificar a página inteira', () => {
+    const areas = Object.fromEntries(INDICADORES_DA_ESCOLA_SABATINA.map(({ rotulo }) => [rotulo, areaDaLinhaDaEscolaSabatina(rotulo)]))
+    expect(areas).toEqual({
+      'Classes (Unidades de Ação)': 'discipleship',
+      Alunos: 'identity',
+      Professores: 'leadership',
+      'Pessoas com a lição': 'identity',
+      'Estudam a lição diariamente': 'identity',
+      'Alunos dos departamentos infantis': 'new_generations',
+      'Alunos adolescentes': 'new_generations',
+      'Alunos jovens': 'new_generations',
+      'Pequenos Grupos': 'discipleship',
+    })
+    expect(new Set(Object.values(areas))).toEqual(new Set(['identity', 'leadership', 'new_generations', 'discipleship']))
+    expect(areaDaLinhaDaEscolaSabatina('Linha que não existe')).toBeNull()
   })
 })

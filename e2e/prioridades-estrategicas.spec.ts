@@ -133,6 +133,10 @@ test('Agenda com símbolo estratégico só onde há ligação clara, e marca da 
   await expect(marca).toHaveCount(0)
   await abrir(page, '/app/evangelismo', page.getByRole('heading', { name: 'Evangelismo', level: 1 }))
   await expect(marca).toHaveText('Discipulado')
+  // Escola Sabatina reúne as quatro prioridades: cabeçalho neutro, marca em cada informação.
+  await abrir(page, '/app/metas/uapg', page.getByRole('heading', { name: 'Escola Sabatina e Pequenos Grupos', level: 1 }))
+  await expect(marca).toHaveCount(0)
+  await expect(page.locator('.quadro-grupos thead .marca-da-area')).toHaveText(['Discipulado', 'Discipulado', 'Discipulado'])
   await abrir(page, '/app/metas', page.getByRole('heading', { name: 'Metas', level: 1 }))
   await expect(marca).toHaveCount(0)
   await expect(page.locator('.goal-cards .marca-da-area--compacta')).toHaveText(['Discipulado', 'Discipulado'])
