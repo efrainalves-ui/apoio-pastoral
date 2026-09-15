@@ -219,10 +219,12 @@ button.entity-row { width: 100%; background: none; border-top: 0; border-inline:
 .quick-actions { position: relative; }
 .quick-actions__trigger { min-width: 44px; min-height: 44px; display: grid; place-items: center; border: 0; border-radius: 999px; background: var(--green-800); color: #fff; cursor: pointer; }
 .quick-actions__trigger svg { width: 22px; height: 22px; }
-.quick-actions__menu { position: absolute; z-index: 30; right: 0; top: calc(100% + 9px); min-width: 250px; display: grid; gap: 2px; padding: 8px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); box-shadow: var(--shadow); }
-.quick-actions__menu a { display: flex; gap: 11px; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 11px; color: inherit; text-decoration: none; font-weight: 600; }
-.quick-actions__menu a:hover, .quick-actions__menu a:focus-visible { background: var(--green-50); }
-.quick-actions__menu svg { width: 19px; height: 19px; color: var(--green-800); }
+.quick-actions__menu { position: absolute; z-index: 30; right: 0; top: calc(100% + 9px); min-width: 250px; display: grid; gap: 2px; padding: 8px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); color: var(--ink); box-shadow: var(--shadow); }
+.quick-actions__menu a { display: flex; gap: 11px; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 11px; color: var(--ink); text-decoration: none; font-weight: 600; line-height: 1.25; -webkit-tap-highlight-color: transparent; }
+.quick-actions__menu a span { color: var(--ink); }
+.quick-actions__menu a:hover, .quick-actions__menu a:focus-visible, .quick-actions__menu a:active, .quick-actions__menu a[aria-current='page'] { background: var(--green-50); color: var(--ink); }
+.quick-actions__menu a:focus-visible { outline: 2px solid var(--green-800); outline-offset: -2px; }
+.quick-actions__menu svg { flex: none; width: 19px; height: 19px; color: var(--green-800); }
 .page-stack { display: grid; gap: 24px; }
 /*
   O envio do relatório sobe para o topo enquanto não há resultado nenhum: é a
@@ -1404,6 +1406,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   .button--quiet { color: #d9e7e1; background: rgb(255 255 255 / 8%); }
   :root:not([data-tema='claro']) .button--quiet:hover:not(:disabled) { background: rgb(255 255 255 / 14%); }
   :root:not([data-tema='claro']) .text-button, :root:not([data-tema='claro']) .nomination-page summary, :root:not([data-tema='claro']) .accent-icon, :root:not([data-tema='claro']) .readiness-card__check, :root:not([data-tema='claro']) .quick-actions__menu svg { color: #9ed4bd; }
+  :root:not([data-tema='claro']) .quick-actions__menu a:focus-visible { outline-color: #9ed4bd; }
   :root:not([data-tema='claro']) .readiness-card__icon, :root:not([data-tema='claro']) .device-row__icon, :root:not([data-tema='claro']) .church-card__icon, :root:not([data-tema='claro']) .fixture-row > span:first-child, :root:not([data-tema='claro']) .avatar, :root:not([data-tema='claro']) .birthday-date, :root:not([data-tema='claro']) .file-picker, :root:not([data-tema='claro']) .budget-hero > svg { color: #d9eee5; }
   :root:not([data-tema='claro']) .detail-highlight svg, :root:not([data-tema='claro']) .privacy-list li > svg, :root:not([data-tema='claro']) .check-list svg, :root:not([data-tema='claro']) .search-results > a > svg, :root:not([data-tema='claro']) .budget-quick-actions svg { color: #9ed4bd; }
   :root:not([data-tema='claro']) .budget-nav a.active, :root:not([data-tema='claro']) .tab-bar .button--primary { color: #0e1714; background: #9ed4bd; }
@@ -1471,6 +1474,7 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .button--quiet { color: #d9e7e1; background: rgb(255 255 255 / 8%); }
 :root[data-tema='escuro'] .button--quiet:hover:not(:disabled) { background: rgb(255 255 255 / 14%); }
 :root[data-tema='escuro'] .text-button, :root[data-tema='escuro'] .nomination-page summary, :root[data-tema='escuro'] .accent-icon, :root[data-tema='escuro'] .readiness-card__check, :root[data-tema='escuro'] .quick-actions__menu svg { color: #9ed4bd; }
+:root[data-tema='escuro'] .quick-actions__menu a:focus-visible { outline-color: #9ed4bd; }
 :root[data-tema='escuro'] .readiness-card__icon, :root[data-tema='escuro'] .device-row__icon, :root[data-tema='escuro'] .church-card__icon, :root[data-tema='escuro'] .fixture-row > span:first-child, :root[data-tema='escuro'] .avatar, :root[data-tema='escuro'] .birthday-date, :root[data-tema='escuro'] .file-picker, :root[data-tema='escuro'] .budget-hero > svg { color: #d9eee5; }
 :root[data-tema='escuro'] .detail-highlight svg, :root[data-tema='escuro'] .privacy-list li > svg, :root[data-tema='escuro'] .check-list svg, :root[data-tema='escuro'] .search-results > a > svg, :root[data-tema='escuro'] .budget-quick-actions svg { color: #9ed4bd; }
 :root[data-tema='escuro'] .budget-nav a.active, :root[data-tema='escuro'] .tab-bar .button--primary { color: #0e1714; background: #9ed4bd; }
