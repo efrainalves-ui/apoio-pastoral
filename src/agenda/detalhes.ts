@@ -1,6 +1,6 @@
 import type { ChurchEntity } from '../district/types'
 import {
-  AGENDA_CATEGORY_LABELS, CATEGORIAS_PESSOAIS, TIPO_DE_COMISSAO_LABELS, isEncontroCategory,
+  AGENDA_CATEGORY_LABELS, CATEGORIAS_PESSOAIS, NIVEL_INSTITUCIONAL_LABELS, TIPO_DE_COMISSAO_LABELS, isEncontroCategory,
   type AgendaCategory, type AgendaEventData, type AgendaEventInput, type CeremonyDetails, type DetalhesDaCeia,
   type DetalhesDaComissao, type DetalhesDaDedicacao, type DetalhesDoCasamento,
   type DetalhesDoEncontro, type DetalhesDoPessoal,
@@ -54,7 +54,7 @@ export function detalhesAoTrocarCategoria(input: AgendaEventInput, category: Age
   if (alvo === 'encontro' && !limpo.encontro) limpo.encontro = encontroVazio(category)
   if (alvo === 'encontro' && limpo.encontro) {
     limpo.encontro = category === 'council'
-      ? { ...limpo.encontro, tipoConcilio: limpo.encontro.tipoConcilio ?? null }
+      ? { ...encontroSemAlcance(limpo.encontro), tipoConcilio: limpo.encontro.tipoConcilio ?? null }
       : (({ tipoConcilio: _tipo, ...resto }) => { void _tipo; return resto })(limpo.encontro)
   }
   if (alvo === 'comissao' && !limpo.comissao) limpo.comissao = comissaoVazia()
@@ -99,9 +99,44 @@ export function encontroComAlcance(encontro: DetalhesDoEncontro, alcance: Detalh
       publicoOutro: alcance === 'distrital' ? encontro.publicoOutro : '',
       departamento: alcance === 'departamento' ? encontro.departamento : '',
       departamentoOutro: alcance === 'departamento' ? encontro.departamentoOutro ?? '' : '',
+      nivelInstitucional: alcance === 'institucional' ? encontro.nivelInstitucional ?? null : null,
+      instituicao: alcance === 'institucional' ? encontro.instituicao ?? '' : '',
     },
     limparIgreja: alcance !== 'igreja',
   }
+}
+
+/** Reunião, Treinamento e Evento perguntam o alcance. Concílio não: o tipo — Concílio ou PGP — já diz o que é. */
+export function usaAlcance(category: AgendaCategory): boolean {
+  return isEncontroCategory(category) && category !== 'council'
+}
+
+/** O encontro sem nada do alcance: é como o Concílio é gravado, mesmo quando um registro antigo trazia um. */
+export function encontroSemAlcance(encontro: DetalhesDoEncontro): DetalhesDoEncontro {
+  const { nivelInstitucional: _nivel, instituicao: _instituicao, departamentoOutro: _outro, ...resto } = encontro
+  void _nivel; void _instituicao; void _outro
+  return { ...resto, alcance: null, publico: null, publicoOutro: '', departamento: '' }
+}
+
+/**
+ * "Reunião · Associação", "Treinamento · Departamento de Música", "Evento · Distrito".
+ *
+ * Só para Reunião, Treinamento e Evento com alcance escolhido; nos demais, o
+ * título e o selo da categoria já dizem tudo.
+ */
+export function resumoDoAlcance(event: Pick<AgendaEventData, 'category' | 'churchId' | 'encontro'>, churches: readonly ChurchEntity[]): string | null {
+  const encontro = event.encontro
+  if (!usaAlcance(event.category) || !encontro?.alcance) return null
+  const tipo = AGENDA_CATEGORY_LABELS[event.category]
+  if (encontro.alcance === 'institucional') {
+    const nivel = encontro.nivelInstitucional ? NIVEL_INSTITUCIONAL_LABELS[encontro.nivelInstitucional] : 'Associação/Missão/União'
+    const nome = encontro.instituicao?.trim()
+    return nome ? `${tipo} · ${nivel} · ${nome}` : `${tipo} · ${nivel}`
+  }
+  if (encontro.alcance === 'distrital') return `${tipo} · Distrito`
+  if (encontro.alcance === 'igreja') return `${tipo} · ${churches.find(({ id }) => id === event.churchId)?.name ?? 'Igreja local'}`
+  const departamento = encontro.departamento === 'Outro' ? encontro.departamentoOutro?.trim() : encontro.departamento.trim()
+  return departamento ? `${tipo} · Departamento de ${departamento}` : `${tipo} · Departamento`
 }
 
 export function encontroComPublico(encontro: DetalhesDoEncontro, publico: DetalhesDoEncontro['publico']): DetalhesDoEncontro {
@@ -243,15 +278,17 @@ export function validarDetalhes(input: AgendaEventInput): void {
 export function validarEncontro(input: AgendaEventInput): void {
   const encontro = input.encontro
   if (!encontro) return
+  if (input.category === 'council' && !encontro.tipoConcilio) throw new Error('Escolha o tipo: Concílio ou PGP.')
   if (!encontro.formato) throw new Error('Escolha o formato: presencial ou online.')
   if (encontro.formato === 'presencial' && vazio(input.location)) throw new Error('Informe o local.')
-  if (!encontro.alcance) throw new Error('Escolha o alcance: distrital, igreja local ou departamento.')
+  if (!usaAlcance(input.category)) return
+  if (!encontro.alcance) throw new Error('Escolha o alcance: Associação/Missão/União, distrital, igreja local ou departamento.')
+  if (encontro.alcance === 'institucional' && !encontro.nivelInstitucional) throw new Error('Escolha: Associação, Missão ou União.')
   if (encontro.alcance === 'distrital' && !encontro.publico) throw new Error('Escolha o público da reunião.')
   if (encontro.alcance === 'distrital' && encontro.publico === 'outro' && vazio(encontro.publicoOutro)) throw new Error('Descreva o público.')
   if (encontro.alcance === 'igreja' && !input.churchId) throw new Error('Escolha a igreja.')
   if (encontro.alcance === 'departamento' && vazio(encontro.departamento)) throw new Error('Escolha o departamento.')
   if (encontro.alcance === 'departamento' && encontro.departamento === 'Outro' && vazio(encontro.departamentoOutro)) throw new Error('Informe o departamento.')
-  if (input.category === 'council' && !encontro.tipoConcilio) throw new Error('Escolha o tipo: Concílio ou PGP.')
 }
 
 /**

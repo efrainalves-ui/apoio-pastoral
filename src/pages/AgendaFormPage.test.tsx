@@ -69,6 +69,7 @@ vi.mock('../people/service', () => ({ PeopleService: class { listPeople = vi.fn(
 vi.mock('../families/service', () => ({ FamilyService: class { listFamilies = vi.fn(() => Promise.resolve([{ id: 'familia-1', name: 'Família Fictícia' }])) } }))
 vi.mock('../nominations/service', () => ({ NominationService: class { list = vi.fn(() => Promise.resolve(estado.processos)) } }))
 vi.mock('../evangelism/service', () => ({ EvangelismPlanningService: class { syncFromAgendaEvent = vi.fn() } }))
+vi.mock('../work-budget/service', () => ({ WorkBudgetService: class { configuracao = vi.fn(() => Promise.resolve({ id: 'config', uniao: 'União Fictícia do Norte', campo: 'Associação Fictícia Central' })) } }))
 vi.mock('../casamentos/service', async (importarOriginal) => ({
   ...await importarOriginal<Record<string, unknown>>(),
   CasamentoService: class {
@@ -218,17 +219,153 @@ describe('reunião, treinamento, evento e concílio', () => {
     })
   })
 
-  it('Concílio pede o tipo: Concílio ou PGP', async () => {
+  it('Concílio pede o tipo e o formato, sem alcance: PGP presencial com local e observações', async () => {
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Treinamento')
+    await user.click(screen.getByRole('radio', { name: 'Igreja local' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Igreja' }), 'Igreja Norte Fictícia')
+    await escolherCategoria(user, 'Concílio')
+    expect(screen.getByRole('group', { name: 'Tipo' })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Alcance' })).not.toBeInTheDocument()
+    for (const opcao of ['Associação/Missão/União', 'Distrital', 'Igreja local', 'Departamento']) expect(screen.queryByRole('radio', { name: opcao })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Igreja' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: 'PGP' }))
+    await user.click(screen.getByRole('radio', { name: 'Presencial' }))
+    await user.type(screen.getByLabelText('Local'), 'Auditório Fictício')
+    await user.type(screen.getByLabelText('Observações'), 'Observação fictícia do PGP')
+    await salvar(user)
+    expect(estado.criados[0]).toMatchObject({
+      category: 'council', title: 'PGP', churchId: null, location: 'Auditório Fictício', notes: 'Observação fictícia do PGP',
+      startAt: '2026-10-06T09:00', endAt: '2026-10-06T12:00',
+      encontro: { tipoConcilio: 'pgp', formato: 'presencial', alcance: null, publico: null, departamento: '' },
+    })
+  })
+
+  it('Concílio online não pede local', async () => {
     const user = userEvent.setup()
     abrir(); await aguardarCarregar()
     await escolherCategoria(user, 'Concílio')
-    expect(screen.getByRole('group', { name: 'Tipo' })).toBeInTheDocument()
-    await user.click(screen.getByRole('radio', { name: 'PGP' }))
+    await user.click(screen.getByRole('radio', { name: 'Concílio' }))
+    await user.click(screen.getByRole('radio', { name: 'Online' }))
+    expect(screen.queryByLabelText('Local')).not.toBeInTheDocument()
+    await salvar(user)
+    expect(estado.criados[0]).toMatchObject({ category: 'council', title: 'Concílio', location: '', encontro: { tipoConcilio: 'concilio', formato: 'online', alcance: null } })
+  })
+
+  it('Reunião, Treinamento e Evento oferecem os quatro alcances, com Associação/Missão/União primeiro', async () => {
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    for (const categoria of ['Reunião', 'Treinamento', 'Evento']) {
+      await escolherCategoria(user, categoria)
+      const alcance = screen.getByRole('group', { name: 'Alcance' })
+      expect(within(alcance).getAllByRole('radio').map((radio) => radio.closest('label')?.textContent), categoria)
+        .toEqual(['Associação/Missão/União', 'Distrital', 'Igreja local', 'Departamento'])
+    }
+  })
+
+  it('Associação/Missão/União: escolhe o nível, sugere o cadastro e limpa a igreja e o departamento escolhidos antes', async () => {
+    estado.eventos = [eventoBase({
+      id: 'treinamento-anterior', category: 'training', title: 'Treinamento anterior fictício',
+      encontro: { formato: 'online', alcance: 'institucional', nivelInstitucional: 'missao', instituicao: 'Missão Fictícia do Sul', publico: null, publicoOutro: '', departamento: '' },
+    })]
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Reunião')
+    await user.type(screen.getByLabelText('Título'), 'Reunião fictícia da Missão')
     await user.click(screen.getByRole('radio', { name: 'Online' }))
     await user.click(screen.getByRole('radio', { name: 'Igreja local' }))
     await user.selectOptions(screen.getByRole('combobox', { name: 'Igreja' }), 'Igreja Norte Fictícia')
+    await user.click(screen.getByRole('radio', { name: 'Departamento' }))
+    await user.type(screen.getByRole('combobox', { name: 'Departamento' }), 'músi')
+    await user.keyboard('{Enter}')
+    await user.click(screen.getByRole('radio', { name: 'Associação/Missão/União' }))
+    expect(screen.queryByRole('combobox', { name: 'Departamento' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Igreja' })).not.toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Instituição' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('radio', { name: 'Missão' }))
+    const nome = screen.getByLabelText('Nome da instituição')
+    const sugestoes = () => [...(document.getElementById(nome.getAttribute('list') ?? '')?.querySelectorAll('option') ?? [])].map((opcao) => opcao.getAttribute('value'))
+    expect(sugestoes()).toEqual(['Associação Fictícia Central', 'Missão Fictícia do Sul'])
+    await user.click(screen.getByRole('radio', { name: 'União' }))
+    expect(sugestoes()).toEqual(['União Fictícia do Norte'])
+    await user.click(screen.getByRole('radio', { name: 'Missão' }))
+    await user.type(nome, 'Missão Fictícia do Sul')
     await salvar(user)
-    expect(estado.criados[0]).toMatchObject({ category: 'council', title: 'PGP', churchId: 'igreja-b', encontro: { tipoConcilio: 'pgp', alcance: 'igreja' } })
+    expect(estado.criados[0]).toMatchObject({
+      category: 'meeting', title: 'Reunião fictícia da Missão', churchId: null,
+      encontro: { formato: 'online', alcance: 'institucional', nivelInstitucional: 'missao', instituicao: 'Missão Fictícia do Sul', publico: null, departamento: '', departamentoOutro: '' },
+    })
+  })
+
+  it('Associação/Missão/União funciona sem o nome e no formato presencial', async () => {
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Evento')
+    await user.type(screen.getByLabelText('Título'), 'Evento fictício da Associação')
+    await user.click(screen.getByRole('radio', { name: 'Presencial' }))
+    await user.type(screen.getByLabelText('Local'), 'Ginásio Fictício')
+    await user.click(screen.getByRole('radio', { name: 'Associação/Missão/União' }))
+    await user.click(screen.getByRole('radio', { name: 'Associação' }))
+    await salvar(user)
+    expect(estado.criados[0]).toMatchObject({ category: 'event', location: 'Ginásio Fictício', encontro: { formato: 'presencial', alcance: 'institucional', nivelInstitucional: 'associacao', instituicao: '' } })
+  })
+})
+
+describe('editar o alcance e registros antigos de encontros', () => {
+  beforeEach(() => { estado.eventId = 'agenda-evento-ficticio' })
+
+  it('treinamento da União abre com o resumo e, trocado para Distrital, não leva a instituição', async () => {
+    estado.evento = eventoBase({
+      category: 'training', title: 'Treinamento fictício da União', location: '',
+      encontro: { formato: 'online', alcance: 'institucional', nivelInstitucional: 'uniao', instituicao: 'União Fictícia do Norte', publico: null, publicoOutro: '', departamento: '' },
+    })
+    const user = userEvent.setup()
+    abrir()
+    expect(await screen.findByText('Treinamento · União · União Fictícia do Norte')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'União' })).toBeChecked()
+    expect(screen.getByLabelText('Nome da instituição')).toHaveValue('União Fictícia do Norte')
+    await user.click(screen.getByRole('radio', { name: 'Distrital' }))
+    await user.click(screen.getByRole('radio', { name: 'Todos os líderes' }))
+    await salvar(user)
+    expect(estado.atualizados[0]).toMatchObject({ title: 'Treinamento fictício da União', encontro: { alcance: 'distrital', publico: 'todos_lideres', nivelInstitucional: null, instituicao: '' } })
+  })
+
+  it('reunião antiga de departamento, sem os campos novos, abre e grava como estava', async () => {
+    estado.evento = eventoBase({ category: 'meeting', title: 'Reunião antiga fictícia', location: '', encontro: { formato: 'online', alcance: 'departamento', publico: null, publicoOutro: '', departamento: 'Ministério Jovem' } })
+    const user = userEvent.setup()
+    abrir()
+    expect(await screen.findByText('Reunião · Departamento de Ministério Jovem')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Departamento' })).toBeChecked()
+    await salvar(user)
+    expect(estado.atualizados[0]).toMatchObject({ title: 'Reunião antiga fictícia', encontro: { alcance: 'departamento', departamento: 'Ministério Jovem' } })
+  })
+
+  it('Concílio antigo com alcance e igreja abre sem o alcance e grava sem nada escondido', async () => {
+    estado.evento = eventoBase({
+      category: 'council', title: 'Concílio', churchId: 'igreja-a', location: '', notes: 'Anotação fictícia do concílio',
+      encontro: { formato: 'online', alcance: 'igreja', publico: null, publicoOutro: '', departamento: '', tipoConcilio: 'concilio' },
+    })
+    const user = userEvent.setup()
+    abrir()
+    expect(await screen.findByRole('radio', { name: 'Concílio' })).toBeChecked()
+    expect(screen.queryByRole('group', { name: 'Alcance' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Igreja' })).not.toBeInTheDocument()
+    expect(document.querySelector('.resumo-do-alcance')).toBeNull()
+    await salvar(user)
+    expect(estado.atualizados[0]).toMatchObject({ category: 'council', title: 'Concílio', churchId: null, notes: 'Anotação fictícia do concílio', encontro: { formato: 'online', tipoConcilio: 'concilio', alcance: null } })
+  })
+
+  it('PGP antigo presencial abre como Concílio do tipo PGP e mantém o local', async () => {
+    estado.evento = eventoBase({ category: 'council', title: 'PGP', location: 'Sede Fictícia', encontro: { formato: 'presencial', alcance: 'distrital', publico: 'administrativo', publicoOutro: '', departamento: '', tipoConcilio: 'pgp' } })
+    const user = userEvent.setup()
+    abrir()
+    expect(await screen.findByRole('radio', { name: 'PGP' })).toBeChecked()
+    expect(screen.getByLabelText('Local')).toHaveValue('Sede Fictícia')
+    expect(screen.queryByRole('group', { name: 'Público' })).not.toBeInTheDocument()
+    await salvar(user)
+    expect(estado.atualizados[0]).toMatchObject({ title: 'PGP', location: 'Sede Fictícia', encontro: { formato: 'presencial', tipoConcilio: 'pgp', alcance: null, publico: null } })
   })
 })
 

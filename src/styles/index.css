@@ -3334,6 +3334,7 @@ html .agenda-page .ponto-categoria.categoria-visual { width: 7px; height: 7px; b
 .linha-compromisso__titulo:focus-visible { border-radius: 4px; outline: 2px solid var(--cat-faixa-atual); outline-offset: 2px; }
 .linha-compromisso__onde { min-width: 0; display: flex; align-items: center; gap: 4px; color: var(--ink); font-size: .78rem; overflow-wrap: anywhere; }
 .linha-compromisso__onde svg { width: 13px; height: 13px; flex: none; }
+.linha-compromisso__alcance { min-width: 0; color: var(--ink); font-size: .78rem; font-weight: 600; overflow-wrap: anywhere; }
 .linha-compromisso__acoes { display: flex; gap: 2px; }
 .linha-compromisso__acoes .icon-button { width: 36px; min-width: 36px; height: 36px; min-height: 36px; }
 @media (max-width: 640px) {

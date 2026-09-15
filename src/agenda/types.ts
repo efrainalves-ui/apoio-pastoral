@@ -24,7 +24,10 @@ export const isEncontroCategory = (category: AgendaCategory): category is Encont
   (ENCONTRO_CATEGORIES as readonly string[]).includes(category)
 
 export type FormatoDoEncontro = 'presencial' | 'online'
-export type AlcanceDoEncontro = 'distrital' | 'igreja' | 'departamento'
+export type AlcanceDoEncontro = 'institucional' | 'distrital' | 'igreja' | 'departamento'
+/** Alcance "Associação/Missão/União": qual das três. */
+export type NivelInstitucional = 'associacao' | 'missao' | 'uniao'
+export const NIVEL_INSTITUCIONAL_LABELS: Record<NivelInstitucional, string> = { associacao: 'Associação', missao: 'Missão', uniao: 'União' }
 export type PublicoDistrital = 'todos_lideres' | 'lideres_departamentos' | 'administrativo' | 'pastores_anciaos' | 'outro'
 export const PUBLICO_DISTRITAL_LABELS: Record<PublicoDistrital, string> = {
   todos_lideres: 'Todos os líderes', lideres_departamentos: 'Líderes de departamentos', administrativo: 'Administrativo',
@@ -40,7 +43,10 @@ export interface DetalhesDoEncontro {
   departamento: string
   /** Quando o departamento é "Outro". */
   departamentoOutro?: string
-  /** Só em Concílio. */
+  /** Só no alcance "Associação/Missão/União". Ausente nos antigos. */
+  nivelInstitucional?: NivelInstitucional | null
+  instituicao?: string
+  /** Só em Concílio, que não tem alcance: o tipo já diz o que é. */
   tipoConcilio?: TipoDeConcilio | null
 }
 
