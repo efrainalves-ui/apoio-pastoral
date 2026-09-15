@@ -1,7 +1,7 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, CheckCircle2, Edit3, FileUp, Plus, Save, Trash2, UsersRound, X } from 'lucide-react'
 import { type FormEvent, useCallback, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { Button } from '../components/ui/Button'
 import { DadosDoRelatorioNaEscolaSabatina } from '../components/RelatorioIntegradoAcesso'
@@ -45,8 +45,11 @@ export function CommunityGroupsPage({ embutida = false }: { embutida?: boolean }
   const [classes, setClasses] = useState<SabbathClassEntity[]>([])
   const [groups, setGroups] = useState<SmallGroupEntity[]>([])
   const [uapgs, setUapgs] = useState<UapgEntity[]>([])
-  const [classDraft, setClassDraft] = useState<ClassDraft>(emptyClass)
-  const [groupDraft, setGroupDraft] = useState<GroupDraft>(emptyGroup)
+  // Vindo das ações de cadastro do Relatório Integrado, a igreja já chega escolhida.
+  const [searchParams] = useSearchParams()
+  const igrejaPedida = searchParams.get('igreja') ?? ''
+  const [classDraft, setClassDraft] = useState<ClassDraft>(() => ({ ...emptyClass(), churchId: igrejaPedida }))
+  const [groupDraft, setGroupDraft] = useState<GroupDraft>(() => ({ ...emptyGroup(), churchId: igrejaPedida }))
   const [uapgDraft, setUapgDraft] = useState<UapgDraft>(emptyUapg)
   const [editor, setEditor] = useState<Editor | null>(null)
   const [error, setError] = useState('')

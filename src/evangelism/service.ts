@@ -6,9 +6,23 @@ import type { VaultRecord } from '../db/types'
 import type { AgendaConflict, AgendaEventData, AgendaEventEntity } from '../agenda/types'
 import { findAgendaConflicts } from '../agenda/service'
 import { localDateKey } from '../shared/dates'
-import { DEFAULT_CAMPAIGN_CHECKLIST, type AnnualGoalData, type AnnualGoalEntity, type AnnualGoalInput, type EvangelismCampaignData, type EvangelismCampaignEntity, type EvangelismCampaignInput, type HistoryEntry, type PointSchedule } from './types'
+import { DEFAULT_CAMPAIGN_CHECKLIST, type AnnualGoalData, type AnnualGoalEntity, type AnnualGoalInput, type CampaignObjective, type EvangelismCampaignData, type EvangelismCampaignEntity, type EvangelismCampaignInput, type HistoryEntry, type PointSchedule } from './types'
 import { readPayload } from '../db/corrupted'
+import { nomeDaCampanhaDoRelatorio, objetivoDoNome } from '../integrated-report/campanhas'
 import { idDerivado } from '../shared/idDerivado'
+
+/** Campanhas que o Relatório Integrado informou para uma igreja num trimestre e que faltam cadastrar. */
+export interface PedidoDeCampanhaDoRelatorio {
+  relatorioId: string
+  churchId: string
+  /** Nome da igreja, para o nome provisório da campanha. */
+  igreja: string
+  trimestre: string
+  declaradas: number
+  /** Campanhas daquele trimestre já cadastradas que não vieram do relatório. */
+  cadastradasSemOrigem: number
+  semanaSanta: boolean
+}
 
 const timestamp = () => new Date().toISOString()
 const localDateTime = (date: string, time: string) => `${date}T${time}`
@@ -24,9 +38,12 @@ function assertGoal(input: AnnualGoalInput) {
   if (input.title.length > 160 || input.description.length > 800 || input.notes.length > 2_000) throw new Error('Revise o tamanho dos textos da meta.')
 }
 function assertCampaign(input: EvangelismCampaignInput, isNew = false) {
-  if (!input.name.trim() || !input.startDate || !input.endDate || input.endDate < input.startDate) throw new Error('Informe nome e período válido para a campanha.')
+  // A campanha informada no Relatório Integrado aconteceu, mas o relatório não traz data nem responsável: ela salva sem eles até alguém completar.
+  const doRelatorio = Boolean(input.origemRelatorio)
+  if (!input.name.trim()) throw new Error(doRelatorio ? 'Informe o nome da campanha.' : 'Informe nome e período válido para a campanha.')
+  if (doRelatorio ? Boolean(input.startDate && input.endDate && input.endDate < input.startDate) : (!input.startDate || !input.endDate || input.endDate < input.startDate)) throw new Error('Informe nome e período válido para a campanha.')
   if (!input.churchIds.length) throw new Error('Escolha ao menos uma igreja envolvida.')
-  if (!input.responsibleGeneral.trim()) throw new Error('Informe o responsável geral.')
+  if (!doRelatorio && !input.responsibleGeneral.trim()) throw new Error('Informe o responsável geral.')
   // Campanhas antigas continuam salvando; as novas nascem ligadas às metas.
   if (isNew && (!input.studyGoalId || !input.baptismGoalId)) throw new Error('Ligue a campanha a uma meta de estudos bíblicos e a uma meta de batismos.')
   if (input.name.length > 160 || input.description.length > 1_000 || input.notes.length > 2_000 || input.learnings.length > 2_000) throw new Error('Revise o tamanho dos textos da campanha.')
@@ -45,29 +62,55 @@ export class EvangelismPlanningService {
   async listGoals(accountId: string, key: CryptoKey): Promise<AnnualGoalEntity[]> { const values = await Promise.all((await this.repository.list(accountId, 'annual_goal')).map((record) => this.decode<AnnualGoalEntity>(record, key, 'annual_goal'))); return values.filter((item): item is AnnualGoalEntity => Boolean(item)).sort((a, b) => a.dueDate.localeCompare(b.dueDate)) }
   async listCampaigns(accountId: string, key: CryptoKey): Promise<EvangelismCampaignEntity[]> { const values = await Promise.all((await this.repository.list(accountId, 'evangelism_campaign')).map((record) => this.decode<EvangelismCampaignEntity>(record, key, 'evangelism_campaign'))); return values.filter((item): item is EvangelismCampaignEntity => Boolean(item)).map((item) => ({ ...item, team: item.team ?? [], points: item.points ?? [], tasks: item.tasks ?? [], checklist: item.checklist?.length ? item.checklist : defaultCampaignChecklist(), budgetItems: item.budgetItems ?? [], followUps: item.followUps ?? [], history: item.history ?? [], additionalAgendaEventIds: item.additionalAgendaEventIds ?? [], planningAreas: item.planningAreas ?? [] })).sort((a, b) => a.startDate.localeCompare(b.startDate)) }
   /**
-   * Cria as campanhas que o Relatório Integrado declarou e que faltam cadastrar.
+   * Cadastra as campanhas que o Relatório Integrado informou e que faltam no Evangelismo.
    *
-   * Só depois de o pastor pedir. Nascem a completar: sem nome, data nem
-   * responsável inventados, sem Agenda e fora das realizadas. O identificador
-   * sai da igreja, do trimestre e da posição, então repetir o pedido — outro
-   * aparelho, um clique duplo — grava por cima em vez de duplicar.
+   * Só depois de o pastor confirmar. A igreja afirmou que elas aconteceram:
+   * nascem realizadas, com igreja, ano e trimestre, e sem data, local ou
+   * responsável inventados — ficam a completar, sem Agenda. O identificador sai
+   * da igreja, do trimestre e da posição, e o que falta é recalculado aqui:
+   * tocar duas vezes, reabrir a página ou importar o mesmo PDF não duplica.
    */
-  async criarCampanhasACompletar(accountId: string, key: CryptoKey, pedidos: ReadonlyArray<{ relatorioId: string; churchId: string; trimestre: string; faltam: number }>): Promise<number> {
-    const campanhas = await this.listCampaigns(accountId, key); const now = timestamp(); const mutations: EncryptedMutation[] = []
+  async registrarCampanhasDoRelatorio(accountId: string, key: CryptoKey, pedidos: ReadonlyArray<PedidoDeCampanhaDoRelatorio>): Promise<EvangelismCampaignEntity[]> {
+    const campanhas = await this.listCampaigns(accountId, key); const now = timestamp(); const mutations: EncryptedMutation[] = []; const criadas: EvangelismCampaignEntity[] = []
     for (const pedido of pedidos) {
       const jaCriadas = campanhas.filter(({ origemRelatorio }) => origemRelatorio?.churchId === pedido.churchId && origemRelatorio.trimestre === pedido.trimestre).length
-      for (let posicao = 1; posicao <= pedido.faltam; posicao += 1) {
+      const [ano, numero] = pedido.trimestre.split('-')
+      // Recalculado aqui, e não na tela: um segundo toque, antes da tela recarregar, já encontra as criadas.
+      const faltam = Math.max(0, pedido.declaradas - pedido.cadastradasSemOrigem - jaCriadas)
+      for (let posicao = 1; posicao <= faltam; posicao += 1) {
         const indice = jaCriadas + posicao
         const id = await idDerivado(`relatorio-integrado:campanha:${accountId}:${pedido.churchId}:${pedido.trimestre}:${indice}`)
-        const [ano, numero] = pedido.trimestre.split('-')
-        mutations.push(await this.campaignMutation(key, id, {
-          name: '', objective: 'other', churchIds: [pedido.churchId], startDate: '', endDate: '', location: '', address: '', responsibleGeneral: '', mainSpeaker: '', team: [], status: 'planning', description: '', notes: '',
+        if (campanhas.some((campanha) => campanha.id === id)) continue
+        const name = nomeDaCampanhaDoRelatorio(pedido.igreja, indice, pedido.declaradas, pedido.semanaSanta)
+        const data: EvangelismCampaignData = {
+          name, objective: objetivoDoNome(name), churchIds: [pedido.churchId], startDate: '', endDate: '', location: '', address: '', responsibleGeneral: '', mainSpeaker: '', team: [], status: 'completed', description: '', notes: '',
           goalId: null, studyGoalId: null, baptismGoalId: null, planningAreas: [], additionalSchedule: 'none', mainAgendaEventId: null, additionalAgendaEventIds: [],
           points: [], tasks: [], checklist: defaultCampaignChecklist(), plannedBudget: 0, budgetItems: [], followUps: [], learnings: '',
-          history: [history(`Declarada no Relatório Integrado do ${numero}º trimestre de ${ano}. A completar.`)], createdAt: now, updatedAt: now,
+          history: [history(`Informada pela igreja no Relatório Integrado do ${numero}º trimestre de ${ano}.`)], createdAt: now, updatedAt: now,
           aCompletar: true, origemRelatorio: { relatorioId: pedido.relatorioId, churchId: pedido.churchId, trimestre: pedido.trimestre, indice },
-        }))
+        }
+        mutations.push(await this.campaignMutation(key, id, data))
+        criadas.push({ id, ...data })
       }
+    }
+    if (mutations.length) await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
+    return criadas
+  }
+
+  /**
+   * As campanhas que o botão antigo criou sem nome recebem o nome agora.
+   *
+   * O mesmo registro, com o mesmo identificador: nada é criado. Como a igreja
+   * informou que elas aconteceram, passam a constar como concluídas. A que já
+   * tem nome — escrito pelo pastor ou dado antes — não é tocada.
+   */
+  async nomearCampanhasDoRelatorio(accountId: string, key: CryptoKey, nomes: ReadonlyArray<{ id: string; name: string; objective: CampaignObjective }>): Promise<number> {
+    const campanhas = await this.listCampaigns(accountId, key); const now = timestamp(); const mutations: EncryptedMutation[] = []
+    for (const { id, name, objective } of nomes) {
+      const atual = campanhas.find((campanha) => campanha.id === id)
+      if (!atual || atual.name.trim() || !atual.origemRelatorio) continue
+      const { id: _id, ...dados } = atual; void _id
+      mutations.push(await this.campaignMutation(key, id, { ...dados, name, objective, status: 'completed', aCompletar: !dados.startDate, updatedAt: now, history: [...dados.history, history('Nome dado a partir do Relatório Integrado.')] }))
     }
     if (mutations.length) await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
     return mutations.length
@@ -131,11 +174,12 @@ export class EvangelismPlanningService {
 
     const agendaRecords = await this.repository.list(accountId, 'agenda_event'); const agendaEvents = (await Promise.all(agendaRecords.map(async (record) => { const payload = await readPayload(key, record, this.database); return payload?.type === 'agenda_event' ? ({ id: record.id, ...(payload.data as object) } as AgendaEventEntity) : null }))).filter((event): event is AgendaEventEntity => Boolean(event))
     const byId = new Map(agendaEvents.map((event) => [event.id, event])); const mutations: EncryptedMutation[] = []; const desiredAgendaIds = new Set<string>()
-    const mainAgendaEventId = current?.mainAgendaEventId ?? crypto.randomUUID(); desiredAgendaIds.add(mainAgendaEventId)
-    const mainData = this.agendaData(byId.get(mainAgendaEventId) ?? null, { type: 'evangelism_campaign', id: campaignId, campaignId }, input.name.trim(), localDateTime(input.startDate, '19:00'), localDateTime(input.startDate, '21:00'), input.churchIds[0] ?? null, input.location, input.address, input.description)
-    mutations.push(await this.agendaMutation(key, mainAgendaEventId, mainData))
+    // Sem data não há compromisso: a campanha informada no relatório não vira evento futuro na Agenda.
+    const semData = !input.startDate; const endDate = input.endDate || input.startDate
+    const mainAgendaEventId = semData ? current?.mainAgendaEventId ?? null : current?.mainAgendaEventId ?? crypto.randomUUID(); if (mainAgendaEventId && !semData) desiredAgendaIds.add(mainAgendaEventId)
+    if (mainAgendaEventId && !semData) mutations.push(await this.agendaMutation(key, mainAgendaEventId, this.agendaData(byId.get(mainAgendaEventId) ?? null, { type: 'evangelism_campaign', id: campaignId, campaignId }, input.name.trim(), localDateTime(input.startDate, '19:00'), localDateTime(input.startDate, '21:00'), input.churchIds[0] ?? null, input.location, input.address, input.description)))
 
-    const additionalDates: string[] = []; if (input.additionalSchedule !== 'none') { let cursor = addDays(input.startDate, input.additionalSchedule === 'daily' ? 1 : 7); const step = input.additionalSchedule === 'daily' ? 1 : 7; while (cursor <= input.endDate) { additionalDates.push(cursor); cursor = addDays(cursor, step) } }
+    const additionalDates: string[] = []; if (!semData && input.additionalSchedule !== 'none') { let cursor = addDays(input.startDate, input.additionalSchedule === 'daily' ? 1 : 7); const step = input.additionalSchedule === 'daily' ? 1 : 7; while (cursor <= endDate) { additionalDates.push(cursor); cursor = addDays(cursor, step) } }
     const additionalAgendaEventIds: string[] = []
     for (const [index, date] of additionalDates.entries()) { const eventId = current?.additionalAgendaEventIds[index] ?? crypto.randomUUID(); additionalAgendaEventIds.push(eventId); desiredAgendaIds.add(eventId); mutations.push(await this.agendaMutation(key, eventId, this.agendaData(byId.get(eventId) ?? null, { type: 'evangelism_campaign', id: campaignId, campaignId }, `${input.name.trim()} · encontro`, localDateTime(date, '19:00'), localDateTime(date, '21:00'), input.churchIds[0] ?? null, input.location, input.address))) }
 
@@ -148,9 +192,9 @@ export class EvangelismPlanningService {
     const oldAgendaIds = new Set([...(current?.additionalAgendaEventIds ?? []), ...(current?.points ?? []).flatMap((point) => point.schedules.map(({ agendaEventId }) => agendaEventId).filter(Boolean) as string[]), ...(current?.tasks ?? []).map(({ agendaEventId }) => agendaEventId).filter(Boolean) as string[]])
     for (const oldId of oldAgendaIds) if (!desiredAgendaIds.has(oldId) && byId.has(oldId)) mutations.push({ recordId: oldId, recordType: 'agenda_event', operation: 'delete', envelope: await encryptPayload(key, { schemaVersion: 1, type: 'agenda_event_tombstone', data: { deletedAt: now } }, oldId) })
 
-    // Salvo pelo formulário, com os dados obrigatórios validados acima, deixa de estar a completar.
+    // Sem data, a campanha do relatório continua a completar; com data, deixa de estar.
     const { aCompletar: _aCompletar, ...semMarca } = input; void _aCompletar
-    const data: EvangelismCampaignData = { ...semMarca, name: input.name.trim(), description: input.description.trim(), notes: input.notes.trim(), responsibleGeneral: input.responsibleGeneral.trim(), mainSpeaker: input.mainSpeaker.trim(), goalId, churchIds: [...new Set(input.churchIds)], planningAreas: [...new Set(input.planningAreas)], mainAgendaEventId, additionalAgendaEventIds, points, tasks, checklist: input.checklist.length ? input.checklist : defaultCampaignChecklist(), budgetItems: input.budgetItems.map((item) => ({ ...item, id: item.id || crypto.randomUUID() })), followUps: input.followUps.map((item) => ({ ...item, id: item.id || crypto.randomUUID() })), history: [...(current?.history ?? []), history(current ? 'Campanha atualizada e Agenda conferida.' : 'Campanha criada e adicionada à Agenda.')], createdAt: current?.createdAt ?? now, updatedAt: now }
+    const data: EvangelismCampaignData = { ...semMarca, ...(input.origemRelatorio && semData ? { aCompletar: true } : {}), endDate, name: input.name.trim(), description: input.description.trim(), notes: input.notes.trim(), responsibleGeneral: input.responsibleGeneral.trim(), mainSpeaker: input.mainSpeaker.trim(), goalId, churchIds: [...new Set(input.churchIds)], planningAreas: [...new Set(input.planningAreas)], mainAgendaEventId, additionalAgendaEventIds, points, tasks, checklist: input.checklist.length ? input.checklist : defaultCampaignChecklist(), budgetItems: input.budgetItems.map((item) => ({ ...item, id: item.id || crypto.randomUUID() })), followUps: input.followUps.map((item) => ({ ...item, id: item.id || crypto.randomUUID() })), history: [...(current?.history ?? []), history(current ? 'Campanha atualizada e Agenda conferida.' : 'Campanha criada e adicionada à Agenda.')], createdAt: current?.createdAt ?? now, updatedAt: now }
     mutations.push(await this.campaignMutation(key, campaignId, data))
 
     // As metas ligadas guardam de quais campanhas vieram, sem repetir vínculo.
@@ -169,7 +213,7 @@ export class EvangelismPlanningService {
       mutations.push(await this.goalMutation(accountId, key, alvoId, { ...alvoData, campaignIds: alvoData.campaignIds.filter((value) => value !== campaignId), updatedAt: now, history: [...alvoData.history, history('Campanha desvinculada da meta.')] }))
     }
     if (current?.goalId && current.goalId !== goalId) { const previous = goals.find(({ id: goalItemId }) => goalItemId === current.goalId); if (previous) { const { id: previousId, ...previousData } = previous; mutations.push(await this.goalMutation(accountId, key, previousId, { ...previousData, campaignIds: previousData.campaignIds.filter((value) => value !== campaignId), updatedAt: now, history: [...previousData.history, history('Campanha desvinculada da meta.')] })) } }
-    if (goal) { const { id: savedGoalId, ...goalData } = goal; const savedGoal: AnnualGoalData = { ...goalData, campaignIds: [...new Set([...goalData.campaignIds, campaignId])], agendaEventIds: [...new Set([...goalData.agendaEventIds, mainAgendaEventId, ...additionalAgendaEventIds])], updatedAt: now, history: goalData.history.some(({ message }) => message === 'Campanha vinculada à meta.') ? goalData.history : [...goalData.history, history('Campanha vinculada à meta.')] }; mutations.push(await this.goalMutation(accountId, key, savedGoalId, savedGoal)); goal = { id: savedGoalId, ...savedGoal } }
+    if (goal) { const { id: savedGoalId, ...goalData } = goal; const savedGoal: AnnualGoalData = { ...goalData, campaignIds: [...new Set([...goalData.campaignIds, campaignId])], agendaEventIds: [...new Set([...goalData.agendaEventIds, ...(mainAgendaEventId ? [mainAgendaEventId] : []), ...additionalAgendaEventIds])], updatedAt: now, history: goalData.history.some(({ message }) => message === 'Campanha vinculada à meta.') ? goalData.history : [...goalData.history, history('Campanha vinculada à meta.')] }; mutations.push(await this.goalMutation(accountId, key, savedGoalId, savedGoal)); goal = { id: savedGoalId, ...savedGoal } }
     const unique = new Map<string, EncryptedMutation>(); for (const mutation of mutations) unique.set(mutation.recordId, mutation); await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), [...unique.values()])
     return { campaign: { id: campaignId, ...data }, goal, createdAgendaEvents: desiredAgendaIds.size }
   }
