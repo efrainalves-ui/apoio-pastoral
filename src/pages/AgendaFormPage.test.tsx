@@ -299,6 +299,25 @@ describe('reunião, treinamento, evento e concílio', () => {
     })
   })
 
+  it('Reunião e Evento podem ter prioridade estratégica escolhida; as demais categorias não perguntam', async () => {
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    for (const categoria of ['Visita', 'Pregação', 'Treinamento', 'Concílio', 'Ceia do Senhor', 'Casamento', 'Pessoal', 'Outro']) {
+      await escolherCategoria(user, categoria)
+      expect(screen.queryByLabelText('Prioridade estratégica'), categoria).not.toBeInTheDocument()
+    }
+    await escolherCategoria(user, 'Evento')
+    const prioridade = screen.getByLabelText('Prioridade estratégica')
+    expect(within(prioridade).getAllByRole('option').map((opcao) => opcao.textContent)).toEqual(['Sem prioridade definida', 'Identidade Adventista', 'Liderança', 'Novas Gerações', 'Discipulado'])
+    await user.type(screen.getByLabelText('Título'), 'Evento fictício de adolescentes')
+    await user.click(screen.getByRole('radio', { name: 'Online' }))
+    await user.click(screen.getByRole('radio', { name: 'Distrital' }))
+    await user.click(screen.getByRole('radio', { name: 'Todos os líderes' }))
+    await user.selectOptions(prioridade, 'Novas Gerações')
+    await salvar(user)
+    expect(estado.criados[0]).toMatchObject({ category: 'event', prioridadeEstrategica: 'new_generations' })
+  })
+
   it('Associação/Missão/União funciona sem o nome e no formato presencial', async () => {
     const user = userEvent.setup()
     abrir(); await aguardarCarregar()

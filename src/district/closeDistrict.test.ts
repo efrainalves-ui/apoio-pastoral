@@ -93,6 +93,9 @@ describe('encerrar distrito', () => {
     expect(isPersonalRecord({ schemaVersion: 1, type: 'agenda_event', data: { category: 'personal', churchId: 'igreja' } })).toBe(false)
     expect(isPersonalRecord({ schemaVersion: 1, type: 'agenda_event', data: { category: 'visit', churchId: null } })).toBe(false)
     expect(isPersonalRecord({ schemaVersion: 1, type: 'person', data: { name: 'Pessoa Fictícia' } })).toBe(false)
+    // Sermões e histórico de pregações seguem o pastor.
+    expect(isPersonalRecord({ schemaVersion: 1, type: 'sermon', data: { title: 'Sermão Fictício' } })).toBe(true)
+    expect(isPersonalRecord({ schemaVersion: 1, type: 'sermon_preaching', data: {} })).toBe(true)
   })
 
   /*
@@ -140,12 +143,12 @@ describe('encerrar distrito', () => {
 
     const previa = await new CloseDistrictService(banco).preview(CONTA, chave)
 
-    expect(previa.districtRecords).toBe(7)
-    expect(previa.personalRecords).toBe(1)
+    expect(previa.districtRecords).toBe(6)
+    expect(previa.personalRecords).toBe(2)
     expect(previa.devices).toBe(1)
     expect(previa.unreadableRecords).toBe(0)
     expect(previa.removedLabels).toContain('Pedidos de oração')
-    expect(previa.removedLabels).toContain('Sermões')
+    expect(previa.removedLabels).not.toContain('Sermões')
   })
 
   it('apaga os dados do distrito e preserva a agenda pessoal', async () => {
@@ -157,8 +160,8 @@ describe('encerrar distrito', () => {
     expect(resultado.completed).toBe(true)
     const repositorio = new VaultRepository(banco)
     const restantes = await repositorio.list(CONTA)
-    expect(restantes.map(({ id }) => id)).toEqual([ids.agendaPessoal])
-    for (const id of [ids.distrito, ids.igreja, ids.pessoa, ids.visita, ids.oracao, ids.sermao, ids.agendaDistrito]) {
+    expect(restantes.map(({ id }) => id).sort()).toEqual([ids.agendaPessoal, ids.sermao].sort())
+    for (const id of [ids.distrito, ids.igreja, ids.pessoa, ids.visita, ids.oracao, ids.agendaDistrito]) {
       expect((await banco.vaultRecords.get(id))?.deletedAt).toBeTruthy()
     }
   })
@@ -172,7 +175,7 @@ describe('encerrar distrito', () => {
     await new CloseDistrictService(banco).close(CONTA, chave)
 
     const fila = await banco.outbox.where('accountId').equals(CONTA).toArray()
-    expect(fila).toHaveLength(7)
+    expect(fila).toHaveLength(6)
     expect(fila.every(({ operation }) => operation === 'delete')).toBe(true)
     expect(fila.some(({ recordId }) => recordId === ids.agendaPessoal)).toBe(false)
     expect(JSON.stringify(fila)).not.toContain('Pedido fictício')
@@ -190,7 +193,7 @@ describe('encerrar distrito', () => {
     await new CloseDistrictService(banco, servico).close(CONTA, chave)
 
     const alvos = await pendingRemotePurge(CONTA, banco)
-    expect(alvos).toHaveLength(7)
+    expect(alvos).toHaveLength(6)
     expect(alvos.some(({ recordId }) => recordId === ids.agendaPessoal)).toBe(false)
     // Cada alvo aponta para a operação que este aparelho acabou de publicar.
     const fila = await banco.outbox.where('accountId').equals(CONTA).toArray()
@@ -422,7 +425,7 @@ describe('encerrar distrito', () => {
     expect(ativos[0]!.id).toBe(terceira.newDeviceId)
     // Sete registros do distrito, sete lápides — não vinte e uma.
     const fila = await banco.outbox.where('accountId').equals(CONTA).toArray()
-    expect(fila).toHaveLength(7)
+    expect(fila).toHaveLength(6)
   })
 
   it('um registro corrompido não derruba o encerramento', async () => {
@@ -435,7 +438,7 @@ describe('encerrar distrito', () => {
 
     const previa = await new CloseDistrictService(banco).preview(CONTA, chave)
     expect(previa.unreadableRecords).toBe(1)
-    expect(previa.districtRecords).toBe(7)
+    expect(previa.districtRecords).toBe(6)
 
     const resultado = await new CloseDistrictService(banco).close(CONTA, chave)
 

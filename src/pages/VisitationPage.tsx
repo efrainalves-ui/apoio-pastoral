@@ -7,6 +7,7 @@ import { resumoDaVisitacao } from '../care/atencaoDaVisita'
 import { VisitasPorIgreja, type FiltroDaVisitacao } from '../components/VisitasPorIgreja'
 import { CasamentosLista } from '../components/casamentos/CasamentosLista'
 import { VisitAnswersSummary } from '../components/VisitAnswersSummary'
+import { MarcaDaArea } from '../components/plano/MarcaDaArea'
 import type { ResumoDaVisitacao } from '../care/atencaoDaVisita'
 
 /** Cada cartão é um número e o filtro daquele número. */
@@ -141,14 +142,16 @@ export function VisitationPage() {
   const agora = today()
   const resumo = resumoDaVisitacao(visits, followUps, tasks)
   const formularioAberto = search.get('nova') === '1'
+  // Visitas, respostas e acompanhamentos são Discipulado; casamentos, orações e tarefas continuam neutros.
+  const abaDeDiscipulado = tab === 'visitas' || tab === 'respostas' || tab === 'acompanhamentos'
   const pendentes = tasks.filter(({ status }) => status === 'pending').sort((a, b) => a.dueAt.localeCompare(b.dueAt))
   const concluidas = tasks.filter(({ status }) => status !== 'pending')
   const [filtro, setFiltro] = useState<FiltroDaVisitacao>('todos')
   const [busca, setBusca] = useState('')
 
   return <div className="page-stack visitation-page">
-    <header className="page-hero agenda-hero">
-      <h1>Visitação</h1>
+    <header className={`page-hero agenda-hero${abaDeDiscipulado ? ' cabecalho-da-area area--discipulado' : ''}`}>
+      <div className="cabecalho-da-area__titulo">{abaDeDiscipulado && <MarcaDaArea area="discipleship" />}<h1>Visitação</h1></div>
       <div className="acoes-do-topo">
         <Link className="botao-itinerario" to="/app/agenda/novo" aria-label="Agendar visita"><CalendarPlus aria-hidden="true" /></Link>
         <Link className="botao-itinerario botao-itinerario--forte" to="/app/visitas/nova" aria-label="Registrar visita"><Plus aria-hidden="true" /></Link>
@@ -156,7 +159,7 @@ export function VisitationPage() {
     </header>
     {error && <div className="alert alert--error" role="alert">{error}</div>}
 
-    <nav className="tira-abas" aria-label="Áreas da visitação">
+    <nav className={`tira-abas${abaDeDiscipulado ? ' area--discipulado' : ''}`} aria-label="Áreas da visitação">
       {TABS.map(([value, label]) => <button key={value} type="button" aria-current={tab === value ? 'page' : undefined} className={`chip-aba ${tab === value ? 'chip-aba--ativa' : ''}`} onClick={() => setSearch(value === 'visitas' ? {} : { aba: value })}>{label}</button>)}
     </nav>
 

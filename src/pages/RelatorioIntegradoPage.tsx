@@ -1,3 +1,4 @@
+import { MarcaDaArea, MarcaDoIndicador } from '../components/plano/MarcaDaArea'
 import { ArrowRight, BookOpen, FileSearch, Layers, Megaphone, School, UsersRound } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
@@ -265,7 +266,7 @@ export function RelatorioIntegradoPage() {
           <div className="ri-destaques">
             <article className="ri-destaque ri-destaque--estudos">
               <span className="ri-destaque__icone" aria-hidden="true"><BookOpen size={18} /></span>
-              <small className="ri-destaque__rotulo">Estudos bíblicos</small>
+              <small className="ri-destaque__rotulo">Estudos bíblicos</small><MarcaDaArea area="discipleship" compacta />
               <strong className="ri-destaque__numero">{estudos === null ? '—' : formatarNumero(estudos)}</strong>
               <Variacao comparacao={comparacaoDosEstudos} />
               <DeParaAntes c={comparacaoDosEstudos} />
@@ -276,7 +277,7 @@ export function RelatorioIntegradoPage() {
               const comparacao = comparacaoDoPeriodo(relatorios, igrejas, id, periodo)
               return <article className={`ri-destaque ri-destaque--${tom}`} key={id}>
                 <span className="ri-destaque__icone" aria-hidden="true"><Icone size={18} /></span>
-                <small className="ri-destaque__rotulo">{rotulo}</small>
+                <small className="ri-destaque__rotulo">{rotulo}</small><MarcaDoIndicador id={id} />
                 <strong className="ri-destaque__numero">{leitura.numero === null ? '—' : formatarNumero(leitura.numero)}</strong>
                 <Variacao comparacao={comparacao} />
                 <DeParaAntes c={comparacao} />
@@ -296,7 +297,7 @@ export function RelatorioIntegradoPage() {
     <section className="ri-bloco" aria-labelledby="ri-evolucao">
       <h2 className="ri-bloco__titulo" id="ri-evolucao">Evolução e comparações</h2>
       <div className="ri-grade">
-        <Card title={nomeDoIndicador} eyebrow={`${escopo} · ${ano}`} className="ri-grade__largo" action={<span className="ri-selo">{indicador?.tratamento === 'somar' ? 'Soma' : 'Último trimestre'}</span>}>
+        <Card title={nomeDoIndicador} eyebrow={`${escopo} · ${ano}`} className="ri-grade__largo" action={<span className="ri-acao-indicador"><MarcaDoIndicador id={indicadorId} /><span className="ri-selo">{indicador?.tratamento === 'somar' ? 'Soma' : 'Último trimestre'}</span></span>}>
           <GraficoDeLinha label={`${nomeDoIndicador} por trimestre em ${ano}`} pontos={serie.map((leitura, indice) => ({ rotulo: `${indice + 1}º tri`, numero: leitura.numero, ativo: aba === indice + 1 }))} />
           <dl className="ri-rodape">
             <div><dt>{aba === null ? 'Ano' : rotuloDoPeriodo}</dt><dd>{leituraDoPeriodo.numero === null ? '—' : formatarNumero(leituraDoPeriodo.numero)}</dd></div>

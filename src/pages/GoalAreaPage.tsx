@@ -1,3 +1,4 @@
+import { MarcaDaArea } from '../components/plano/MarcaDaArea'
 import { ArrowLeft, FileUp } from 'lucide-react'
 import { useCallback, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -212,7 +213,7 @@ export function GoalAreaPage() {
   return (
     <div className="page-stack page-narrow goal-area-page">
       <Link className="text-link back-link" to="/app/metas"><ArrowLeft />Voltar às metas</Link>
-      <header className="page-hero"><div><p className="eyebrow">{year}</p><h1>{GOAL_AREA_LABELS[area]}</h1></div></header>
+      <header className={area === 'bible_studies' || area === 'baptisms' ? 'page-hero cabecalho-da-area area--discipulado' : 'page-hero'}><div>{(area === 'bible_studies' || area === 'baptisms') && <MarcaDaArea area="discipleship" />}<p className="eyebrow">{year}</p><h1>{GOAL_AREA_LABELS[area]}</h1></div></header>
       {error && <div className="alert alert--error" role="alert">{error}</div>}
       {notice && <div className="alert alert--success" role="status">{notice}</div>}
 

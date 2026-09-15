@@ -81,6 +81,8 @@ export const AREAS_DO_PLANO: readonly AreaDoPlano[] = [
 
 export const areaPorSlug = (slug: string): AreaDoPlano | undefined => AREAS_DO_PLANO.find((area) => area.slug === slug)
 export const areaDoPlanejamento = (area: PlanningArea): AreaDoPlano => AREAS_DO_PLANO.find((item) => item.area === area)!
+/** O nome das legendas e dos símbolos pequenos: "Identidade", e os demais como são. */
+export const nomeCurtoDaArea = (area: AreaDoPlano): string => area.slug === 'identidade' ? 'Identidade' : area.nome
 
 export interface LeituraDaArea { situacao: Situacao; numero: number | null; trimestre: string | null }
 

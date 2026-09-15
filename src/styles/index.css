@@ -3461,6 +3461,35 @@ html .agenda-page .ponto-categoria.categoria-visual { width: 7px; height: 7px; b
   .resumo-visitacao__numeros { gap: 8px; }
   .resumo-visitacao__numeros dd { font-size: 1.35rem; }
 }
+
+/*
+  Prioridade estratégica na Agenda: um símbolo pequeno ao lado do selo da
+  categoria. A cor, o fundo e a faixa da categoria não mudam.
+*/
+.agenda-selos { min-width: 0; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 3px 10px; }
+.prioridade-agenda { display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-size: .7rem; font-weight: 700; line-height: 1.25; }
+.prioridade-agenda .simbolo-area { width: 12px; height: 12px; }
+.legenda-prioridades { display: grid; gap: 4px; }
+.legenda-prioridades__titulo { margin: 0; color: var(--muted); font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.legenda-prioridades__lista { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.legenda-prioridades__item { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); font-size: .72rem; }
+.legenda-prioridades__item .simbolo-area { width: 11px; height: 11px; }
+@media (max-width: 720px) {
+  .prioridade-agenda__nome { display: none; }
+  .legenda-agenda:not(.legenda-agenda--aberta) .legenda-prioridades { display: none; }
+}
+
+/* Páginas ligadas a uma área: símbolo e nome no cabeçalho, com uma faixa lateral. O fundo não muda. */
+.marca-da-area { display: inline-flex; align-items: center; gap: 6px; color: var(--area-texto); font-size: .72rem; font-weight: 800; letter-spacing: .08em; line-height: 1.2; text-transform: uppercase; }
+.marca-da-area .simbolo-area { width: 14px; height: 14px; }
+.cabecalho-da-area { border-left: 5px solid var(--area); padding-left: 16px; }
+.cabecalho-da-area .marca-da-area:not(.marca-da-area--compacta) { display: flex; width: fit-content; margin-bottom: 6px; }
+.cabecalho-da-area__titulo { min-width: 0; }
+.marca-da-area--compacta { gap: 4px; font-size: .7rem; font-weight: 700; letter-spacing: .02em; text-transform: none; }
+.marca-da-area--compacta .simbolo-area { width: 11px; height: 11px; }
+.tira-abas.area--discipulado .chip-aba--ativa { box-shadow: inset 0 -3px 0 var(--area); }
+.ri-acao-indicador { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 10px; }
+.sermon-preaching-list__distrito { color: var(--muted); font-weight: 500; }
 .linha-compromisso__acoes { display: flex; gap: 2px; }
 .linha-compromisso__acoes .icon-button { width: 36px; min-width: 36px; height: 36px; min-height: 36px; }
 @media (max-width: 640px) {

@@ -1,3 +1,4 @@
+import { MarcaDaArea } from '../components/plano/MarcaDaArea'
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowRight, ClipboardCheck, ClipboardList, Plus, Settings, Vote } from 'lucide-react'
 import { useCallback, useState } from 'react'
@@ -61,8 +62,9 @@ export function CommissionsPage() {
   const pending = meetings.filter((meeting) => !meeting.finalizedAt).length
 
   return <div className="page-stack commissions-page">
-    <header className="page-hero">
+    <header className="page-hero cabecalho-da-area area--lideranca">
       <div>
+        <MarcaDaArea area="leadership" />
         <p className="eyebrow">Organização</p>
         <h1>Comissões</h1>
       </div>

@@ -1,3 +1,4 @@
+import { MarcaDaArea } from '../components/plano/MarcaDaArea'
 import { FileText, Flag, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/ui/Card'
@@ -81,7 +82,7 @@ export function GoalsPage() {
           const crescimento = emPorcentagem ? crescimentoDaMeta(area, goals, sources, year) : null
           const ponto = (valor: number) => `${valor >= 0 ? '+' : '−'}${Math.abs(valor).toFixed(1).replace('.', ',')}%`
           return (
-            <Card key={area} title={GOAL_AREA_LABELS[area]}>
+            <Card key={area} title={GOAL_AREA_LABELS[area]} action={area === 'baptisms' || area === 'bible_studies' ? <MarcaDaArea area="discipleship" compacta /> : undefined}>
               <div className="goal-card">
                 {crescimento
                   ? <>
@@ -113,7 +114,7 @@ export function GoalsPage() {
 
       <Card title="Missão e discipulado">
         <div className="entity-list">
-          <Link className="entity-row entity-row--link" to="/app/metas/missao/duplas"><UsersRound aria-hidden="true" /><span><strong>Duplas missionárias</strong></span><span>Abrir</span></Link>
+          <Link className="entity-row entity-row--link" to="/app/metas/missao/duplas"><UsersRound aria-hidden="true" /><span><strong>Duplas missionárias</strong><MarcaDaArea area="discipleship" compacta /></span><span>Abrir</span></Link>
         </div>
       </Card>
 

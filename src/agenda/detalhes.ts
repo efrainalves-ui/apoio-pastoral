@@ -5,6 +5,7 @@ import {
   type DetalhesDaComissao, type DetalhesDaDedicacao, type DetalhesDoCasamento,
   type DetalhesDoEncontro, type DetalhesDoPessoal,
 } from './types'
+import { usaPrioridadeEscolhida } from './prioridade'
 
 /** Os detalhes que só existem em um tipo de compromisso. */
 const DETALHES_POR_CATEGORIA = ['encontro', 'comissao', 'ceia', 'casamento', 'dedicacao', 'pessoal'] as const
@@ -68,6 +69,7 @@ export function detalhesAoTrocarCategoria(input: AgendaEventInput, category: Age
   if (category !== 'wedding' && limpo.papelNoCasamento === 'cerimonia') { limpo.casamentoId = null; limpo.papelNoCasamento = null }
   if (!usaObservacoes(category)) limpo.notes = ''
   if (category !== 'preaching') { limpo.escolhaDeIgreja = null; limpo.churchIds = [] }
+  if (!usaPrioridadeEscolhida(category) && limpo.prioridadeEstrategica !== undefined) limpo.prioridadeEstrategica = null
   return limpo
 }
 

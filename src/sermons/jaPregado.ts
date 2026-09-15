@@ -16,6 +16,10 @@ export interface PregacaoAnteriorData {
   lugar: string
   /** AAAA-MM-DD, ou vazio quando a data não é lembrada. */
   data: string
+  /** Nome do distrito em que a igreja estava, guardado quando o distrito é encerrado. */
+  distrito?: string
+  /** Compromisso da Agenda de onde o registro veio, para não aparecer em dobro nem ser copiado de novo. */
+  origemEventoId?: string
   createdAt: string
   updatedAt: string
 }

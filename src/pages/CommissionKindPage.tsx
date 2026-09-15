@@ -1,3 +1,4 @@
+import { MarcaDaArea } from '../components/plano/MarcaDaArea'
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, ClipboardList, Plus, Settings, Vote } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -114,8 +115,8 @@ export function CommissionKindPage({ kind }: { kind: CommissionKind }) {
 
   return <div className="page-stack commission-kind-page">
     <Link className="text-link back-link" to="/app/comissoes"><ArrowLeft />Voltar a Comissões</Link>
-    <header className="page-hero">
-      <div><p className="eyebrow">Comissões</p><h1>{label.title}</h1></div>
+    <header className="page-hero cabecalho-da-area area--lideranca">
+      <div><MarcaDaArea area="leadership" /><p className="eyebrow">Comissões</p><h1>{label.title}</h1></div>
       <span className="commission-kind-page__icon">{label.icon}</span>
     </header>
 

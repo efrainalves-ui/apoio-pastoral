@@ -34,11 +34,14 @@ describe('início seguro de novo distrito', () => {
     await seed(database, 'technical-account', key, 'sermon-fixture', 'sermon', { title: 'Sermão Fictício' }, 'sermon')
 
     const service = new NewDistrictService(database); const preview = await service.preview('technical-account', key, 'technical')
-    expect(preview.preserved[0]).toContain('sem nomes'); expect(preview.removed).toEqual(expect.arrayContaining(['Pessoas', 'Metas', 'Histórico de sermões']))
+    expect(preview.preserved[0]).toContain('sem nomes'); expect(preview.removed).toEqual(expect.arrayContaining(['Pessoas', 'Metas']))
+    // A biblioteca de sermões é do pastor: não entra no que se apaga.
+    expect(preview.removed).not.toContain('Histórico de sermões'); expect(preview.preserved.join(' ')).toContain('Biblioteca de sermões')
     const result = await service.start('technical-account', key, 'technical')
     expect(result.technicalHistoryId).not.toBeNull()
     const records = await database.vaultRecords.where('accountId').equals('technical-account').toArray()
-    expect(records).toHaveLength(1); expect(JSON.stringify(records)).not.toContain('Pessoa Fictícia'); expect(JSON.stringify(records)).not.toContain('Meta Fictícia'); expect(JSON.stringify(records)).not.toContain('Sermão Fictício')
-    const payload = await decryptPayload(key, records[0]!); expect(payload.type).toBe('technical_history'); expect(payload.data).toMatchObject({ recordCounts: { goal: 1, sermon: 1 } })
+    expect(records.map(({ id }) => id).sort()).toEqual([result.technicalHistoryId, 'sermon-fixture'].sort()); expect(JSON.stringify(records)).not.toContain('Pessoa Fictícia'); expect(JSON.stringify(records)).not.toContain('Meta Fictícia')
+    const tecnico = records.find(({ id }) => id === result.technicalHistoryId)!
+    const payload = await decryptPayload(key, tecnico); expect(payload.type).toBe('technical_history'); expect(payload.data).toMatchObject({ recordCounts: { goal: 1, sermon: 1 } })
   })
 })

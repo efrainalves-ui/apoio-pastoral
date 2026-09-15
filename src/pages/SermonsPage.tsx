@@ -1,3 +1,4 @@
+import { MarcaDaArea } from '../components/plano/MarcaDaArea'
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { BookOpen, FileText, Plus } from 'lucide-react'
 import { useCallback, useState } from 'react'
@@ -52,8 +53,9 @@ export function SermonsPage() {
   }, [account, masterKey])
   useReloadOnSync(load)
   return <div className="page-stack sermons-page">
-    <header className="page-hero">
+    <header className="page-hero cabecalho-da-area area--identidade">
       <div>
+        <MarcaDaArea area="identity" />
         <p className="eyebrow">Biblioteca</p>
         <h1>Sermões</h1>
         <p className="acervo">{sermons.length} {sermons.length === 1 ? 'no acervo' : 'no acervo'}</p>

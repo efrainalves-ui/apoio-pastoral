@@ -136,18 +136,18 @@ describe('identidade das categorias nas quatro visualizações', () => {
     const user = userEvent.setup()
     abrir()
 
-    const semana = await screen.findByRole('link', { name: 'Abrir Pregação da identidade, Pregação' })
+    const semana = await screen.findByRole('link', { name: 'Abrir Pregação da identidade, Pregação, prioridade estratégica Identidade' })
     conferir(semana, 'Semana'); expect(within(semana).getByText('Pregação')).toBeInTheDocument()
 
     await user.click(screen.getByRole('tab', { name: 'Dia' }))
-    conferir(screen.getByRole('link', { name: 'Abrir Pregação da identidade, Pregação' }), 'Dia')
+    conferir(screen.getByRole('link', { name: 'Abrir Pregação da identidade, Pregação, prioridade estratégica Identidade' }), 'Dia')
 
     await user.click(screen.getByRole('tab', { name: 'Mês' }))
     conferir(document.querySelector('.calendario .ponto-categoria'), 'Mês: ponto')
-    conferir(screen.getByRole('link', { name: 'Abrir Pregação da identidade, Pregação' }), 'Mês: lista abaixo')
+    conferir(screen.getByRole('link', { name: 'Abrir Pregação da identidade, Pregação, prioridade estratégica Identidade' }), 'Mês: lista abaixo')
 
     await user.click(screen.getByRole('tab', { name: 'Lista' }))
-    conferir(screen.getByRole('link', { name: 'Abrir Pregação da identidade, Pregação' }), 'Lista')
+    conferir(screen.getByRole('link', { name: 'Abrir Pregação da identidade, Pregação, prioridade estratégica Identidade' }), 'Lista')
   })
 
   it('principal tem destaque forte, moderada tem destaque moderado', async () => {
@@ -220,7 +220,7 @@ describe('lista do mês', () => {
     expect(within(regiao).getAllByRole('link', { name: /^Abrir / }).map((link) => link.textContent)).toEqual(['Comissão do começo do mês', 'Visita da tarde', 'Pregação da noite'])
     expect(within(regiao).queryByText('Do mês passado')).not.toBeInTheDocument()
     expect(within(regiao).queryByText('Do mês seguinte')).not.toBeInTheDocument()
-    const visitaDaTarde = within(regiao).getByRole('link', { name: 'Abrir Visita da tarde, Visita' }).closest('li')!
+    const visitaDaTarde = within(regiao).getByRole('link', { name: 'Abrir Visita da tarde, Visita, prioridade estratégica Discipulado' }).closest('li')!
     expect(within(visitaDaTarde).getByText('16:00–17:00')).toBeInTheDocument()
   })
 
@@ -260,7 +260,7 @@ describe('lista do mês', () => {
     const user = userEvent.setup()
     abrir()
     await user.click(await screen.findByRole('tab', { name: 'Lista' }))
-    expect(screen.getByRole('link', { name: 'Abrir Visita de teste fictícia, Visita' })).toHaveAttribute('href', '/app/agenda/agenda-evento-ficticio/editar')
+    expect(screen.getByRole('link', { name: 'Abrir Visita de teste fictícia, Visita, prioridade estratégica Discipulado' })).toHaveAttribute('href', '/app/agenda/agenda-evento-ficticio/editar')
     expect(screen.getByRole('link', { name: 'Editar Visita de teste fictícia' })).toHaveAttribute('href', '/app/agenda/agenda-evento-ficticio/editar')
     await user.click(screen.getByRole('button', { name: 'Remover Visita de teste fictícia' }))
     expect(data.apagar).toHaveBeenCalledWith('agenda-conta-ficticia', expect.anything(), 'agenda-evento-ficticio')

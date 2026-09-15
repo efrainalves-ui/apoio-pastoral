@@ -10,7 +10,8 @@ import { identidadeDoCompromisso } from '../agenda/identidade'
 import { listaDoMes, resumoDoMes, tituloDoMes } from '../agenda/listaDoMes'
 import type { AgendaEventEntity } from '../agenda/types'
 import { useAuthVault } from '../auth/AuthVaultContext'
-import { LegendaDaAgenda, SeloDaCategoria, atributosDaCategoria } from '../components/agenda/IdentidadeDaCategoria'
+import { LegendaDaAgenda, atributosDaCategoria } from '../components/agenda/IdentidadeDaCategoria'
+import { SelosDoCompromisso, rotuloDaPrioridade } from '../components/agenda/MarcaDePrioridade'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { DistrictService } from '../district/service'
@@ -37,7 +38,7 @@ function faixaDeDias(inicio: Date, fim: Date): string {
 /* Dia: cada compromisso na grade das horas, com a identidade da categoria. */
 function EventChip({ event, compact = false }: { event: AgendaEventEntity; compact?: boolean }) {
   const identidade = identidadeDoCompromisso(event.category)
-  return <Link className={`agenda-category categoria-visual ${compact ? 'agenda-category--compact' : ''}`} {...atributosDaCategoria(identidade)} to={`/app/agenda/${event.id}/editar`} aria-label={`Abrir ${event.title}, ${identidade.rotulo}`}><span>{eventTime(event)}</span><SeloDaCategoria categoria={event.category} /><strong>{event.title}</strong>{event.category === 'preaching' && event.sermonSnapshot && <small><BookOpen />{event.sermonSnapshot.title}</small>}</Link>
+  return <Link className={`agenda-category categoria-visual ${compact ? 'agenda-category--compact' : ''}`} {...atributosDaCategoria(identidade)} to={`/app/agenda/${event.id}/editar`} aria-label={`Abrir ${event.title}, ${identidade.rotulo}${rotuloDaPrioridade(event)}`}><span>{eventTime(event)}</span><SelosDoCompromisso event={event} /><strong>{event.title}</strong>{event.category === 'preaching' && event.sermonSnapshot && <small><BookOpen />{event.sermonSnapshot.title}</small>}</Link>
 }
 
 export function AgendaPage() {
@@ -72,7 +73,7 @@ export function AgendaPage() {
     const onde = ondeAcontece(event)
     const alcance = resumoDoAlcance(event, churches)
     const identidade = identidadeDoCompromisso(event.category)
-    return <Link className={`compromisso categoria-visual ${new Date(event.endAt) < hoje ? 'compromisso--passado' : ''}`} {...atributosDaCategoria(identidade)} key={event.id} to={`/app/agenda/${event.id}/editar`} aria-label={`Abrir ${event.title}, ${identidade.rotulo}`}><span className="compromisso__hora">{eventTime(event)}</span><span className="compromisso__faixa" aria-hidden="true" /><span className="compromisso__corpo"><SeloDaCategoria categoria={event.category} /><strong>{event.title}</strong>{alcance && <small className="compromisso__alcance">{alcance}</small>}{onde && <small>{onde}</small>}</span></Link>
+    return <Link className={`compromisso categoria-visual ${new Date(event.endAt) < hoje ? 'compromisso--passado' : ''}`} {...atributosDaCategoria(identidade)} key={event.id} to={`/app/agenda/${event.id}/editar`} aria-label={`Abrir ${event.title}, ${identidade.rotulo}${rotuloDaPrioridade(event)}`}><span className="compromisso__hora">{eventTime(event)}</span><span className="compromisso__faixa" aria-hidden="true" /><span className="compromisso__corpo"><SelosDoCompromisso event={event} /><strong>{event.title}</strong>{alcance && <small className="compromisso__alcance">{alcance}</small>}{onde && <small>{onde}</small>}</span></Link>
   }
 
   function renderDias(dias: Date[], comVazios: boolean) {
@@ -99,8 +100,8 @@ export function AgendaPage() {
             return <li key={event.id} className="linha-compromisso categoria-visual" {...atributosDaCategoria(identidade)}>
               <span className="linha-compromisso__hora">{faixaDeHorario(event)}</span>
               <span className="linha-compromisso__corpo">
-                <SeloDaCategoria categoria={event.category} />
-                <Link className="linha-compromisso__titulo" to={`/app/agenda/${event.id}/editar`} aria-label={`Abrir ${event.title}, ${identidade.rotulo}`}>{event.title}</Link>
+                <SelosDoCompromisso event={event} />
+                <Link className="linha-compromisso__titulo" to={`/app/agenda/${event.id}/editar`} aria-label={`Abrir ${event.title}, ${identidade.rotulo}${rotuloDaPrioridade(event)}`}>{event.title}</Link>
                 {alcance && <small className="linha-compromisso__alcance">{alcance}</small>}
                 {onde && <small className="linha-compromisso__onde"><MapPin aria-hidden="true" />{onde}</small>}
                 {event.sermonSnapshot && <small className="linha-compromisso__onde"><BookOpen aria-hidden="true" />{event.sermonSnapshot.title}</small>}
