@@ -136,7 +136,8 @@ test('os estudos bíblicos alimentam a meta, e reenviar não duplica o progresso
   const tituloDaEscola = page.getByRole('heading', { name: 'Dados do Relatório Integrado' })
   await navigateInsideApp(page, '/app/metas/uapg', tituloDaEscola)
   const escola = page.locator('section.card').filter({ has: tituloDaEscola })
-  await expect(escola.getByRole('row', { name: 'Pequenos Grupos 0 5' })).toBeVisible()
+  // A linha leva a marca da própria prioridade: Pequenos Grupos é Discipulado.
+  await expect(escola.getByRole('row', { name: 'Pequenos Grupos Discipulado 0 5' })).toBeVisible()
 })
 
 test('os cartões de Metas ficam limpos, e o arquivo que não é PDF pede conversão', async ({ page }) => {
