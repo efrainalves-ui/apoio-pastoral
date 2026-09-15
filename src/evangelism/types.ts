@@ -39,6 +39,8 @@ export interface AnnualGoalData {
   budget?: GoalBudgetItem[]
   budgetNotes?: string
   progress?: GoalProgressEntry[]
+  /** O pastor revisou e decidiu que esta meta não é cópia da campanha de mesmo nome. */
+  mantidaSeparada?: boolean
 }
 export interface AnnualGoalEntity extends AnnualGoalData { id: string }
 export type AnnualGoalInput = Omit<AnnualGoalData, 'campaignIds' | 'agendaEventIds' | 'history' | 'createdAt' | 'updatedAt'>
@@ -86,6 +88,8 @@ export interface EvangelismCampaignData {
   aCompletar?: boolean
   /** De qual igreja, trimestre e relatório a campanha veio. */
   origemRelatorio?: { relatorioId: string; churchId: string; trimestre: string; indice: number }
+  /** Campanhas de mesmo nome e datas que o pastor revisou e decidiu manter separadas desta. */
+  mantidaSeparadaDe?: string[]
 }
 export interface EvangelismCampaignEntity extends EvangelismCampaignData { id: string }
 export type EvangelismCampaignInput = Omit<EvangelismCampaignData, 'mainAgendaEventId' | 'additionalAgendaEventIds' | 'history' | 'createdAt' | 'updatedAt'>

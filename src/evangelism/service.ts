@@ -10,11 +10,27 @@ import { DEFAULT_CAMPAIGN_CHECKLIST, type AnnualGoalData, type AnnualGoalEntity,
 import { readPayload } from '../db/corrupted'
 import { nomeDaCampanhaDoRelatorio, objetivoDoNome } from '../integrated-report/campanhas'
 import { idDerivado } from '../shared/idDerivado'
-import { metasDaCampanha, metaTemDadosProprios, planejarConsolidacao, planoVazio, unirCampanhas, type ResultadoDaConsolidacao } from './consolidacao'
+import type { CipherEnvelope } from '../crypto/types'
+import { filtrarPlano, gruposDeCorrecao, metasDaCampanha, metaTemDadosProprios, planejarConsolidacao, planoVazio, unirCampanhas, type GrupoDeCorrecao, type PlanoDeConsolidacao, type ResultadoDaConsolidacao } from './consolidacao'
 
 /** Quantos estudos bíblicos e batismos a campanha espera; as metas nascem e mudam junto com ela. */
 export interface MetasDaCampanha { bible_studies?: number; baptisms?: number }
 type TipoApagavel = 'agenda_event' | 'annual_goal' | 'evangelism_campaign'
+
+/** Cópia cifrada, neste aparelho, dos registros como estavam antes de uma correção revisada. */
+interface CopiaDaLimpeza { id: string; criadaEm: string; resumo: ResultadoDaConsolidacao; registros: Array<{ recordId: string; recordType: VaultRecord['recordType']; envelope: CipherEnvelope; versaoDepois: number }> }
+const chaveDasCopias = (accountId: string) => `apoio-pastoral:limpezas-revisadas:${accountId}`
+function lerCopias(accountId: string): CopiaDaLimpeza[] {
+  try { const lido = localStorage.getItem(chaveDasCopias(accountId)); const valor: unknown = lido ? JSON.parse(lido) : []; return Array.isArray(valor) ? valor as CopiaDaLimpeza[] : [] } catch { return [] }
+}
+function guardarCopias(accountId: string, copias: readonly CopiaDaLimpeza[]) {
+  try {
+    if (copias.length) localStorage.setItem(chaveDasCopias(accountId), JSON.stringify(copias.slice(-10)))
+    else localStorage.removeItem(chaveDasCopias(accountId))
+  } catch { throw new Error('Não foi possível guardar a cópia de segurança neste aparelho. Nada foi alterado.') }
+}
+/** Só o conteúdo cifrado: a cópia nunca guarda texto legível. */
+const envelopeDe = ({ algorithm, ciphertext, iv, aad, keyVersion }: CipherEnvelope): CipherEnvelope => ({ algorithm, ciphertext, iv, aad, keyVersion })
 
 /** Campanhas que o Relatório Integrado informou para uma igreja num trimestre e que faltam cadastrar. */
 export interface PedidoDeCampanhaDoRelatorio {
@@ -192,8 +208,8 @@ export class EvangelismPlanningService {
       const ligadaId = vinculos[campo]
       const existente = ligadaId ? goals.find((item) => item.id === ligadaId) ?? null : null
       if (!(alvo > 0) && existente?.linkedArea !== area) continue
-      // Sem data não há período para a meta, e nenhum dia é inventado.
-      if (semData) { if (alvo > 0 && !existente) throw new Error('Informe as datas da campanha para ligar as metas.'); continue }
+      // Sem data não há período para a meta e nenhum dia é inventado: a campanha salva normalmente, e a meta espera as datas.
+      if (semData) continue
       const metaId = existente?.id ?? await idDerivado(`campanha:${campaignId}:meta:${area}`)
       const base: AnnualGoalData = existente
         ? (({ id: _metaId, ...resto }) => { void _metaId; return resto })(existente)
@@ -290,16 +306,90 @@ export class EvangelismPlanningService {
     await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
   }
 
+  /** Só lê: encontra o que parece repetido e descreve cada correção. Nada é gravado. */
+  async analisarCorrecoes(accountId: string, key: CryptoKey): Promise<GrupoDeCorrecao[]> {
+    const [campanhas, metas, eventos] = await this.dadosDaRevisao(accountId, key)
+    return gruposDeCorrecao(planejarConsolidacao(campanhas, metas, eventos), campanhas, metas, eventos)
+  }
+
+  private async dadosDaRevisao(accountId: string, key: CryptoKey): Promise<[EvangelismCampaignEntity[], AnnualGoalEntity[], AgendaEventEntity[]]> {
+    return Promise.all([this.listCampaigns(accountId, key), this.listGoals(accountId, key), this.listarEventos(accountId, key)])
+  }
+
   /**
-   * Junta o que estava repetido entre Evangelismo e Planejamento Anual.
+   * Aplica só os grupos confirmados.
    *
-   * Segura e repetível: o plano (ver consolidacao.ts) só aponta cópias técnicas;
-   * a campanha principal fica, recebe o que só a cópia tinha, e os vínculos são
-   * refeitos antes de qualquer cópia sair. Executada de novo, não encontra nada.
+   * O plano é refeito com os dados de agora e filtrado pelas chaves escolhidas.
+   * Antes de gravar, a versão cifrada de cada registro que vai mudar é guardada
+   * neste aparelho; se não for possível guardá-la, nada é alterado.
    */
-  async consolidarCampanhasEMetas(accountId: string, key: CryptoKey): Promise<ResultadoDaConsolidacao> {
-    const [campanhas, metas, eventos] = await Promise.all([this.listCampaigns(accountId, key), this.listGoals(accountId, key), this.listarEventos(accountId, key)])
-    const plano = planejarConsolidacao(campanhas, metas, eventos)
+  async aplicarCorrecoes(accountId: string, key: CryptoKey, chaves: readonly string[]): Promise<ResultadoDaConsolidacao> {
+    const [campanhas, metas, eventos] = await this.dadosDaRevisao(accountId, key)
+    const plano = filtrarPlano(planejarConsolidacao(campanhas, metas, eventos), new Set(chaves))
+    const { mutations, resultado } = await this.mutacoesDaCorrecao(accountId, key, plano, campanhas, metas, eventos)
+    if (!mutations.length) return resultado
+    const antes = await this.database.vaultRecords.bulkGet(mutations.map(({ recordId }) => recordId))
+    const copia: CopiaDaLimpeza = {
+      // Só números: nomes de campanhas não saem do cofre cifrado.
+      id: crypto.randomUUID(), criadaEm: timestamp(), resumo: { ...resultado, campanhas: [] },
+      registros: antes.flatMap((registro) => registro ? [{ recordId: registro.id, recordType: registro.recordType, envelope: envelopeDe(registro), versaoDepois: 0 }] : []),
+    }
+    const anteriores = lerCopias(accountId)
+    guardarCopias(accountId, [...anteriores, copia])
+    await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
+    const depois = await this.database.vaultRecords.bulkGet(copia.registros.map(({ recordId }) => recordId))
+    const confirmada = { ...copia, registros: copia.registros.map((registro, indice) => ({ ...registro, versaoDepois: depois[indice]?.version ?? 0 })) }
+    try { guardarCopias(accountId, [...anteriores, confirmada]) } catch { /* a cópia sem as versões finais continua guardada; desfazer passa a pular os registros */ }
+    return resultado
+  }
+
+  /** "Manter separados": fica registrado nos próprios registros, e o grupo não volta a ser apontado em nenhum aparelho. */
+  async manterSeparados(accountId: string, key: CryptoKey, chave: string): Promise<void> {
+    const [campanhas, metas, eventos] = await this.dadosDaRevisao(accountId, key)
+    const plano = filtrarPlano(planejarConsolidacao(campanhas, metas, eventos), new Set([chave]))
+    const now = timestamp(); const mutations: EncryptedMutation[] = []
+    for (const { principalId, copiaIds } of plano.campanhasDuplicadas) {
+      const principal = campanhas.find(({ id }) => id === principalId); if (!principal) continue
+      const { id: _id, ...dados } = principal; void _id
+      mutations.push(await this.campaignMutation(key, principalId, { ...dados, mantidaSeparadaDe: [...new Set([...(dados.mantidaSeparadaDe ?? []), ...copiaIds])], updatedAt: now, history: [...dados.history, history(`Revisão: mantida separada de ${copiaIds.length} campanha(s) de mesmo nome.`)] }))
+    }
+    for (const metaId of new Set([...plano.metasOrfas.map((orfa) => orfa.metaId), ...plano.ajustes.map((ajuste) => ajuste.metaId)])) {
+      const meta = metas.find(({ id }) => id === metaId); if (!meta) continue
+      const { id: _id, ...dados } = meta; void _id
+      mutations.push(await this.goalMutation(accountId, key, metaId, { ...dados, mantidaSeparada: true, updatedAt: now, history: [...dados.history, history('Revisão: mantida separada da campanha de mesmo nome.')] }))
+    }
+    if (mutations.length) await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
+  }
+
+  /** A limpeza mais recente que ainda pode ser desfeita neste aparelho. */
+  ultimaLimpeza(accountId: string): { criadaEm: string; registros: number; resumo: ResultadoDaConsolidacao } | null {
+    const copia = lerCopias(accountId).at(-1)
+    return copia ? { criadaEm: copia.criadaEm, registros: copia.registros.length, resumo: copia.resumo } : null
+  }
+
+  /**
+   * Volta cada registro à versão guardada antes da limpeza.
+   *
+   * Registro alterado depois da limpeza (em qualquer aparelho) não é
+   * sobrescrito: a mudança mais nova é do pastor, e fica.
+   */
+  async desfazerUltimaLimpeza(accountId: string, key: CryptoKey): Promise<{ restaurados: number; ignorados: number }> {
+    void key
+    const copias = lerCopias(accountId); const copia = copias.at(-1)
+    if (!copia) return { restaurados: 0, ignorados: 0 }
+    const atuais = await this.database.vaultRecords.bulkGet(copia.registros.map(({ recordId }) => recordId))
+    const mutations: EncryptedMutation[] = []; let ignorados = 0
+    copia.registros.forEach((registro, indice) => {
+      const atual = atuais[indice]
+      if (!atual || !registro.versaoDepois || atual.version !== registro.versaoDepois) { ignorados += 1; return }
+      mutations.push({ recordId: registro.recordId, recordType: registro.recordType, envelope: registro.envelope })
+    })
+    if (mutations.length) await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutations)
+    guardarCopias(accountId, copias.slice(0, -1))
+    return { restaurados: mutations.length, ignorados }
+  }
+
+  private async mutacoesDaCorrecao(accountId: string, key: CryptoKey, plano: PlanoDeConsolidacao, campanhas: EvangelismCampaignEntity[], metas: AnnualGoalEntity[], eventos: AgendaEventEntity[]): Promise<{ mutations: EncryptedMutation[]; resultado: ResultadoDaConsolidacao }> {
     const contar = (acao: 'ligar' | 'remover' | 'manter') => plano.metasOrfas.filter((orfa) => orfa.acao === acao).length
     const resultado: ResultadoDaConsolidacao = {
       campanhasExaminadas: plano.campanhasExaminadas, metasExaminadas: plano.metasExaminadas,
@@ -307,7 +397,7 @@ export class EvangelismPlanningService {
       metasRepetidas: plano.metasOrfas.length, metasRemovidas: contar('remover'), metasLigadas: contar('ligar'), metasPreservadas: contar('manter'),
       datasCorrigidas: plano.ajustes.length, campanhas: [],
     }
-    if (planoVazio(plano)) return resultado
+    if (planoVazio(plano)) return { mutations: [], resultado }
 
     const now = timestamp()
     const campanhasPorId = new Map(campanhas.map((campanha) => [campanha.id, campanha])); const metasPorId = new Map(metas.map((meta) => [meta.id, meta]))
@@ -325,7 +415,6 @@ export class EvangelismPlanningService {
       campanhasPorId.set(principalId, principal); campanhasMudadas.add(principalId); anotar(principalId, `${copiaIds.length} cópia(s) técnica(s) unida(s) a esta campanha.`)
     }
     for (const id of plano.compromissosDaCopia) apagar.push({ tipo: 'agenda_event', id })
-    // Encontros de pontos e tarefas que vieram da cópia passam a apontar para a principal.
     const eventosMudados = eventos.flatMap((evento) => {
       const origem = evento.linkedSource; const grupo = origem ? plano.campanhasDuplicadas.find(({ copiaIds }) => copiaIds.includes(origem.campaignId)) : undefined
       return origem && grupo && !plano.compromissosDaCopia.includes(evento.id) ? [{ ...evento, linkedSource: { ...origem, campaignId: grupo.principalId } }] : []
@@ -335,8 +424,7 @@ export class EvangelismPlanningService {
       const meta = metasPorId.get(orfa.metaId); const campanha = campanhasPorId.get(orfa.campanhaId); if (!meta || !campanha) continue
       const campo = orfa.area === 'bible_studies' ? 'studyGoalId' : 'baptismGoalId'
       if (orfa.acao === 'remover') {
-        // A quantidade esperada é o único dado que a cópia pode ter; passa para a meta ligada, se lá faltar.
-        const ligada = campanha[campo] ? metasPorId.get(campanha[campo]) : undefined
+        const ligadaId = campanha[campo]; const ligada = ligadaId ? metasPorId.get(ligadaId) : undefined
         if (ligada && !((ligada.target ?? 0) > 0) && (meta.target ?? 0) > 0) { metasPorId.set(ligada.id, { ...ligada, target: meta.target ?? 0 }); metasMudadas.add(ligada.id) }
         apagar.push({ tipo: 'annual_goal', id: meta.id }); metasPorId.delete(meta.id); metasMudadas.delete(meta.id)
         anotar(campanha.id, `meta repetida de ${rotulo(orfa.area)} removida.`)
@@ -358,19 +446,18 @@ export class EvangelismPlanningService {
     for (const id of new Set([...campanhasMudadas, ...notas.keys()])) {
       const campanha = campanhasPorId.get(id); if (!campanha) continue
       const { id: _id, ...dados } = campanha; void _id
-      mutations.push(await this.campaignMutation(key, id, { ...dados, updatedAt: now, history: [...dados.history, ...(notas.get(id) ?? []).map((texto) => history(`Consolidação: ${texto}`))] }))
+      mutations.push(await this.campaignMutation(key, id, { ...dados, updatedAt: now, history: [...dados.history, ...(notas.get(id) ?? []).map((texto) => history(`Correção revisada: ${texto}`))] }))
     }
     for (const id of metasMudadas) {
       const meta = metasPorId.get(id); if (!meta) continue
       const { id: _id, ...dados } = meta; void _id
-      mutations.push(await this.goalMutation(accountId, key, id, { ...dados, updatedAt: now, history: [...dados.history, history('Consolidada com a campanha do Evangelismo.')] }))
+      mutations.push(await this.goalMutation(accountId, key, id, { ...dados, updatedAt: now, history: [...dados.history, history('Correção revisada com a campanha do Evangelismo.')] }))
     }
     for (const evento of eventosMudados) { const { id, ...dados } = evento; mutations.push(await this.agendaMutation(key, id, { ...dados, updatedAt: now })) }
     for (const { tipo, id } of apagar) mutations.push(await this.tombstone(key, tipo, id, now))
     const unicas = new Map<string, EncryptedMutation>(); for (const mutation of mutations) unicas.set(mutation.recordId, mutation)
-    await this.repository.applyEncryptedMutations(accountId, currentDeviceId(accountId), [...unicas.values()])
     resultado.campanhas = [...notas.keys()].map((id) => campanhasPorId.get(id)?.name ?? '').filter(Boolean)
-    return resultado
+    return { mutations: [...unicas.values()], resultado }
   }
   async copyGoals(accountId: string, key: CryptoKey, goalIds: string[], targetYear: number): Promise<AnnualGoalEntity[]> { const sources = (await this.listGoals(accountId, key)).filter(({ id }) => goalIds.includes(id)); const copies: AnnualGoalEntity[] = []; for (const source of sources) { const due = source.dueDate ? `${targetYear}${source.dueDate.slice(4)}` : `${targetYear}-12-31`; copies.push(await this.saveGoal(accountId, key, { title: source.title, description: source.description, area: source.area, year: targetYear, churchIds: source.churchIds, responsible: source.responsible, dueDate: due, priority: source.priority, status: 'planned', notes: source.notes, references: source.references, ...(source.startDate ? { startDate: `${targetYear}${source.startDate.slice(4)}` } : {}), ...(source.target === undefined ? {} : { target: source.target }), linkedArea: source.linkedArea ?? null })) } return copies }
   async agendaConflicts(accountId: string, key: CryptoKey, startAt: string, endAt: string, editingId?: string): Promise<AgendaConflict[]> { const events = (await Promise.all((await this.repository.list(accountId, 'agenda_event')).map(async (record) => { const payload = await readPayload(key, record, this.database); return payload?.type === 'agenda_event' ? ({ id: record.id, ...(payload.data as object) } as AgendaEventEntity) : null }))).filter((event): event is AgendaEventEntity => Boolean(event)); const candidate = { title: 'Conferência de horário', category: 'event' as const, churchId: null, location: '', address: '', visitTarget: 'none' as const, sermonId: null, sermonSnapshot: null, ceremonyDetails: null, linkedSource: null, startAt, endAt, allDay: false, reminderMinutes: null, notes: '', includeInItinerary: true, mondayException: true }; return findAgendaConflicts(candidate, events, editingId) }

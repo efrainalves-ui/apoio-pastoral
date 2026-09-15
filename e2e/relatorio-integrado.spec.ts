@@ -207,6 +207,12 @@ test('as campanhas informadas viram cadastro no Evangelismo, com Semana Santa, s
   await expect(cartoes).toHaveCount(3)
   await expect(cartoes.filter({ hasText: 'Semana Santa' })).toContainText('Data não informada · 1º trimestre de 2026')
   await expect(cartoes.filter({ hasText: 'Semana Santa' })).not.toContainText('Em andamento')
+  await expect(page.locator('.evangelism-metrics > div').filter({ hasText: 'Data não informada' }).locator('strong')).toHaveText('3')
+  await expect(page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Próximos eventos', exact: true }) })).not.toContainText('Semana Santa')
+  await page.evaluate(() => { window.history.pushState({}, '', '/app/planejamento'); window.dispatchEvent(new PopStateEvent('popstate')) })
+  await expect(page.getByRole('heading', { name: 'Calendário Anual' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Campanhas sem data definida' })).toContainText('Data não informada · 1º trimestre de 2026')
+  await expect(page.locator('.annual-calendar .calendario-item').filter({ hasText: 'Semana Santa' })).toHaveCount(0)
 
   // Reabrir e importar o mesmo PDF de novo não cria outra.
   await abrirRelatorio(page)

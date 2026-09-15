@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  anoDaCampanha, campanhasEmAndamento, campanhasSemData, hojeLocal, mesesDaCampanha, periodoCurto, proximasCampanhas, situacaoDaCampanha, textoDoPeriodo,
+  anoDaCampanha, campanhasEmAndamento, campanhasSemData, hojeLocal, mesesDaCampanha, periodoCurto, proximasCampanhas, situacaoDaCampanha, textoDoPeriodo, totaisPorSituacao,
 } from './periodo'
 import type { EvangelismCampaignEntity } from './types'
 
@@ -24,11 +24,19 @@ describe('situação da campanha pelo período', () => {
     expect(situacaoDaCampanha(PRIMAVERA, '2026-09-21')).toBe('encerrada')
   })
 
-  it('a etapa guardada no cadastro não decide se ela está acontecendo', () => {
-    expect(situacaoDaCampanha(campanha({ startDate: '2026-09-11', endDate: '2026-09-20', status: 'completed' }), HOJE)).toBe('em_andamento')
+  it('etapas de organização não decidem nada; só a conclusão ou o cancelamento confirmados valem acima das datas', () => {
+    for (const status of ['planning', 'preparing', 'happening'] as const) expect(situacaoDaCampanha({ ...PRIMAVERA, status }, HOJE)).toBe('em_andamento')
+    expect(situacaoDaCampanha({ ...FUTURA, status: 'happening' }, HOJE)).toBe('proxima')
     expect(situacaoDaCampanha(ENCERRADA, HOJE)).toBe('encerrada')
-    expect(situacaoDaCampanha({ ...ENCERRADA, status: 'completed' }, HOJE)).toBe('concluida')
+    expect(situacaoDaCampanha({ ...PRIMAVERA, status: 'completed' }, HOJE)).toBe('concluida')
     expect(situacaoDaCampanha({ ...PRIMAVERA, status: 'cancelled' }, HOJE)).toBe('cancelada')
+  })
+
+  it('totais contam cada campanha pela mesma regra dos cartões e do filtro', () => {
+    const todas = [PRIMAVERA, COLHEITA, FUTURA, ENCERRADA, SEM_DATA, { ...ENCERRADA, status: 'completed' as const }]
+    const totais = totaisPorSituacao(todas, HOJE)
+    expect(totais).toEqual({ em_andamento: 2, proxima: 1, encerrada: 1, concluida: 1, cancelada: 0, sem_data: 1 })
+    for (const [situacao, total] of Object.entries(totais)) expect(todas.filter((item) => situacaoDaCampanha(item, HOJE) === situacao)).toHaveLength(total)
   })
 
   it('campanha futura e campanha sem data', () => {

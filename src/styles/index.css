@@ -977,6 +977,35 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .situacao--cancelada { color: #6b5660; background: #eee6ea; }
 .situacao--sem_data { color: #6b4e1b; background: #fff0c9; }
 .planning-campaign-row .entity-badge { flex: none; }
+.revisao-correcoes { scroll-margin-top: 90px; }
+.revisao-correcoes__topo { margin: 0 0 14px; }
+.revisao-grupo { padding: 16px; border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 12px; background: var(--paper); }
+.revisao-grupo + .revisao-grupo { margin-top: 12px; }
+.revisao-grupo__cabecalho { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.revisao-grupo__cabecalho small { color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.revisao-grupo__cabecalho h3 { margin: 2px 0 0; }
+.revisao-grupo__motivo { margin: 0; color: var(--ink); line-height: 1.45; }
+.revisao-grupo__motivo strong { margin-right: 6px; }
+.revisao-grupo__rolagem { overflow-x: auto; }
+.revisao-grupo__tabela { width: 100%; font-size: .82rem; }
+.revisao-grupo__tabela th, .revisao-grupo__tabela td { text-align: left; vertical-align: top; }
+.revisao-grupo__principal th, .revisao-grupo__principal td { background: var(--green-50); }
+.revisao-grupo__efeitos { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.revisao-grupo__efeitos > div { min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.revisao-grupo__efeitos dt { margin-bottom: 4px; color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.revisao-grupo__efeitos dd { margin: 0; font-size: .82rem; overflow-wrap: anywhere; }
+.revisao-grupo__efeitos ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
+.evangelism-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 760px) {
+  .revisao-grupo__efeitos { grid-template-columns: 1fr; }
+  .revisao-grupo__tabela thead { display: none; }
+  .revisao-grupo__tabela, .revisao-grupo__tabela tbody, .revisao-grupo__tabela tr { display: grid; gap: 4px; }
+  .revisao-grupo__tabela tr { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+  .revisao-grupo__tabela tr + tr { margin-top: 8px; }
+  .revisao-grupo__tabela th, .revisao-grupo__tabela td { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 8px; padding: 2px 0; border: 0; }
+  .revisao-grupo__tabela th::before, .revisao-grupo__tabela td::before { content: attr(data-rotulo); color: var(--muted); font-weight: 600; }
+  .evangelism-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .annual-calendar .calendario-item { min-height: 0; padding: 7px 8px; align-items: flex-start; border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 9px; background: var(--paper); }
 .annual-calendar .calendario-item > span { min-width: 0; display: grid; gap: 2px; }
 .annual-calendar .calendario-item strong { font-size: .8rem; line-height: 1.25; }

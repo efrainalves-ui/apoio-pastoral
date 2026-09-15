@@ -1,7 +1,8 @@
 import { buildLocalReportPdf } from '../reports/localPdf'
 import { freeText } from '../reports/redaction'
 import { campaignBudget } from './core'
-import { CAMPAIGN_OBJECTIVE_LABELS, CAMPAIGN_STATUS_LABELS, FOLLOW_UP_STATUS_LABELS, type EvangelismCampaignEntity } from './types'
+import { hojeLocal, ROTULOS_DA_SITUACAO, situacaoDaCampanha, textoDoPeriodo } from './periodo'
+import { CAMPAIGN_OBJECTIVE_LABELS, FOLLOW_UP_STATUS_LABELS, type EvangelismCampaignEntity } from './types'
 
 /**
  * Relatório de encerramento da campanha.
@@ -17,8 +18,8 @@ export function campaignReportLines(campaign: EvangelismCampaignEntity, includeP
   return [
     `Campanha: ${freeText(includePeople, campaign.name) || 'nome não incluído'}`,
     `Objetivo: ${CAMPAIGN_OBJECTIVE_LABELS[campaign.objective]}`,
-    `Período: ${campaign.startDate} a ${campaign.endDate}`,
-    `Situação: ${CAMPAIGN_STATUS_LABELS[campaign.status]}`,
+    `Período: ${textoDoPeriodo(campaign)}`,
+    `Situação: ${ROTULOS_DA_SITUACAO[situacaoDaCampanha(campaign, hojeLocal())]}`,
     `Pontos realizados: ${campaign.points.filter(({ status }) => status === 'completed').length} de ${campaign.points.length}`,
     `Eventos organizados: ${1 + campaign.additionalAgendaEventIds.length + campaign.points.reduce((total, point) => total + point.schedules.length, 0)}`,
     `Equipe: ${campaign.team.length} participação(ões)`,

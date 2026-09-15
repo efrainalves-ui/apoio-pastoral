@@ -24,12 +24,29 @@ export function hojeLocal(agora: Date = new Date()): string {
 
 export const fimDaCampanha = ({ startDate, endDate }: Pick<CampanhaNoTempo, 'startDate' | 'endDate'>): string => endDate || startDate
 
+/**
+ * Uma regra só, para cartões, filtros, totais, Planejamento e Calendário.
+ *
+ * Sem data vem primeiro: a campanha do Relatório Integrado consta como concluída,
+ * mas sem dia não há como situá-la. Depois vale a confirmação manual (Concluída,
+ * Cancelada), e só então as datas.
+ */
 export function situacaoDaCampanha(campanha: CampanhaNoTempo, hoje: string): SituacaoDoPeriodo {
   if (!campanha.startDate) return 'sem_data'
   if (campanha.status === 'cancelled') return 'cancelada'
+  if (campanha.status === 'completed') return 'concluida'
   if (hoje < campanha.startDate) return 'proxima'
   if (hoje <= fimDaCampanha(campanha)) return 'em_andamento'
-  return campanha.status === 'completed' ? 'concluida' : 'encerrada'
+  return 'encerrada'
+}
+
+export const ORDEM_DAS_SITUACOES: readonly SituacaoDoPeriodo[] = ['em_andamento', 'proxima', 'encerrada', 'concluida', 'cancelada', 'sem_data']
+
+/** Quantas campanhas em cada situação — os totais usam exatamente a regra dos cartões e do filtro. */
+export function totaisPorSituacao(campanhas: readonly CampanhaNoTempo[], hoje: string): Record<SituacaoDoPeriodo, number> {
+  const totais: Record<SituacaoDoPeriodo, number> = { proxima: 0, em_andamento: 0, encerrada: 0, concluida: 0, cancelada: 0, sem_data: 0 }
+  for (const campanha of campanhas) totais[situacaoDaCampanha(campanha, hoje)] += 1
+  return totais
 }
 
 /** Ano a que a campanha pertence: o do início, ou o do trimestre do relatório quando não há data. */
