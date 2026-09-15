@@ -93,6 +93,97 @@ test('a finalidade chega à Visitação, e Nomeações pendente se liga ao criar
   await expect(page.getByText(/Sem processo de nomeações/)).toHaveCount(0)
 })
 
+test('alcance conforme a categoria: Associação/Missão/União nos encontros, e Concílio sem alcance', async ({ page }) => {
+  page.on('dialog', (dialog) => void dialog.accept())
+  await registerAndEnter(page, 'agenda.alcance.e2e@example.invalid')
+  await criarIgreja(page, IGREJA)
+  const salvar = async () => {
+    await page.getByRole('button', { name: 'Salvar compromisso' }).click()
+    await expect(page.getByRole('heading', { name: 'Agenda', level: 1 })).toBeVisible()
+  }
+
+  // Reunião online da Associação: o departamento escolhido antes some ao trocar de alcance.
+  await novoCompromisso(page, 'Reunião')
+  await page.getByLabel('Título').fill('Reunião Fictícia da Associação')
+  await page.getByRole('radio', { name: 'Online' }).check()
+  await expect(page.getByRole('group', { name: 'Alcance' }).getByRole('radio')).toHaveCount(4)
+  await page.getByRole('radio', { name: 'Departamento', exact: true }).check()
+  await page.getByRole('combobox', { name: 'Departamento' }).fill('Músi')
+  await page.keyboard.press('Enter')
+  await page.getByRole('radio', { name: 'Associação/Missão/União' }).check()
+  await expect(page.getByRole('combobox', { name: 'Departamento' })).toHaveCount(0)
+  await expect(page.getByRole('combobox', { name: 'Igreja', exact: true })).toHaveCount(0)
+  await page.getByRole('radio', { name: 'Associação', exact: true }).check()
+  await page.getByLabel('Nome da instituição').fill('Associação Fictícia Central')
+  await preencherHorario(page, 8)
+  await salvar()
+
+  await novoCompromisso(page, 'Treinamento')
+  await page.getByLabel('Título').fill('Treinamento Fictício do Departamento')
+  await page.getByRole('radio', { name: 'Presencial' }).check()
+  await page.getByLabel('Local', { exact: true }).fill('Salão Fictício')
+  await page.getByRole('radio', { name: 'Departamento', exact: true }).check()
+  await page.getByRole('combobox', { name: 'Departamento' }).fill('Músi')
+  await page.keyboard.press('Enter')
+  await preencherHorario(page, 11)
+  await salvar()
+
+  await novoCompromisso(page, 'Evento')
+  await page.getByLabel('Título').fill('Evento Fictício da União')
+  await page.getByRole('radio', { name: 'Presencial' }).check()
+  await page.getByLabel('Local', { exact: true }).fill('Ginásio Fictício')
+  await page.getByRole('radio', { name: 'Associação/Missão/União' }).check()
+  await page.getByRole('radio', { name: 'União', exact: true }).check()
+  await preencherHorario(page, 14)
+  await salvar()
+
+  // Concílio: tipo e formato, sem nenhuma opção de alcance.
+  await novoCompromisso(page, 'Concílio')
+  await expect(page.getByRole('group', { name: 'Alcance' })).toHaveCount(0)
+  await expect(page.getByRole('radio', { name: 'Distrital' })).toHaveCount(0)
+  await page.getByRole('radio', { name: 'PGP' }).check()
+  await page.getByRole('radio', { name: 'Presencial' }).check()
+  await page.getByLabel('Local', { exact: true }).fill('Sede Fictícia')
+  await page.getByLabel('Observações').fill('Observação fictícia do PGP')
+  await preencherHorario(page, 17)
+  await salvar()
+
+  await novoCompromisso(page, 'Concílio')
+  await page.getByRole('radio', { name: 'Concílio', exact: true }).check()
+  await page.getByRole('radio', { name: 'Online' }).check()
+  await expect(page.getByLabel('Local', { exact: true })).toHaveCount(0)
+  await preencherHorario(page, 20)
+  await salvar()
+
+  const abrirLista = async () => {
+    await page.getByRole('tab', { name: 'Lista' }).click()
+    await expect(page.locator('.linha-compromisso')).toHaveCount(5)
+  }
+  const linha = (titulo: string) => page.locator('.linha-compromisso').filter({ has: page.getByRole('link', { name: `Abrir ${titulo},`, exact: false }) })
+  await abrirLista()
+  await expect(linha('Reunião Fictícia da Associação').locator('.linha-compromisso__alcance')).toHaveText('Reunião · Associação · Associação Fictícia Central')
+  await expect(linha('Treinamento Fictício do Departamento').locator('.linha-compromisso__alcance')).toHaveText('Treinamento · Departamento de Música')
+  await expect(linha('Evento Fictício da União').locator('.linha-compromisso__alcance')).toHaveText('Evento · União')
+  await expect(linha('PGP').locator('.linha-compromisso__alcance')).toHaveCount(0)
+  await expect(linha('Concílio').locator('.linha-compromisso__alcance')).toHaveCount(0)
+
+  // Editar: a reunião passa a ser da Missão, sem o nome da Associação.
+  await linha('Reunião Fictícia da Associação').getByRole('link', { name: /Abrir Reunião Fictícia da Associação/ }).click()
+  await expect(page.locator('.resumo-do-alcance')).toHaveText('Reunião · Associação · Associação Fictícia Central')
+  await page.getByRole('radio', { name: 'Missão', exact: true }).check()
+  await page.getByLabel('Nome da instituição').fill('')
+  await salvar()
+  await abrirLista()
+  await expect(linha('Reunião Fictícia da Associação').locator('.linha-compromisso__alcance')).toHaveText('Reunião · Missão')
+
+  // O PGP reabre sem alcance, com o local e as observações.
+  await linha('PGP').getByRole('link', { name: /Abrir PGP/ }).click()
+  await expect(page.getByRole('radio', { name: 'PGP' })).toBeChecked()
+  await expect(page.getByRole('group', { name: 'Alcance' })).toHaveCount(0)
+  await expect(page.getByLabel('Local', { exact: true })).toHaveValue('Sede Fictícia')
+  await expect(page.getByLabel('Observações')).toHaveValue('Observação fictícia do PGP')
+})
+
 test('reunião, Ceia do Senhor e dedicação mostram só o que a escolha pede', async ({ page }) => {
   page.on('dialog', (dialog) => void dialog.accept())
   await registerAndEnter(page, 'agenda.escolhas.e2e@example.invalid')

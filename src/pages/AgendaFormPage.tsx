@@ -5,7 +5,8 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { responsaveisPadraoDaCeia } from '../agenda/ceia'
 import {
   aplicarEscolhaDeIgreja, ceiaVazia, comissaoVazia, dedicacaoDoLegado, detalhesAoTrocarCategoria,
-  encontroVazio, igrejasDoCompromisso, pedeTitulo, pessoalVazio, tituloGerado, tituloParaGravar, usaObservacoes, usaPessoaOuFamilia,
+  encontroSemAlcance, encontroVazio, igrejasDoCompromisso, pedeTitulo, pessoalVazio, resumoDoAlcance, tituloGerado, tituloParaGravar,
+  usaAlcance, usaObservacoes, usaPessoaOuFamilia,
 } from '../agenda/detalhes'
 import { AgendaService, findAgendaConflicts, isMonday } from '../agenda/service'
 import {
@@ -37,9 +38,11 @@ import { PeopleService } from '../people/service'
 import type { PersonEntity } from '../people/types'
 import { SermonService } from '../sermons/service'
 import type { SermonEntity } from '../sermons/types'
+import { WorkBudgetService } from '../work-budget/service'
 
 const agenda = new AgendaService(); const districts = new DistrictService(); const sermonsService = new SermonService(); const peopleService = new PeopleService(); const evangelism = new EvangelismPlanningService()
 const familiesService = new FamilyService(); const nominations = new NominationService(); const vinculo = new VinculoAgendaComissao(); const casamentosService = new CasamentoService()
+const trabalho = new WorkBudgetService()
 
 function initialInput(startAt?: string): AgendaEventInput {
   const defaults = categoryDefaults('visit', startAt ? new Date(startAt) : new Date())
@@ -98,18 +101,23 @@ export function AgendaFormPage() {
   /** `null` enquanto não foi mexido: vale o oficiante do acompanhamento. */
   const [oficiante, setOficiante] = useState<string | null>(null)
   const [duplicados, setDuplicados] = useState<CasamentoEntity[]>([])
+  /** União e Campo do cadastro do obreiro: sugestões para o alcance "Associação/Missão/União". */
+  const [vinculoDoObreiro, setVinculoDoObreiro] = useState({ uniao: '', campo: '' })
   const dirty = useRef(false)
 
   const load = useCallback(async () => {
     if (!account || !masterKey) return
     const district = await districts.getDistrict(account.id, masterKey)
-    const [nextEvents, nextChurches, current, nextSermons, nextPeople, nextFamilies, nextProcessos, nextCasamentos] = await Promise.all([
+    const [nextEvents, nextChurches, current, nextSermons, nextPeople, nextFamilies, nextProcessos, nextCasamentos, configuracao] = await Promise.all([
       agenda.listEvents(account.id, masterKey), district ? districts.listChurches(account.id, masterKey, district.id) : [],
       eventId ? agenda.getEvent(account.id, masterKey, eventId) : null, sermonsService.list(account.id, masterKey),
       peopleService.listPeople(account.id, masterKey), familiesService.listFamilies(account.id, masterKey), nominations.list(account.id, masterKey),
       casamentosService.listar(account.id, masterKey),
+      // Sem o cadastro do obreiro, o compromisso abre do mesmo jeito, só sem as sugestões.
+      trabalho.configuracao(account.id, masterKey).catch(() => null),
     ])
     setEvents(nextEvents); setChurches(nextChurches); setSermons(nextSermons); setPeople(nextPeople); setFamilies(nextFamilies); setProcessos(nextProcessos); setCasamentos(nextCasamentos)
+    setVinculoDoObreiro({ uniao: configuracao?.uniao ?? '', campo: configuracao?.campo ?? '' })
     const casamentoPedido = !eventId && !dirty.current && casamentoDaUrl ? nextCasamentos.find(({ id }) => id === casamentoDaUrl) : undefined
     if (casamentoPedido) setInput((atual) => preencherDoCasamento(atual, casamentoPedido))
     if (current && !dirty.current) {
@@ -241,6 +249,16 @@ export function AgendaFormPage() {
       return { ...current, ...escolhido, instrutor: anterior?.instrutor ?? null }
     })
   }
+  /* Nomes de instituição já conhecidos para o nível escolhido: o do cadastro do obreiro e os usados em outros compromissos. */
+  const nivelInstitucional = input.encontro?.alcance === 'institucional' ? input.encontro.nivelInstitucional ?? null : null
+  const instituicoes = useMemo(() => {
+    if (!nivelInstitucional) return []
+    const doCadastro = nivelInstitucional === 'uniao' ? vinculoDoObreiro.uniao : vinculoDoObreiro.campo
+    const usados = events
+      .filter((item) => item.id !== eventId && item.encontro?.alcance === 'institucional' && item.encontro.nivelInstitucional === nivelInstitucional)
+      .map((item) => item.encontro?.instituicao ?? '')
+    return [...new Set([doCadastro, ...usados].map((nome) => nome.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [eventId, events, nivelInstitucional, vinculoDoObreiro])
   const igrejasAtivas = churches.filter(({ status }) => status !== 'archived')
   const nomeDaIgreja = (id: string) => churches.find((church) => church.id === id)?.name ?? ''
 
@@ -282,7 +300,12 @@ export function AgendaFormPage() {
       if (category === 'communion') paraGravar.ceia = { ...ceia, responsaveis: responsaveisDaCeia }
       if (category === 'child_dedication') paraGravar.dedicacao = dedicacao
       if (category === 'personal') paraGravar.pessoal = pessoal
-      if (isEncontroCategory(category)) paraGravar.encontro = input.encontro ?? encontroVazio(category)
+      if (isEncontroCategory(category)) {
+        const encontro = input.encontro ?? encontroVazio(category)
+        // Concílio não tem alcance: o de um registro antigo, e a igreja que vinha com ele, não voltam a ser gravados escondidos.
+        paraGravar.encontro = usaAlcance(category) ? encontro : encontroSemAlcance(encontro)
+        if (!usaAlcance(category) || encontro.alcance !== 'igreja') paraGravar.churchId = null
+      }
       const contexto = { churches, pessoaNome: input.pessoaId ? nomeDaPessoa(input.pessoaId) : undefined, familiaNome: families.find(({ id }) => id === input.familiaId)?.name }
       // O título antigo só é mantido quando foi o pastor quem o escreveu.
       const tituloAnterior = original && original.title !== tituloGerado(original, contexto) ? original.title : ''
@@ -331,11 +354,12 @@ export function AgendaFormPage() {
   const ceremony = ceremonyCategory ? input.ceremonyDetails ?? emptyCeremonyDetails(ceremonyCategory) : null
   // Um compromisso antigo de Viagem continua abrindo com a sua categoria; só não se cria mais.
   const categorias: readonly AgendaCategory[] = (NEW_EVENT_CATEGORIES as readonly AgendaCategory[]).includes(category) ? NEW_EVENT_CATEGORIES : [...NEW_EVENT_CATEGORIES, category]
+  const resumoGravado = original ? resumoDoAlcance(original, churches) : null
   const semProcessoDeNomeacoes = category === 'committee' && comissao.tipo === 'nomeacoes' && Boolean(input.churchId) && !comissao.meetingId
     && !processos.some((processo) => processo.churchId === input.churchId && processo.status !== 'archived' && processo.status !== 'completed')
   return <div className="page-stack page-narrow">
     <Link className="text-link back-link" to="/app/agenda"><ArrowLeft />Voltar à agenda</Link>
-    <header className="page-hero"><div><p className="eyebrow">Planeje sua rotina</p><h1>{eventId ? 'Editar compromisso' : 'Novo compromisso'}</h1></div></header>
+    <header className="page-hero"><div><p className="eyebrow">Planeje sua rotina</p><h1>{eventId ? 'Editar compromisso' : 'Novo compromisso'}</h1>{resumoGravado && <p className="resumo-do-alcance">{resumoGravado}</p>}</div></header>
     {error && <div className="alert alert--error" role="alert">{error}</div>}
     <form onSubmit={(formEvent) => void submit(formEvent)}>
       <Card title="Dados do compromisso"><div className="form-grid">
@@ -382,7 +406,7 @@ export function AgendaFormPage() {
         {category === 'council' && <Escolha rotulo="Tipo" nome="concilio-tipo" opcoes={TIPOS_DE_CONCILIO} valor={input.encontro?.tipoConcilio} obrigatorio
           onChange={(tipoConcilio) => mudar((current) => ({ ...current, encontro: { ...(current.encontro ?? encontroVazio('council')), tipoConcilio } }))} />}
         {(pedeTitulo(category) || category === 'travel') && <Field label="Título" name="agenda-title" value={input.title} onChange={(changeEvent) => patch({ title: changeEvent.target.value })} required maxLength={160} />}
-        {isEncontroCategory(category) && <CamposDeEncontro input={input} churches={churches} onChange={patch} />}
+        {isEncontroCategory(category) && <CamposDeEncontro input={input} churches={churches} onChange={patch} instituicoes={instituicoes} />}
         {(category === 'other' || category === 'travel') && <>
           {category === 'other' && <SeletorDeIgreja churches={churches} valor={input.churchId} onChange={escolherIgreja} />}
           <Field label="Local" name="agenda-location" value={input.location} onChange={(changeEvent) => patch({ location: changeEvent.target.value })} maxLength={160} />

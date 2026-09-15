@@ -1,9 +1,9 @@
 import { X } from 'lucide-react'
 import { type KeyboardEvent, type ReactNode, useId, useMemo, useState } from 'react'
-import { encontroComAlcance, encontroComFormato, encontroComPublico } from '../../agenda/detalhes'
+import { encontroComAlcance, encontroComFormato, encontroComPublico, usaAlcance } from '../../agenda/detalhes'
 import {
-  PUBLICO_DISTRITAL_LABELS, type AgendaEventInput, type AlcanceDoEncontro, type DetalhesDoEncontro,
-  type FormatoDoEncontro, type PublicoDistrital,
+  NIVEL_INSTITUCIONAL_LABELS, PUBLICO_DISTRITAL_LABELS, type AgendaEventInput, type AlcanceDoEncontro, type DetalhesDoEncontro,
+  type FormatoDoEncontro, type NivelInstitucional, type PublicoDistrital,
 } from '../../agenda/types'
 import type { ChurchEntity } from '../../district/types'
 import { COMMON_OFFICES } from '../../nominations/core'
@@ -136,8 +136,10 @@ export function BuscaDeNomes({ rotulo, opcoes, selecionados, onEscolher, onRemov
 
 const FORMATOS: ReadonlyArray<{ valor: FormatoDoEncontro; rotulo: string }> = [{ valor: 'presencial', rotulo: 'Presencial' }, { valor: 'online', rotulo: 'Online' }]
 const ALCANCES: ReadonlyArray<{ valor: AlcanceDoEncontro; rotulo: string }> = [
-  { valor: 'distrital', rotulo: 'Distrital' }, { valor: 'igreja', rotulo: 'Igreja local' }, { valor: 'departamento', rotulo: 'Departamento' },
+  { valor: 'institucional', rotulo: 'Associação/Missão/União' }, { valor: 'distrital', rotulo: 'Distrital' },
+  { valor: 'igreja', rotulo: 'Igreja local' }, { valor: 'departamento', rotulo: 'Departamento' },
 ]
+const NIVEIS = (Object.keys(NIVEL_INSTITUCIONAL_LABELS) as NivelInstitucional[]).map((valor) => ({ valor, rotulo: NIVEL_INSTITUCIONAL_LABELS[valor] }))
 const PUBLICOS = (Object.keys(PUBLICO_DISTRITAL_LABELS) as PublicoDistrital[]).map((valor) => ({ valor, rotulo: PUBLICO_DISTRITAL_LABELS[valor] }))
 
 /**
@@ -145,12 +147,14 @@ const PUBLICOS = (Object.keys(PUBLICO_DISTRITAL_LABELS) as PublicoDistrital[]).m
  *
  * Um componente só para os quatro: a regra — presencial pede local, distrital
  * pede público, igreja local pede a igreja — é a mesma, e duas cópias acabariam
- * divergindo.
+ * divergindo. Concílio fica só com o formato: não tem alcance.
  */
-export function CamposDeEncontro({ input, churches, onChange }: {
+export function CamposDeEncontro({ input, churches, onChange, instituicoes = [] }: {
   input: AgendaEventInput
   churches: readonly ChurchEntity[]
   onChange: (patch: Partial<AgendaEventInput>) => void
+  /** Nomes já cadastrados para o nível escolhido, como sugestão. */
+  instituicoes?: readonly string[]
 }) {
   const encontro: DetalhesDoEncontro = input.encontro ?? { formato: null, alcance: null, publico: null, publicoOutro: '', departamento: '' }
   const nome = input.category
@@ -159,8 +163,31 @@ export function CamposDeEncontro({ input, churches, onChange }: {
       <Escolha rotulo="Formato" nome={`${nome}-formato`} opcoes={FORMATOS} valor={encontro.formato} obrigatorio
         onChange={(formato) => { const proximo = encontroComFormato(encontro, formato); onChange({ encontro: proximo.encontro, ...(proximo.limparLocal ? { location: '', address: '' } : {}) }) }} />
       {encontro.formato === 'presencial' && <Field label="Local" name="agenda-location" value={input.location} onChange={(event) => onChange({ location: event.target.value })} maxLength={160} required />}
+      {usaAlcance(input.category) && <CamposDoAlcance encontro={encontro} input={input} churches={churches} onChange={onChange} instituicoes={instituicoes} />}
+    </>
+  )
+}
+
+function CamposDoAlcance({ encontro, input, churches, onChange, instituicoes }: {
+  encontro: DetalhesDoEncontro
+  input: AgendaEventInput
+  churches: readonly ChurchEntity[]
+  onChange: (patch: Partial<AgendaEventInput>) => void
+  instituicoes: readonly string[]
+}) {
+  const nome = input.category
+  const listaId = useId()
+  return (
+    <>
       <Escolha rotulo="Alcance" nome={`${nome}-alcance`} opcoes={ALCANCES} valor={encontro.alcance} obrigatorio
         onChange={(alcance) => { const proximo = encontroComAlcance(encontro, alcance); onChange({ encontro: proximo.encontro, ...(proximo.limparIgreja ? { churchId: null } : {}) }) }} />
+      {encontro.alcance === 'institucional' && <Escolha rotulo="Instituição" nome={`${nome}-nivel`} opcoes={NIVEIS} valor={encontro.nivelInstitucional} obrigatorio
+        onChange={(nivelInstitucional) => onChange({ encontro: { ...encontro, nivelInstitucional } })} />}
+      {encontro.alcance === 'institucional' && <>
+        <Field label="Nome da instituição" name="agenda-instituicao" list={listaId} autoComplete="off" value={encontro.instituicao ?? ''} maxLength={120}
+          onChange={(event) => onChange({ encontro: { ...encontro, instituicao: event.target.value } })} />
+        <datalist id={listaId}>{instituicoes.map((instituicao) => <option key={instituicao} value={instituicao} />)}</datalist>
+      </>}
       {encontro.alcance === 'distrital' && <Escolha rotulo="Público" nome={`${nome}-publico`} opcoes={PUBLICOS} valor={encontro.publico} obrigatorio onChange={(publico) => onChange({ encontro: encontroComPublico(encontro, publico) })} />}
       {encontro.alcance === 'distrital' && encontro.publico === 'outro' && <Field label="Qual público?" name="agenda-publico-outro" value={encontro.publicoOutro} onChange={(event) => onChange({ encontro: { ...encontro, publicoOutro: event.target.value } })} maxLength={120} required />}
       {encontro.alcance === 'igreja' && <SeletorDeIgreja churches={churches} valor={input.churchId} obrigatorio onChange={(churchId) => onChange({ churchId })} />}

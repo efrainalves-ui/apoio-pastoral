@@ -1,6 +1,6 @@
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { CasamentoService } from '../casamentos/service'
-import { textoDasIgrejas } from '../agenda/detalhes'
+import { resumoDoAlcance, textoDasIgrejas } from '../agenda/detalhes'
 import { BookOpen, CalendarDays, ChevronLeft, ChevronRight, Download, Edit3, MapPin, Plus, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -70,8 +70,9 @@ export function AgendaPage() {
   /* Semana e os dias abaixo do Mês: a mesma linha de sempre, agora com a identidade da categoria. */
   function renderCompromisso(event: AgendaEventEntity) {
     const onde = ondeAcontece(event)
+    const alcance = resumoDoAlcance(event, churches)
     const identidade = identidadeDoCompromisso(event.category)
-    return <Link className={`compromisso categoria-visual ${new Date(event.endAt) < hoje ? 'compromisso--passado' : ''}`} {...atributosDaCategoria(identidade)} key={event.id} to={`/app/agenda/${event.id}/editar`} aria-label={`Abrir ${event.title}, ${identidade.rotulo}`}><span className="compromisso__hora">{eventTime(event)}</span><span className="compromisso__faixa" aria-hidden="true" /><span className="compromisso__corpo"><SeloDaCategoria categoria={event.category} /><strong>{event.title}</strong>{onde && <small>{onde}</small>}</span></Link>
+    return <Link className={`compromisso categoria-visual ${new Date(event.endAt) < hoje ? 'compromisso--passado' : ''}`} {...atributosDaCategoria(identidade)} key={event.id} to={`/app/agenda/${event.id}/editar`} aria-label={`Abrir ${event.title}, ${identidade.rotulo}`}><span className="compromisso__hora">{eventTime(event)}</span><span className="compromisso__faixa" aria-hidden="true" /><span className="compromisso__corpo"><SeloDaCategoria categoria={event.category} /><strong>{event.title}</strong>{alcance && <small className="compromisso__alcance">{alcance}</small>}{onde && <small>{onde}</small>}</span></Link>
   }
 
   function renderDias(dias: Date[], comVazios: boolean) {
@@ -94,11 +95,13 @@ export function AgendaPage() {
           <ul className="lista-mes__itens">{grupo.eventos.map((event) => {
             const identidade = identidadeDoCompromisso(event.category)
             const onde = ondeAcontece(event)
+            const alcance = resumoDoAlcance(event, churches)
             return <li key={event.id} className="linha-compromisso categoria-visual" {...atributosDaCategoria(identidade)}>
               <span className="linha-compromisso__hora">{faixaDeHorario(event)}</span>
               <span className="linha-compromisso__corpo">
                 <SeloDaCategoria categoria={event.category} />
                 <Link className="linha-compromisso__titulo" to={`/app/agenda/${event.id}/editar`} aria-label={`Abrir ${event.title}, ${identidade.rotulo}`}>{event.title}</Link>
+                {alcance && <small className="linha-compromisso__alcance">{alcance}</small>}
                 {onde && <small className="linha-compromisso__onde"><MapPin aria-hidden="true" />{onde}</small>}
                 {event.sermonSnapshot && <small className="linha-compromisso__onde"><BookOpen aria-hidden="true" />{event.sermonSnapshot.title}</small>}
               </span>

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { ChurchEntity } from '../district/types'
 import {
   aplicarEscolhaDeIgreja, ceiaVazia, detalhesAoTrocarCategoria, encontroComAlcance, encontroComFormato,
-  encontroComPublico, encontroVazio, igrejasDoCompromisso, normalizarLegado, pedeTitulo, textoDasIgrejas,
-  tituloGerado, tituloParaGravar, usaObservacoes, validarDetalhes,
+  encontroComPublico, encontroSemAlcance, encontroVazio, igrejasDoCompromisso, normalizarLegado, pedeTitulo, resumoDoAlcance,
+  textoDasIgrejas, tituloGerado, tituloParaGravar, usaAlcance, usaObservacoes, validarDetalhes,
 } from './detalhes'
 import { NEW_EVENT_CATEGORIES, categoryDefaults, type AgendaEventInput } from './types'
 
@@ -118,6 +118,56 @@ describe('reunião, treinamento, evento e concílio: a mesma regra', () => {
     const concilio = { ...encontroVazio('council'), formato: 'online' as const, alcance: 'departamento' as const, departamento: 'Música' }
     expect(() => validarDetalhes(base({ category: 'council', encontro: concilio }))).toThrow('Concílio ou PGP')
     expect(() => validarDetalhes(base({ category: 'council', encontro: { ...concilio, tipoConcilio: 'pgp' } }))).not.toThrow()
+  })
+})
+
+describe('alcance conforme a categoria', () => {
+  const encontro = (overrides = {}) => ({ ...encontroVazio('meeting'), ...overrides })
+
+  it('Concílio não tem alcance; Reunião, Treinamento e Evento têm', () => {
+    expect(NEW_EVENT_CATEGORIES.filter(usaAlcance)).toEqual(['meeting', 'training', 'event'])
+    const semAlcance = { ...encontroVazio('council'), formato: 'online' as const, tipoConcilio: 'concilio' as const }
+    expect(() => validarDetalhes(base({ category: 'council', encontro: semAlcance }))).not.toThrow()
+    expect(() => validarDetalhes(base({ category: 'council', encontro: { ...semAlcance, formato: 'presencial' } }))).toThrow('local')
+    expect(() => validarDetalhes(base({ category: 'council', location: 'Auditório Fictício', encontro: { ...semAlcance, formato: 'presencial', tipoConcilio: 'pgp' } }))).not.toThrow()
+  })
+
+  it('Concílio antigo com alcance perde o alcance ao ser lido para gravar, e mantém o tipo e o formato', () => {
+    const antigo = { ...encontroVazio('council'), formato: 'online' as const, alcance: 'departamento' as const, departamento: 'Outro', departamentoOutro: 'Capelania Fictícia', tipoConcilio: 'pgp' as const }
+    expect(encontroSemAlcance(antigo)).toEqual({ formato: 'online', alcance: null, publico: null, publicoOutro: '', departamento: '', tipoConcilio: 'pgp' })
+    const reuniaoQueViraConcilio = detalhesAoTrocarCategoria(base({ category: 'meeting', encontro: encontro({ alcance: 'institucional', nivelInstitucional: 'uniao', instituicao: 'União Fictícia' }) }), 'council')
+    expect(reuniaoQueViraConcilio.encontro).toEqual({ formato: null, alcance: null, publico: null, publicoOutro: '', departamento: '', tipoConcilio: null })
+  })
+
+  it('Associação/Missão/União pede qual das três, e não pede igreja nem departamento', () => {
+    const institucional = encontro({ formato: 'online', alcance: 'institucional' })
+    expect(() => validarDetalhes(base({ category: 'event', encontro: institucional }))).toThrow('Associação, Missão ou União')
+    for (const nivelInstitucional of ['associacao', 'missao', 'uniao'] as const) {
+      expect(() => validarDetalhes(base({ category: 'training', encontro: { ...institucional, nivelInstitucional } }))).not.toThrow()
+    }
+  })
+
+  it('trocar o alcance limpa o que era da escolha anterior, inclusive a instituição', () => {
+    const departamento = encontro({ alcance: 'departamento', departamento: 'Outro', departamentoOutro: 'Capelania Fictícia' })
+    const institucional = encontroComAlcance(departamento, 'institucional')
+    expect(institucional.encontro).toMatchObject({ alcance: 'institucional', departamento: '', departamentoOutro: '', publico: null, nivelInstitucional: null, instituicao: '' })
+    expect(institucional.limparIgreja).toBe(true)
+    const preenchido = { ...institucional.encontro, nivelInstitucional: 'missao' as const, instituicao: 'Missão Fictícia' }
+    expect(encontroComAlcance(preenchido, 'distrital').encontro).toMatchObject({ nivelInstitucional: null, instituicao: '' })
+    expect(encontroComAlcance(preenchido, 'igreja')).toMatchObject({ encontro: { nivelInstitucional: null, instituicao: '' }, limparIgreja: false })
+  })
+
+  it('o resumo diz a categoria e o alcance', () => {
+    const resumo = (category: AgendaEventInput['category'], detalhes: object, churchId: string | null = null) => resumoDoAlcance(base({ category, churchId, encontro: encontro(detalhes) }), IGREJAS)
+    expect(resumo('meeting', { alcance: 'institucional', nivelInstitucional: 'associacao' })).toBe('Reunião · Associação')
+    expect(resumo('training', { alcance: 'institucional', nivelInstitucional: 'missao' })).toBe('Treinamento · Missão')
+    expect(resumo('event', { alcance: 'institucional', nivelInstitucional: 'uniao', instituicao: 'União Fictícia' })).toBe('Evento · União · União Fictícia')
+    expect(resumo('meeting', { alcance: 'distrital', publico: 'administrativo' })).toBe('Reunião · Distrito')
+    expect(resumo('training', { alcance: 'departamento', departamento: 'Ministério Jovem' })).toBe('Treinamento · Departamento de Ministério Jovem')
+    expect(resumo('training', { alcance: 'departamento', departamento: 'Outro', departamentoOutro: 'Capelania Fictícia' })).toBe('Treinamento · Departamento de Capelania Fictícia')
+    expect(resumo('event', { alcance: 'igreja' }, 'b')).toBe('Evento · Norte Fictícia')
+    expect(resumo('meeting', { alcance: null })).toBeNull()
+    expect(resumo('council', { alcance: 'distrital', tipoConcilio: 'concilio' })).toBeNull()
   })
 })
 
