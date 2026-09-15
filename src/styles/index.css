@@ -971,6 +971,25 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .annual-calendar a svg { width: 15px; flex: 0 0 auto; color: var(--green-700); }
 .annual-calendar a span { overflow-wrap: anywhere; }
 .annual-calendar small { color: var(--muted); }
+.situacao--proxima { color: #2c5873; background: #dfedf5; }
+.situacao--em_andamento { color: #1d5840; background: #d9f0e3; }
+.situacao--encerrada, .situacao--concluida { color: #4c5c56; background: #e8eeeb; }
+.situacao--cancelada { color: #6b5660; background: #eee6ea; }
+.situacao--sem_data { color: #6b4e1b; background: #fff0c9; }
+.planning-campaign-row .entity-badge { flex: none; }
+.annual-calendar .calendario-item { min-height: 0; padding: 7px 8px; align-items: flex-start; border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 9px; background: var(--paper); }
+.annual-calendar .calendario-item > span { min-width: 0; display: grid; gap: 2px; }
+.annual-calendar .calendario-item strong { font-size: .8rem; line-height: 1.25; }
+.annual-calendar .calendario-item small { font-size: .72rem; line-height: 1.3; }
+.annual-calendar .calendario-item .calendario-item__periodo { color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+.annual-calendar .calendario-item svg { margin-top: 2px; }
+.calendario-item--em_andamento { border-left-color: #2f8a63 !important; }
+.calendario-item--proxima { border-left-color: #3f7fa6 !important; }
+.calendario-item--encerrada, .calendario-item--concluida, .calendario-item--cancelada { border-left-color: #a3b0aa !important; }
+.calendario-item--sem_data { border-left-style: dashed !important; border-left-color: #c28a2c !important; }
+.annual-calendar__sem-data { margin-top: 12px; padding: 14px; border: 1px dashed var(--line); border-radius: 12px; display: grid; gap: 8px; }
+.annual-calendar__sem-data h3 { margin: 0; color: var(--green-900); }
+.annual-calendar__sem-data > div { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
 .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .detail-grid > div { padding: 13px; border-radius: 11px; display: grid; gap: 5px; background: var(--green-50); }
 .detail-grid small { color: var(--muted); }
@@ -1428,7 +1447,12 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   :root:not([data-tema='claro']) .prayer-status--answered { color: #d9eee5; background: #244638; }
   :root:not([data-tema='claro']) .prayer-status--closed, :root:not([data-tema='claro']) .prayer-status--archived { color: #d5ded9; background: #35413c; }
   :root:not([data-tema='claro']) .planning-upcoming time, :root:not([data-tema='claro']) .annual-calendar a svg, :root:not([data-tema='claro']) .campaign-card > svg { color: #9ed4bd; }
-  :root:not([data-tema='claro']) .annual-calendar h3 { color: #d9eee5; }
+  :root:not([data-tema='claro']) .annual-calendar h3, :root:not([data-tema='claro']) .annual-calendar__sem-data h3 { color: #d9eee5; }
+  :root:not([data-tema='claro']) .situacao--proxima { color: #b9daf0; background: #1b3242; }
+  :root:not([data-tema='claro']) .situacao--em_andamento { color: #b4e6cd; background: #16392a; }
+  :root:not([data-tema='claro']) .situacao--encerrada, :root:not([data-tema='claro']) .situacao--concluida { color: #c3cfca; background: #243029; }
+  :root:not([data-tema='claro']) .situacao--cancelada { color: #dcc5cf; background: #36282e; }
+  :root:not([data-tema='claro']) .situacao--sem_data { color: #f0d49a; background: #3a2d13; }
   :root:not([data-tema='claro']) .campaign-status--planning, :root:not([data-tema='claro']) .status--planned, :root:not([data-tema='claro']) .priority--normal { color: #d5ded9; background: #35413c; }
   :root:not([data-tema='claro']) .campaign-status--preparing, :root:not([data-tema='claro']) .status--in_progress, :root:not([data-tema='claro']) .priority--high { color: #ead9a7; background: #3c3322; }
   :root:not([data-tema='claro']) .campaign-status--happening, :root:not([data-tema='claro']) .status--completed { color: #d9eee5; background: #244638; }
@@ -1496,7 +1520,12 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 :root[data-tema='escuro'] .prayer-status--answered { color: #d9eee5; background: #244638; }
 :root[data-tema='escuro'] .prayer-status--closed, :root[data-tema='escuro'] .prayer-status--archived { color: #d5ded9; background: #35413c; }
 :root[data-tema='escuro'] .planning-upcoming time, :root[data-tema='escuro'] .annual-calendar a svg, :root[data-tema='escuro'] .campaign-card > svg { color: #9ed4bd; }
-:root[data-tema='escuro'] .annual-calendar h3 { color: #d9eee5; }
+:root[data-tema='escuro'] .annual-calendar h3, :root[data-tema='escuro'] .annual-calendar__sem-data h3 { color: #d9eee5; }
+:root[data-tema='escuro'] .situacao--proxima { color: #b9daf0; background: #1b3242; }
+:root[data-tema='escuro'] .situacao--em_andamento { color: #b4e6cd; background: #16392a; }
+:root[data-tema='escuro'] .situacao--encerrada, :root[data-tema='escuro'] .situacao--concluida { color: #c3cfca; background: #243029; }
+:root[data-tema='escuro'] .situacao--cancelada { color: #dcc5cf; background: #36282e; }
+:root[data-tema='escuro'] .situacao--sem_data { color: #f0d49a; background: #3a2d13; }
 :root[data-tema='escuro'] .campaign-status--planning, :root[data-tema='escuro'] .status--planned, :root[data-tema='escuro'] .priority--normal { color: #d5ded9; background: #35413c; }
 :root[data-tema='escuro'] .campaign-status--preparing, :root[data-tema='escuro'] .status--in_progress, :root[data-tema='escuro'] .priority--high { color: #ead9a7; background: #3c3322; }
 :root[data-tema='escuro'] .campaign-status--happening, :root[data-tema='escuro'] .status--completed { color: #d9eee5; background: #244638; }

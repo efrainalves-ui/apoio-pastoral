@@ -201,12 +201,12 @@ test('as campanhas informadas viram cadastro no Evangelismo, com Semana Santa, s
   await expect(page.getByRole('status').filter({ hasText: 'Campanha cadastrada no Evangelismo' })).toContainText(`Campanha — ${SUL.nome}`)
   await expect(page.getByRole('button', { name: /^Cadastrar campanha/ })).toHaveCount(0)
 
-  // No Evangelismo: realizadas, com a origem no lugar da data.
+  // No Evangelismo: sem data inventada, com o trimestre do relatório no lugar dela.
   await navigateInsideApp(page, '/app/evangelismo', page.getByRole('heading', { name: 'Campanhas', exact: true }))
   const cartoes = page.locator('.campaign-card')
   await expect(cartoes).toHaveCount(3)
-  await expect(cartoes.filter({ hasText: 'Semana Santa' })).toContainText('Relatório Integrado · 1º trimestre de 2026')
-  await expect(cartoes.filter({ hasText: 'Semana Santa' })).toContainText('Concluída')
+  await expect(cartoes.filter({ hasText: 'Semana Santa' })).toContainText('Data não informada · 1º trimestre de 2026')
+  await expect(cartoes.filter({ hasText: 'Semana Santa' })).not.toContainText('Em andamento')
 
   // Reabrir e importar o mesmo PDF de novo não cria outra.
   await abrirRelatorio(page)
