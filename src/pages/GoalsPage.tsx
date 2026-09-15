@@ -4,7 +4,6 @@ import { Card } from '../components/ui/Card'
 import { CountUp } from '../components/ui/CountUp'
 import { ProgressRing } from '../components/ui/ProgressRing'
 import { GOAL_AREAS, GOAL_AREA_LABELS, PERCENT_TARGET_AREAS, areaComparison, crescimentoDaMeta } from '../goals/areas'
-import { MONTH_LABELS } from '../goals/format'
 import { useQuadroDeGrupos } from '../missionary/useQuadroDeGrupos'
 import { useGoalSources } from '../goals/useGoalSources'
 import { useAuthVault } from '../auth/AuthVaultContext'
@@ -94,10 +93,6 @@ export function GoalsPage() {
                       <div><small>Falta</small><strong>{crescimento.alvo > 0 ? `${crescimento.falta.toFixed(1).replace('.', ',')} p.p.` : '—'}</strong></div>
                     </div>
                     </div>
-                    {crescimento.ateOMes > 0
-                      ? <p className="goal-card__percent">Janeiro a {MONTH_LABELS[crescimento.ateOMes - 1]}, nos dois anos: {formatGoalValue(area, crescimento.anterior)} → {formatGoalValue(area, crescimento.atual)}</p>
-                      : <p className="goal-card__percent">Envie o Comparativo de Entradas deste ano</p>}
-                    {crescimento.objetivoAnual > 0 && <p className="goal-card__percent">Meta do ano: {formatGoalValue(area, crescimento.objetivoAnual)} · {year - 1} fechou em {formatGoalValue(area, crescimento.anoAnteriorFechado)}</p>}
                   </>
                   : <>
                     <div className={progresso.objective > 0 ? 'meta-anel' : undefined}>
@@ -108,8 +103,6 @@ export function GoalsPage() {
                       <div><small>Falta</small><strong>{progresso.target > 0 ? formatGoalValue(area, progresso.missing) : '—'}</strong></div>
                     </div>
                     </div>
-                    <p className="goal-card__percent">{progresso.objective > 0 ? `${progresso.percent}% alcançado` : 'Defina a meta do ano para acompanhar'}</p>
-                    {progresso.hasPrevious && <p className="goal-card__percent">{year - 1}: {formatGoalValue(area, progresso.previous)}</p>}
                   </>}
                 <Link className="button button--secondary" to={`/app/metas/${area}`}>Acompanhar</Link>
               </div>
