@@ -53,7 +53,7 @@ async function enviarEGravar(page: Page, arquivo: string, trimestre: number, con
 }
 
 const irAoInicio = (page: Page) => navigateInsideApp(page, '/app', page.getByRole('heading', { name: 'Plano Estratégico da Divisão Sul-Americana — 2026–2030' }))
-const cartao = (page: Page, nome: string) => page.getByRole('link', { name: new RegExp(`^${nome}\\. `, 'u') })
+const cartao = (page: Page, nome: string) => page.getByRole('link', { name: new RegExp(`^${nome}: `, 'u') })
 const numeroDo = (page: Page, nome: string) => cartao(page, nome).locator('.plano-card__numero')
 
 /** Menor contraste (WCAG) entre o texto e o fundo real do elemento, no tema aplicado. */
@@ -107,9 +107,11 @@ test('Plano Estratégico: cartões com o Relatório Integrado, detalhe da área 
   await expect(numeroDo(page, 'Identidade Adventista')).toHaveText('12')
   await expect(numeroDo(page, 'Discipulado')).toHaveText('4')
   await expect(numeroDo(page, 'Liderança')).toHaveText('—')
-  await expect(cartao(page, 'Discipulado')).toContainText('Pessoas ministrando estudos bíblicos')
-  await expect(cartao(page, 'Discipulado')).toContainText('1º tri de 2026')
-  await expect(cartao(page, 'Identidade Adventista')).toContainText('2026 · até o 1º tri')
+  // No cartão ficam só símbolo, nome, número, propósito e "Ver detalhes".
+  await expect(cartao(page, 'Discipulado')).toContainText('Viver o discipulado')
+  await expect(cartao(page, 'Discipulado')).not.toContainText('Pessoas ministrando estudos bíblicos')
+  await expect(cartao(page, 'Discipulado')).not.toContainText('tri')
+  await expect(cartao(page, 'Identidade Adventista')).not.toContainText('2026')
 
   // Teclado: o cartão é um link e abre com Enter.
   await cartao(page, 'Discipulado').focus()
@@ -117,15 +119,20 @@ test('Plano Estratégico: cartões com o Relatório Integrado, detalhe da área 
   await expect(page).toHaveURL(/\/app\/plano-estrategico\/discipulado$/)
   await expect(page.getByRole('heading', { name: 'Discipulado', level: 1 })).toBeVisible()
   await expect(page.locator('.plano-distrito__numero')).toHaveText('4')
-  await expect(page.locator('.plano-distrito__dados')).toContainText('1 de 2')
+  await expect(page.locator('.plano-distrito__dados')).toContainText('Ano de 2026')
   await expect(page.locator('.plano-distrito__dados')).toContainText('Sem base de comparação')
   await expect(page.getByRole('row', { name: new RegExp(SUL) })).toContainText('Sem relatório')
   await expect(page.getByRole('row', { name: new RegExp(NORTE) })).toContainText('Informado')
   await expect(page.getByRole('heading', { name: 'Responderam (1)', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Não responderam (1)', exact: true })).toBeVisible()
-  await expect(page.locator('.plano-indicador--principal')).toContainText('Número de pessoas que estão ministrando Estudos Bíblicos.')
-  await expect(page.locator('.plano-indicador--principal')).toContainText('primeiro-plano-ficticio.pdf · 1º tri · 1 igreja(s)')
+  // O indicador mostra só nome, número e o detalhe da área: nada de seção, pergunta, cálculo ou arquivo.
+  await expect(page.locator('.plano-indicador--principal')).toContainText('Pessoas dando estudos')
+  await expect(page.locator('.plano-indicador--principal .plano-indicador__numero')).toHaveText('4')
   await expect(page.locator('.plano-indicador').filter({ hasText: 'Estudos bíblicos (gerais)' })).toHaveCount(1)
+  const area = page.locator('.plano-area-page')
+  for (const tecnico of ['Seção', 'Pergunta', 'Cálculo', 'Arquivos', '.pdf', 'pág.', 'Soma dos trimestres', 'igreja(s)', 'Igrejas que informaram']) {
+    await expect(area, tecnico).not.toContainText(tecnico)
+  }
 
   // Dois trimestres, as duas igrejas.
   await enviarEGravar(page, 'segundo-plano-ficticio.pdf', 2, relatorioIntegradoFicticio(2, [

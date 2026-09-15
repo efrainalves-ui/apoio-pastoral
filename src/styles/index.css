@@ -3490,6 +3490,51 @@ html .agenda-page .ponto-categoria.categoria-visual { width: 7px; height: 7px; b
 .tira-abas.area--discipulado .chip-aba--ativa { box-shadow: inset 0 -3px 0 var(--area); }
 .ri-acao-indicador { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 10px; }
 .sermon-preaching-list__distrito { color: var(--muted); font-weight: 500; }
+
+/*
+  Cartões da tela inicial: o cartão inteiro é o caminho.
+
+  Hierarquia curta — ícone e título em cima, número grande no meio, um detalhe
+  embaixo. A lista fica na página que o cartão abre; aqui ela só faria o pastor
+  rolar. O tom de atenção muda a borda e o ícone, nunca o fundo inteiro.
+*/
+.grade-inicio { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; align-items: stretch; }
+.cartao-inicio { display: flex; flex-direction: column; gap: 14px; padding: 20px; color: var(--ink); text-decoration: none; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.cartao-inicio:hover { transform: translateY(-2px); border-color: var(--green-700); box-shadow: var(--shadow); }
+.cartao-inicio:focus-visible { outline: 3px solid var(--green-800); outline-offset: 3px; }
+.cartao-inicio__topo { display: flex; align-items: center; gap: 10px; }
+.cartao-inicio__icone { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: 12px; color: var(--green-800); background: var(--green-50); }
+.cartao-inicio__icone svg { width: 20px; height: 20px; }
+.cartao-inicio__titulo { flex: 1; min-width: 0; margin: 0; font-family: inherit; font-size: .95rem; font-weight: 700; line-height: 1.25; letter-spacing: 0; overflow-wrap: anywhere; }
+.cartao-inicio__seta { width: 18px; height: 18px; flex: none; color: var(--muted); }
+.cartao-inicio__corpo { display: flex; flex-direction: column; gap: 10px; }
+.cartao-inicio__vazio { color: var(--muted); font-size: .88rem; line-height: 1.45; }
+.cartao-inicio__extra { color: var(--muted); font-size: .8rem; line-height: 1.35; overflow-wrap: anywhere; }
+.cartao-inicio--atencao .cartao-inicio__icone { color: #7a4f00; background: var(--ambar-fraca, #fbf0d8); }
+.cartao-inicio--atencao { border-color: #e2c48c; }
+.cartao-inicio--ok .cartao-inicio__icone { color: var(--green-800); background: var(--green-100); }
+.cartao-numeros { display: flex; flex-wrap: wrap; gap: 10px 20px; }
+.cartao-numero { display: grid; gap: 1px; min-width: 0; }
+.cartao-numero strong { font-size: 1.8rem; line-height: 1; font-variant-numeric: tabular-nums; color: var(--green-900); }
+.cartao-numero small { color: var(--muted); font-size: .76rem; line-height: 1.3; }
+.cartao-inicio--atencao .cartao-numero strong { color: #8a5a00; }
+.cartao-agenda { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--cat-fundo-atual); box-shadow: inset 4px 0 0 var(--cat-faixa-atual); }
+.cartao-agenda__hora { font-size: 1.25rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); }
+.cartao-agenda__corpo { min-width: 0; display: grid; gap: 2px; }
+.cartao-agenda__corpo strong { overflow-wrap: anywhere; line-height: 1.25; }
+.cartao-agenda__corpo small { color: var(--ink); font-size: .78rem; overflow-wrap: anywhere; }
+.cartao-pessoas { display: grid; gap: 8px; }
+.cartao-pessoas__item { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cartao-pessoas__item > span:last-child { min-width: 0; display: grid; gap: 1px; }
+.cartao-pessoas__item strong { font-size: .88rem; overflow-wrap: anywhere; }
+.cartao-pessoas__item small { color: var(--muted); font-size: .74rem; }
+.cartao-inicio .marca-da-area { flex: none; }
+
+/* Áreas estratégicas: indicadores em linhas limpas, sem informação técnica. */
+.plano-indicadores .plano-indicador { display: flex; align-items: center; gap: 10px; padding: 11px 14px; }
+.plano-indicador__nome { flex: 1; min-width: 0; line-height: 1.35; overflow-wrap: anywhere; }
+.plano-indicador--principal .plano-indicador__nome { font-weight: 700; }
+@media (max-width: 520px) { .plano-indicadores .plano-indicador { align-items: flex-start; } .plano-indicador__numero { padding-top: 1px; } }
 .linha-compromisso__acoes { display: flex; gap: 2px; }
 .linha-compromisso__acoes .icon-button { width: 36px; min-width: 36px; height: 36px; min-height: 36px; }
 @media (max-width: 640px) {

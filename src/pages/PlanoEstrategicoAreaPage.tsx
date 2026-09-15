@@ -14,7 +14,7 @@ import { rotuloDoTrimestre } from '../integrated-report/types'
 import { useRelatorioIntegrado } from '../integrated-report/useRelatorioIntegrado'
 import {
   TITULO_DO_PLANO, anoDeReferencia, areaPorSlug, comparacaoDaArea, evolucaoDoAno, formatarNumero, indicadoresQueCompoem,
-  leituraPrincipalDaIgreja, origensNoPeriodo, resultadoDaArea, textoDaDiferenca, type AreaDoPlano,
+  leituraPrincipalDaIgreja, resultadoDaArea, textoDaDiferenca, type AreaDoPlano,
 } from '../plano-estrategico/areas'
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 
@@ -96,11 +96,9 @@ function DetalheDaArea({ area }: { area: AreaDoPlano }) {
 
     <section className="card plano-distrito" aria-labelledby="plano-distrito-titulo">
       <h2 className="card__title" id="plano-distrito-titulo">Resultado do distrito</h2>
-      <p className="plano-distrito__rotulo">{area.principal.rotulo}</p>
       <p className="plano-distrito__numero">{numeroOuTraco(resultado.numero)}</p>
       <dl className="plano-distrito__dados">
         <div><dt>Período</dt><dd>{rotuloDoPeriodo}</dd></div>
-        <div><dt>Igrejas que informaram</dt><dd>{resultado.informaram} de {ativas.length}</dd></div>
         <div><dt>{rotuloDaComparacao(comparacao.de, comparacao.para)}</dt><dd className={`plano-tendencia plano-tendencia--${comparacao.tendencia}`}>{textoDaDiferenca(comparacao.diferenca, comparacao.percentual)}</dd></div>
       </dl>
     </section>
@@ -126,7 +124,7 @@ function DetalheDaArea({ area }: { area: AreaDoPlano }) {
     <Card title="Comparação entre trimestres" eyebrow={String(ano)}>
       <div className="plano-tabela">
         <table>
-          <thead><tr><th scope="col">Trimestre</th><th scope="col">Resultado</th><th scope="col">Diferença</th><th scope="col">Igrejas que informaram</th></tr></thead>
+          <thead><tr><th scope="col">Trimestre</th><th scope="col">Resultado</th><th scope="col">Diferença</th></tr></thead>
           <tbody>{evolucao.map(({ chave, resultado: item }, indice) => {
             const anterior = indice === 0 ? resultadoDaArea(relatorios, ativas, area, trimestreAnterior(ano, 1)) : evolucao[indice - 1]!.resultado
             const diferenca = comparar(anterior.numero, item.numero)
@@ -134,7 +132,6 @@ function DetalheDaArea({ area }: { area: AreaDoPlano }) {
               <th scope="row">{rotuloDoTrimestre(chave)}</th>
               <td>{numeroOuTraco(item.numero)}</td>
               <td>{textoDaDiferenca(diferenca.diferenca, diferenca.percentual, '—')}</td>
-              <td>{item.informaram} de {ativas.length}</td>
             </tr>
           })}</tbody>
         </table>
@@ -175,23 +172,17 @@ function DetalheDaArea({ area }: { area: AreaDoPlano }) {
     </Card>
 
     <Card title="Indicadores que compõem o resultado" eyebrow={rotuloDoPeriodo} action={<Link className="text-link" to="/app/metas/relatorio-integrado">Relatório Integrado<ChevronRight aria-hidden="true" /></Link>}>
+      {/*
+        Linhas limpas: nome à esquerda, número à direita e o detalhe da área.
+        Seção, pergunta do relatório, arquivos e regra de cálculo continuam no
+        código e no Relatório Integrado — na tela, atrapalhavam a leitura.
+      */}
       <ul className="plano-indicadores">{indicadoresQueCompoem(area).map(({ indicador, principal, recorte }) => {
         const numero = principal ? resultado.numero : leituraDoDistrito(relatorios, ativas, indicador.id, periodo).numero
-        const origens = origensNoPeriodo(relatorios, ativas, indicador.id, periodo)
         return <li key={indicador.id} className={`plano-indicador ${principal ? 'plano-indicador--principal' : ''}`}>
-          <div className="plano-indicador__cabeca">
-            <span className="plano-indicador__marca" aria-hidden="true" />
-            <strong>{principal ? area.principal.rotulo : rotuloCurto(indicador)}</strong>
-            <span className="plano-indicador__numero">{numeroOuTraco(numero)}</span>
-          </div>
-          <dl className="plano-indicador__origem">
-            <div><dt>Seção</dt><dd>{indicador.secao}</dd></div>
-            <div><dt>Pergunta</dt><dd>{indicador.rotulo}{recorte ? ` · ${recorte}` : ''}</dd></div>
-            <div><dt>Cálculo</dt><dd>{indicador.tratamento === 'somar' ? 'Soma das igrejas; no ano, soma dos trimestres' : 'Soma das igrejas; no ano, último trimestre informado de cada igreja'}</dd></div>
-            <div><dt>Arquivos</dt><dd>{origens.length
-              ? origens.map((origem) => `${origem.arquivo} · ${rotuloCurtoDoTrimestre(origem.trimestre)} · ${origem.igrejas} igreja(s)${origem.paginas.length ? ` · pág. ${origem.paginas.join(', ')}` : ''}`).join('; ')
-              : 'Nenhum no período'}</dd></div>
-          </dl>
+          <span className="plano-indicador__marca" aria-hidden="true" />
+          <span className="plano-indicador__nome">{rotuloCurto(indicador)}{recorte ? ` · ${recorte}` : ''}</span>
+          <span className="plano-indicador__numero">{numeroOuTraco(numero)}</span>
         </li>
       })}</ul>
     </Card>

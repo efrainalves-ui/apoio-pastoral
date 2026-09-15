@@ -52,8 +52,8 @@ describe('painel inicial', () => {
   it('mostra o cartão Fidelidade sem valores financeiros', async () => {
     render(<MemoryRouter><HomePage /></MemoryRouter>)
     expect(await screen.findByRole('heading', { name: 'Fidelidade' })).toBeInTheDocument()
-    expect(screen.getByText('Dizimistas não sistemáticos')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Abrir Fidelidade/i })).toHaveAttribute('href', '/app/fidelidade')
+    expect(screen.getByText('não sistemáticos')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Fidelidade' })).toHaveAttribute('href', '/app/fidelidade')
     /*
       O número sobe animado. Conferi-lo sem esperar pega o meio da contagem — o
       que o teste media era a animação, não o dado.
@@ -61,7 +61,17 @@ describe('painel inicial', () => {
     await waitFor(() => expect(screen.getByText('Em oração').parentElement).toHaveTextContent('Em oração1'))
     expect(screen.queryByText('Conteúdo reservado fictício')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Evangelismo' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Abrir Evangelismo/i })).toHaveAttribute('href', '/app/evangelismo')
+    expect(screen.getByRole('link', { name: 'Evangelismo' })).toHaveAttribute('href', '/app/evangelismo')
+  })
+
+  it('os cartões são curtos: número e caminho, sem listas nem "Pessoas por igreja"', async () => {
+    render(<MemoryRouter><HomePage /></MemoryRouter>)
+    expect(await screen.findByRole('link', { name: 'Tarefas que pedem atenção' })).toHaveAttribute('href', '/app/visitacao?aba=tarefas&filtro=atencao')
+    expect(screen.getByRole('link', { name: 'Igrejas que precisam de atenção' })).toHaveAttribute('href', '/app/distrito/atencao')
+    expect(screen.getByRole('link', { name: 'Agenda' })).toHaveAttribute('href', '/app/agenda')
+    expect(screen.getByRole('link', { name: 'Aniversariantes' })).toHaveAttribute('href', '/app/aniversarios')
+    expect(screen.getByRole('link', { name: 'Interessados e estudos' })).toHaveAttribute('href', '/app/missionario')
+    expect(screen.queryByRole('heading', { name: 'Pessoas por igreja' })).not.toBeInTheDocument()
   })
 
   it('mostra o Plano Estratégico em quatro cartões e a visitação só em resumo', async () => {
@@ -71,7 +81,7 @@ describe('painel inicial', () => {
       ['Identidade Adventista', 'identidade'], ['Liderança', 'lideranca'], ['Novas Gerações', 'novas-geracoes'], ['Discipulado', 'discipulado'],
     ] as const
     for (const [nome, slug] of cartoes) {
-      const cartao = screen.getByRole('link', { name: new RegExp(`^${nome}\\. .*: sem informação\\. Sem relatório em \\d{4}\\. Ver detalhes$`, 'u') })
+      const cartao = screen.getByRole('link', { name: `${nome}: sem informação. Ver detalhes` })
       expect(cartao).toHaveAttribute('href', `/app/plano-estrategico/${slug}`)
       expect(cartao).toHaveTextContent('—')
     }
