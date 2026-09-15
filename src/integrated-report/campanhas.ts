@@ -1,10 +1,16 @@
-import type { EvangelismCampaignEntity } from '../evangelism/types'
+import type { CampaignObjective, EvangelismCampaignEntity } from '../evangelism/types'
 import { mesesDoTrimestre } from './metas'
-import { numeroDoValor } from './service'
+import { numeroDoValor, valorGuardado } from './service'
 import type { RelatorioIntegradoEntity } from './types'
 
 /** O indicador que declara quantas campanhas a igreja realizou no trimestre. */
 export const CAMPANHAS_NO_RELATORIO = 'evangelismo--numero-de-campanhas-evangelisticas-em-geral'
+
+/** As perguntas do relatório que só existem quando houve Semana Santa. */
+export const SEMANA_SANTA_NO_RELATORIO: readonly string[] = [
+  'ministerio-pessoal--pontos-de-pregacao-de-semana-santa-igreja-pgs',
+  'ministerio-pessoal--total-de-amigos-presentes-na-semana-santa',
+]
 
 export interface ConferenciaDeCampanhas {
   churchId: string
@@ -13,8 +19,6 @@ export interface ConferenciaDeCampanhas {
   /** Campanhas já cadastradas que caem dentro daquele trimestre. */
   cadastradas: EvangelismCampaignEntity[]
   /**
-   * O que precisa de olho humano.
-   *
    * `faltam_cadastrar`: a igreja declarou mais do que existe cadastrado.
    * `sobram_cadastradas`: existe mais cadastrado do que ela declarou.
    * `confere`: os números batem — o que não prova que são as mesmas campanhas.
@@ -43,14 +47,9 @@ export function noTrimestre(campanha: EvangelismCampaignEntity, trimestre: strin
 /**
  * Compara o que a igreja declarou com o que está cadastrado — e não decide nada.
  *
- * O pastor pediu que o relatório não crie campanha nem meta: ele quer saber se
- * já existe campanha cadastrada para aquela igreja naquele trimestre. Por isso
- * aqui não se une, não se apaga e não se cria. Quando os números não batem, a
- * diferença aparece para ele olhar.
- *
  * A comparação é por igreja e por período, nunca pelo texto do nome: nome de
- * campanha se repete entre anos e entre igrejas, e deduplicar por ele juntaria
- * coisas diferentes ou separaria coisas iguais.
+ * campanha se repete entre anos e entre igrejas. Campanha criada a partir do
+ * relatório conta pela origem, porque nasce sem data.
  */
 export function conferirCampanhas(
   relatorios: readonly RelatorioIntegradoEntity[],
@@ -60,7 +59,7 @@ export function conferirCampanhas(
   const saida: ConferenciaDeCampanhas[] = []
   for (const relatorio of relatorios) {
     if (relatorio.trimestre !== trimestre) continue
-    const declaradas = numeroDoValor(relatorio.valores[CAMPANHAS_NO_RELATORIO])
+    const declaradas = numeroDoValor(valorGuardado(relatorio, CAMPANHAS_NO_RELATORIO))
     if (declaradas === null) continue
 
     const cadastradas = campanhas.filter((campanha) =>
@@ -84,4 +83,46 @@ export function conferirCampanhas(
 /** Quantas linhas precisam de conferência humana. */
 export function contarDivergencias(conferencia: readonly ConferenciaDeCampanhas[]): number {
   return conferencia.filter(({ situacao }) => situacao !== 'confere').length
+}
+
+/** O relatório daquele trimestre traz Semana Santa realizada. */
+export function informouSemanaSanta(relatorio: RelatorioIntegradoEntity): boolean {
+  return SEMANA_SANTA_NO_RELATORIO.some((id) => (numeroDoValor(valorGuardado(relatorio, id)) ?? 0) > 0)
+}
+
+/**
+ * O nome de uma campanha que o relatório informou sem dizer como se chamava.
+ *
+ * "Campanha — Monte Sião" quando é uma; "Campanha 1 — Monte Sião",
+ * "Campanha 2 — Monte Sião" quando são várias. Se o relatório traz Semana
+ * Santa, a primeira é ela, com o nome dela.
+ */
+export function nomeDaCampanhaDoRelatorio(igreja: string, indice: number, informadas: number, semanaSanta: boolean): string {
+  if (semanaSanta && indice === 1) return 'Semana Santa'
+  return informadas > 1 ? `Campanha ${indice} — ${igreja}` : `Campanha — ${igreja}`
+}
+
+export const objetivoDoNome = (nome: string): CampaignObjective => nome === 'Semana Santa' ? 'holy_week' : 'other'
+
+/**
+ * Campanhas criadas pelo botão antigo, sem nome, e o nome que devem receber.
+ *
+ * Reprocessa o que já existe em vez de criar outra: o identificador fica, e só
+ * nome e objetivo mudam. A que já tem nome não é tocada.
+ */
+export function campanhasSemNome(
+  campanhas: readonly EvangelismCampaignEntity[],
+  relatorios: readonly RelatorioIntegradoEntity[],
+  nomeDaIgreja: (churchId: string) => string,
+): Array<{ id: string; name: string; objective: CampaignObjective }> {
+  return campanhas.filter((campanha) => campanha.origemRelatorio && !campanha.name.trim()).map((campanha) => {
+    const origem = campanha.origemRelatorio!
+    const relatorio = relatorios.find((item) => item.churchId === origem.churchId && item.trimestre === origem.trimestre)
+    const informadas = Math.max(numeroDoValor(relatorio ? valorGuardado(relatorio, CAMPANHAS_NO_RELATORIO) : undefined) ?? 0, origem.indice)
+    const semanaSanta = Boolean(relatorio && informouSemanaSanta(relatorio))
+      && !campanhas.some((outra) => outra.id !== campanha.id && outra.objective === 'holy_week' && outra.churchIds.includes(origem.churchId)
+        && (outra.origemRelatorio?.trimestre === origem.trimestre || noTrimestre(outra, origem.trimestre)))
+    const name = nomeDaCampanhaDoRelatorio(nomeDaIgreja(origem.churchId), origem.indice, informadas, semanaSanta)
+    return { id: campanha.id, name, objective: objetivoDoNome(name) }
+  })
 }

@@ -1,6 +1,6 @@
-import { CATALOGO_DO_RELATORIO, indicadorPorId, type ClasseDaEscolaSabatina } from './catalogo'
+import { CATALOGO_DO_RELATORIO, indicadorPorId, type ClasseDaEscolaSabatina, type IndicadorDoRelatorio } from './catalogo'
 import { lancamentosDoTrimestre } from './metas'
-import { numeroDoValor } from './service'
+import { numeroDoValor, possivelErroDeDigitacao, valorAnterior, valorGuardado } from './service'
 import { compararTrimestres, type RelatorioIntegradoEntity, type ValorDoIndicador } from './types'
 
 /**
@@ -10,13 +10,14 @@ import { compararTrimestres, type RelatorioIntegradoEntity, type ValorDoIndicado
  * Um período é um trimestre do ano ou o ano completo (`trimestre` nulo). Nos
  * indicadores que somam, o ano é a soma dos trimestres; nos que são fotografia
  * — Escola Sabatina, Pequenos Grupos, Unidades de Ação —, o ano vale o último
- * trimestre confirmado de cada igreja.
+ * trimestre informado de cada igreja.
  */
 export interface Periodo { ano: number; trimestre: number | null }
 
 export const rotuloCurtoDoTrimestre = (trimestre: string) => `${trimestre.split('-')[1]}º tri`
 export const trimestresDoAno = (ano: number) => [1, 2, 3, 4].map((numero) => `${ano}-${numero}`)
 const doAno = (relatorio: RelatorioIntegradoEntity, ano: number) => relatorio.trimestre.startsWith(`${ano}-`)
+const trimestresDoPeriodo = (periodo: Periodo) => periodo.trimestre === null ? trimestresDoAno(periodo.ano) : [`${periodo.ano}-${periodo.trimestre}`]
 
 /** Anos com relatório, do mais recente ao mais antigo; o ano corrente sempre entra. */
 export function anosDosRelatorios(relatorios: readonly RelatorioIntegradoEntity[], anoCorrente: number): number[] {
@@ -27,13 +28,12 @@ export function anosDosRelatorios(relatorios: readonly RelatorioIntegradoEntity[
  * Os estados de um número, que a tela nunca confunde.
  *
  * `informado` inclui o zero. `nao_respondido` é traço, ou pergunta sem resposta
- * num relatório entregue. `sem_relatorio` é a igreja que não entregou. `aguardando`
- * é o valor que destoou e espera confirmação. `recusado` foi visto e rejeitado.
+ * num relatório entregue. `sem_relatorio` é a igreja que não entregou.
  */
-export type Situacao = 'informado' | 'nao_respondido' | 'sem_relatorio' | 'aguardando' | 'recusado'
+export type Situacao = 'informado' | 'nao_respondido' | 'sem_relatorio'
 
 export const ROTULO_DA_SITUACAO: Record<Situacao, string> = {
-  informado: 'Informado', nao_respondido: 'Não respondido', sem_relatorio: 'Sem relatório', aguardando: 'Aguardando confirmação', recusado: 'Recusado',
+  informado: 'Informado', nao_respondido: 'Sem informação', sem_relatorio: 'Sem relatório',
 }
 
 export interface Leitura {
@@ -48,11 +48,8 @@ const vazia = (situacao: Situacao): Leitura => ({ situacao, numero: null, valor:
 
 function leituraDoTrimestre(relatorio: RelatorioIntegradoEntity | undefined, indicadorId: string): Leitura {
   if (!relatorio) return vazia('sem_relatorio')
-  const valor = relatorio.valores[indicadorId]
+  const valor = valorGuardado(relatorio, indicadorId)
   if (valor) return { situacao: 'informado', numero: numeroDoValor(valor), valor, trimestre: relatorio.trimestre }
-  const pendente = relatorio.pendentes?.[indicadorId]
-  if (pendente) return { situacao: 'aguardando', numero: numeroDoValor(pendente), valor: pendente, trimestre: relatorio.trimestre }
-  if (relatorio.recusados?.includes(indicadorId)) return { ...vazia('recusado'), trimestre: relatorio.trimestre }
   return { ...vazia('nao_respondido'), trimestre: relatorio.trimestre }
 }
 
@@ -67,13 +64,12 @@ export function leituraDaIgreja(
     return leituraDoTrimestre(daIgreja.find(({ trimestre }) => trimestre === `${periodo.ano}-${periodo.trimestre}`), indicadorId)
   }
   if (!daIgreja.length) return vazia('sem_relatorio')
-  const leituras = [...daIgreja].sort((a, b) => compararTrimestres(a.trimestre, b.trimestre)).map((relatorio) => leituraDoTrimestre(relatorio, indicadorId))
-  const informadas = leituras.filter(({ situacao }) => situacao === 'informado')
-  if (!informadas.length) {
-    return vazia(leituras.some(({ situacao }) => situacao === 'aguardando') ? 'aguardando' : leituras.some(({ situacao }) => situacao === 'recusado') ? 'recusado' : 'nao_respondido')
-  }
-  const indicador = indicadorPorId(indicadorId)
-  if (indicador?.tratamento === 'somar') {
+  const informadas = [...daIgreja]
+    .sort((a, b) => compararTrimestres(a.trimestre, b.trimestre))
+    .map((relatorio) => leituraDoTrimestre(relatorio, indicadorId))
+    .filter(({ situacao }) => situacao === 'informado')
+  if (!informadas.length) return vazia('nao_respondido')
+  if (indicadorPorId(indicadorId)?.tratamento === 'somar') {
     const numeros = informadas.map(({ numero }) => numero).filter((numero): numero is number => numero !== null)
     return { situacao: 'informado', numero: numeros.length ? numeros.reduce((soma, numero) => soma + numero, 0) : null, valor: null, trimestre: informadas.length === 1 ? informadas[0]!.trimestre : null }
   }
@@ -85,8 +81,6 @@ export interface LeituraDoDistrito {
   informaram: number
   naoResponderam: number
   semRelatorio: number
-  aguardando: number
-  recusados: number
   /** O trimestre mais recente dos números, nos indicadores de fotografia. */
   trimestre: string | null
 }
@@ -105,8 +99,6 @@ export function leituraDoDistrito(
     informaram: contar('informado'),
     naoResponderam: contar('nao_respondido'),
     semRelatorio: contar('sem_relatorio'),
-    aguardando: contar('aguardando'),
-    recusados: contar('recusado'),
     trimestre: leituras.map(({ trimestre }) => trimestre).filter((item): item is string => item !== null).sort(compararTrimestres).at(-1) ?? null,
   }
 }
@@ -142,11 +134,13 @@ export function serieTrimestral(relatorios: readonly RelatorioIntegradoEntity[],
   return [1, 2, 3, 4].map((trimestre) => leituraDoDistrito(relatorios, igrejas, indicadorId, { ano, trimestre }))
 }
 
+export type ComparacaoDoPeriodo = Comparacao & { de: string | null; para: string | null }
+
 /**
  * A comparação que cabe no período: no trimestre, contra o anterior; no ano,
  * entre os dois últimos trimestres que têm número.
  */
-export function comparacaoDoPeriodo(relatorios: readonly RelatorioIntegradoEntity[], igrejas: readonly string[], indicadorId: string, periodo: Periodo): Comparacao & { de: string | null; para: string | null } {
+export function comparacaoDoPeriodo(relatorios: readonly RelatorioIntegradoEntity[], igrejas: readonly string[], indicadorId: string, periodo: Periodo): ComparacaoDoPeriodo {
   if (periodo.trimestre !== null) {
     const antes = trimestreAnterior(periodo.ano, periodo.trimestre)
     return {
@@ -162,14 +156,6 @@ export function comparacaoDoPeriodo(relatorios: readonly RelatorioIntegradoEntit
   return { ...comparar(penultimo.leitura.numero, ultimo.leitura.numero), de: penultimo.trimestre, para: ultimo.trimestre }
 }
 
-/** Quem entregou cada trimestre do ano. */
-export function entregasDoAno(relatorios: readonly RelatorioIntegradoEntity[], igrejas: readonly string[], ano: number): Array<{ churchId: string; trimestres: boolean[] }> {
-  return igrejas.map((churchId) => ({
-    churchId,
-    trimestres: trimestresDoAno(ano).map((trimestre) => relatorios.some((relatorio) => relatorio.churchId === churchId && relatorio.trimestre === trimestre)),
-  }))
-}
-
 export function coberturaDoPeriodo(relatorios: readonly RelatorioIntegradoEntity[], igrejas: readonly string[], periodo: Periodo): { responderam: string[]; naoResponderam: string[] } {
   const entregou = (churchId: string) => relatorios.some((relatorio) => relatorio.churchId === churchId && (periodo.trimestre === null
     ? doAno(relatorio, periodo.ano)
@@ -183,8 +169,7 @@ export function coberturaDoPeriodo(relatorios: readonly RelatorioIntegradoEntity
  */
 export function estudosDoPeriodo(relatorios: readonly RelatorioIntegradoEntity[], igrejas: readonly string[], periodo: Periodo): number | null {
   const ativas = new Set(igrejas)
-  const trimestres = periodo.trimestre === null ? trimestresDoAno(periodo.ano) : [`${periodo.ano}-${periodo.trimestre}`]
-  const lancamentos = trimestres.flatMap((trimestre) => lancamentosDoTrimestre(relatorios, trimestre))
+  const lancamentos = trimestresDoPeriodo(periodo).flatMap((trimestre) => lancamentosDoTrimestre(relatorios, trimestre))
     .filter(({ metric, churchId }) => metric === 'bible_studies' && ativas.has(churchId))
   return lancamentos.length ? lancamentos.reduce((soma, { amount }) => soma + amount, 0) : null
 }
@@ -206,15 +191,6 @@ export function historicoDeEnvios(relatorios: readonly RelatorioIntegradoEntity[
     })
   }
   return [...lotes.values()].sort((a, b) => b.em.localeCompare(a.em))
-}
-
-export interface ValorAguardando { relatorio: RelatorioIntegradoEntity; indicadorId: string; rotulo: string; valor: ValorDoIndicador; numero: number | null }
-
-export function valoresAguardando(relatorios: readonly RelatorioIntegradoEntity[], ano: number): ValorAguardando[] {
-  return relatorios.filter((relatorio) => doAno(relatorio, ano)).flatMap((relatorio) =>
-    Object.entries(relatorio.pendentes ?? {}).map(([indicadorId, valor]) => ({
-      relatorio, indicadorId, rotulo: indicadorPorId(indicadorId)?.rotulo ?? indicadorId, valor, numero: numeroDoValor(valor),
-    })))
 }
 
 /** As faixas da Escola Sabatina que o pastor acompanha, a partir das classes do relatório. */
@@ -252,3 +228,125 @@ export function faixasDoIndicador(
 /** Os indicadores com número, que viram gráfico. Sim/não fica só no detalhamento. */
 export const INDICADORES_NUMERICOS = CATALOGO_DO_RELATORIO.filter(({ formato }) => formato !== 'sim_nao')
 export const AREAS_DO_RELATORIO = [...new Set(CATALOGO_DO_RELATORIO.map(({ secao }) => secao))]
+
+export const ESTUDOS_GERAIS = 'ministerio-pessoal--numero-de-pessoas-recebendo-estudos-biblicos'
+export const ESTUDOS_ASA = 'acao-solidaria-adventista--numero-de-pessoas-recebendo-estudos-biblicos-pela-asa'
+
+/** Os nomes que cabem numa linha. O texto completo do relatório continua a um toque. */
+const ROTULOS_CURTOS: Readonly<Record<string, string>> = {
+  [ESTUDOS_GERAIS]: 'Estudos bíblicos (gerais)',
+  [ESTUDOS_ASA]: 'Estudos bíblicos pela ASA',
+  'escola-sabatina--numero-de-pequenos-grupos-da-igreja': 'Pequenos Grupos',
+  'escola-sabatina--numero-de-unidades-de-acao': 'Unidades de Ação',
+  'escola-sabatina--numero-de-alunos-da-escola-sabatina': 'Alunos da Escola Sabatina',
+  'escola-sabatina--numero-de-alunos-presentes': 'Alunos presentes',
+  'escola-sabatina--numero-de-professores-em-cada-classe': 'Professores',
+  'escola-sabatina--numero-de-pessoas-que-tem-sua-licao-da': 'Pessoas com a lição',
+  'escola-sabatina--numero-de-alunos-que-estao-dando-estudos-biblicos': 'Alunos dando estudos',
+  'evangelismo--numero-de-campanhas-evangelisticas-em-geral': 'Campanhas evangelísticas',
+  'evangelismo--numero-de-programas-de-alcance-evangelistico-com-criancas': 'Evangelismo com crianças',
+  'ministerio-pessoal--numero-de-classes-biblicas-em-funcionamento': 'Classes Bíblicas',
+  'ministerio-pessoal--numero-de-duplas-missionarias-ministrando-estudos-biblicos': 'Duplas missionárias',
+  'ministerio-pessoal--numero-de-treinamentos-encontros-missionarios': 'Treinamentos missionários',
+  'ministerio-pessoal--pontos-de-pregacao-de-semana-santa-igreja-pgs': 'Pontos da Semana Santa',
+  'ministerio-pessoal--total-de-amigos-presentes-na-semana-santa': 'Amigos na Semana Santa',
+  'secretaria--numero-de-presentes-na-escola-sabatina': 'Presentes na Escola Sabatina',
+  'secretaria--numero-de-presentes-no-culto-divino': 'Presentes no culto divino',
+  'secretaria--capacidade-instalada-quantos-adultos-cabem-sentados-nos-bancos': 'Capacidade da nave',
+  'planejamento-estrategico--numero-de-pessoas-que-estao-ministrando-estudos-biblicos': 'Pessoas dando estudos',
+  'planejamento-estrategico--numero-de-alunos-que-estudam-diariamente-a-licao': 'Estudam a lição diariamente',
+  'planejamento-estrategico--numero-de-alunos-da-classe-envolvidos-em-frentes': 'Alunos em frentes missionárias',
+  'ancionato--numero-de-anciaos-ancias-da-igreja-ou-diretores': 'Anciãos e diretores',
+  'comunicacao--numero-de-seguidores-que-a-congregacao-possui-somados': 'Seguidores nas redes',
+}
+
+export function rotuloCurto(indicador: Pick<IndicadorDoRelatorio, 'id' | 'rotulo'>): string {
+  const escrito = ROTULOS_CURTOS[indicador.id]
+  if (escrito) return escrito
+  const limpo = indicador.rotulo
+    .replace(/\{[^}]*\}/gu, '').replace(/\([^)]*\)/gu, '').replace(/\s+/gu, ' ').trim()
+    .replace(/[.?:;,]+$/u, '')
+    .replace(/^N[úu]mero de /u, '')
+  const frase = limpo.charAt(0).toLocaleUpperCase('pt-BR') + limpo.slice(1)
+  if (frase.length <= 48) return frase
+  return `${frase.slice(0, 46).replace(/\s+\S*$/u, '')}…`
+}
+
+export interface PossivelErro {
+  churchId: string
+  trimestre: string
+  indicadorId: string
+  anterior: { trimestre: string; numero: number }
+  atual: number
+}
+
+/** O asterisco de um valor: a mudança extrema contra a resposta anterior da mesma igreja. */
+export function possivelErroNoValor(relatorios: readonly RelatorioIntegradoEntity[], churchId: string, indicadorId: string, trimestre: string): PossivelErro | null {
+  const relatorio = relatorios.find((item) => item.churchId === churchId && item.trimestre === trimestre)
+  if (!relatorio) return null
+  const atual = numeroDoValor(valorGuardado(relatorio, indicadorId))
+  const antes = valorAnterior(relatorios, churchId, indicadorId, trimestre)
+  const numeroAntes = numeroDoValor(antes?.valor)
+  if (!antes || atual === null || numeroAntes === null || !possivelErroDeDigitacao(numeroAntes, atual)) return null
+  return { churchId, trimestre, indicadorId, anterior: { trimestre: antes.trimestre, numero: numeroAntes }, atual }
+}
+
+export function possiveisErros(relatorios: readonly RelatorioIntegradoEntity[], igrejas: readonly string[], periodo: Periodo): PossivelErro[] {
+  const trimestres = trimestresDoPeriodo(periodo)
+  return relatorios
+    .filter((relatorio) => igrejas.includes(relatorio.churchId) && trimestres.includes(relatorio.trimestre))
+    .flatMap((relatorio) => INDICADORES_NUMERICOS
+      .map(({ id }) => possivelErroNoValor(relatorios, relatorio.churchId, id, relatorio.trimestre))
+      .filter((erro): erro is PossivelErro => erro !== null))
+}
+
+export interface DesempenhoDaIgreja { churchId: string; leitura: Leitura; comparacao: ComparacaoDoPeriodo }
+
+/** Cada igreja no indicador, com a própria comparação do período. */
+export function desempenhoDasIgrejas(relatorios: readonly RelatorioIntegradoEntity[], igrejas: readonly string[], indicadorId: string, periodo: Periodo): DesempenhoDaIgreja[] {
+  return igrejas.map((churchId) => ({
+    churchId,
+    leitura: leituraDaIgreja(relatorios, churchId, indicadorId, periodo),
+    comparacao: comparacaoDoPeriodo(relatorios, [churchId], indicadorId, periodo),
+  }))
+}
+
+/** Quantos indicadores cresceram, diminuíram ou ficaram estáveis no período. */
+export function tendenciasDosIndicadores(relatorios: readonly RelatorioIntegradoEntity[], igrejas: readonly string[], indicadores: readonly string[], periodo: Periodo): Record<Tendencia, string[]> {
+  const saida: Record<Tendencia, string[]> = { alta: [], queda: [], estavel: [], sem_base: [] }
+  for (const id of indicadores) saida[comparacaoDoPeriodo(relatorios, igrejas, id, periodo).tendencia].push(id)
+  return saida
+}
+
+/** O que precisa vir num relatório para ele não ficar incompleto. */
+export const INDICADORES_ESSENCIAIS: readonly string[] = [
+  ESTUDOS_GERAIS,
+  'escola-sabatina--numero-de-pequenos-grupos-da-igreja',
+  'escola-sabatina--numero-de-unidades-de-acao',
+  'escola-sabatina--numero-de-alunos-da-escola-sabatina',
+  'evangelismo--numero-de-campanhas-evangelisticas-em-geral',
+]
+
+export type SituacaoDaResposta = 'respondeu' | 'incompleto' | 'sem_relatorio'
+
+export interface RespostaDoTrimestre { trimestre: string; situacao: SituacaoDaResposta; faltando: string[]; possiveisErros: number }
+
+/** Quem respondeu cada trimestre, se veio completo e se trouxe algum possível erro de digitação. */
+export function respostasDoAno(relatorios: readonly RelatorioIntegradoEntity[], igrejas: readonly string[], ano: number): Array<{ churchId: string; trimestres: RespostaDoTrimestre[] }> {
+  return igrejas.map((churchId) => ({
+    churchId,
+    trimestres: trimestresDoAno(ano).map((trimestre) => {
+      const relatorio = relatorios.find((item) => item.churchId === churchId && item.trimestre === trimestre)
+      if (!relatorio) return { trimestre, situacao: 'sem_relatorio', faltando: [], possiveisErros: 0 }
+      const faltando = INDICADORES_ESSENCIAIS.filter((id) => !valorGuardado(relatorio, id))
+      const erros = INDICADORES_NUMERICOS.filter(({ id }) => possivelErroNoValor(relatorios, churchId, id, trimestre)).length
+      return { trimestre, situacao: faltando.length ? 'incompleto' : 'respondeu', faltando, possiveisErros: erros }
+    }),
+  }))
+}
+
+/** As perguntas do relatório que a igreja deixou sem informação naquele trimestre. */
+export function camposSemInformacao(relatorio: RelatorioIntegradoEntity | undefined): IndicadorDoRelatorio[] {
+  if (!relatorio) return []
+  return CATALOGO_DO_RELATORIO.filter(({ id }) => !valorGuardado(relatorio, id))
+}

@@ -2,7 +2,7 @@ import { currentDeviceId } from '../auth/device'
 import { encryptPayload } from '../crypto/vault'
 import { readPayload } from '../db/corrupted'
 import { db, type ApoioDatabase } from '../db/database'
-import { VaultRepository } from '../db/repository'
+import { VaultRepository, type EncryptedMutation } from '../db/repository'
 import { indicadorPorId, type IndicadorDoRelatorio } from './catalogo'
 import { compararTrimestres, type RelatorioIntegradoData, type RelatorioIntegradoEntity, type ValorDoIndicador } from './types'
 
@@ -18,12 +18,15 @@ export function numeroDoValor(valor: ValorDoIndicador | undefined): number | nul
   return null
 }
 
-/** O mesmo valor com outro número, quando o pastor corrige o que o papel dizia. */
-export function comNumero(valor: ValorDoIndicador, novo: number): ValorDoIndicador {
-  if (valor.tipo === 'numero') return { tipo: 'numero', valor: novo }
-  if (valor.tipo === 'por_sabado') return { tipo: 'por_sabado', segundo: novo, setimo: null }
-  if (valor.tipo === 'por_classe') return { tipo: 'por_classe', classes: {}, total: novo }
-  return valor
+/**
+ * O valor que a igreja informou, onde quer que ele tenha ficado guardado.
+ *
+ * Relatórios gravados antes desta etapa deixaram parte dos números em
+ * `pendentes`, esperando uma confirmação que deixou de existir. Eles são o que a
+ * igreja escreveu e valem como tal.
+ */
+export function valorGuardado(relatorio: Pick<RelatorioIntegradoData, 'valores' | 'pendentes'>, indicadorId: string): ValorDoIndicador | undefined {
+  return relatorio.valores[indicadorId] ?? relatorio.pendentes?.[indicadorId]
 }
 
 export interface LeituraDoIndicador {
@@ -45,10 +48,20 @@ export function valorAtual(
   indicadorId: string,
 ): LeituraDoIndicador | null {
   const candidatos = relatorios
-    .filter((relatorio) => relatorio.churchId === churchId && relatorio.valores[indicadorId])
+    .filter((relatorio) => relatorio.churchId === churchId && valorGuardado(relatorio, indicadorId))
     .sort((esquerda, direita) => compararTrimestres(direita.trimestre, esquerda.trimestre))
   const escolhido = candidatos[0]
-  return escolhido ? { trimestre: escolhido.trimestre, valor: escolhido.valores[indicadorId]! } : null
+  return escolhido ? { trimestre: escolhido.trimestre, valor: valorGuardado(escolhido, indicadorId)! } : null
+}
+
+/** A resposta mais recente da igreja antes de um trimestre. */
+export function valorAnterior(
+  relatorios: readonly RelatorioIntegradoEntity[],
+  churchId: string,
+  indicadorId: string,
+  trimestre: string,
+): LeituraDoIndicador | null {
+  return valorAtual(relatorios.filter((relatorio) => compararTrimestres(relatorio.trimestre, trimestre) < 0), churchId, indicadorId)
 }
 
 /**
@@ -71,7 +84,7 @@ export function totalDoDistrito(
   if (indicador.tratamento === 'somar') {
     const numeros = relatorios
       .filter((relatorio) => ativas.has(relatorio.churchId))
-      .map((relatorio) => numeroDoValor(relatorio.valores[indicadorId]))
+      .map((relatorio) => numeroDoValor(valorGuardado(relatorio, indicadorId)))
       .filter((numero): numero is number => numero !== null)
     return numeros.length ? numeros.reduce((soma, numero) => soma + numero, 0) : null
   }
@@ -93,18 +106,23 @@ export function semRelatorio(
 }
 
 /**
- * Quanto um valor destoa do trimestre anterior da mesma igreja.
+ * Possível erro de digitação: só a mudança extrema.
  *
- * Devolve nulo quando não há com o que comparar, ou quando a base é pequena
- * demais para a comparação significar alguma coisa — sair de 1 para 4 é comum e
- * não merece interromper ninguém; sair de 5 para 45 é outra conversa.
+ * O relatório é o registro do que a igreja respondeu, e nenhum número é
+ * bloqueado ou trocado. O asterisco é só uma observação, e por isso o critério é
+ * conservador: os dois lados maiores que zero, um pelo menos cinco vezes o outro
+ * e uma diferença de pelo menos vinte. Uma queda para zero, um crescimento
+ * possível ou uma base pequena não recebem asterisco — marcar quase tudo
+ * ensinaria a ignorar a marca.
  */
-export const BASE_MINIMA_PARA_COMPARAR = 3
+export const RAZAO_DO_POSSIVEL_ERRO = 5
+export const DIFERENCA_DO_POSSIVEL_ERRO = 20
 
-export function destoa(anterior: number | null, novo: number | null): boolean {
-  if (anterior === null || novo === null) return false
-  if (anterior < BASE_MINIMA_PARA_COMPARAR) return false
-  return novo >= anterior * 3 || novo <= anterior * 0.4
+export function possivelErroDeDigitacao(anterior: number | null, atual: number | null): boolean {
+  if (anterior === null || atual === null || anterior <= 0 || atual <= 0) return false
+  const maior = Math.max(anterior, atual)
+  const menor = Math.min(anterior, atual)
+  return maior >= menor * RAZAO_DO_POSSIVEL_ERRO && maior - menor >= DIFERENCA_DO_POSSIVEL_ERRO
 }
 
 export class RelatorioIntegradoService {
@@ -134,45 +152,24 @@ export class RelatorioIntegradoService {
     return { id, ...completo }
   }
 
-  private async abrir(accountId: string, key: CryptoKey, relatorioId: string): Promise<RelatorioIntegradoEntity> {
-    const relatorio = (await this.listar(accountId, key)).find(({ id }) => id === relatorioId)
-    if (!relatorio) throw new Error('Relatório não encontrado.')
-    return relatorio
-  }
-
   /**
-   * A decisão sobre um valor que esperava confirmação.
+   * Os números que ficaram esperando confirmação passam a valer como vieram.
    *
-   * Aprovado ou corrigido, passa a valer e alimenta as metas; recusado fica
-   * registrado como recusado. Depois disto, as metas precisam ser
-   * sincronizadas — é o que a tela faz em seguida.
+   * Reprocessa o que já está guardado sem pedir o PDF de novo: o valor sai de
+   * `pendentes` e entra em `valores` exatamente como a igreja escreveu. Igreja,
+   * trimestre, páginas, arquivo e data da gravação ficam como estavam — é essa
+   * data que o histórico de envios mostra. Rodar de novo não encontra nada.
    */
-  async decidirPendente(
-    accountId: string,
-    key: CryptoKey,
-    relatorioId: string,
-    indicadorId: string,
-    decisao: { tipo: 'aprovado' } | { tipo: 'corrigido'; valor: number } | { tipo: 'recusado' },
-  ): Promise<RelatorioIntegradoEntity> {
-    const { id, pendentes = {}, recusados = [], ...dados } = await this.abrir(accountId, key, relatorioId)
-    const valor = pendentes[indicadorId]
-    if (!valor) throw new Error('Este valor já foi decidido.')
-    if (decisao.tipo === 'corrigido' && (!Number.isInteger(decisao.valor) || decisao.valor < 0)) throw new Error('Informe um número inteiro, sem valores negativos.')
-    const { [indicadorId]: _decidido, ...restantes } = pendentes; void _decidido
-    const valores = decisao.tipo === 'recusado' ? dados.valores
-      : { ...dados.valores, [indicadorId]: decisao.tipo === 'corrigido' ? comNumero(valor, decisao.valor) : valor }
-    const foraAgora = decisao.tipo === 'recusado' ? [...new Set([...recusados, indicadorId])] : recusados.filter((item) => item !== indicadorId)
-    return this.gravar(accountId, key, {
-      ...dados, valores,
-      ...(foraAgora.length ? { recusados: foraAgora } : {}),
-      ...(Object.keys(restantes).length ? { pendentes: restantes } : {}),
-    }, id)
-  }
-
-  /** Registra que o pastor conferiu a diferença entre o relatório e o cadastro, com os dois números de agora. */
-  async marcarConferido(accountId: string, key: CryptoKey, relatorioId: string, indicadorId: string, numeros: { relatorio: number; cadastro: number }): Promise<RelatorioIntegradoEntity> {
-    const { id, ...dados } = await this.abrir(accountId, key, relatorioId)
-    return this.gravar(accountId, key, { ...dados, conferencias: { ...(dados.conferencias ?? {}), [indicadorId]: { ...numeros, em: new Date().toISOString() } } }, id)
+  async aceitarValoresGuardados(accountId: string, key: CryptoKey): Promise<number> {
+    const mutacoes: EncryptedMutation[] = []
+    for (const relatorio of await this.listar(accountId, key)) {
+      if (!relatorio.pendentes || !Object.keys(relatorio.pendentes).length) continue
+      const { id, pendentes, ...dados } = relatorio
+      const data: RelatorioIntegradoData = { ...dados, valores: { ...pendentes, ...dados.valores } }
+      mutacoes.push({ recordId: id, recordType: 'integrated_report', envelope: await encryptPayload(key, { schemaVersion: 1, type: 'integrated_report', data }, id) })
+    }
+    if (mutacoes.length) await this.repo.applyEncryptedMutations(accountId, currentDeviceId(accountId), mutacoes)
+    return mutacoes.length
   }
 }
 
