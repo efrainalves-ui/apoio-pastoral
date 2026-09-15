@@ -6,6 +6,7 @@ import {
 } from '../../integrated-report/painel'
 import type { RelatorioIntegradoEntity } from '../../integrated-report/types'
 import { formatarNumero, MarcaDePossivelErro, Variacao } from './Graficos'
+import { MarcaDoIndicador } from '../plano/MarcaDaArea'
 
 type Filtro = 'respondidos' | 'alta' | 'queda' | 'erro' | 'todos'
 /* Abre só no que alguma igreja respondeu: são mais de sessenta perguntas, e a maioria das vazias não diz nada. */
@@ -84,6 +85,7 @@ export function IndicadoresCompletos({ relatorios, igrejas, nomeDaIgreja, ano, a
                       {erros.length > 0 && <span className="ri-indicador__asterisco" aria-label={`${erros.length} possível(is) erro(s) de digitação`}>*</span>}
                     </button>
                     <small>{indicador.tratamento === 'somar' ? 'Soma' : 'Último trimestre'}</small>
+                    <MarcaDoIndicador id={indicador.id} />
                   </th>
                   {serie.map((leitura, indice) => <td key={indice} data-rotulo={`${indice + 1}º tri`} className={`numero-tabela${leitura.numero === null ? ' ri-tabela__vazio' : ''}${trimestreAtivo === indice + 1 ? ' ri-coluna-ativa' : ''}`}>
                     {leitura.numero === null ? '—' : formatarNumero(leitura.numero)}

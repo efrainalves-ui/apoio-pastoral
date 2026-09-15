@@ -14,8 +14,10 @@ import {
   categoryDefaults, emptyCeremonyDetails, endFollowingStart, isCeremonyCategory, isEncontroCategory, localDateTime,
   type AgendaCategory, type AgendaEventEntity, type AgendaEventInput, type AndamentoDaPauta, type CeremonyDetails,
   type ComoDoPessoal, type DetalhesDaCeia, type DetalhesDaComissao, type DetalhesDaDedicacao,
-  type DetalhesDoPessoal, type EscolhaDeIgreja, type ItemDaCeia, type PapelNaCeia, type TipoDeComissao, type TipoDeConcilio,
+  type DetalhesDoPessoal, type EscolhaDeIgreja, type ItemDaCeia, type PapelNaCeia, type PrioridadeEstrategica, type TipoDeComissao, type TipoDeConcilio,
 } from '../agenda/types'
+import { usaPrioridadeEscolhida } from '../agenda/prioridade'
+import { AREAS_DO_PLANO } from '../plano-estrategico/areas'
 import { VinculoAgendaComissao } from '../agenda/vinculoComissao'
 import { noivoVazio, nomeDoCasal, possiveisDuplicados, tituloDaCerimonia, validarCasamento } from '../casamentos/core'
 import { CasamentoService, eCerimonia } from '../casamentos/service'
@@ -407,6 +409,7 @@ export function AgendaFormPage() {
           onChange={(tipoConcilio) => mudar((current) => ({ ...current, encontro: { ...(current.encontro ?? encontroVazio('council')), tipoConcilio } }))} />}
         {(pedeTitulo(category) || category === 'travel') && <Field label="Título" name="agenda-title" value={input.title} onChange={(changeEvent) => patch({ title: changeEvent.target.value })} required maxLength={160} />}
         {isEncontroCategory(category) && <CamposDeEncontro input={input} churches={churches} onChange={patch} instituicoes={instituicoes} />}
+        {usaPrioridadeEscolhida(category) && <label className="field"><span className="field__label">Prioridade estratégica</span><select className="field__input" value={input.prioridadeEstrategica ?? ''} onChange={(changeEvent) => patch({ prioridadeEstrategica: (changeEvent.target.value || null) as PrioridadeEstrategica | null })}><option value="">Sem prioridade definida</option>{AREAS_DO_PLANO.map((area) => <option key={area.slug} value={area.area}>{area.nome}</option>)}</select></label>}
         {(category === 'other' || category === 'travel') && <>
           {category === 'other' && <SeletorDeIgreja churches={churches} valor={input.churchId} onChange={escolherIgreja} />}
           <Field label="Local" name="agenda-location" value={input.location} onChange={(changeEvent) => patch({ location: changeEvent.target.value })} maxLength={160} />

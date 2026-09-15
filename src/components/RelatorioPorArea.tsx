@@ -1,6 +1,9 @@
+import { Link } from 'react-router-dom'
 import { PLANNING_AREA_LABELS } from '../evangelism/types'
 import { rotuloDoTrimestre } from '../integrated-report/types'
 import type { AreaEstrategica, SerieDoIndicador } from '../integrated-report/areasEstrategicas'
+import { areaDoPlanejamento } from '../plano-estrategico/areas'
+import { SimboloDaArea } from './plano/SimboloDaArea'
 import { Card } from './ui/Card'
 
 /**
@@ -48,8 +51,10 @@ export function RelatorioPorArea({ areas }: { areas: readonly AreaEstrategica[] 
   return <>
     {comDados.map(({ area, series }) => <Card
       key={area}
+      className={`area-marcada area--${areaDoPlanejamento(area).slug}`}
       eyebrow="Relatório Integrado"
       title={PLANNING_AREA_LABELS[area]}
+      action={<Link className="icon-button" to={`/app/plano-estrategico/${areaDoPlanejamento(area).slug}`} aria-label={`Abrir ${areaDoPlanejamento(area).nome} no Plano Estratégico`}><SimboloDaArea simbolo={areaDoPlanejamento(area).simbolo} /></Link>}
     >
       <div className="areas-do-relatorio">
         {series.filter(({ atual }) => atual !== null).map((serie) => <div className="area-do-relatorio" key={serie.indicador.id}>

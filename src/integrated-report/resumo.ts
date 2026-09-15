@@ -1,3 +1,5 @@
+import type { PlanningArea } from '../evangelism/types'
+import { AREA_DO_INDICADOR } from './areasEstrategicas'
 import type { ClasseDaEscolaSabatina } from './catalogo'
 import { lancamentosDoTrimestre, totalDoDistritoNaMeta } from './metas'
 import { numeroDoValor, totalDoDistrito, valorAtual } from './service'
@@ -59,6 +61,21 @@ export const INDICADORES_DA_ESCOLA_SABATINA: readonly IndicadorDaEscolaSabatina[
   { rotulo: 'Alunos jovens', id: ALUNOS, classes: ['Jovens'] },
   { rotulo: 'Pequenos Grupos', id: 'escola-sabatina--numero-de-pequenos-grupos-da-igreja', cadastro: 'pequenosGrupos' },
 ]
+
+/**
+ * A prioridade estratégica de cada linha da Escola Sabatina.
+ *
+ * A Escola Sabatina reúne as quatro áreas, então cada informação leva a sua:
+ * as turmas de crianças, adolescentes e jovens são Novas Gerações; o resto
+ * segue a ligação do Relatório Integrado — alunos e lição, Identidade;
+ * professores, Liderança; Unidades de Ação e Pequenos Grupos, Discipulado.
+ */
+export function areaDaLinhaDaEscolaSabatina(rotulo: string): PlanningArea | null {
+  const indicador = INDICADORES_DA_ESCOLA_SABATINA.find((item) => item.rotulo === rotulo)
+  if (!indicador) return null
+  if (indicador.classes) return 'new_generations'
+  return AREA_DO_INDICADOR[indicador.id] ?? null
+}
 
 /** Parte das classes de um indicador por classe, no valor mais recente de cada igreja ativa. */
 function totalDasClasses(relatorios: readonly RelatorioIntegradoEntity[], id: string, classes: readonly ClasseDaEscolaSabatina[], igrejasAtivas: readonly string[]): number | null {

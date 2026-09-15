@@ -1,3 +1,4 @@
+import { MarcaDaArea } from '../components/plano/MarcaDaArea'
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { AgendaService } from '../agenda/service'
 import { CalendarPlus, Check, ChevronDown, ChevronUp, Copy, FileText, Printer, Send, Trash2 } from 'lucide-react'
@@ -173,7 +174,7 @@ export function CommissionMeetingPage() {
 
   return <div className="page-stack commission-print-root">
     <Link className="text-link back-link no-print" to="/app/comissoes">Voltar a Comissões</Link>
-    <header className="page-hero"><div><p className="eyebrow">{meeting.kind === 'board' ? 'Comissão Diretiva' : 'Reunião Administrativa'}</p><h1>{meeting.date || 'Rascunho de reunião'}</h1><p>{churchName} · {present} com voto · quórum mínimo {quorum || 'não configurado'}</p></div><span className={`status-pill ${hasQuorum ? 'status-pill--success' : 'status-pill--warning'}`}>{hasQuorum ? 'Quórum confirmado' : 'Sem quórum'}</span></header>
+    <header className="page-hero cabecalho-da-area area--lideranca"><div><MarcaDaArea area="leadership" /><p className="eyebrow">{meeting.kind === 'board' ? 'Comissão Diretiva' : 'Reunião Administrativa'}</p><h1>{meeting.date || 'Rascunho de reunião'}</h1><p>{churchName} · {present} com voto · quórum mínimo {quorum || 'não configurado'}</p></div><span className={`status-pill ${hasQuorum ? 'status-pill--success' : 'status-pill--warning'}`}>{hasQuorum ? 'Quórum confirmado' : 'Sem quórum'}</span></header>
     {frozen && <div className="alert alert--success" role="status">Ata finalizada. A reunião está disponível somente para consulta, cópia e impressão.</div>}
     {message && <div className="alert alert--success" role="status">{message}</div>}
     {error && <div className="alert alert--error" role="alert">{error}</div>}

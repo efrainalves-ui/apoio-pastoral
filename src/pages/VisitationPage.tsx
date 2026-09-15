@@ -6,6 +6,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { resumoDaVisitacao } from '../care/atencaoDaVisita'
 import { VisitasPorIgreja, type FiltroDaVisitacao } from '../components/VisitasPorIgreja'
 import { CasamentosLista } from '../components/casamentos/CasamentosLista'
+import { VisitAnswersSummary } from '../components/VisitAnswersSummary'
+import { MarcaDaArea } from '../components/plano/MarcaDaArea'
 import type { ResumoDaVisitacao } from '../care/atencaoDaVisita'
 
 /** Cada cartão é um número e o filtro daquele número. */
@@ -47,6 +49,7 @@ const today = localDateKey
 /** Uma área só para o pastoreio: visitas, acompanhamentos, orações e tarefas. */
 const TABS = [
   ['visitas', 'Visitas'],
+  ['respostas', 'Respostas'],
   ['acompanhamentos', 'Acompanhamentos'],
   ['casamentos', 'Casamentos'],
   ['oracao', 'Pedidos de oração'],
@@ -139,14 +142,16 @@ export function VisitationPage() {
   const agora = today()
   const resumo = resumoDaVisitacao(visits, followUps, tasks)
   const formularioAberto = search.get('nova') === '1'
+  // Visitas, respostas e acompanhamentos são Discipulado; casamentos, orações e tarefas continuam neutros.
+  const abaDeDiscipulado = tab === 'visitas' || tab === 'respostas' || tab === 'acompanhamentos'
   const pendentes = tasks.filter(({ status }) => status === 'pending').sort((a, b) => a.dueAt.localeCompare(b.dueAt))
   const concluidas = tasks.filter(({ status }) => status !== 'pending')
   const [filtro, setFiltro] = useState<FiltroDaVisitacao>('todos')
   const [busca, setBusca] = useState('')
 
   return <div className="page-stack visitation-page">
-    <header className="page-hero agenda-hero">
-      <h1>Visitação</h1>
+    <header className={`page-hero agenda-hero${abaDeDiscipulado ? ' cabecalho-da-area area--discipulado' : ''}`}>
+      <div className="cabecalho-da-area__titulo">{abaDeDiscipulado && <MarcaDaArea area="discipleship" />}<h1>Visitação</h1></div>
       <div className="acoes-do-topo">
         <Link className="botao-itinerario" to="/app/agenda/novo" aria-label="Agendar visita"><CalendarPlus aria-hidden="true" /></Link>
         <Link className="botao-itinerario botao-itinerario--forte" to="/app/visitas/nova" aria-label="Registrar visita"><Plus aria-hidden="true" /></Link>
@@ -154,7 +159,7 @@ export function VisitationPage() {
     </header>
     {error && <div className="alert alert--error" role="alert">{error}</div>}
 
-    <nav className="tira-abas" aria-label="Áreas da visitação">
+    <nav className={`tira-abas${abaDeDiscipulado ? ' area--discipulado' : ''}`} aria-label="Áreas da visitação">
       {TABS.map(([value, label]) => <button key={value} type="button" aria-current={tab === value ? 'page' : undefined} className={`chip-aba ${tab === value ? 'chip-aba--ativa' : ''}`} onClick={() => setSearch(value === 'visitas' ? {} : { aba: value })}>{label}</button>)}
     </nav>
 
@@ -184,6 +189,8 @@ export function VisitationPage() {
 
       <VisitasPorIgreja visits={visits} followUps={followUps} tasks={tasks} churches={churches} nomeDoAlvo={targetName} filtro={filtro} busca={busca} />
     </>}
+
+    {tab === 'respostas' && <VisitAnswersSummary />}
 
     {tab === 'acompanhamentos' && <Card title="Acompanhamentos" action={<Button variant="secondary" icon={<Plus />} onClick={() => setSearch({ aba: 'acompanhamentos', novo: '1' })}>Novo acompanhamento</Button>}>
       {search.get('novo') === '1' && <form className="compact-task-form" onSubmit={createFollowUp}><label className="field"><span className="field__label">Acompanhar</span><select className="field__input" value={followSubjectType} onChange={(event) => { setFollowSubjectType(event.target.value as typeof followSubjectType); setFollowSubjectId('') }}><option value="person">Pessoa</option><option value="family">Família</option></select></label><label className="field"><span className="field__label">Igreja</span><select className="field__input" value={followChurch} onChange={(event) => { setFollowChurch(event.target.value); setFollowSubjectId('') }} required><option value="">Selecione</option>{churches.map((church) => <option key={church.id} value={church.id}>{church.name}</option>)}</select></label><label className="field"><span className="field__label">{followSubjectType === 'person' ? 'Pessoa' : 'Família'}</span><select className="field__input" value={followSubjectId} onChange={(event) => setFollowSubjectId(event.target.value)} required><option value="">Selecione</option>{(followSubjectType === 'person' ? people.filter((person) => person.currentChurchId === followChurch) : families.filter((family) => family.primaryChurchId === followChurch)).map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label><label className="field"><span className="field__label">Próximo cuidado</span><select className="field__input" value={followKind} onChange={(event) => setFollowKind(event.target.value as FollowUpKind)}>{FOLLOW_UP_KINDS.map((kind) => <option key={kind} value={kind}>{FOLLOW_UP_LABELS[kind]}</option>)}</select></label><Field label="Data" name="follow-due" type="date" value={followDue} onChange={(event) => setFollowDue(event.target.value)} required /><label className="field full-span"><span className="field__label">Observação opcional</span><textarea className="field__input" rows={2} maxLength={2000} value={followNotes} onChange={(event) => setFollowNotes(event.target.value)} /></label><div className="form-actions"><Button type="submit" disabled={!followChurch || !followSubjectId || !followDue}>Criar acompanhamento</Button><Button type="button" variant="secondary" onClick={() => setSearch({ aba: 'acompanhamentos' })}>Cancelar</Button></div></form>}

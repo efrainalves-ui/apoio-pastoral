@@ -8,6 +8,7 @@ import { pendingRemotePurge } from '../db/purge'
 import { VaultRepository, type EncryptedMutation } from '../db/repository'
 import type { VaultPayload } from '../crypto/types'
 import { pendingActionId, type PendingActionRecord, type PendingActionStage, type VaultRecord } from '../db/types'
+import { PreservacaoDosSermoes } from '../sermons/preservacao'
 
 /**
  * O que segue o pastor quando ele troca de distrito.
@@ -46,8 +47,15 @@ const TIPOS_PESSOAIS = new Set([
   'pessoal_compra', 'pessoal_migracao',
 ])
 
+/*
+  Sermões e histórico de pregações são do pastor, não do lugar. Antes de
+  apagar o distrito, `PreservacaoDosSermoes` tira o vínculo com as igrejas e
+  guarda só o nome da igreja e do distrito; o cadastro delas vai embora.
+*/
+const TIPOS_DO_PREGADOR = new Set(['sermon', 'sermon_preaching'])
+
 export function isPersonalRecord(payload: VaultPayload): boolean {
-  if (TIPOS_DO_OBREIRO.has(payload.type) || TIPOS_PESSOAIS.has(payload.type)) return true
+  if (TIPOS_DO_OBREIRO.has(payload.type) || TIPOS_PESSOAIS.has(payload.type) || TIPOS_DO_PREGADOR.has(payload.type)) return true
   if (payload.type !== 'agenda_event') return false
   const dados = payload.data as { category?: string; churchId?: string | null }
   return dados.category === 'personal' && !dados.churchId
@@ -212,6 +220,8 @@ export class CloseDistrictService {
     const existente = await this.database.pendingActions.get(pendingActionId(accountId, 'close_district'))
     if (existente) return this.avancar(accountId, existente, key)
 
+    // O histórico de pregações passa a guardar os nomes antes de as igrejas serem apagadas.
+    await new PreservacaoDosSermoes(this.database).preservar(accountId, key)
     const { district, personal } = await this.classify(accountId, key)
     const agora = new Date().toISOString()
 

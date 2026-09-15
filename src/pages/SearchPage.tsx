@@ -1,3 +1,4 @@
+import { MarcaDePrioridade } from '../components/agenda/MarcaDePrioridade'
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 import { ArrowLeft, CalendarDays, Church, Search, UserRound, UsersRound } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
@@ -86,7 +87,7 @@ export function SearchPage() {
             {results.people.map((person) => <Link key={person.id} to={`/app/pessoas/${person.id}`}><UserRound /><span><strong>{person.name}</strong><small>Pessoa{person.whatsapp ? ' · WhatsApp cadastrado' : ''}</small></span></Link>)}
             {results.families.map((family) => <Link key={family.id} to={`/app/familias/${family.id}`}><UsersRound /><span><strong>{family.name}</strong><small>Família</small></span></Link>)}
             {results.churches.map((church) => <Link key={church.id} to={`/app/distrito/igrejas/${church.id}`}><Church /><span><strong>{church.name}</strong><small>Igreja</small></span></Link>)}
-            {results.events.map((event) => <Link key={event.id} to={`/app/agenda/${event.id}/editar`}><CalendarDays /><span><strong>{event.title}</strong><small>Compromisso · {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', ...(event.allDay ? {} : { timeStyle: 'short' }) }).format(new Date(event.startAt))}</small></span></Link>)}
+            {results.events.map((event) => <Link key={event.id} to={`/app/agenda/${event.id}/editar`}><CalendarDays /><span><strong>{event.title}</strong><MarcaDePrioridade event={event} /><small>Compromisso · {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', ...(event.allDay ? {} : { timeStyle: 'short' }) }).format(new Date(event.startAt))}</small></span></Link>)}
           </div>}
     </Card>
   </div>

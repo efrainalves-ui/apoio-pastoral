@@ -3335,6 +3335,161 @@ html .agenda-page .ponto-categoria.categoria-visual { width: 7px; height: 7px; b
 .linha-compromisso__onde { min-width: 0; display: flex; align-items: center; gap: 4px; color: var(--ink); font-size: .78rem; overflow-wrap: anywhere; }
 .linha-compromisso__onde svg { width: 13px; height: 13px; flex: none; }
 .linha-compromisso__alcance { min-width: 0; color: var(--ink); font-size: .78rem; font-weight: 600; overflow-wrap: anywhere; }
+
+/*
+  Plano Estratégico: a cor identifica a área e nada mais. O fundo continua
+  neutro; a cor vai na faixa, no símbolo, nas barras, na aba escolhida e nos
+  marcadores. Texto colorido só onde o contraste passa de 4,5:1 — e nunca texto
+  branco sobre o amarelo de Novas Gerações.
+*/
+:root {
+  --area-identidade: #b3261e; --area-identidade-suave: #fbeae8;
+  --area-lideranca: #1f5aa6; --area-lideranca-suave: #e7eef9;
+  --area-novas: #e0a800; --area-novas-texto: #7a5600; --area-novas-suave: #fdf3d5;
+  --area-discipulado: #2e7d32; --area-discipulado-suave: #e6f2e7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) {
+    --area-identidade: #ff8a80; --area-identidade-suave: #3a1d1b;
+    --area-lideranca: #8ab4f8; --area-lideranca-suave: #18263a;
+    --area-novas: #f2c14e; --area-novas-texto: #f2c14e; --area-novas-suave: #372b12;
+    --area-discipulado: #81c995; --area-discipulado-suave: #15291b;
+  }
+}
+:root[data-tema='escuro'] {
+  --area-identidade: #ff8a80; --area-identidade-suave: #3a1d1b;
+  --area-lideranca: #8ab4f8; --area-lideranca-suave: #18263a;
+  --area-novas: #f2c14e; --area-novas-texto: #f2c14e; --area-novas-suave: #372b12;
+  --area-discipulado: #81c995; --area-discipulado-suave: #15291b;
+}
+.area--identidade { --area: var(--area-identidade); --area-texto: var(--area-identidade); --area-suave: var(--area-identidade-suave); }
+.area--lideranca { --area: var(--area-lideranca); --area-texto: var(--area-lideranca); --area-suave: var(--area-lideranca-suave); }
+.area--novas-geracoes { --area: var(--area-novas); --area-texto: var(--area-novas-texto); --area-suave: var(--area-novas-suave); }
+.area--discipulado { --area: var(--area-discipulado); --area-texto: var(--area-discipulado); --area-suave: var(--area-discipulado-suave); }
+.simbolo-area { width: 28px; height: 28px; fill: var(--area); flex: none; }
+
+.plano-estrategico { display: grid; gap: 14px; }
+.plano-estrategico__titulo { margin: 0; font-size: clamp(1.2rem, 2.4vw, 1.55rem); line-height: 1.25; letter-spacing: -.02em; color: var(--ink); text-wrap: balance; }
+.plano-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1280px) { .plano-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .plano-cards { grid-template-columns: 1fr; } }
+.plano-cards > li { min-width: 0; }
+.plano-card { position: relative; height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 24px 20px 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--paper); color: var(--ink); text-decoration: none; box-shadow: var(--shadow); overflow: hidden; transition: transform .15s ease, border-color .15s ease; }
+.plano-card__faixa { position: absolute; inset: 0 0 auto 0; height: 6px; background: var(--area); }
+.plano-card:hover { transform: translateY(-2px); border-color: var(--area); }
+.plano-card:focus-visible { outline: 3px solid var(--area-texto); outline-offset: 3px; }
+.plano-card__cabeca { display: flex; align-items: center; gap: 10px; }
+.plano-card__nome { font-size: 1.05rem; line-height: 1.25; overflow-wrap: anywhere; }
+.plano-card__rotulo { margin-top: 6px; font-size: .72rem; font-weight: 700; letter-spacing: .08em; line-height: 1.35; text-transform: uppercase; color: var(--area-texto); }
+.plano-card__numero { font-size: clamp(2.2rem, 4vw, 2.8rem); font-weight: 800; line-height: 1; letter-spacing: -.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.plano-card__texto { flex: 1; color: var(--muted); font-size: .9rem; line-height: 1.5; }
+.plano-card__rodape { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: .8rem; }
+.plano-card__rodape small { color: var(--muted); }
+.plano-card__acao { display: inline-flex; align-items: center; gap: 2px; min-height: 28px; font-weight: 700; color: var(--area-texto); }
+.plano-card__acao svg { width: 16px; height: 16px; }
+@media (prefers-reduced-motion: reduce) { .plano-card:hover { transform: none; } }
+
+.plano-area-hero { display: flex; align-items: flex-start; gap: 16px; padding: 4px 0 4px 16px; border-left: 6px solid var(--area); }
+.plano-area-hero .simbolo-area { width: 44px; height: 44px; margin-top: 18px; }
+.plano-area-hero h1 { margin: 0 0 8px; font-size: clamp(1.9rem, 4vw, 2.6rem); letter-spacing: -.04em; color: var(--ink); }
+.plano-area-hero__texto { margin: 0; max-width: 65ch; color: var(--muted); line-height: 1.55; }
+.plano-periodo { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 18px; }
+.plano-periodo .field { min-width: 120px; margin: 0; }
+.plano-periodo__abas { display: flex; flex-wrap: wrap; gap: 6px; }
+.plano-periodo__aba { min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); font-weight: 600; cursor: pointer; }
+.plano-periodo__aba--ativa { border-color: var(--area); background: var(--area-suave); box-shadow: inset 0 -3px 0 var(--area); font-weight: 800; }
+.plano-periodo__aba:focus-visible { outline: 3px solid var(--area-texto); outline-offset: 2px; }
+.plano-distrito { display: grid; gap: 6px; border-top: 4px solid var(--area); }
+.plano-distrito .card__title { margin: 0; }
+.plano-distrito__rotulo { margin: 8px 0 0; font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--area-texto); }
+.plano-distrito__numero { margin: 0; font-size: clamp(2.6rem, 6vw, 3.6rem); font-weight: 800; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.plano-distrito__dados { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 18px; margin: 10px 0 0; }
+.plano-distrito__dados div { display: grid; gap: 2px; }
+.plano-distrito__dados dt { font-size: .78rem; color: var(--muted); }
+.plano-distrito__dados dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.plano-area-page .serie-trimestral__barra { background: var(--area); }
+.plano-serie { gap: 18px; }
+.plano-serie .serie-trimestral__trilho { width: 44px; height: 110px; }
+.plano-serie__coluna--escolhida .serie-trimestral__trilho { box-shadow: 0 0 0 2px var(--area); }
+.plano-serie__coluna--escolhida strong { color: var(--area-texto); }
+.plano-tabela { overflow-x: auto; }
+.plano-tabela table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.plano-tabela th, .plano-tabela td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.plano-tabela thead th { font-size: .78rem; font-weight: 700; color: var(--muted); }
+.plano-tabela tbody th { min-width: 150px; font-weight: 600; white-space: normal; }
+.plano-situacao { display: inline-flex; align-items: center; gap: 6px; font-size: .84rem; }
+.plano-situacao::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--area); }
+.plano-situacao--nao_respondido::before { background: transparent; box-shadow: inset 0 0 0 2px var(--area); }
+.plano-situacao--sem_relatorio::before { background: transparent; box-shadow: inset 0 0 0 2px var(--muted); }
+.plano-cobertura { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.plano-cobertura h3 { margin: 0 0 8px; font-size: .95rem; }
+.plano-cobertura ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.plano-cobertura p { margin: 0; }
+.plano-indicadores { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.plano-indicador { padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; }
+.plano-indicador--principal { border-color: var(--area); background: var(--area-suave); }
+.plano-indicador__cabeca { display: flex; align-items: center; gap: 10px; }
+.plano-indicador__marca { width: 10px; height: 10px; border-radius: 3px; background: var(--area); flex: none; }
+.plano-indicador__cabeca strong { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.plano-indicador__numero { font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.plano-indicador__origem { margin: 8px 0 0; display: grid; gap: 4px; font-size: .82rem; }
+.plano-indicador__origem div { display: grid; grid-template-columns: 84px 1fr; gap: 8px; }
+.plano-indicador__origem dt { color: var(--muted); }
+.plano-indicador__origem dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 520px) {
+  .plano-indicador__origem div { grid-template-columns: 1fr; gap: 0; }
+  .plano-serie { gap: 10px; }
+  .plano-serie .serie-trimestral__trilho { width: 34px; }
+}
+
+/* Páginas com várias áreas continuam neutras: só a borda de cima e o símbolo identificam. */
+.area-marcada { border-top: 4px solid var(--area); }
+.area-marcada .card__header .simbolo-area { width: 22px; height: 22px; }
+
+.resumo-visitacao { display: grid; gap: 12px; color: var(--ink); text-decoration: none; }
+.resumo-visitacao:hover { border-color: var(--green-700); }
+.resumo-visitacao__topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.resumo-visitacao__topo .eyebrow { display: block; }
+.resumo-visitacao__topo .card__title { margin: 0; }
+.resumo-visitacao__numeros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.resumo-visitacao__numeros > div { display: grid; gap: 2px; align-content: start; }
+.resumo-visitacao__numeros dt { font-size: .8rem; line-height: 1.3; color: var(--muted); }
+.resumo-visitacao__numeros dd { margin: 0; font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.resumo-visitacao__numeros dd.resumo-visitacao__tendencia { display: inline-flex; align-items: center; gap: 4px; font-size: .76rem; font-weight: 600; color: var(--muted); }
+.resumo-visitacao__tendencia svg { width: 14px; height: 14px; }
+@media (max-width: 520px) {
+  .resumo-visitacao__numeros { gap: 8px; }
+  .resumo-visitacao__numeros dd { font-size: 1.35rem; }
+}
+
+/*
+  Prioridade estratégica na Agenda: um símbolo pequeno ao lado do selo da
+  categoria. A cor, o fundo e a faixa da categoria não mudam.
+*/
+.agenda-selos { min-width: 0; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 3px 10px; }
+.prioridade-agenda { display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-size: .7rem; font-weight: 700; line-height: 1.25; }
+.prioridade-agenda .simbolo-area { width: 12px; height: 12px; }
+.legenda-prioridades { display: grid; gap: 4px; }
+.legenda-prioridades__titulo { margin: 0; color: var(--muted); font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.legenda-prioridades__lista { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.legenda-prioridades__item { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); font-size: .72rem; }
+.legenda-prioridades__item .simbolo-area { width: 11px; height: 11px; }
+@media (max-width: 720px) {
+  .prioridade-agenda__nome { display: none; }
+  .legenda-agenda:not(.legenda-agenda--aberta) .legenda-prioridades { display: none; }
+}
+
+/* Páginas ligadas a uma área: símbolo e nome no cabeçalho, com uma faixa lateral. O fundo não muda. */
+.marca-da-area { display: inline-flex; align-items: center; gap: 6px; color: var(--area-texto); font-size: .72rem; font-weight: 800; letter-spacing: .08em; line-height: 1.2; text-transform: uppercase; }
+.marca-da-area .simbolo-area { width: 14px; height: 14px; }
+.cabecalho-da-area { border-left: 5px solid var(--area); padding-left: 16px; }
+.cabecalho-da-area .marca-da-area:not(.marca-da-area--compacta) { display: flex; width: fit-content; margin-bottom: 6px; }
+.cabecalho-da-area__titulo { min-width: 0; }
+.marca-da-area--compacta { gap: 4px; font-size: .7rem; font-weight: 700; letter-spacing: .02em; text-transform: none; }
+.marca-da-area--compacta .simbolo-area { width: 11px; height: 11px; }
+.tira-abas.area--discipulado .chip-aba--ativa { box-shadow: inset 0 -3px 0 var(--area); }
+.ri-acao-indicador { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 10px; }
+.sermon-preaching-list__distrito { color: var(--muted); font-weight: 500; }
 .linha-compromisso__acoes { display: flex; gap: 2px; }
 .linha-compromisso__acoes .icon-button { width: 36px; min-width: 36px; height: 36px; min-height: 36px; }
 @media (max-width: 640px) {

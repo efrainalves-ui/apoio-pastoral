@@ -2,6 +2,10 @@ import { encryptPayload } from '../crypto/vault'
 import { readPayload } from '../db/corrupted'
 import { db, type ApoioDatabase } from '../db/database'
 import type { VaultRecord } from '../db/types'
+import { PreservacaoDosSermoes } from '../sermons/preservacao'
+
+/** A biblioteca de sermões e o histórico de pregações seguem o pastor para o distrito novo. */
+const TIPOS_PRESERVADOS = new Set(['sermon', 'sermon_preaching'])
 
 export const NEW_DISTRICT_MODES = ['empty', 'technical'] as const
 export type NewDistrictMode = (typeof NEW_DISTRICT_MODES)[number]
@@ -58,17 +62,28 @@ export class NewDistrictService {
     const records = await this.active(accountId, key)
     const byType = records.reduce<Record<string, number>>((counts, { type }) => ({ ...counts, [type]: (counts[type] ?? 0) + 1 }), {})
     const presentTypes = Object.keys(byType)
+    const temSermoes = presentTypes.some((type) => TIPOS_PRESERVADOS.has(type))
     return {
       recordCount: records.length,
       byType,
-      preserved: mode === 'technical' && presentTypes.some((type) => technicalSourceTypes.has(type)) ? ['Resumo técnico agregado, sem nomes, contatos ou conteúdo dos registros atuais.'] : ['Nenhum dado do distrito atual.'],
-      removed: namesFor(presentTypes),
+      preserved: [
+        ...(mode === 'technical' && presentTypes.some((type) => technicalSourceTypes.has(type)) ? ['Resumo técnico agregado, sem nomes, contatos ou conteúdo dos registros atuais.'] : ['Nenhum dado do distrito atual.']),
+        ...(temSermoes ? ['Biblioteca de sermões e histórico de pregações, só com os nomes das igrejas.'] : []),
+      ],
+      removed: namesFor(presentTypes.filter((type) => !TIPOS_PRESERVADOS.has(type))),
     }
   }
 
   async start(accountId: string, key: CryptoKey, mode: NewDistrictMode): Promise<NewDistrictResult> {
     const active = await this.active(accountId, key)
-    const allRecords = await this.database.vaultRecords.where('accountId').equals(accountId).toArray()
+    // Antes de apagar as igrejas, o histórico de pregações guarda os nomes delas e perde o vínculo.
+    await new PreservacaoDosSermoes(this.database).preservar(accountId, key)
+    const registrosAtuais = await this.database.vaultRecords.where('accountId').equals(accountId).toArray()
+    const preservados = new Set([
+      ...active.filter(({ type }) => TIPOS_PRESERVADOS.has(type)).map(({ record }) => record.id),
+      ...registrosAtuais.filter(({ recordType }) => TIPOS_PRESERVADOS.has(recordType)).map(({ id }) => id),
+    ])
+    const allRecords = registrosAtuais.filter(({ id }) => !preservados.has(id))
     const counts = active.reduce<Record<string, number>>((result, { type }) => ({ ...result, [type]: (result[type] ?? 0) + 1 }), {})
     const now = new Date().toISOString()
     const technicalHistoryId = mode === 'technical' ? crypto.randomUUID() : null
@@ -80,7 +95,7 @@ export class NewDistrictService {
 
     await this.database.transaction('rw', this.database.vaultRecords, this.database.outbox, async () => {
       await this.database.vaultRecords.bulkDelete(allRecords.map((record) => record.id))
-      await this.database.outbox.where('accountId').equals(accountId).delete()
+      await this.database.outbox.where('accountId').equals(accountId).filter(({ recordId }) => !preservados.has(recordId)).delete()
       if (technicalHistoryId && technicalEnvelope) {
         await this.database.vaultRecords.put({ id: technicalHistoryId, accountId, recordType: 'encrypted', version: 1, createdAt: now, updatedAt: now, ...technicalEnvelope })
       }

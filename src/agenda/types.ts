@@ -34,6 +34,8 @@ export const PUBLICO_DISTRITAL_LABELS: Record<PublicoDistrital, string> = {
   pastores_anciaos: 'Pastores e anciãos', outro: 'Outro público',
 }
 export type TipoDeConcilio = 'concilio' | 'pgp'
+/** As quatro áreas do Plano Estratégico, com os mesmos valores do planejamento. */
+export type PrioridadeEstrategica = 'identity' | 'leadership' | 'new_generations' | 'discipleship'
 
 export interface DetalhesDoEncontro {
   formato: FormatoDoEncontro | null
@@ -159,6 +161,8 @@ export interface AgendaEventData {
   escolhaDeIgreja?: EscolhaDeIgreja | null
   churchIds?: string[]
   encontro?: DetalhesDoEncontro | null
+  /** Só em Reunião e Evento, e só quando escolhida. Ausente nos antigos. */
+  prioridadeEstrategica?: PrioridadeEstrategica | null
   comissao?: DetalhesDaComissao | null
   ceia?: DetalhesDaCeia | null
   casamento?: DetalhesDoCasamento | null

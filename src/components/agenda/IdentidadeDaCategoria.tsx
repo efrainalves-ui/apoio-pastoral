@@ -1,5 +1,7 @@
 import { useId, useState, type CSSProperties } from 'react'
 import { CATEGORIAS_VISUAIS, identidadeDoCompromisso, type IdentidadeDaCategoria } from '../../agenda/identidade'
+import { AREAS_DO_PLANO, nomeCurtoDaArea } from '../../plano-estrategico/areas'
+import { SimboloDaArea } from '../plano/SimboloDaArea'
 
 /**
  * Os atributos que dão a um elemento a identidade da categoria: a classe, o
@@ -43,6 +45,15 @@ export function LegendaDaAgenda() {
           </li>
         })}
       </ul>
+      <div className="legenda-prioridades">
+        <p className="legenda-prioridades__titulo" id={`${id}-prioridades`}>Prioridades estratégicas</p>
+        <ul className="legenda-prioridades__lista" aria-labelledby={`${id}-prioridades`}>
+          {AREAS_DO_PLANO.map((area) => <li key={area.slug} className={`legenda-prioridades__item area--${area.slug}`}>
+            <SimboloDaArea simbolo={area.simbolo} />
+            <span>{nomeCurtoDaArea(area)}</span>
+          </li>)}
+        </ul>
+      </div>
     </div>
   )
 }

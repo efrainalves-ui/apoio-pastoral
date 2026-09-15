@@ -299,6 +299,41 @@ describe('reunião, treinamento, evento e concílio', () => {
     })
   })
 
+  it('Treinamento começa sem prioridade e grava a escolhida', async () => {
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Treinamento')
+    const prioridade = screen.getByLabelText('Prioridade estratégica')
+    expect(prioridade).toHaveValue('')
+    expect(within(prioridade).getByRole('option', { selected: true })).toHaveTextContent('Sem prioridade definida')
+    await user.type(screen.getByLabelText('Título'), 'Treinamento fictício de líderes')
+    await user.click(screen.getByRole('radio', { name: 'Online' }))
+    await user.click(screen.getByRole('radio', { name: 'Distrital' }))
+    await user.click(screen.getByRole('radio', { name: 'Todos os líderes' }))
+    await salvar(user)
+    expect(estado.criados[0]).toMatchObject({ category: 'training', title: 'Treinamento fictício de líderes' })
+    expect(estado.criados[0]?.prioridadeEstrategica ?? null).toBeNull()
+  })
+
+  it('Reunião, Evento e Treinamento podem ter prioridade estratégica escolhida; as demais categorias não perguntam', async () => {
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    for (const categoria of ['Visita', 'Pregação', 'Comissão', 'Concílio', 'Ceia do Senhor', 'Casamento', 'Pessoal', 'Outro']) {
+      await escolherCategoria(user, categoria)
+      expect(screen.queryByLabelText('Prioridade estratégica'), categoria).not.toBeInTheDocument()
+    }
+    await escolherCategoria(user, 'Evento')
+    const prioridade = screen.getByLabelText('Prioridade estratégica')
+    expect(within(prioridade).getAllByRole('option').map((opcao) => opcao.textContent)).toEqual(['Sem prioridade definida', 'Identidade Adventista', 'Liderança', 'Novas Gerações', 'Discipulado'])
+    await user.type(screen.getByLabelText('Título'), 'Evento fictício de adolescentes')
+    await user.click(screen.getByRole('radio', { name: 'Online' }))
+    await user.click(screen.getByRole('radio', { name: 'Distrital' }))
+    await user.click(screen.getByRole('radio', { name: 'Todos os líderes' }))
+    await user.selectOptions(prioridade, 'Novas Gerações')
+    await salvar(user)
+    expect(estado.criados[0]).toMatchObject({ category: 'event', prioridadeEstrategica: 'new_generations' })
+  })
+
   it('Associação/Missão/União funciona sem o nome e no formato presencial', async () => {
     const user = userEvent.setup()
     abrir(); await aguardarCarregar()

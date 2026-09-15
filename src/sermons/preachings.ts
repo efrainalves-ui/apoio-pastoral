@@ -13,6 +13,8 @@ export interface Preaching {
   date: string
   scheduled: boolean
   origem: 'agenda' | 'anterior'
+  /** Distrito em que foi pregado, quando a igreja ficou só como nome histórico. */
+  distrito?: string
 }
 
 export const OUTRA_IGREJA = 'outra'
@@ -45,15 +47,18 @@ export function listPreachings(
       scheduled: new Date(event.startAt).getTime() > agora.getTime(),
       origem: 'agenda',
     }))
+  // Copiado da Agenda ao encerrar o distrito: enquanto o compromisso existir, vale o compromisso.
+  const naAgenda = new Set(daAgenda.map(({ eventId }) => eventId))
   const registradas: Preaching[] = anteriores
-    .filter((registro) => registro.sermonId === sermonId)
+    .filter((registro) => registro.sermonId === sermonId && !(registro.origemEventoId && naAgenda.has(registro.origemEventoId)))
     .map((registro) => ({
       eventId: registro.id,
       churchId: registro.churchId,
-      place: registro.churchId ? churches.find(({ id }) => id === registro.churchId)?.name ?? '' : registro.lugar,
+      place: registro.churchId ? churches.find(({ id }) => id === registro.churchId)?.name ?? registro.lugar : registro.lugar,
       date: registro.data,
       scheduled: false,
-      origem: 'anterior',
+      origem: 'anterior' as const,
+      ...(registro.distrito ? { distrito: registro.distrito } : {}),
     }))
   return [...daAgenda, ...registradas].sort((esquerda, direita) => compararDatasDePregacao(esquerda.date, direita.date))
 }

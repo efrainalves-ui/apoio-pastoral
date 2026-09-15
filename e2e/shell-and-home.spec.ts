@@ -160,15 +160,12 @@ test('o início mostra os blocos práticos do dia sem classificar ninguém', asy
   await register(page)
 
   await expect(page.getByRole('heading', { name: 'Tarefas', exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Visitas e cuidados', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Resumo de Visitação', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Interessados e estudos', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Igrejas que precisam de atenção', exact: true })).toBeVisible()
 
-  // O número virou o caminho: o cartão de pedidos de oração saiu do início, e a
-  // contagem dentro de "Visitas e cuidados" leva à aba deles. Havia dois lugares
-  // dizendo a mesma coisa, e um deles ainda tinha um link de texto embaixo.
-  await expect(page.getByRole('link', { name: /Pedidos de oração/ })).toHaveAttribute('href', '/app/visitacao?aba=oracao')
-  await expect(page.getByRole('link', { name: /Acompanhamentos/ })).toHaveAttribute('href', '/app/visitacao?aba=acompanhamentos')
+  // A visitação é um cartão curto: o toque leva às respostas completas na Visitação.
+  await expect(page.getByRole('link', { name: 'Resumo de Visitação' })).toHaveAttribute('href', '/app/visitacao?aba=respostas')
   await expect(page.getByRole('link', { name: /Abrir tarefas/ })).toHaveAttribute('href', '/app/visitacao?aba=tarefas')
   await expect(page.getByRole('link', { name: /Abrir interessados e estudos/ })).toHaveAttribute('href', '/app/missionario')
 
