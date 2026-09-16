@@ -60,7 +60,14 @@ h1, h2, h3, .brand strong { font-family: ui-rounded, "SF Pro Rounded", Inter, ui
 
 .field { display: grid; gap: 7px; margin-bottom: 17px; }
 .field__label { font-size: .88rem; font-weight: 700; color: #34443f; }
-.field__input { width: 100%; height: 49px; border: 1px solid #cbd5d0; border-radius: 11px; padding: 0 14px; color: var(--ink); background: white; }
+/*
+  `max-width` segura o `select`, que mede por dentro pela opção mais comprida —
+  uma igreja de nome longo esticava o campo além da tela. `min-width: 0` fica só
+  no campo, e não no `.field`: pô-lo no `.field` deixava a etiqueta encolher até
+  zero dentro de uma `.entity-row`, e aí era o `select` que escapava para fora da
+  direita, a 418px numa tela de 412.
+*/
+.field__input { width: 100%; min-width: 0; max-width: 100%; height: 49px; border: 1px solid #cbd5d0; border-radius: 11px; padding: 0 14px; color: var(--ink); background: white; }
 .field__input:hover { border-color: #94a69f; }
 .field__input:focus { border-color: var(--green-700); box-shadow: 0 0 0 3px rgb(44 108 90 / 13%); outline: 0; }
 .field__input:focus-visible { outline: 3px solid #e2b350; outline-offset: 2px; }
@@ -554,6 +561,110 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .import-history > div:last-child { border-bottom: 0; }
 .import-history span:first-child { display: grid; gap: 3px; }
 .import-history small { color: var(--muted); }
+/*
+  Fidelidade é área neutra: nenhuma cor de prioridade estratégica entra aqui. Os
+  três estados se distinguem por tom dentro da mesma família, e o mais forte é o
+  que já está resolvido.
+*/
+.fidelidade-visao { display: grid; gap: 14px; }
+.fidelidade-resumo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; border-bottom: 1px solid var(--line); }
+.fidelidade-resumo > div { min-width: 0; padding: 4px 14px 12px 0; display: grid; gap: 2px; }
+.fidelidade-resumo span { color: var(--muted); font-size: .64rem; letter-spacing: .09em; text-transform: uppercase; font-weight: 600; overflow-wrap: break-word; hyphens: manual; }
+.fidelidade-resumo strong { font-family: var(--serifada); font-weight: 400; font-size: clamp(1.4rem, 5vw, 1.8rem); line-height: 1.05; }
+.fidelidade-igrejas { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: 10px; }
+.fidelidade-igreja { width: 100%; height: 100%; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); color: inherit; font: inherit; text-align: left; cursor: pointer; display: grid; gap: 10px; align-content: start; }
+.fidelidade-igreja:hover { border-color: var(--green-700); }
+.fidelidade-igreja:focus-visible { outline: 2px solid var(--green-700); outline-offset: 2px; }
+.fidelidade-igreja--escolhida { border-color: var(--green-700); box-shadow: inset 0 0 0 1px var(--green-700); }
+.fidelidade-igreja__nome { font-weight: 700; font-size: .98rem; overflow-wrap: anywhere; }
+.fidelidade-igreja__estados { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.fidelidade-estado { min-width: 0; display: grid; gap: 1px; }
+.fidelidade-estado strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+/*
+  `anywhere` e não `break-word`: no celular a coluna do meio fica com cerca de
+  cem pixels e "acompanhamento" mede um pouco mais que isso. Com `break-word` a
+  palavra transbordava o cartão e empurrava a página seis pixels para o lado —
+  o teste de rolagem lateral pegou. `anywhere` também ensina a grade a medir a
+  coluna pela palavra quebrada, e não pela palavra inteira.
+*/
+.fidelidade-estado small { color: var(--muted); font-size: .68rem; overflow-wrap: anywhere; hyphens: manual; }
+.fidelidade-estado--fieis strong { color: var(--green-800); }
+.fidelidade-estado--acompanhamento strong { color: #5d7a6d; }
+.fidelidade-estado--avaliar strong { color: var(--muted); }
+.fidelidade-igreja__barra { height: 6px; border-radius: 999px; background: var(--green-50); display: flex; overflow: hidden; }
+.fidelidade-igreja__parte { display: block; height: 100%; }
+.fidelidade-igreja__parte--fieis { background: var(--green-700); }
+.fidelidade-igreja__parte--acompanhamento { background: #9bb8ab; }
+.fidelidade-igreja__parte--avaliar { background: var(--line); }
+
+/* A lista de avaliação: nome numa linha, o resto na de baixo, e o botão à direita. */
+.avaliar { display: grid; gap: 12px; }
+.avaliar__filtros { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, .5fr); gap: 12px; align-items: end; }
+.avaliar__campo { position: relative; display: block; }
+.avaliar__campo svg { position: absolute; left: 12px; top: 50%; width: 17px; height: 17px; color: var(--muted); pointer-events: none; transform: translateY(-50%); }
+.avaliar__campo .field__input { padding-left: 38px; }
+.avaliar__contagem { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; color: var(--muted); font-size: .8rem; }
+.avaliar__contagem strong { color: var(--ink); font-size: .9rem; font-variant-numeric: tabular-nums; }
+.avaliar__lista { margin: 0; padding: 0; list-style: none; display: grid; }
+.avaliar-pessoa { padding: 12px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; align-items: center; }
+.avaliar-pessoa:last-child { border-bottom: 0; }
+.avaliar-pessoa__nome { grid-column: 1; font-weight: 650; overflow-wrap: anywhere; }
+.avaliar-pessoa__dados { grid-column: 1; grid-row: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; color: var(--muted); font-size: .78rem; }
+.avaliar-pessoa__igreja { min-width: 0; overflow-wrap: anywhere; }
+.avaliar-pessoa__etiqueta { padding: 2px 9px; border-radius: 999px; background: var(--green-50); color: var(--green-800); font-size: .72rem; font-weight: 650; }
+.avaliar-pessoa .button { grid-column: 2; grid-row: 1 / span 2; justify-self: end; }
+.avaliar__paginas { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; padding-top: 4px; }
+.avaliar__paginas span { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.renda-padrao { color: var(--muted); font-size: .72rem; }
+
+/*
+  A avaliação de uma pessoa: quem ela é, o aviso de cadastro repetido quando
+  houver, e a pergunta. O aviso usa superfície neutra — Fidelidade não recebe cor
+  de prioridade —, e só o ícone é âmbar, que é o que o olho procura.
+*/
+.avaliacao-lista { display: grid; }
+.avaliacao { padding: 15px 0; border-bottom: 1px solid var(--line); display: grid; gap: 12px; }
+.avaliacao:last-child { border-bottom: 0; }
+.avaliacao__pessoa { display: grid; gap: 4px; }
+.avaliacao__pessoa > strong { font-size: 1rem; overflow-wrap: anywhere; }
+.avaliacao__dados { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--muted); font-size: .78rem; }
+.avaliacao__aviso { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--green-50); display: grid; gap: 10px; }
+.avaliacao__aviso-titulo { margin: 0; display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .88rem; }
+.avaliacao__aviso-titulo svg { width: 18px; height: 18px; flex: 0 0 auto; color: var(--ambar, #b6771a); }
+.avaliacao__parecidos { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.avaliacao__parecidos li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: .84rem; }
+.avaliacao__parecidos strong { min-width: 0; overflow-wrap: anywhere; }
+.avaliacao__parecidos span:not(.avaliar-pessoa__etiqueta) { color: var(--muted); }
+.avaliacao__aviso .form-actions { margin: 0; }
+.avaliacao__opcoes { margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.avaliacao__opcoes legend { grid-column: 1 / -1; padding: 0 0 8px; font-weight: 700; font-size: .9rem; }
+@media (max-width: 720px) {
+  .avaliacao__opcoes { grid-template-columns: 1fr; }
+}
+/*
+  A linha de situação de renda carrega um campo inteiro, e a grade de quatro
+  colunas da `.entity-row` não cabe num celular: o campo era espremido e o
+  `select` saía pela direita. Aqui são duas colunas no computador e uma no
+  celular, com o campo descendo para a linha de baixo.
+*/
+.entity-row.entity-row--renda { grid-template-columns: minmax(0, 1fr) minmax(170px, auto); }
+.entity-row.entity-row--renda .field { margin: 0; min-width: 0; }
+@media (max-width: 720px) {
+  .entity-row.entity-row--renda { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .avaliar__filtros { grid-template-columns: 1fr; }
+  .avaliar-pessoa { grid-template-columns: 1fr; }
+  .avaliar-pessoa .button { grid-column: 1; grid-row: auto; justify-self: stretch; margin-top: 8px; }
+  .fidelidade-resumo > div { padding-right: 8px; }
+}
+:root:not([data-tema='claro']) .fidelidade-igreja__parte--fieis, :root[data-tema='escuro'] .fidelidade-igreja__parte--fieis { background: #5fb896; }
+:root:not([data-tema='claro']) .fidelidade-igreja__parte--acompanhamento, :root[data-tema='escuro'] .fidelidade-igreja__parte--acompanhamento { background: #4a6b5d; }
+:root:not([data-tema='claro']) .fidelidade-estado--fieis strong, :root[data-tema='escuro'] .fidelidade-estado--fieis strong { color: #9ed4bd; }
+:root:not([data-tema='claro']) .fidelidade-estado--acompanhamento strong, :root[data-tema='escuro'] .fidelidade-estado--acompanhamento strong { color: #b6c9c0; }
+:root:not([data-tema='claro']) .avaliar-pessoa__etiqueta, :root[data-tema='escuro'] .avaliar-pessoa__etiqueta { color: #9ed4bd; }
+:root:not([data-tema='claro']) .fidelidade-igreja--escolhida, :root[data-tema='escuro'] .fidelidade-igreja--escolhida { border-color: #5fb896; box-shadow: inset 0 0 0 1px #5fb896; }
+
 .fidelity-church-table { display: grid; gap: 10px; }
 .fidelity-church-table > div { padding: 14px; border: 1px solid var(--line); border-radius: 12px; display: grid; grid-template-columns: minmax(160px, 1.2fr) repeat(3, minmax(120px, 1fr)); gap: 12px; align-items: center; }
 .fidelity-church-table span { display: grid; gap: 3px; }

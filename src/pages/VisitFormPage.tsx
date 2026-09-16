@@ -24,6 +24,7 @@ import type { MissionaryPairEntity } from '../missionary/types'
 import { FamilyService } from '../families/service'
 import { FAMILY_ROLES, FAMILY_ROLE_LABELS, nomeDaFamilia, type FamilyRole } from '../families/parentesco'
 import { PeopleService } from '../people/service'
+import { temRenda } from '../people/rendaPorIdade'
 import type { IncomeStatus, PersonEntity } from '../people/types'
 import { possiveisDuplicados } from '../casamentos/core'
 import { CasamentoService } from '../casamentos/service'
@@ -135,7 +136,9 @@ export function VisitFormPage() {
   const guests = participants.filter(({ kind }) => kind === 'guest')
   function changeChurch(nextChurchId: string) { if (selectedMemberIds.length && nextChurchId !== churchId) setSelectionNotice('Os membros escolhidos foram limpos porque a igreja mudou.'); else setSelectionNotice(''); setChurchId(nextChurchId); setSelectedMemberIds([]) }
   const presentPeople = participants.filter(({ present, personId }) => present && personId).map(({ personId }) => people.find(({ id }) => id === personId)).filter((person): person is PersonEntity => Boolean(person))
-  const incomeCandidates = presentPeople.filter((person) => person.incomeStatus === 'unknown' && (person.fidelity?.category === 'non_tither' || person.fidelity?.category === 'non_systematic_tither'))
+  // Quem tem 67 anos ou mais já conta como pessoa com renda: perguntar de novo,
+  // na sala da casa dela, seria perguntar o que o aplicativo já sabe.
+  const incomeCandidates = presentPeople.filter((person) => temRenda(person) === 'unknown' && (person.fidelity?.category === 'non_tither' || person.fidelity?.category === 'non_systematic_tither'))
     // As perguntas ficam sempre abertas. Escolher membros serve para vincular a
   // resposta na hora de salvar, não para liberar o formulário.
   const nomePorPessoa = useCallback((personId: string) => people.find(({ id }) => id === personId)?.name, [people])
