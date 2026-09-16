@@ -13,6 +13,8 @@ const password = 'senha-ficticia-plano-2026'
 const DISTRITO = 'Distrito Fictício do Relatório'
 const NORTE = 'Fictícia do Norte'
 const SUL = 'Fictícia do Sul'
+/** Igreja sem nenhum relatório: é ela que prova a mensagem de "sem informação". */
+const LESTE = 'Fictícia do Leste'
 const AREAS = ['Identidade Adventista', 'Liderança', 'Novas Gerações', 'Discipulado']
 const ALUNOS = ['0', '2', '4', '4', '3', '6', '6', '9', '2', '2', '38']
 
@@ -84,6 +86,7 @@ test('Plano Estratégico: cartões com o Relatório Integrado, detalhe da área 
   await entrar(page)
   await cadastrarIgreja(page, NORTE)
   await cadastrarIgreja(page, SUL)
+  await cadastrarIgreja(page, LESTE)
 
   // Sem relatório: os quatro cartões aparecem, com nome e símbolo, sem número inventado.
   await irAoInicio(page)
@@ -118,13 +121,15 @@ test('Plano Estratégico: cartões com o Relatório Integrado, detalhe da área 
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/\/app\/plano-estrategico\/discipulado$/)
   await expect(page.getByRole('heading', { name: 'Discipulado', level: 1 })).toBeVisible()
-  await expect(page.locator('.plano-distrito__numero')).toHaveText('4')
-  await expect(page.locator('.plano-distrito__dados')).toContainText('Ano de 2026')
-  await expect(page.locator('.plano-distrito__dados')).toContainText('Sem base de comparação')
-  await expect(page.getByRole('row', { name: new RegExp(SUL) })).toContainText('Sem relatório')
-  await expect(page.getByRole('row', { name: new RegExp(NORTE) })).toContainText('Informado')
-  await expect(page.getByRole('heading', { name: 'Responderam (1)', exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Não responderam (1)', exact: true })).toBeVisible()
+  await expect(page.locator('.plano-resultado__numero')).toHaveText('4')
+  await expect(page.locator('.plano-resultado__titulo')).toHaveText('Resultado do distrito')
+  await expect(page.locator('.plano-resultado__dados')).toContainText('Ano de 2026')
+  // Um trimestre só: não há base de comparação, nem no resultado nem na tabela.
+  await expect(page.locator('.plano-variacao')).toHaveText(['—', '—'])
+  const pagina = page.locator('.plano-area-page')
+  for (const removido of ['Igrejas que responderam', 'Responderam', 'Não responderam', 'Situação', 'Informado', 'Sem relatório', 'Sem informação neste período', 'Igrejas que informaram']) {
+    await expect(pagina, removido).not.toContainText(removido)
+  }
   // O indicador mostra só nome, número e o detalhe da área: nada de seção, pergunta, cálculo ou arquivo.
   await expect(page.locator('.plano-indicador--principal')).toContainText('Pessoas dando estudos')
   await expect(page.locator('.plano-indicador--principal .plano-indicador__numero')).toHaveText('4')
@@ -143,38 +148,76 @@ test('Plano Estratégico: cartões com o Relatório Integrado, detalhe da área 
   // Identidade soma os trimestres (12 + 8 + 5); Discipulado vale o último de cada igreja (6 + 3).
   await expect(numeroDo(page, 'Identidade Adventista')).toHaveText('25')
   await expect(numeroDo(page, 'Discipulado')).toHaveText('9')
+
+  // Terceiro trimestre: o distrito cai, a igreja do Norte cai e a do Sul fica igual.
+  await enviarEGravar(page, 'terceiro-plano-ficticio.pdf', 3, relatorioIntegradoFicticio(3, [
+    { nome: NORTE, pequenosGrupos: '3', campanhas: '0', alunos: ALUNOS, ministrandoEstudos: '3' },
+    { nome: SUL, pequenosGrupos: '1', campanhas: '0', alunos: ALUNOS, ministrandoEstudos: '3' },
+  ]))
+  await irAoInicio(page)
+  await expect(numeroDo(page, 'Discipulado')).toHaveText('6')
   await tocar(cartao(page, 'Discipulado'))
-  await expect(page.locator('.plano-distrito__numero')).toHaveText('9')
-  await expect(page.locator('.plano-distrito__dados')).toContainText('1º tri → 2º tri')
-  await expect(page.locator('.plano-distrito__dados')).toContainText('+5 (+125%)')
-  await expect(page.getByRole('row', { name: /2º trimestre de 2026/ })).toContainText('+5 (+125%)')
+
+  // Distrito: variação só em porcentagem, e nenhum trimestre futuro vazio na tabela.
+  await expect(page.locator('.plano-resultado__numero')).toHaveText('6')
+  await expect(page.locator('.plano-resultado__dados')).toContainText('2º tri → 3º tri')
+  await expect(page.locator('.plano-resultado__dados .plano-variacao')).toHaveText('−33,3%')
+  await expect(page.getByRole('row', { name: /1º trimestre de 2026/ })).toContainText('—')
+  await expect(page.getByRole('row', { name: /2º trimestre de 2026/ })).toContainText('+125%')
+  await expect(page.getByRole('row', { name: /3º trimestre de 2026/ })).toContainText('−33,3%')
+  await expect(page.getByRole('row', { name: /4º trimestre de 2026/ })).toHaveCount(0)
+  await expect(page.locator('.plano-area-page')).not.toContainText('+5 (')
+  await expect(page.locator('.plano-serie')).toHaveAttribute('aria-label', /Discipulado em 2026\. 1º trimestre de 2026: 4; 2º trimestre de 2026: 9; 3º trimestre de 2026: 6\./)
+
+  // Uma igreja de cada vez, na mesma página: com dados, com variação zerada e sem nenhum dado.
+  const seletor = page.getByLabel('Visualizar resultado de')
+  await expect(seletor).toHaveValue('distrito')
+  await seletor.selectOption({ label: NORTE })
+  await expect(page.locator('.plano-resultado__titulo')).toHaveText(NORTE)
+  await expect(page.locator('.plano-resultado__numero')).toHaveText('3')
+  await expect(page.locator('.plano-resultado__dados .plano-variacao')).toHaveText('−50%')
+  await seletor.selectOption({ label: SUL })
+  await expect(page.locator('.plano-resultado__numero')).toHaveText('3')
+  await expect(page.locator('.plano-resultado__dados .plano-variacao')).toHaveText('0%')
+  await expect(page.getByRole('row', { name: /1º trimestre de 2026/ })).toHaveCount(0)
+  await seletor.selectOption({ label: LESTE })
+  await expect(page.getByText('Sem informação neste período')).toBeVisible()
+  await expect(page.locator('.plano-resultado__numero')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Comparação entre trimestres' })).toHaveCount(0)
+  await seletor.selectOption({ label: 'Distrito — resultado geral' })
+  await expect(page.locator('.plano-resultado__numero')).toHaveText('6')
+
   await tocar(page.getByRole('button', { name: '1º tri' }))
   await expect(page.getByRole('button', { name: '1º tri' })).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.locator('.plano-distrito__numero')).toHaveText('4')
-  await expect(page.locator('.plano-serie')).toHaveAttribute('aria-label', /1º trimestre de 2026: 4; 2º trimestre de 2026: 9; 3º trimestre de 2026: sem informação/)
+  await expect(page.locator('.plano-resultado__numero')).toHaveText('4')
 
   // Contraste nos dois temas: rótulo colorido e aba escolhida no detalhe; rótulo, número, texto e ação nos cartões.
   await tocar(page.getByRole('button', { name: 'Ano' }))
   for (const tema of ['claro', 'escuro']) {
     await page.evaluate((valor) => { document.documentElement.dataset.tema = valor }, tema)
-    expect(await menorContraste(page, '.plano-distrito__rotulo, .plano-periodo__aba--ativa, .plano-serie strong'), `detalhe ${tema}`).toBeGreaterThanOrEqual(4.5)
+    expect(await menorContraste(page, '.plano-resultado__numero, .plano-periodo__aba--ativa, .plano-serie strong, .plano-variacao, .plano-escopo .field__label'), `detalhe ${tema}`).toBeGreaterThanOrEqual(4.5)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), `detalhe ${tema}`).toBe(true)
   }
   await irAoInicio(page)
   for (const tema of ['claro', 'escuro']) {
     await page.evaluate((valor) => { document.documentElement.dataset.tema = valor }, tema)
-    expect(await menorContraste(page, '.plano-card__rotulo, .plano-card__acao, .plano-card__numero, .plano-card__texto, .plano-card__nome'), `início ${tema}`).toBeGreaterThanOrEqual(4.5)
+    expect(await menorContraste(page, '.plano-card__acao, .plano-card__numero, .plano-card__texto, .plano-card__nome'), `início ${tema}`).toBeGreaterThanOrEqual(4.5)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), `início ${tema}`).toBe(true)
   }
 
   // Cada área abre a própria página, com nome e símbolo; Identidade compara 12 com 13.
-  for (const [nome, slug, numero] of [['Identidade Adventista', 'identidade', '25'], ['Liderança', 'lideranca', '—'], ['Novas Gerações', 'novas-geracoes', '—']] as const) {
+  for (const [nome, slug, numero] of [['Identidade Adventista', 'identidade', '25'], ['Liderança', 'lideranca', ''], ['Novas Gerações', 'novas-geracoes', '']] as const) {
     await irAoInicio(page)
     await tocar(cartao(page, nome))
     await expect(page).toHaveURL(new RegExp(`/app/plano-estrategico/${slug}$`))
     await expect(page.getByRole('heading', { name: nome, level: 1 })).toBeVisible()
     await expect(page.locator('.plano-area-hero .simbolo-area')).toHaveCount(1)
-    await expect(page.locator('.plano-distrito__numero')).toHaveText(numero)
-    if (slug === 'identidade') await expect(page.locator('.plano-distrito__dados')).toContainText('+1 (+8,3%)')
+    await expect(page.getByLabel('Visualizar resultado de')).toBeVisible()
+    if (numero) {
+      await expect(page.locator('.plano-resultado__numero')).toHaveText(numero)
+      await expect(page.locator('.plano-resultado__dados .plano-variacao')).toHaveText('+8,3%')
+    } else {
+      await expect(page.locator('.plano-resultado__vazio')).toHaveText('Sem informação neste período')
+    }
   }
 })

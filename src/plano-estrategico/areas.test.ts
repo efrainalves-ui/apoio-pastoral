@@ -3,7 +3,7 @@ import { CATALOGO_DO_RELATORIO, indicadorPorId } from '../integrated-report/cata
 import type { RelatorioIntegradoEntity, ValorDoIndicador } from '../integrated-report/types'
 import {
   AREAS_DO_PLANO, anoDeReferencia, areaPorSlug, comparacaoDaArea, evolucaoDoAno, indicadoresQueCompoem, leituraPrincipalDaIgreja,
-  origensNoPeriodo, resultadoDaArea, textoDaDiferenca, ultimoTrimestreComDados,
+  origensNoPeriodo, resultadoDaArea, textoDaDiferenca, ultimoTrimestreComDados, variacaoDaComparacao,
 } from './areas'
 
 const IDENTIDADE = areaPorSlug('identidade')!
@@ -107,6 +107,15 @@ describe('origem de cada informação', () => {
       { arquivo: 'primeiro.pdf', trimestre: '2026-1', paginas: [1, 2, 4], igrejas: 2 },
       { arquivo: 'segundo.pdf', trimestre: '2026-2', paginas: [2], igrejas: 1 },
     ])
+  })
+
+  it('a variação vai só em porcentagem, com sinal e tom', () => {
+    expect(variacaoDaComparacao({ diferenca: 5, percentual: 125 })).toEqual({ texto: '+125%', tom: 'alta' })
+    expect(variacaoDaComparacao({ diferenca: -3, percentual: -33.3 })).toEqual({ texto: '−33,3%', tom: 'queda' })
+    expect(variacaoDaComparacao({ diferenca: 0, percentual: 0 })).toEqual({ texto: '0%', tom: 'estavel' })
+    // Sem trimestre anterior, e crescer sobre zero: porcentagem não existe.
+    expect(variacaoDaComparacao({ diferenca: null, percentual: null })).toEqual({ texto: '—', tom: 'sem_base' })
+    expect(variacaoDaComparacao({ diferenca: 4, percentual: null })).toEqual({ texto: '—', tom: 'sem_base' })
   })
 
   it('a diferença é escrita com sinal e porcentagem só quando há base', () => {
