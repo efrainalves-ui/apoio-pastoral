@@ -188,6 +188,23 @@ export function origensNoPeriodo(relatorios: readonly RelatorioIntegradoEntity[]
 
 export const formatarNumero = (numero: number): string => numero.toLocaleString('pt-BR')
 
+export type TomDaVariacao = 'alta' | 'queda' | 'estavel' | 'sem_base'
+export interface VariacaoParaTela { texto: string; tom: TomDaVariacao }
+
+/**
+ * A variação entre dois períodos, só em porcentagem.
+ *
+ * O sinal vem escrito e o tom acompanha, para a informação não depender da
+ * cor. Sem trimestre anterior — ou com base zero, onde porcentagem não existe
+ * — fica o traço: inventar "+100%" sobre nada seria dizer o que não se sabe.
+ */
+export function variacaoDaComparacao(comparacao: Pick<Comparacao, 'diferenca' | 'percentual'>): VariacaoParaTela {
+  if (comparacao.diferenca === null || comparacao.percentual === null) return { texto: '—', tom: 'sem_base' }
+  if (comparacao.percentual === 0) return { texto: '0%', tom: 'estavel' }
+  const sinal = comparacao.percentual > 0 ? '+' : '−'
+  return { texto: `${sinal}${Math.abs(comparacao.percentual).toLocaleString('pt-BR')}%`, tom: comparacao.percentual > 0 ? 'alta' : 'queda' }
+}
+
 /** "+12 (+8,5%)", "−3", "0"; sem base, o texto de vazio. */
 export function textoDaDiferenca(diferenca: number | null, percentual: number | null, vazio = 'Sem base de comparação'): string {
   if (diferenca === null) return vazio

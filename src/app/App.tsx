@@ -73,6 +73,7 @@ const VisitDetailPage = lazy(() => import('../pages/VisitDetailPage').then((modu
 const VisitFormPage = lazy(() => import('../pages/VisitFormPage').then((module) => ({ default: module.VisitFormPage })))
 const VisitationPage = lazy(() => import('../pages/VisitationPage').then((module) => ({ default: module.VisitationPage })))
 const PlanoEstrategicoAreaPage = lazy(() => import('../pages/PlanoEstrategicoAreaPage').then((module) => ({ default: module.PlanoEstrategicoAreaPage })))
+const IgrejasComPendenciaPage = lazy(() => import('../pages/IgrejasComPendenciaPage').then((module) => ({ default: module.IgrejasComPendenciaPage })))
 const CasamentoPage = lazy(() => import('../pages/CasamentoPage').then((module) => ({ default: module.CasamentoPage })))
 const CasamentoNovoPage = lazy(() => import('../pages/CasamentoNovoPage').then((module) => ({ default: module.CasamentoNovoPage })))
 const LembretesPage = lazy(() => import('../pages/LembretesPage').then((module) => ({ default: module.LembretesPage })))
@@ -392,6 +393,7 @@ export function App() {
         <Route path="links" element={<UsefulLinksPage />} />
         <Route path="visitacao" element={<VisitationPage />} />
         <Route path="plano-estrategico/:area" element={<PlanoEstrategicoAreaPage />} />
+        <Route path="distrito/atencao" element={<IgrejasComPendenciaPage />} />
         <Route path="casamentos" element={<Navigate to="/app/visitacao?aba=casamentos" replace />} />
         <Route path="casamentos/novo" element={<CasamentoNovoPage />} />
         <Route path="casamentos/:casamentoId" element={<CasamentoPage />} />

@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronRight } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Minus } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { useAuthVault } from '../auth/AuthVaultContext'
@@ -6,20 +6,25 @@ import { SimboloDaArea } from '../components/plano/SimboloDaArea'
 import { Card } from '../components/ui/Card'
 import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
-import {
-  ROTULO_DA_SITUACAO, anosDosRelatorios, comparar, coberturaDoPeriodo, leituraDoDistrito, rotuloCurto, rotuloCurtoDoTrimestre,
-  trimestreAnterior, type Periodo,
-} from '../integrated-report/painel'
+import { anosDosRelatorios, comparar, leituraDoDistrito, rotuloCurto, rotuloCurtoDoTrimestre, type Comparacao, type Periodo } from '../integrated-report/painel'
 import { rotuloDoTrimestre } from '../integrated-report/types'
 import { useRelatorioIntegrado } from '../integrated-report/useRelatorioIntegrado'
 import {
   TITULO_DO_PLANO, anoDeReferencia, areaPorSlug, comparacaoDaArea, evolucaoDoAno, formatarNumero, indicadoresQueCompoem,
-  leituraPrincipalDaIgreja, origensNoPeriodo, resultadoDaArea, textoDaDiferenca, type AreaDoPlano,
+  resultadoDaArea, variacaoDaComparacao, type AreaDoPlano,
 } from '../plano-estrategico/areas'
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 
 const districts = new DistrictService()
+const DISTRITO = 'distrito'
 const numeroOuTraco = (numero: number | null) => numero === null ? '—' : formatarNumero(numero)
+
+/** A variação em porcentagem: sinal, seta e cor dizem a mesma coisa. */
+function Variacao({ comparacao }: { comparacao: Pick<Comparacao, 'diferenca' | 'percentual'> }) {
+  const { texto, tom } = variacaoDaComparacao(comparacao)
+  const Icone = tom === 'alta' ? ArrowUp : tom === 'queda' ? ArrowDown : tom === 'estavel' ? Minus : null
+  return <span className={`plano-variacao plano-variacao--${tom}`}>{Icone && <Icone aria-hidden="true" />}{texto}</span>
+}
 
 /** "3º tri → 4º tri", ou com o ano quando a comparação atravessa o ano. */
 function rotuloDaComparacao(de: string | null, para: string | null): string {
@@ -50,16 +55,19 @@ function DetalheDaArea({ area }: { area: AreaDoPlano }) {
   const anoCorrente = useMemo(() => new Date().getFullYear(), [])
   const [anoEscolhido, setAnoEscolhido] = useState<number | null>(null)
   const [trimestre, setTrimestre] = useState<number | null>(null)
+  const [escopo, setEscopo] = useState<string>(DISTRITO)
 
   if (!pronto) return <div className="app-loading" role="status">Abrindo a área…</div>
 
   const nomeDaIgreja = (id: string) => igrejas.find((igreja) => igreja.id === id)?.name ?? 'Igreja'
   const ano = anoEscolhido ?? anoDeReferencia(relatorios, anoCorrente)
   const periodo: Periodo = { ano, trimestre }
-  const resultado = resultadoDaArea(relatorios, ativas, area, periodo)
-  const comparacao = comparacaoDaArea(relatorios, ativas, area, periodo)
-  const evolucao = evolucaoDoAno(relatorios, ativas, area, ano)
-  const cobertura = coberturaDoPeriodo(relatorios, ativas, periodo)
+  // O distrito continua somando as igrejas ativas; escolher uma igreja só troca o recorte.
+  const igrejasDoEscopo = escopo === DISTRITO ? ativas : [escopo]
+  const resultado = resultadoDaArea(relatorios, igrejasDoEscopo, area, periodo)
+  const comparacao = comparacaoDaArea(relatorios, igrejasDoEscopo, area, periodo)
+  const evolucao = evolucaoDoAno(relatorios, igrejasDoEscopo, area, ano)
+  const trimestresComDados = evolucao.filter(({ resultado: item }) => item.numero !== null)
   const maior = Math.max(1, ...evolucao.map(({ resultado: item }) => item.numero ?? 0))
   const rotuloDoPeriodo = trimestre === null ? `Ano de ${ano}` : rotuloDoTrimestre(`${ano}-${trimestre}`)
   const porNome = (a: string, b: string) => nomeDaIgreja(a).localeCompare(nomeDaIgreja(b), 'pt-BR')
@@ -94,104 +102,74 @@ function DetalheDaArea({ area }: { area: AreaDoPlano }) {
       </div>
     </div>
 
-    <section className="card plano-distrito" aria-labelledby="plano-distrito-titulo">
-      <h2 className="card__title" id="plano-distrito-titulo">Resultado do distrito</h2>
-      <p className="plano-distrito__rotulo">{area.principal.rotulo}</p>
-      <p className="plano-distrito__numero">{numeroOuTraco(resultado.numero)}</p>
-      <dl className="plano-distrito__dados">
+    {/* Distrito ou uma igreja: a página inteira acompanha a escolha, sem abrir outra tela. */}
+    <div className="plano-escopo">
+      <label className="field">
+        <span className="field__label">Visualizar resultado de</span>
+        <select className="field__input" value={escopo} onChange={(evento) => setEscopo(evento.target.value)}>
+          <option value={DISTRITO}>Distrito — resultado geral</option>
+          {igrejasEmOrdem.map((churchId) => <option key={churchId} value={churchId}>{nomeDaIgreja(churchId)}</option>)}
+        </select>
+      </label>
+    </div>
+
+    <section className="plano-resultado" aria-labelledby="plano-resultado-titulo">
+      <h2 className="plano-resultado__titulo" id="plano-resultado-titulo">{escopo === DISTRITO ? 'Resultado do distrito' : nomeDaIgreja(escopo)}</h2>
+      {resultado.numero === null
+        ? <p className="plano-resultado__vazio">Sem informação neste período</p>
+        : <p className="plano-resultado__numero">{formatarNumero(resultado.numero)}</p>}
+      <dl className="plano-resultado__dados">
         <div><dt>Período</dt><dd>{rotuloDoPeriodo}</dd></div>
-        <div><dt>Igrejas que informaram</dt><dd>{resultado.informaram} de {ativas.length}</dd></div>
-        <div><dt>{rotuloDaComparacao(comparacao.de, comparacao.para)}</dt><dd className={`plano-tendencia plano-tendencia--${comparacao.tendencia}`}>{textoDaDiferenca(comparacao.diferenca, comparacao.percentual)}</dd></div>
+        <div><dt>{rotuloDaComparacao(comparacao.de, comparacao.para)}</dt><dd><Variacao comparacao={comparacao} /></dd></div>
       </dl>
     </section>
 
-    <Card title="Evolução durante o ano" eyebrow={String(ano)}>
+    {trimestresComDados.length > 0 && <Card title="Evolução durante o ano" eyebrow={String(ano)}>
       <div
         className="serie-trimestral plano-serie"
         role="img"
-        aria-label={`${area.principal.rotulo} em ${ano}. ${evolucao.map(({ chave, resultado: item }) => `${rotuloDoTrimestre(chave)}: ${item.numero === null ? 'sem informação' : formatarNumero(item.numero)}`).join('; ')}.`}
+        aria-label={`${area.nome} em ${ano}. ${trimestresComDados.map(({ chave, resultado: item }) => `${rotuloDoTrimestre(chave)}: ${formatarNumero(item.numero ?? 0)}`).join('; ')}.`}
       >
-        {evolucao.map(({ chave, resultado: item }, indice) => <div key={chave} className={`serie-trimestral__coluna ${trimestre === indice + 1 ? 'plano-serie__coluna--escolhida' : ''}`}>
+        {trimestresComDados.map(({ chave, resultado: item }) => <div key={chave} className={`serie-trimestral__coluna ${`${ano}-${trimestre}` === chave ? 'plano-serie__coluna--escolhida' : ''}`}>
           <span className="serie-trimestral__trilho">
-            {item.numero === null
-              ? <span className="serie-trimestral__vazio" />
-              : <span className="serie-trimestral__barra" style={{ height: `${Math.round((item.numero / maior) * 100)}%` }} />}
+            <span className="serie-trimestral__barra" style={{ height: `${Math.round(((item.numero ?? 0) / maior) * 100)}%` }} />
           </span>
-          <strong>{numeroOuTraco(item.numero)}</strong>
+          <strong>{formatarNumero(item.numero ?? 0)}</strong>
           <small>{rotuloCurtoDoTrimestre(chave)}</small>
         </div>)}
       </div>
-    </Card>
+    </Card>}
 
-    <Card title="Comparação entre trimestres" eyebrow={String(ano)}>
+    {trimestresComDados.length > 0 && <Card title="Comparação entre trimestres" eyebrow={String(ano)}>
       <div className="plano-tabela">
         <table>
-          <thead><tr><th scope="col">Trimestre</th><th scope="col">Resultado</th><th scope="col">Diferença</th><th scope="col">Igrejas que informaram</th></tr></thead>
-          <tbody>{evolucao.map(({ chave, resultado: item }, indice) => {
-            const anterior = indice === 0 ? resultadoDaArea(relatorios, ativas, area, trimestreAnterior(ano, 1)) : evolucao[indice - 1]!.resultado
-            const diferenca = comparar(anterior.numero, item.numero)
+          <thead><tr><th scope="col">Trimestre</th><th scope="col">Resultado</th><th scope="col">Variação</th></tr></thead>
+          <tbody>{trimestresComDados.map(({ chave, resultado: item }) => {
+            const indice = evolucao.findIndex((ponto) => ponto.chave === chave)
+            // O primeiro trimestre do ano não tem trimestre anterior aqui: fica o traço.
+            const anterior = indice > 0 ? evolucao[indice - 1]!.resultado.numero : null
             return <tr key={chave}>
               <th scope="row">{rotuloDoTrimestre(chave)}</th>
-              <td>{numeroOuTraco(item.numero)}</td>
-              <td>{textoDaDiferenca(diferenca.diferenca, diferenca.percentual, '—')}</td>
-              <td>{item.informaram} de {ativas.length}</td>
+              <td>{formatarNumero(item.numero ?? 0)}</td>
+              <td><Variacao comparacao={comparar(anterior, item.numero)} /></td>
             </tr>
           })}</tbody>
         </table>
       </div>
-    </Card>
-
-    <Card title="Resultado por igreja" eyebrow={rotuloDoPeriodo} id="igrejas">
-      {!igrejasEmOrdem.length
-        ? <div className="empty-state compact-empty"><strong>Nenhuma igreja ativa no distrito</strong></div>
-        : <div className="plano-tabela">
-          <table>
-            <thead><tr><th scope="col">Igreja</th><th scope="col">Resultado</th><th scope="col">{rotuloDaComparacao(comparacao.de, comparacao.para)}</th><th scope="col">Situação</th></tr></thead>
-            <tbody>{igrejasEmOrdem.map((churchId) => {
-              const leitura = leituraPrincipalDaIgreja(relatorios, churchId, area, periodo)
-              const daIgreja = comparacaoDaArea(relatorios, [churchId], area, periodo)
-              return <tr key={churchId}>
-                <th scope="row">{nomeDaIgreja(churchId)}</th>
-                <td>{numeroOuTraco(leitura.numero)}</td>
-                <td>{textoDaDiferenca(daIgreja.diferenca, daIgreja.percentual, '—')}</td>
-                <td><span className={`plano-situacao plano-situacao--${leitura.situacao}`}>{ROTULO_DA_SITUACAO[leitura.situacao]}</span></td>
-              </tr>
-            })}</tbody>
-          </table>
-        </div>}
-    </Card>
-
-    <Card title="Igrejas que responderam" eyebrow={rotuloDoPeriodo}>
-      <div className="plano-cobertura">
-        <section aria-labelledby="plano-responderam">
-          <h3 id="plano-responderam">Responderam ({cobertura.responderam.length})</h3>
-          {cobertura.responderam.length ? <ul>{[...cobertura.responderam].sort(porNome).map((id) => <li key={id}>{nomeDaIgreja(id)}</li>)}</ul> : <p className="muted">Nenhuma</p>}
-        </section>
-        <section aria-labelledby="plano-nao-responderam">
-          <h3 id="plano-nao-responderam">Não responderam ({cobertura.naoResponderam.length})</h3>
-          {cobertura.naoResponderam.length ? <ul>{[...cobertura.naoResponderam].sort(porNome).map((id) => <li key={id}>{nomeDaIgreja(id)}</li>)}</ul> : <p className="muted">Nenhuma</p>}
-        </section>
-      </div>
-    </Card>
+    </Card>}
 
     <Card title="Indicadores que compõem o resultado" eyebrow={rotuloDoPeriodo} action={<Link className="text-link" to="/app/metas/relatorio-integrado">Relatório Integrado<ChevronRight aria-hidden="true" /></Link>}>
+      {/*
+        Linhas limpas: nome à esquerda, número à direita e o detalhe da área.
+        Seção, pergunta do relatório, arquivos e regra de cálculo continuam no
+        código e no Relatório Integrado — na tela, atrapalhavam a leitura.
+      */}
       <ul className="plano-indicadores">{indicadoresQueCompoem(area).map(({ indicador, principal, recorte }) => {
         const numero = principal ? resultado.numero : leituraDoDistrito(relatorios, ativas, indicador.id, periodo).numero
-        const origens = origensNoPeriodo(relatorios, ativas, indicador.id, periodo)
         return <li key={indicador.id} className={`plano-indicador ${principal ? 'plano-indicador--principal' : ''}`}>
-          <div className="plano-indicador__cabeca">
-            <span className="plano-indicador__marca" aria-hidden="true" />
-            <strong>{principal ? area.principal.rotulo : rotuloCurto(indicador)}</strong>
-            <span className="plano-indicador__numero">{numeroOuTraco(numero)}</span>
-          </div>
-          <dl className="plano-indicador__origem">
-            <div><dt>Seção</dt><dd>{indicador.secao}</dd></div>
-            <div><dt>Pergunta</dt><dd>{indicador.rotulo}{recorte ? ` · ${recorte}` : ''}</dd></div>
-            <div><dt>Cálculo</dt><dd>{indicador.tratamento === 'somar' ? 'Soma das igrejas; no ano, soma dos trimestres' : 'Soma das igrejas; no ano, último trimestre informado de cada igreja'}</dd></div>
-            <div><dt>Arquivos</dt><dd>{origens.length
-              ? origens.map((origem) => `${origem.arquivo} · ${rotuloCurtoDoTrimestre(origem.trimestre)} · ${origem.igrejas} igreja(s)${origem.paginas.length ? ` · pág. ${origem.paginas.join(', ')}` : ''}`).join('; ')
-              : 'Nenhum no período'}</dd></div>
-          </dl>
+          <span className="plano-indicador__marca" aria-hidden="true" />
+          <span className="plano-indicador__nome">{rotuloCurto(indicador)}{recorte ? ` · ${recorte}` : ''}</span>
+          <span className="plano-indicador__numero">{numeroOuTraco(numero)}</span>
         </li>
       })}</ul>
     </Card>

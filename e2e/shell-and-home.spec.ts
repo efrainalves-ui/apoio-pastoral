@@ -159,15 +159,16 @@ test('barra inferior, atalhos do topo e botão de criar funcionam', async ({ pag
 test('o início mostra os blocos práticos do dia sem classificar ninguém', async ({ page }) => {
   await register(page)
 
-  await expect(page.getByRole('heading', { name: 'Tarefas', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Tarefas que pedem atenção', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Resumo de Visitação', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Interessados e estudos', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Igrejas que precisam de atenção', exact: true })).toBeVisible()
 
-  // A visitação é um cartão curto: o toque leva às respostas completas na Visitação.
+  // Cartões curtos: cada um é um caminho inteiro, e a lista fica na página que ele abre.
   await expect(page.getByRole('link', { name: 'Resumo de Visitação' })).toHaveAttribute('href', '/app/visitacao?aba=respostas')
-  await expect(page.getByRole('link', { name: /Abrir tarefas/ })).toHaveAttribute('href', '/app/visitacao?aba=tarefas')
-  await expect(page.getByRole('link', { name: /Abrir interessados e estudos/ })).toHaveAttribute('href', '/app/missionario')
+  await expect(page.getByRole('link', { name: 'Tarefas que pedem atenção' })).toHaveAttribute('href', '/app/visitacao?aba=tarefas&filtro=atencao')
+  await expect(page.getByRole('link', { name: 'Igrejas que precisam de atenção' })).toHaveAttribute('href', '/app/distrito/atencao')
+  await expect(page.getByRole('heading', { name: 'Pessoas por igreja' })).toHaveCount(0)
 
   const horizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
   expect(horizontalOverflow).toBe(false)

@@ -145,7 +145,11 @@ export function VisitationPage() {
   // Visitas, respostas e acompanhamentos são Discipulado; casamentos, orações e tarefas continuam neutros.
   const abaDeDiscipulado = tab === 'visitas' || tab === 'respostas' || tab === 'acompanhamentos'
   const pendentes = tasks.filter(({ status }) => status === 'pending').sort((a, b) => a.dueAt.localeCompare(b.dueAt))
+  /* Vindo do cartão da tela inicial: primeiro o que venceu e o que é para hoje. */
+  const soAtencao = search.get('filtro') === 'atencao'
+  const pedemAtencao = pendentes.filter(({ dueAt }) => dueAt.slice(0, 10) <= agora)
   const concluidas = tasks.filter(({ status }) => status !== 'pending')
+  const tarefasNaTela = soAtencao ? pedemAtencao : [...pendentes, ...concluidas]
   const [filtro, setFiltro] = useState<FiltroDaVisitacao>('todos')
   const [busca, setBusca] = useState('')
 
@@ -209,7 +213,10 @@ export function VisitationPage() {
 
     {tab === 'tarefas' && <>
       <div className="linha-de-busca">
-        <p className="conta-de-tarefas">{pendentes.length} {pendentes.length === 1 ? 'tarefa aberta' : 'tarefas abertas'}</p>
+        <p className="conta-de-tarefas">{soAtencao
+          ? `${pedemAtencao.length} ${pedemAtencao.length === 1 ? 'tarefa vencida ou de hoje' : 'tarefas vencidas ou de hoje'}`
+          : `${pendentes.length} ${pendentes.length === 1 ? 'tarefa aberta' : 'tarefas abertas'}`}</p>
+        {soAtencao && <button type="button" className="text-button" onClick={() => setSearch({ aba: 'tarefas' })}>Ver todas</button>}
         <button type="button" className="botao-novo" onClick={() => setSearch({ aba: 'tarefas', ...(formularioAberto ? {} : { nova: '1' }) })}>{formularioAberto ? 'Fechar' : 'Nova tarefa'}</button>
       </div>
 
@@ -236,9 +243,9 @@ export function VisitationPage() {
         precisa fazer, não preencher um formulário. Antes eram sete campos
         ocupando a tela inteira e a primeira tarefa só aparecia depois deles.
       */}
-      {!tasks.length
-        ? <div className="empty-state"><ListChecks /><strong>Nenhuma tarefa</strong></div>
-        : <div className="lista-tarefas-cuidado">{[...pendentes, ...concluidas].map((task) => {
+      {!tarefasNaTela.length
+        ? <div className="empty-state"><ListChecks /><strong>{soAtencao ? 'Nada vencido nem para hoje' : 'Nenhuma tarefa'}</strong></div>
+        : <div className="lista-tarefas-cuidado">{tarefasNaTela.map((task) => {
           const atrasada = task.status === 'pending' && task.dueAt < agora
           return <button key={task.id} type="button" className={`linha-tarefa ${task.status === 'completed' ? 'linha-tarefa--feita' : ''}`} onClick={() => toggleTask(task)}>
             {task.status === 'completed' ? <CheckCircle2 className="linha-tarefa__marca" /> : <Circle className="linha-tarefa__marca" />}
