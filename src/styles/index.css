@@ -1604,9 +1604,16 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   :root:not([data-tema='claro']) .commission-return-note { color: #d9eee5; background: #1e3a30; border-color: #4f7565; }
   :root:not([data-tema='claro']) .button--secondary:disabled { color: #a6b4ae; border-color: #46564f; opacity: .72; }
   :root:not([data-tema='claro']) .checklist-add { background: rgb(255 255 255 / 6%); }
-  :root:not([data-tema='claro']) /* Nenhuma ação com texto escuro sobre fundo escuro: no tema escuro os verdes
-     de texto e de ícone precisam clarear para continuarem legíveis. */
-  .button--quiet { color: #d9e7e1; background: rgb(255 255 255 / 8%); }
+  /*
+    Nenhuma ação com texto escuro sobre fundo escuro: no tema escuro os verdes de
+    texto e de ícone precisam clarear para continuarem legíveis.
+
+    O comentário fica ACIMA da regra. No meio do seletor ele a partia: o texto
+    clareava e o fundo continuava o verde claro do tema claro, e o botão saía
+    quase branco sobre quase branco. Medido em 16/09/2026: fundo `#edf5f0` com
+    texto `#d9e7e1`, contraste de 1,1:1.
+  */
+  :root:not([data-tema='claro']) .button--quiet { color: #d9e7e1; background: rgb(255 255 255 / 8%); }
   :root:not([data-tema='claro']) .button--quiet:hover:not(:disabled) { background: rgb(255 255 255 / 14%); }
   :root:not([data-tema='claro']) .text-button, :root:not([data-tema='claro']) .nomination-page summary, :root:not([data-tema='claro']) .accent-icon, :root:not([data-tema='claro']) .readiness-card__check, :root:not([data-tema='claro']) .quick-actions__menu svg { color: #9ed4bd; }
   :root:not([data-tema='claro']) .quick-actions__menu a:focus-visible { outline-color: #9ed4bd; }
@@ -1679,9 +1686,8 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 :root[data-tema='escuro'] .commission-return-note { color: #d9eee5; background: #1e3a30; border-color: #4f7565; }
 :root[data-tema='escuro'] .button--secondary:disabled { color: #a6b4ae; border-color: #46564f; opacity: .72; }
 :root[data-tema='escuro'] .checklist-add { background: rgb(255 255 255 / 6%); }
-:root[data-tema='escuro'] /* Nenhuma ação com texto escuro sobre fundo escuro: no tema escuro os verdes
-   de texto e de ícone precisam clarear para continuarem legíveis. */
-.button--quiet { color: #d9e7e1; background: rgb(255 255 255 / 8%); }
+/* O mesmo cuidado da regra acima, e pelo mesmo motivo: comentário fora do seletor. */
+:root[data-tema='escuro'] .button--quiet { color: #d9e7e1; background: rgb(255 255 255 / 8%); }
 :root[data-tema='escuro'] .button--quiet:hover:not(:disabled) { background: rgb(255 255 255 / 14%); }
 :root[data-tema='escuro'] .text-button, :root[data-tema='escuro'] .nomination-page summary, :root[data-tema='escuro'] .accent-icon, :root[data-tema='escuro'] .readiness-card__check, :root[data-tema='escuro'] .quick-actions__menu svg { color: #9ed4bd; }
 :root[data-tema='escuro'] .quick-actions__menu a:focus-visible { outline-color: #9ed4bd; }
