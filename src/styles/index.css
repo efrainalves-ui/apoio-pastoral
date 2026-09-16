@@ -954,6 +954,34 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   .reading-history article { grid-template-columns: 1fr; }
 }
 
+/* O ano mês a mês: o mês com leitura em destaque, o mês vazio como marca curta. */
+.mes-a-mes { display: grid; gap: 12px; justify-items: start; }
+.mes-a-mes__lista { width: 100%; margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.mes-linha { border: 1px solid var(--line); border-radius: 13px; background: var(--paper); }
+.mes-linha--atual { border-color: var(--green-700); }
+.mes-linha--vazio { background: transparent; }
+.mes-linha__botao { width: 100%; min-height: 52px; padding: 11px 14px; border: 0; border-radius: 13px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; display: grid; grid-template-columns: minmax(92px, auto) 1fr minmax(56px, 104px) 18px; align-items: center; gap: 8px 14px; }
+.mes-linha__botao:focus-visible { outline: 2px solid var(--green-700); outline-offset: 2px; }
+.mes-linha__nome { font-weight: 700; text-transform: capitalize; }
+.mes-linha__numeros { color: var(--muted); font-size: .88rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.mes-linha__barra { height: 6px; border-radius: 999px; background: var(--green-50); overflow: hidden; }
+.mes-linha__barra > span { display: block; height: 100%; border-radius: 999px; background: var(--green-700); }
+.mes-linha__botao > svg { width: 18px; height: 18px; color: var(--muted); }
+.mes-detalhe { padding: 0 14px 14px; display: grid; gap: 9px; }
+.mes-detalhe ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; }
+.mes-detalhe__livros li { font-weight: 650; }
+.mes-detalhe__sessoes li { padding: 8px 0 0; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 3px 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mes-detalhe p { margin: 0; }
+.mes-a-mes__vazios { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); font-size: .78rem; }
+.mes-vazio { padding: 2px 9px; border-radius: 999px; background: var(--green-50); text-transform: capitalize; }
+@media (max-width: 720px) {
+  .mes-linha__botao { grid-template-columns: 1fr 18px; }
+  .mes-linha__numeros, .mes-linha__barra { grid-column: 1 / -1; }
+  .mes-linha__botao > svg { grid-row: 1; grid-column: 2; }
+}
+:root:not([data-tema='claro']) .mes-linha__barra > span, :root[data-tema='escuro'] .mes-linha__barra > span { background: #5fb896; }
+:root:not([data-tema='claro']) .mes-linha--atual, :root[data-tema='escuro'] .mes-linha--atual { border-color: #5fb896; }
+
 .ceremony-people, .ceremony-checklist { margin: 17px 0 0; padding: 15px; border: 1px solid var(--line); border-radius: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 .ceremony-people legend, .ceremony-checklist legend { padding: 0 7px; font-weight: 800; }
 .ceremony-people label, .ceremony-checklist label { min-height: 42px; padding: 9px 11px; border-radius: 9px; display: flex; gap: 9px; align-items: center; background: var(--green-50); }
