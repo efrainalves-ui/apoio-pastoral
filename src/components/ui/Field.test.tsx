@@ -13,11 +13,14 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('campo com calendário', () => {
-  it('a data ganha um botão de calendário com nome próprio, e o clique no campo também abre', async () => {
+  it('a data ganha um botão de calendário, descrito pelo campo, e o clique no campo também abre', async () => {
     const user = userEvent.setup()
     render(<Field label="Data de término" name="agenda-end-date" type="date" value="2026-09-16" onChange={() => undefined} />)
 
-    const botao = screen.getByRole('button', { name: 'Abrir calendário de Data de término' })
+    const botao = screen.getByRole('button', { name: 'Abrir calendário' })
+    // O campo vem pela descrição: procurar "Data de término" pelo rótulo acha só o campo.
+    expect(botao).toHaveAccessibleDescription('Data de término')
+    expect(screen.getAllByLabelText(/Data de término/)).toHaveLength(1)
     await user.click(botao)
     expect(abrir).toHaveBeenCalledTimes(1)
 

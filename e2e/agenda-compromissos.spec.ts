@@ -46,7 +46,7 @@ test('o campo de data tem botão de calendário, nos dois temas, e continua acei
     janela.aberturas = 0
     ;(HTMLInputElement.prototype as unknown as { showPicker: () => void }).showPicker = () => { janela.aberturas += 1 }
   })
-  const botao = page.getByRole('button', { name: 'Abrir calendário de Data' })
+  const botao = page.getByRole('button', { name: 'Abrir calendário' })
   await expect(botao).toBeVisible()
   const caixa = (await botao.boundingBox())!
   expect(caixa.width, 'largura do toque').toBeGreaterThanOrEqual(40)
