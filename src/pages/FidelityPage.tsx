@@ -16,8 +16,13 @@ import { PeopleService } from '../people/service'
 import { isAutomatedTest } from '../sync/config'
 import { FIDELITY_CATEGORY_LABELS, type FidelitySnapshot, type PersonEntity } from '../people/types'
 import { minimoParaSistematico, rotuloDoDizimoOnline, veioDoDizimoOnline } from '../people/dizimoOnline'
-import { fidelityCareSummary, isFaithfulByAge, isFidelityCareCandidate } from '../people/fidelitySummary'
-import { calculateAge } from '../people/dates'
+import { isFidelityCareCandidate, precisaDeAvaliacao } from '../people/fidelitySummary'
+import { situacaoDeRenda } from '../people/rendaPorIdade'
+import { cadastrosParecidos } from '../people/duplicados'
+import { umaPorPessoa } from '../people/vinculos'
+import { FidelidadePorIgreja } from '../components/fidelidade/FidelidadePorIgreja'
+import { PessoasParaAvaliar } from '../components/fidelidade/PessoasParaAvaliar'
+import { AvaliacaoDaPessoa, type SituacaoEscolhida } from '../components/fidelidade/AvaliacaoDaPessoa'
 
 const imports = new ImportService()
 const peopleService = new PeopleService()
@@ -40,10 +45,13 @@ export function FidelityPage() {
   const [category, setCategory] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [report, setReport] = useState<ImportBatchEntity | null>(null)
   const [autoSummary, setAutoSummary] = useState<{ resolved: number; pending: number; manual: number } | null>(null)
   const [manualChurches, setManualChurches] = useState<Record<string, string>>({})
   const [assessmentOpen, setAssessmentOpen] = useState(false)
+  // "Avaliar depois" não grava nada: só tira a pessoa da fila desta sessão.
+  const [adiados, setAdiados] = useState<string[]>([])
   const anoCorrente = new Date().getFullYear()
   const [anoDoRelatorio, setAnoDoRelatorio] = useState(anoCorrente)
   const [buscaNome, setBuscaNome] = useState('')
@@ -155,25 +163,80 @@ export function FidelityPage() {
   const tither = people.filter(({ fidelity }) => fidelity?.category === 'tither').length
   const nonSystematicTither = people.filter(({ fidelity }) => fidelity?.category === 'non_systematic_tither').length
   const nonTither = people.filter(({ fidelity }) => fidelity?.category === 'non_tither').length
-  const selectedPeople = people.filter((person) => !churchId || person.currentChurchId === churchId)
-  const careSummary = fidelityCareSummary(selectedPeople)
-  // O acompanhamento é a lista mais longa da tela: são centenas de nomes, e sem
-  // recorte por igreja ela não serve para trabalhar, só para assustar.
-  const doAcompanhamento = selectedPeople.filter((person) => !igrejaDoAcompanhamento || person.currentChurchId === igrejaDoAcompanhamento)
-  const toEvaluate = doAcompanhamento.filter((person) => isFidelityCareCandidate(person) && !isFaithfulByAge(person) && person.incomeStatus === 'unknown')
-  const incomeCandidates = doAcompanhamento.filter(isFidelityCareCandidate)
-  const filtroDeIgreja = <label className="field"><span className="field__label">Igreja</span><select className="field__input" value={igrejaDoAcompanhamento} onChange={(event) => setIgrejaDoAcompanhamento(event.target.value)}><option value="">Todas as igrejas</option>{churches.map((church) => <option key={church.id} value={church.id}>{church.name}</option>)}</select></label>
+  /*
+    O acompanhamento é a lista mais longa da tela: são centenas de nomes, e sem
+    recorte por igreja ela não serve para trabalhar, só para assustar. A igreja
+    escolhida nos cartões é a mesma que recorta esta lista.
+  */
+  // Cadastros vinculados entram uma vez só: é a mesma pessoa em dois registros.
+  const pessoasUnicas = umaPorPessoa(people)
+  const candidatosParaAvaliar = pessoasUnicas.filter((person) => precisaDeAvaliacao(person))
+  const incomeCandidates = pessoasUnicas.filter((person) => (!igrejaDoAcompanhamento || person.currentChurchId === igrejaDoAcompanhamento) && isFidelityCareCandidate(person))
   const assessmentChurchId = churchId || churches[0]?.id || ''
-  const assessmentPeople = people.filter((person) => person.currentChurchId === assessmentChurchId && isFidelityCareCandidate(person) && !isFaithfulByAge(person) && person.incomeStatus === 'unknown')
+  const paraAvaliarAgora = candidatosParaAvaliar.filter((person) => person.currentChurchId === assessmentChurchId && !adiados.includes(person.id))
 
-  if (assessmentOpen) return <div className="page-stack"><Link className="text-link back-link" to="/app/fidelidade" onClick={() => setAssessmentOpen(false)}><ArrowLeft />Voltar à fidelidade</Link><header className="page-hero"><div><p className="eyebrow">Avaliação</p><h1>{churchName(assessmentChurchId)}</h1></div></header><Card title="Pessoas a avaliar"><label className="field"><span className="field__label">Igreja</span><select className="field__input" value={assessmentChurchId} onChange={(event) => setChurchId(event.target.value)}>{churches.map((church) => <option key={church.id} value={church.id}>{church.name}</option>)}</select></label><p className="card-copy">{assessmentPeople.length} pessoa(s) a avaliar.</p>{assessmentPeople.length === 0 ? <div className="empty-state compact-empty"><CheckCircle2 /><strong>Nenhuma pessoa pendente nesta igreja</strong></div> : <div className="entity-list">{assessmentPeople.map((person) => <div className="entity-row" key={person.id}><span><strong>{person.name}</strong><small>{FIDELITY_CATEGORY_LABELS[person.fidelity!.category]} · {calculateAge(person.birthDate)} anos</small></span><div className="form-actions"><Button variant="secondary" disabled={busy} onClick={() => void updateIncome(person, 'has_income')}>Tem renda</Button><Button variant="secondary" disabled={busy} onClick={() => void updateIncome(person, 'no_income')}>Não tem renda</Button><Button variant="secondary" disabled={busy}>Deixar para depois</Button></div></div>)}</div>}</Card></div>
+  /**
+   * A resposta do pastor sobre uma pessoa.
+   *
+   * "É dizimista" vira leitura de fidelidade com data e origem; as duas de renda
+   * gravam só a condição de renda; "Avaliar depois" não grava nada — a pessoa
+   * volta na próxima vez que a tela for aberta.
+   */
+  /** O mesmo cuidado das outras gravações desta tela: ocupa, tenta, conta o que houve e recarrega. */
+  async function salvar(acao: () => Promise<unknown>, mensagem: string, falha: string) {
+    setBusy(true); setError(''); setNotice('')
+    try { await acao(); setNotice(mensagem); await load() }
+    catch (reason) { setError(reason instanceof Error ? reason.message : falha) }
+    finally { setBusy(false) }
+  }
+
+  async function responder(person: PersonEntity, escolha: SituacaoEscolhida) {
+    if (!account || !masterKey) return
+    if (escolha === 'depois') { setAdiados((atual) => [...atual, person.id]); return }
+    if (escolha === 'dizimista') {
+      await salvar(() => peopleService.confirmarDizimista(account.id, masterKey, person.id), `${person.name} confirmada como dizimista.`, 'Não foi possível confirmar a fidelidade.')
+      return
+    }
+    await updateIncome(person, escolha === 'com_renda' ? 'has_income' : 'no_income')
+  }
+
+  async function vincular(person: PersonEntity, outros: readonly string[]) {
+    if (!account || !masterKey) return
+    await salvar(() => peopleService.vincularCadastros(account.id, masterKey, [person.id, ...outros]), 'Cadastros vinculados como a mesma pessoa.', 'Não foi possível vincular os cadastros.')
+  }
+
+  async function separar(person: PersonEntity, outros: readonly string[]) {
+    if (!account || !masterKey) return
+    await salvar(() => peopleService.marcarComoPessoasDiferentes(account.id, masterKey, [person.id, ...outros]), 'Registrado como pessoas diferentes.', 'Não foi possível registrar a decisão.')
+  }
+
+  if (assessmentOpen) return <div className="page-stack">
+    <Link className="text-link back-link" to="/app/fidelidade" onClick={() => setAssessmentOpen(false)}><ArrowLeft />Voltar à fidelidade</Link>
+    <header className="page-hero"><div><p className="eyebrow">Avaliação</p><h1>{churchName(assessmentChurchId)}</h1></div></header>
+    {notice && <div className="alert alert--success" role="status">{notice}</div>}
+    {error && <div className="alert alert--error" role="alert">{error}</div>}
+    <Card eyebrow="Visão nominal privada" title="Pessoas a avaliar">
+      <label className="field"><span className="field__label">Igreja</span><select className="field__input" value={assessmentChurchId} onChange={(event) => setChurchId(event.target.value)}>{churches.map((church) => <option key={church.id} value={church.id}>{church.name}</option>)}</select></label>
+      <p className="avaliar__contagem" aria-live="polite"><strong>{paraAvaliarAgora.length} {paraAvaliarAgora.length === 1 ? 'pessoa' : 'pessoas'}</strong></p>
+      {paraAvaliarAgora.length === 0
+        ? <div className="empty-state compact-empty"><CheckCircle2 /><strong>Nenhuma pessoa pendente nesta igreja</strong></div>
+        : <div className="avaliacao-lista">{paraAvaliarAgora.map((person) => <AvaliacaoDaPessoa
+          key={person.id}
+          pessoa={person}
+          parecidos={cadastrosParecidos(person, people)}
+          ocupado={busy}
+          onEscolher={(escolha) => void responder(person, escolha)}
+          onVincular={(ids) => void vincular(person, ids)}
+          onPessoasDiferentes={(ids) => void separar(person, ids)}
+        />)}</div>}
+    </Card>
+  </div>
 
   return <div className="page-stack">
     <Link className="text-link back-link" to="/app/mais"><ArrowLeft />Voltar</Link>
     <header className="page-hero"><div><p className="eyebrow">Fidelidade</p><h1>Fidelidade nos dízimos</h1></div></header>
     {error && <div className="alert alert--error" role="alert">{error}</div>}
     <section className="district-metrics fidelity-metrics"><div><small>Não dizimistas</small><strong>{nonTither}</strong><span className="parte-do-todo">{percent(nonTither, total)}</span></div><div><small>Não sistemáticos</small><strong>{nonSystematicTither}</strong><span className="parte-do-todo">{percent(nonSystematicTither, total)}</span></div><div><small>Dizimistas</small><strong>{tither}</strong><span className="parte-do-todo">{percent(tither, total)}</span></div></section>
-    <Card eyebrow={churchId ? churchName(churchId) : 'Distrito'} title="Fidelidade da igreja"><div className="private-summary"><div><span>Fiéis</span><strong>{careSummary.faithful}</strong></div><div><span>Em acompanhamento</span><strong>{careSummary.followingUp}</strong></div><button type="button" onClick={() => setAssessmentOpen(true)}><span>A avaliar</span><strong>{careSummary.toEvaluate}</strong></button></div></Card>
     {(() => {
       const anos = fidelidadePorAno(people, new Date().getFullYear())
       if (!anos.length) return null
@@ -278,10 +341,12 @@ export function FidelityPage() {
       pastor não procura "uma pessoa do distrito": ele procura alguém de uma
       igreja. Então a igreja vem primeiro, e a lista só existe dentro dela.
     */}
-    <Card eyebrow="Visão nominal privada" title={churchId ? churchName(churchId) : 'Fidelidade por igreja'} action={churchId ? <Button variant="secondary" onClick={() => { setChurchId(''); setBuscaNome(''); setCategory('') }}>Todas as igrejas</Button> : null}>
-      {!churchId ? <>
-        <div className="fidelity-church-table">{churches.map((church) => { const grupo = people.filter((person) => person.currentChurchId === church.id); const resumo = fidelityCareSummary(grupo); return <button className="fidelity-church-row" type="button" key={church.id} onClick={() => setChurchId(church.id)}><strong>{church.name}</strong><span><small>Fiéis</small>{resumo.faithful}</span><span><small>Em acompanhamento</small>{resumo.followingUp}</span><span><small>A avaliar</small>{resumo.toEvaluate}</span></button> })}</div>
-      </> : <>
+    <Card eyebrow="Distrito" title="Fidelidade por igreja">
+      <FidelidadePorIgreja igrejas={churches} pessoas={people} igrejaSelecionada={igrejaDoAcompanhamento} onEscolherIgreja={setIgrejaDoAcompanhamento} />
+    </Card>
+    <Card eyebrow="Visão nominal privada" title={churchId ? churchName(churchId) : 'Lista nominal'} action={churchId ? <Button variant="secondary" onClick={() => { setChurchId(''); setBuscaNome(''); setCategory('') }}>Limpar</Button> : null}>
+      <label className="field"><span className="field__label">Igreja</span><select className="field__input" value={churchId} onChange={(event) => setChurchId(event.target.value)}><option value="">Escolher igreja…</option>{churches.map((church) => <option key={church.id} value={church.id}>{church.name}</option>)}</select></label>
+      {!churchId ? <div className="empty-state"><LockKeyhole /><strong>Escolha uma igreja para ver os nomes</strong></div> : <>
         <div className="filter-bar">
           <label className="field"><span className="field__label">Buscar pessoa</span><input className="field__input" value={buscaNome} onChange={(event) => setBuscaNome(event.target.value)} placeholder="Parte do nome" /></label>
           <label className="field"><span className="field__label">Categoria</span><select className="field__input" value={category} onChange={(event) => setCategory(event.target.value)}><option value="">Todas</option>{Object.entries(FIDELITY_CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -290,8 +355,21 @@ export function FidelityPage() {
         {fidelityPeople.length === 0 ? <div className="empty-state"><LockKeyhole /><strong>Nenhuma informação neste filtro</strong></div> : <div className="entity-list">{fidelityPeople.map((person) => <Link className="entity-row" key={person.id} to={`/app/pessoas/${person.id}`}><span className="avatar">{person.name[0]}</span><span><strong>{person.name}</strong><small>{churchName(person.currentChurchId)}</small></span><span className={`entity-badge ${veioDoDizimoOnline(person.fidelity) ? 'entity-badge--dizimo-online' : 'entity-badge--active'}`}>{FIDELITY_CATEGORY_LABELS[person.fidelity!.category]}</span><span>{rotuloDoDizimoOnline(person.fidelity) ?? fidelityDetail(person.fidelity!)}</span></Link>)}</div>}
       </>}
     </Card>
-    <Card eyebrow="Acompanhamento" title="Pessoas para avaliar"><div className="filter-bar">{filtroDeIgreja}</div><p className="field__hint">{toEvaluate.length} pessoa(s) a avaliar aqui.</p>{toEvaluate.length === 0 ? <div className="empty-state compact-empty"><CheckCircle2 /><strong>Nenhuma pessoa pendente de avaliação</strong></div> : <div className="entity-list">{toEvaluate.map((person) => <div className="entity-row" key={person.id}><span><strong>{person.name}</strong><small>{churchName(person.currentChurchId)} · {FIDELITY_CATEGORY_LABELS[person.fidelity!.category]} · {calculateAge(person.birthDate)} anos</small></span><Button variant="secondary" onClick={() => { setChurchId(person.currentChurchId); setAssessmentOpen(true) }}>Avaliar</Button></div>)}</div>}</Card>
-    <Card eyebrow="Acompanhamento" title="Situação de renda">{incomeCandidates.length === 0 ? <p className="muted">Não há pessoas nesta classificação.</p> : <div className="entity-list">{incomeCandidates.map((person) => <div className="entity-row" key={person.id}><span><strong>{person.name}</strong><small>{churchName(person.currentChurchId)} · {FIDELITY_CATEGORY_LABELS[person.fidelity!.category]}</small></span><label className="field"><span className="field__label">Situação de renda</span><select className="field__input" value={person.incomeStatus} disabled={busy} onChange={(event) => void updateIncome(person, event.target.value as PersonEntity['incomeStatus'])}><option value="unknown">Ainda não avaliada</option><option value="has_income">Tem renda</option><option value="no_income">Não tem renda</option></select></label></div>)}</div>}</Card>
+    <Card eyebrow="Visão nominal privada" title="Pessoas para avaliar">
+      <PessoasParaAvaliar
+        pessoas={candidatosParaAvaliar}
+        igrejas={churches}
+        igrejaSelecionada={igrejaDoAcompanhamento}
+        onEscolherIgreja={setIgrejaDoAcompanhamento}
+        onAvaliar={(person) => { setChurchId(person.currentChurchId); setAssessmentOpen(true) }}
+      />
+    </Card>
+    {/*
+      A idade decide sozinha a partir dos 67 anos, e a tela diz que foi ela. A
+      correção continua aberta: quando o pastor sabe de uma exceção, o que ele
+      escolhe passa a valer acima do padrão.
+    */}
+    <Card eyebrow="Acompanhamento" title="Situação de renda">{incomeCandidates.length === 0 ? <p className="muted">Não há pessoas nesta classificação.</p> : <div className="entity-list">{incomeCandidates.map((person) => { const renda = situacaoDeRenda(person); return <div className="entity-row entity-row--renda" key={person.id}><span><strong>{person.name}</strong><small>{churchName(person.currentChurchId)} · {FIDELITY_CATEGORY_LABELS[person.fidelity!.category]}</small>{renda.origem === 'idade' && <small className="renda-padrao">Padrão pela idade · {renda.idade} anos</small>}</span><label className="field"><span className="field__label">Situação de renda</span><select className="field__input" value={renda.status} disabled={busy} onChange={(event) => void updateIncome(person, event.target.value as PersonEntity['incomeStatus'])}><option value="unknown">Ainda não avaliada</option><option value="has_income">Tem renda</option><option value="no_income">Não tem renda</option></select></label></div> })}</div>}</Card>
     <Card eyebrow="Histórico" title="Importações de fidelidade" action={batches.some(({ status }) => status === 'applied') ? <Button variant="secondary" onClick={() => void undo()} disabled={busy} icon={<RotateCcw />}>Desfazer última</Button> : null}>{batches.length === 0 ? <div className="empty-state compact-empty"><FileSearch /><strong>Nenhuma importação</strong></div> : <div className="import-history">{batches.map((batch) => <div key={batch.id}><span><strong>{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(batch.appliedAt))}</strong><small>{batch.referenceYear ? `Relatório de ${batch.referenceYear}` : 'Ano não informado'} · {batch.status === 'applied' ? 'aplicada' : 'desfeita'}</small></span><span>{batch.summary.updated} atualizações · {batch.summary.issues} divergências</span></div>)}</div>}</Card>
   </div>
 }

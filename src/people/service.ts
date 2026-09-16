@@ -3,7 +3,7 @@ import { decryptRecord, encryptPayload } from '../crypto/vault'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { VaultRecord } from '../db/types'
-import { normalizeFidelitySnapshot, PASTORAL_STATUS_LABELS, type IncomeStatus, type PersonData, type PersonEntity, type PersonHistoryEntry, type PersonInput } from './types'
+import { FIDELITY_CATEGORY_LABELS, normalizeFidelitySnapshot, PASTORAL_STATUS_LABELS, type FidelitySnapshot, type IncomeStatus, type PersonData, type PersonEntity, type PersonHistoryEntry, type PersonInput } from './types'
 import { assertPersonInput, normalizePhone } from './validation'
 
 const detailLabels: Record<'name' | 'birthDate' | 'whatsapp' | 'notes', string> = {
@@ -18,7 +18,8 @@ export class PeopleService {
     const payload = await decryptRecord(masterKey, record)
     if (payload?.type !== 'person') return null
     const data = payload.data as PersonData
-    return { id: record.id, ...data, incomeStatus: data.incomeStatus ?? 'unknown', fidelity: normalizeFidelitySnapshot(data.fidelity), fidelityHistory: (data.fidelityHistory ?? []).map((snapshot) => normalizeFidelitySnapshot(snapshot)!) }
+    // `nameVariants` nasce vazio nos cadastros antigos: quem lê não precisa saber disso.
+    return { id: record.id, ...data, incomeStatus: data.incomeStatus ?? 'unknown', nameVariants: data.nameVariants ?? [], fidelity: normalizeFidelitySnapshot(data.fidelity), fidelityHistory: (data.fidelityHistory ?? []).map((snapshot) => normalizeFidelitySnapshot(snapshot)!) }
   }
 
   async listPeople(accountId: string, masterKey: CryptoKey): Promise<PersonEntity[]> {
@@ -116,6 +117,112 @@ export class PeopleService {
     const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'person', data }, personId)
     await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), personId, envelope, 'person')
     return { id: personId, ...data }
+  }
+
+  /**
+   * O pastor confirma, na mão, que a pessoa é dizimista.
+   *
+   * O relatório erra e o pastor sabe: quem devolve o dízimo em outra igreja, ou
+   * entrou depois do fechamento, aparece como não dizimista. A confirmação vira
+   * uma leitura como outra qualquer — com data, e dizendo que veio dele —, a
+   * leitura antiga desce para o histórico, e nada mais do cadastro é tocado.
+   *
+   * A idade não entra aqui: 67 anos decide renda, nunca fidelidade.
+   */
+  async confirmarDizimista(accountId: string, masterKey: CryptoKey, personId: string, onDate = new Date()): Promise<PersonEntity> {
+    const current = await this.getPerson(accountId, masterKey, personId)
+    if (!current) throw new Error('Pessoa não encontrada.')
+    if (current.fidelity?.category === 'tither') return current
+    const now = onDate.toISOString()
+    const anterior = current.fidelity
+    const fidelity: FidelitySnapshot = {
+      referenceYear: onDate.getFullYear(), months: null, rangeMin: 8, rangeMax: 12,
+      category: 'tither', precision: 'category_only', updatedAt: now, importedAt: now,
+      source: 'Confirmação manual do pastor', importBatchId: '',
+    }
+    const { id: _id, ...stored } = current; void _id
+    const data: PersonData = {
+      ...stored,
+      fidelity,
+      fidelityHistory: anterior ? [...current.fidelityHistory, anterior] : current.fidelityHistory,
+      history: [...current.history, {
+        id: crypto.randomUUID(), at: now, event: 'fidelity_updated',
+        from: anterior ? FIDELITY_CATEGORY_LABELS[anterior.category] : 'sem leitura',
+        to: FIDELITY_CATEGORY_LABELS.tither, source: 'Confirmação manual do pastor',
+      }],
+      updatedAt: now,
+    }
+    const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'person', data }, personId)
+    await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), personId, envelope, 'person')
+    return { id: personId, ...data }
+  }
+
+  /**
+   * Dois ou mais cadastros passam a ser a mesma pessoa.
+   *
+   * Nada é apagado: os registros continuam inteiros, cada um com o seu histórico,
+   * e ganham um grupo em comum. Os nomes diferentes ficam guardados como
+   * variações, que é como a próxima importação vai reconhecê-la em vez de criar
+   * um terceiro cadastro.
+   *
+   * Quem decide é o pastor — esta função não descobre nada sozinha.
+   */
+  async vincularCadastros(accountId: string, masterKey: CryptoKey, personIds: readonly string[], onDate = new Date()): Promise<PersonEntity[]> {
+    if (new Set(personIds).size < 2) throw new Error('Escolha pelo menos dois cadastros para vincular.')
+    const encontrados = await Promise.all([...new Set(personIds)].map((id) => this.getPerson(accountId, masterKey, id)))
+    const cadastros = encontrados.filter((pessoa): pessoa is PersonEntity => Boolean(pessoa))
+    if (cadastros.length !== new Set(personIds).size) throw new Error('Um dos cadastros não foi encontrado.')
+    const now = onDate.toISOString()
+    // Vincular a quem já é de um grupo entra no grupo existente, e não cria outro.
+    const groupId = cadastros.find(({ linkedGroupId }) => linkedGroupId)?.linkedGroupId ?? crypto.randomUUID()
+    const todosOsNomes = [...new Set(cadastros.flatMap((pessoa) => [pessoa.name, ...(pessoa.nameVariants ?? [])]))]
+    const salvos: PersonEntity[] = []
+    for (const pessoa of cadastros) {
+      const { id, ...stored } = pessoa
+      const data: PersonData = {
+        ...stored,
+        linkedGroupId: groupId,
+        nameVariants: todosOsNomes.filter((nome) => nome !== pessoa.name),
+        history: [...pessoa.history, {
+          id: crypto.randomUUID(), at: now, event: 'records_linked',
+          to: todosOsNomes.join(' · '), source: 'Vínculo confirmado pelo pastor',
+        }],
+        updatedAt: now,
+      }
+      const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'person', data }, id)
+      await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'person')
+      salvos.push({ id, ...data })
+    }
+    return salvos
+  }
+
+  /**
+   * O pastor diz que dois cadastros parecidos são pessoas diferentes.
+   *
+   * Fica gravado dos dois lados para o aviso não voltar: duas irmãs de nome
+   * parecido na mesma igreja são o caso comum, e um aviso que reaparece toda
+   * semana é um aviso que ninguém lê mais.
+   */
+  async marcarComoPessoasDiferentes(accountId: string, masterKey: CryptoKey, personIds: readonly string[]): Promise<PersonEntity[]> {
+    const distintos = [...new Set(personIds)]
+    if (distintos.length < 2) throw new Error('Escolha pelo menos dois cadastros.')
+    const encontrados = await Promise.all(distintos.map((id) => this.getPerson(accountId, masterKey, id)))
+    const cadastros = encontrados.filter((pessoa): pessoa is PersonEntity => Boolean(pessoa))
+    if (cadastros.length !== distintos.length) throw new Error('Um dos cadastros não foi encontrado.')
+    const now = new Date().toISOString()
+    const salvos: PersonEntity[] = []
+    for (const pessoa of cadastros) {
+      const { id, ...stored } = pessoa
+      const data: PersonData = {
+        ...stored,
+        naoSaoAMesmaPessoa: [...new Set([...(pessoa.naoSaoAMesmaPessoa ?? []), ...distintos.filter((outro) => outro !== id)])],
+        updatedAt: now,
+      }
+      const envelope = await encryptPayload(masterKey, { schemaVersion: 1, type: 'person', data }, id)
+      await this.repository.saveEncrypted(accountId, currentDeviceId(accountId), id, envelope, 'person')
+      salvos.push({ id, ...data })
+    }
+    return salvos
   }
 
   /**

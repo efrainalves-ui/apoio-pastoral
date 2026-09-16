@@ -16,7 +16,7 @@ export const IMPORT_STATUS_LABELS: Record<PersonImportStatus, string> = {
   archived: 'Arquivado',
 }
 
-export type PersonHistoryEvent = 'created' | 'details_updated' | 'church_changed' | 'pastoral_status_changed' | 'import_status_changed' | 'fidelity_updated' | 'income_status_updated'
+export type PersonHistoryEvent = 'created' | 'details_updated' | 'church_changed' | 'pastoral_status_changed' | 'import_status_changed' | 'fidelity_updated' | 'income_status_updated' | 'records_linked'
 
 export interface PersonHistoryEntry {
   id: string
@@ -92,6 +92,29 @@ export interface PersonData {
    */
   churchSource?: MembershipPeriod['source']
   history: PersonHistoryEntry[]
+  /**
+   * Cadastros que o pastor confirmou serem a mesma pessoa.
+   *
+   * Uma letra trocada no nome cria um segundo registro, e a leitura de
+   * fidelidade cai só num deles: a mesma pessoa aparece duas vezes, uma como
+   * dizimista e outra como não dizimista. Quem tem o mesmo `linkedGroupId` é uma
+   * pessoa só — conta uma vez nos totais e compartilha a situação de fidelidade.
+   *
+   * Vincular não apaga nada: os dois registros continuam inteiros, com seus
+   * históricos, e a decisão é sempre do pastor. Ausente em quem nunca foi
+   * vinculado, que é a imensa maioria.
+   */
+  linkedGroupId?: string
+  /** Os outros nomes com que a pessoa já apareceu, para reconhecê-la nas próximas importações. */
+  nameVariants?: string[]
+  /**
+   * Cadastros que o pastor já disse não serem esta pessoa.
+   *
+   * Sem isto o aviso de possível duplicidade voltaria toda vez para as duas
+   * irmãs de nome parecido da mesma igreja, e um aviso que não se cala vira
+   * aviso que não se lê.
+   */
+  naoSaoAMesmaPessoa?: string[]
   incomeStatus: IncomeStatus
   fidelity: FidelitySnapshot | null
   fidelityHistory: FidelitySnapshot[]
