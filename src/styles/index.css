@@ -65,6 +65,20 @@ h1, h2, h3, .brand strong { font-family: ui-rounded, "SF Pro Rounded", Inter, ui
 .field__input:focus { border-color: var(--green-700); box-shadow: 0 0 0 3px rgb(44 108 90 / 13%); outline: 0; }
 .field__input:focus-visible { outline: 3px solid #e2b350; outline-offset: 2px; }
 .field__input[aria-invalid='true'] { border-color: var(--red); }
+/*
+  O botão de calendário do campo de data.
+
+  O ícone que o navegador desenha sozinho é minúsculo, muda de navegador para
+  navegador e some no tema escuro. Ele sai de cena e entra este botão: sempre
+  visível, com área de toque de dedo, abrindo o mesmo calendário do navegador.
+*/
+.field__com-calendario { position: relative; display: block; }
+.field__com-calendario .field__input { width: 100%; padding-right: 52px; }
+.field__com-calendario .field__input::-webkit-calendar-picker-indicator { display: none; }
+.field__calendario { position: absolute; top: 50%; right: 5px; transform: translateY(-50%); width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 10px; color: var(--green-800); background: transparent; cursor: pointer; }
+.field__calendario svg { width: 20px; height: 20px; }
+.field__calendario:hover { background: var(--green-50); }
+.field__calendario:focus-visible { outline: 3px solid #e2b350; outline-offset: 2px; }
 .field__textarea { min-height: 104px; height: auto; padding-block: 13px; resize: vertical; line-height: 1.5; }
 .field__textarea--large { min-height: 150px; }
 .field__hint, .field__error { font-size: .77rem; color: var(--muted); }
@@ -1422,6 +1436,8 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
   :root:not([data-tema='claro']) .quadro--falta { color: #f19289; }
   :root:not([data-tema='claro']) { color: #eaf2ed; background: #070f0c; --cream: #070f0c; --paper: #0b1512; --ink: #eaf2ed; --muted: #8ba397; --line: #1e332b; --green-50: #16261f; --ambar: #e5a53f; --ambar-fraca: #3a2d13; }
   :root:not([data-tema='claro']) .field__input { color: var(--ink); background: #111b17; border-color: #415049; }
+  :root:not([data-tema='claro']) .field__calendario { color: #9ed4bd; }
+  :root:not([data-tema='claro']) .field__calendario:hover { background: rgb(255 255 255 / 10%); }
   :root:not([data-tema='claro']) .search-input { background: #111b17; border-color: #415049; }
   :root:not([data-tema='claro']) .field__label { color: #d1ded8; }
   :root:not([data-tema='claro']) .auth-panel { background: #111a17; }
@@ -1495,6 +1511,8 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 }
 :root[data-tema='escuro'] { color: #e4ece8; background: #0e1714; --cream: #0e1714; --paper: #16211d; --ink: #e4ece8; --muted: #a6b4ae; --line: #2d3a35; --green-50: #213a31; }
 :root[data-tema='escuro'] .field__input { color: var(--ink); background: #111b17; border-color: #415049; }
+:root[data-tema='escuro'] .field__calendario { color: #9ed4bd; }
+:root[data-tema='escuro'] .field__calendario:hover { background: rgb(255 255 255 / 10%); }
 :root[data-tema='escuro'] .search-input { background: #111b17; border-color: #415049; }
 :root[data-tema='escuro'] .field__label { color: #d1ded8; }
 :root[data-tema='escuro'] .auth-panel { background: #111a17; }

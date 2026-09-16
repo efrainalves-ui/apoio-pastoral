@@ -36,6 +36,39 @@ async function preencherHorario(page: Page, hora: number) {
 
 const IGREJA = 'Igreja Fictícia da Agenda'
 
+test('o campo de data tem botão de calendário, nos dois temas, e continua aceitando a data digitada', async ({ page }) => {
+  await registerAndEnter(page, 'agenda.calendario.e2e@example.invalid')
+  await novoCompromisso(page, 'Reunião')
+
+  // O calendário é o do navegador: aqui só se confere que o botão o chama.
+  await page.evaluate(() => {
+    const janela = window as unknown as { aberturas: number }
+    janela.aberturas = 0
+    ;(HTMLInputElement.prototype as unknown as { showPicker: () => void }).showPicker = () => { janela.aberturas += 1 }
+  })
+  const botao = page.getByRole('button', { name: 'Abrir calendário de Data' })
+  await expect(botao).toBeVisible()
+  const caixa = (await botao.boundingBox())!
+  expect(caixa.width, 'largura do toque').toBeGreaterThanOrEqual(40)
+  expect(caixa.height, 'altura do toque').toBeGreaterThanOrEqual(40)
+  await botao.click()
+  expect(await page.evaluate(() => (window as unknown as { aberturas: number }).aberturas)).toBe(1)
+  // Tocar no próprio campo também abre.
+  await page.getByLabel('Data', { exact: true }).click()
+  expect(await page.evaluate(() => (window as unknown as { aberturas: number }).aberturas)).toBe(2)
+
+  // A data digitada continua valendo, e o botão continua visível no tema escuro.
+  const dia = isoDateTime(agendaDate(), 9).slice(0, 10)
+  await page.getByLabel('Data', { exact: true }).fill(dia)
+  await expect(page.getByLabel('Data', { exact: true })).toHaveValue(dia)
+  for (const tema of ['claro', 'escuro']) {
+    await page.evaluate((valor) => { document.documentElement.dataset.tema = valor }, tema)
+    await expect(botao, tema).toBeVisible()
+  }
+  // Os demais campos não ganharam botão: é só o de data.
+  await expect(page.getByRole('button', { name: /^Abrir calendário/ })).toHaveCount(1)
+})
+
 test('comissão marcada na Agenda abre no módulo com a data, o horário e o local de lá', async ({ page }) => {
   page.on('dialog', (dialog) => void dialog.accept())
   await registerAndEnter(page, 'agenda.comissao.e2e@example.invalid')
