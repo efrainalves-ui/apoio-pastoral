@@ -4,11 +4,12 @@ import { BookCheck, BookOpen, ChevronLeft, ChevronRight, Clock3, Goal, Pencil, P
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { localDateKey } from '../shared/dates'
+import { LeituraMesAMes } from '../components/leitura/LeituraMesAMes'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Field } from '../components/ui/Field'
 import {
-  acumuladoAteOMes, bookProgress, datasCoerentes, formatarTempo, mesesDoAno, metaDoAno, metasMensaisAntigas, propostaDeSoma, readingMonth,
+  acumuladoAteOMes, bookProgress, datasCoerentes, formatarTempo, metaDoAno, metasMensaisAntigas, propostaDeSoma, readingMonth,
   relatorioMensal, resumoAnual, revisaoPendente, sessaoDoRegistroRetroativo, type ProgressoDaMeta,
 } from '../reading/core'
 import { ReadingService } from '../reading/service'
@@ -74,7 +75,6 @@ export function ReadingPage() {
   const relatorio = relatorioMensal(books, sessions, mes)
   const acumulado = acumuladoAteOMes(books, sessions, mes)
   const metaDoMesEscolhido = metaDoAno(goals, mes.slice(0, 4))
-  const meses = mesesDoAno(books, sessions, ano)
   const pendente = revisaoPendente(goals); const antigas = metasMensaisAntigas(goals); const proposta = propostaDeSoma(goals)
   const visibleBooks = useMemo(() => view === 'all' ? books : books.filter(({ status }) => status === view), [books, view])
   const bookName = (id: string) => books.find((book) => book.id === id)?.title ?? 'Livro removido'
@@ -191,11 +191,8 @@ export function ReadingPage() {
       {!relatorio.historico.length ? <div className="empty-state"><Clock3 /><strong>Nenhuma leitura registrada neste mês</strong></div> : <div className="reading-history">{relatorio.historico.map((session) => <article key={session.id}><span><strong>{bookName(session.bookId)}</strong><small>{dataCurta(session.date)}</small></span><span>{session.pages} página(s) · {formatarTempo(session.minutes)}</span>{session.notes && <p>{session.notes}</p>}<div className="form-actions"><Button variant="quiet" icon={<Pencil />} aria-label={`Editar leitura de ${dataCurta(session.date)}`} onClick={() => editarSessao(session)} /><Button variant="quiet" icon={<Trash2 />} aria-label={`Excluir leitura de ${dataCurta(session.date)}`} onClick={() => excluirSessao(session)} /></div></article>)}</div>}
     </Card>
 
-    <Card title={`Meses de ${ano}`} eyebrow="Resultado">
-      <div className="rolagem-tabela"><table className="tabela-simples">
-        <thead><tr><th scope="col">Mês</th><th scope="col">Livros</th><th scope="col">Páginas</th><th scope="col">Tempo</th></tr></thead>
-        <tbody>{meses.map((linha) => <tr key={linha.mes}><td><button type="button" className="text-button" onClick={() => setMes(linha.mes)}>{nomeDoMes(linha.mes)}</button></td><td className="numero-tabela">{linha.livros}</td><td className="numero-tabela">{numero(linha.paginas)}</td><td className="numero-tabela">{formatarTempo(linha.minutos)}</td></tr>)}</tbody>
-      </table></div>
+    <Card title="Leitura mês a mês" eyebrow={ano}>
+      <LeituraMesAMes livros={books} sessoes={sessions} ano={ano} mesSelecionado={mes} onEscolherMes={setMes} />
     </Card>
 
     <nav className="reading-nav" aria-label="Filtros de leitura">{(Object.keys(VIEW_LABELS) as ReadingView[]).map((item) => <button key={item} className={view === item ? 'active' : ''} aria-pressed={view === item} onClick={() => setView(item)}>{VIEW_LABELS[item]}</button>)}</nav>

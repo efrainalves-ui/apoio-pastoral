@@ -85,8 +85,38 @@ describe('relatório mensal', () => {
     expect(acumuladoAteOMes(LIVROS, SESSOES, '2026-02')).toEqual({ livros: 1, paginas: 320, minutos: 275 })
     const meses = mesesDoAno(LIVROS, SESSOES, '2026')
     expect(meses).toHaveLength(12)
-    expect(meses[2]).toEqual({ mes: '2026-03', livros: 1, paginas: 100, minutos: 60 })
-    expect(meses[11]).toEqual({ mes: '2026-12', livros: 0, paginas: 0, minutos: 0 })
+    expect(meses[2]).toEqual({ mes: '2026-03', livros: 1, paginas: 100, minutos: 60, temRegistro: true })
+    expect(meses[11]).toEqual({ mes: '2026-12', livros: 0, paginas: 0, minutos: 0, temRegistro: false })
+  })
+})
+
+/*
+  O registro do pastor: um livro, oitenta páginas e uma hora e meia, no mesmo mês.
+
+  Os três números vêm de campos diferentes e não podem se trocar pelo caminho: o
+  ano, o relatório do mês e a linha daquele mês precisam dizer a mesma coisa.
+*/
+describe('um livro, 80 páginas e 90 minutos no mesmo mês', () => {
+  const UNICO = [livro('unico', { status: 'completed', startDate: '2026-09-01', completedDate: '2026-09-16', totalPages: 80, pagesRead: 80 })]
+  const UMA = [sessao('u1', 'unico', '2026-09-16', 80, 90)]
+
+  it('o ano, o mês e a linha do mês mostram 1 livro, 80 páginas e 1h 30min', () => {
+    const anoTodo = resumoAnual(UNICO, UMA, '2026', null)
+    expect(anoTodo.livros.feito).toBe(1)
+    expect(anoTodo.paginas.feito).toBe(80)
+    expect(anoTodo.minutos).toBe(90)
+    expect(formatarTempo(anoTodo.minutos)).toBe('1h 30min')
+
+    const setembro = relatorioMensal(UNICO, UMA, '2026-09')
+    expect(setembro).toMatchObject({ paginas: 80, minutos: 90, sessoes: 1, dias: 1 })
+    expect(setembro.livrosConcluidos.map(({ id }) => id)).toEqual(['unico'])
+    expect(setembro.historico.map(({ pages, minutes }) => ({ pages, minutes }))).toEqual([{ pages: 80, minutes: 90 }])
+
+    // `1` é a quantidade de livros e `80` são as páginas — nunca o contrário.
+    const linhas = mesesDoAno(UNICO, UMA, '2026')
+    expect(linhas[8]).toEqual({ mes: '2026-09', livros: 1, paginas: 80, minutos: 90, temRegistro: true })
+    expect(linhas.filter(({ temRegistro }) => temRegistro)).toHaveLength(1)
+    expect(acumuladoAteOMes(UNICO, UMA, '2026-09')).toEqual({ livros: 1, paginas: 80, minutos: 90 })
   })
 })
 

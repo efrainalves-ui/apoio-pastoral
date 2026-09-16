@@ -83,12 +83,20 @@ export function acumuladoAteOMes(livros: readonly Livro[], sessoes: readonly Ses
   }
 }
 
-/** Os doze meses do ano, como resultado. */
+/**
+ * Os doze meses do ano, como resultado.
+ *
+ * Cada mês traz os mesmos números do relatório daquele mês — livros concluídos,
+ * páginas e tempo das sessões —, sem contar nada por outro caminho. `temRegistro`
+ * separa o mês que teve leitura do mês que ficou vazio, para a tela destacar um
+ * e recolher o outro.
+ */
 export function mesesDoAno(livros: readonly Livro[], sessoes: readonly Sessao[], ano: string) {
   return Array.from({ length: 12 }, (_, indice) => {
     const mes = `${ano}-${String(indice + 1).padStart(2, '0')}`
     const relatorio = relatorioMensal(livros, sessoes, mes)
-    return { mes, livros: relatorio.livrosConcluidos.length, paginas: relatorio.paginas, minutos: relatorio.minutos }
+    const numeros = { livros: relatorio.livrosConcluidos.length, paginas: relatorio.paginas, minutos: relatorio.minutos }
+    return { mes, ...numeros, temRegistro: numeros.livros > 0 || numeros.paginas > 0 || numeros.minutos > 0 }
   })
 }
 
