@@ -205,8 +205,9 @@ test('Plano Estratégico: cartões com o Relatório Integrado, detalhe da área 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), `início ${tema}`).toBe(true)
   }
 
-  // Cada área abre a própria página, com nome e símbolo; Identidade compara 12 com 13.
-  for (const [nome, slug, numero] of [['Identidade Adventista', 'identidade', '25'], ['Liderança', 'lideranca', ''], ['Novas Gerações', 'novas-geracoes', '']] as const) {
+  // Cada área abre a própria página, com nome e símbolo; Identidade compara 12 com 13,
+  // e Novas Gerações soma os alunos de bebês a jovens das duas igrejas, iguais nos dois últimos trimestres.
+  for (const [nome, slug, numero, variacao] of [['Identidade Adventista', 'identidade', '25', '+8,3%'], ['Liderança', 'lideranca', '', ''], ['Novas Gerações', 'novas-geracoes', '50', '0%']] as const) {
     await irAoInicio(page)
     await tocar(cartao(page, nome))
     await expect(page).toHaveURL(new RegExp(`/app/plano-estrategico/${slug}$`))
@@ -215,7 +216,7 @@ test('Plano Estratégico: cartões com o Relatório Integrado, detalhe da área 
     await expect(page.getByLabel('Visualizar resultado de')).toBeVisible()
     if (numero) {
       await expect(page.locator('.plano-resultado__numero')).toHaveText(numero)
-      await expect(page.locator('.plano-resultado__dados .plano-variacao')).toHaveText('+8,3%')
+      await expect(page.locator('.plano-resultado__dados .plano-variacao')).toHaveText(variacao)
     } else {
       await expect(page.locator('.plano-resultado__vazio')).toHaveText('Sem informação neste período')
     }

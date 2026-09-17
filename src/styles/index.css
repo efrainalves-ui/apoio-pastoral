@@ -1771,6 +1771,21 @@ button.text-link { padding: 0; background: none; border: 0; font: inherit; font-
 .quadro-grupos td small { color: var(--muted); font-weight: 400; }
 .quadro--alcancado { color: var(--green-700); font-weight: 700; }
 .quadro--falta { color: #b3261e; font-weight: 700; }
+/*
+  Os números de Escola Sabatina e Pequenos Grupos dizem de onde vieram. "Sem
+  informação" é texto menor e apagado, para nunca parecer um zero; a divergência
+  com o cadastro vem em âmbar, que o tema escuro redefine pelo token.
+*/
+.quadro-periodo { margin: 0 0 10px; color: var(--muted); font-size: .85rem; font-weight: 600; }
+.quadro-periodo__escolha { width: auto; max-width: 100%; margin-bottom: 10px; }
+.quadro-numero { display: grid; gap: 2px; justify-items: inherit; min-width: 0; }
+.quadro-numero strong small { display: inline; }
+.quadro-numero .quadro--sem-informacao, .private-summary .quadro--sem-informacao { font-size: .9rem; font-weight: 600; line-height: 1.3; color: var(--muted); white-space: normal; overflow-wrap: break-word; }
+.quadro-origem { display: block; color: var(--muted); font-size: .72rem; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.quadro-divergencia { display: block; color: var(--ambar); font-size: .75rem; font-weight: 700; }
+.quadro-grupos td .quadro-numero { justify-items: end; }
+.quadro-grupos td .quadro--sem-informacao { min-width: 8.5em; text-align: right; }
+.quadro-grupos thead .quadro-origem { margin-top: 2px; }
 
 /*
   A escolha à mão vence a do sistema, nas duas direções. Estas regras estavam

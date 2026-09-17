@@ -15,7 +15,10 @@ import { DistrictService } from '../district/service'
 import { FamilyService } from '../families/service'
 import type { FamilyEntity } from '../families/types'
 import { MissionaryService } from '../missionary/service'
-import { metaDeGrupos } from '../missionary/metasDeGrupos'
+import { quadroDeGrupos, trimestreDoQuadro, trimestresComRelatorio } from '../missionary/metasDeGrupos'
+import { NumeroDoQuadro, PeriodoDoQuadro } from '../components/quadro/NumeroDeGrupos'
+import { RelatorioIntegradoService } from '../integrated-report/service'
+import type { RelatorioIntegradoEntity } from '../integrated-report/types'
 import type { SabbathClassEntity, SmallGroupEntity, UapgEntity } from '../missionary/types'
 import { calculateAge } from '../people/dates'
 import { PeopleService } from '../people/service'
@@ -40,6 +43,7 @@ const peopleService = new PeopleService()
 const familyService = new FamilyService()
 const missionary = new MissionaryService()
 const careService = new CareService()
+const relatorioIntegrado = new RelatorioIntegradoService()
 
 const TABS = [
   ['visao', 'Visão geral'],
@@ -70,6 +74,8 @@ export function ChurchDetailPage() {
   const [classes, setClasses] = useState<SabbathClassEntity[]>([])
   const [smallGroups, setSmallGroups] = useState<SmallGroupEntity[]>([])
   const [integracoes, setIntegracoes] = useState<UapgEntity[]>([])
+  const [relatorios, setRelatorios] = useState<RelatorioIntegradoEntity[]>([])
+  const [igrejasDoDistrito, setIgrejasDoDistrito] = useState<string[]>([])
   const [events, setEvents] = useState<AgendaEventEntity[]>([])
   const [anteriores, setAnteriores] = useState<Array<PregacaoAnteriorEntity & { titulo: string }>>([])
   const [visitCount, setVisitCount] = useState(0)
@@ -96,9 +102,12 @@ export function ChurchDetailPage() {
       setDistrictName(district?.name ?? 'Distrito')
       setMembers(people.filter((person) => person.currentChurchId === churchId && person.importStatus !== 'archived').sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')))
       setFamilies(nextFamilies.filter(({ primaryChurchId }) => primaryChurchId === churchId))
-      const [nextClasses, nextGroups, nextIntegracoes] = await Promise.all([
+      const [nextClasses, nextGroups, nextIntegracoes, nextRelatorios, nextIgrejas] = await Promise.all([
         missionary.listClasses(account.id, masterKey), missionary.listSmallGroups(account.id, masterKey), missionary.listUapgs(account.id, masterKey),
+        relatorioIntegrado.listar(account.id, masterKey), district ? service.listChurches(account.id, masterKey, district.id) : [],
       ])
+      setRelatorios(nextRelatorios)
+      setIgrejasDoDistrito(nextIgrejas.map(({ id }) => id))
       setClasses(nextClasses.filter((item) => item.churchId === churchId))
       setSmallGroups(nextGroups.filter((item) => item.churchId === churchId && item.active))
       setIntegracoes(nextIntegracoes.filter((item) => item.churchId === churchId && item.active))
@@ -244,15 +253,18 @@ export function ChurchDetailPage() {
 
       {tab === 'visao' && (() => {
         // O mesmo quadro que a página de Escola Sabatina mostra do distrito
-        // inteiro, recortado nesta igreja: aqui é onde o pastor está quando
-        // pergunta se esta igreja já tem os grupos que devia ter.
-        const meta = metaDeGrupos(members.length)
-        const linha = (rotulo: string, alcancado: number) => <div key={rotulo}><small>{rotulo}</small><strong className={alcancado >= meta ? 'quadro--alcancado' : 'quadro--falta'}>{alcancado}<small>/{meta}</small></strong></div>
-        return <Card title="Escola Sabatina e Pequenos Grupos" eyebrow={`Meta de ${meta} para ${members.length} membro(s)`} action={<Link className="text-link" to="/app/metas/uapg">Abrir</Link>}>
+        // inteiro, recortado nesta igreja. O trimestre é o do distrito, e não o
+        // último desta igreja: a igreja que não enviou fica sem informação.
+        const trimestres = trimestresComRelatorio(relatorios, igrejasDoDistrito)
+        const trimestre = trimestreDoQuadro(relatorios, igrejasDoDistrito, search.get('trimestre'))
+        const linha = quadroDeGrupos([church], members, classes, smallGroups, integracoes, relatorios, trimestre).igrejas[0]!
+        const item = (rotulo: string, numero: typeof linha.escolaSabatina, comTrimestre: boolean) => <div key={rotulo}><small>{rotulo}</small><NumeroDoQuadro item={numero} meta={linha.meta} comTrimestre={comTrimestre} /></div>
+        return <Card className="quadro-da-igreja" title="Escola Sabatina e Pequenos Grupos" eyebrow={`Meta de ${linha.meta} para ${linha.membros} membro(s)`} action={<Link className="text-link" to={trimestre ? `/app/metas/uapg?trimestre=${trimestre}` : '/app/metas/uapg'}>Abrir</Link>}>
+          <PeriodoDoQuadro trimestre={trimestre} trimestres={trimestres} aoEscolher={(escolhido) => setSearch({ trimestre: escolhido }, { replace: true })} />
           <div className="private-summary">
-            {linha('Unidades da Escola Sabatina', classes.length)}
-            {linha('Pequenos Grupos', smallGroups.length)}
-            {linha('Integração', integracoes.length)}
+            {item('Unidades da Escola Sabatina', linha.escolaSabatina, trimestre !== null)}
+            {item('Pequenos Grupos', linha.pequenosGrupos, trimestre !== null)}
+            {item('Integração', linha.integracoes, false)}
           </div>
         </Card>
       })()}

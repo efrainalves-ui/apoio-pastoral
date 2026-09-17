@@ -140,6 +140,66 @@ test('os estudos bíblicos alimentam a meta, e reenviar não duplica o progresso
   await expect(escola.getByRole('row', { name: 'Pequenos Grupos Discipulado 0 5' })).toBeVisible()
 })
 
+/*
+  Na página da igreja, Unidades e Pequenos Grupos vêm do relatório daquela
+  igreja no trimestre do distrito: cada uma com o seu número, o zero informado
+  como zero, e a igreja que não enviou sem informação — nunca zero.
+*/
+test('Escola Sabatina e Pequenos Grupos da igreja vêm do relatório do trimestre, sem somar e sem fingir zero', async ({ page }) => {
+  test.setTimeout(300_000)
+  await entrar(page)
+  const ZERO = { nome: 'Fictícia do Zero', alunos: ['0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0'] }
+  const AUSENTE = 'Fictícia Ausente'
+  for (const nome of [NORTE.nome, SUL.nome, ZERO.nome, AUSENTE]) await cadastrarIgreja(page, nome)
+  await abrirRelatorio(page)
+  await enviarEGravar(page, 'escola-ficticia.pdf', 2, relatorioIntegradoFicticio(2, [
+    { ...NORTE, pequenosGrupos: '5', campanhas: '0', unidades: ['0', '0', '0', '0', '0', '0', '1', '3', '0', '0', '4'] },
+    { ...SUL, pequenosGrupos: '2', campanhas: '0', unidades: ['0', '0', '0', '0', '0', '0', '1', '2', '0', '0', '3'] },
+    { ...ZERO, pequenosGrupos: '0', campanhas: '0', unidades: ['0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0'] },
+  ]))
+
+  const abrirIgreja = async (nome: string) => {
+    await navigateInsideApp(page, '/app/distrito', page.getByRole('heading', { name: 'Distrito Fictício do Relatório' }))
+    await page.getByRole('link', { name: new RegExp(nome) }).first().click()
+    await expect(page.getByRole('heading', { name: nome, exact: true })).toBeVisible()
+    const cartao = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Escola Sabatina e Pequenos Grupos' }) })
+    await expect(cartao.getByText('Dados do 2º trimestre de 2026')).toBeVisible()
+    return cartao
+  }
+  const valor = (cartao: ReturnType<Page['locator']>, rotulo: string) => cartao.locator('.private-summary > div').filter({ has: page.getByText(rotulo, { exact: true }) })
+
+  const norte = await abrirIgreja(NORTE.nome)
+  await expect(valor(norte, 'Unidades da Escola Sabatina').locator('strong')).toHaveText('4/0')
+  await expect(valor(norte, 'Pequenos Grupos').locator('strong')).toHaveText('5/0')
+  await expect(valor(norte, 'Pequenos Grupos').getByText('Relatório Integrado')).toBeVisible()
+  await expect(valor(norte, 'Integração').locator('strong')).toHaveText('Sem informação')
+
+  const sul = await abrirIgreja(SUL.nome)
+  await expect(valor(sul, 'Unidades da Escola Sabatina').locator('strong')).toHaveText('3/0')
+  await expect(valor(sul, 'Pequenos Grupos').locator('strong')).toHaveText('2/0')
+
+  const zero = await abrirIgreja(ZERO.nome)
+  await expect(valor(zero, 'Unidades da Escola Sabatina').locator('strong')).toHaveText('0/0')
+  await expect(valor(zero, 'Pequenos Grupos').locator('strong')).toHaveText('0/0')
+
+  const ausente = await abrirIgreja(AUSENTE)
+  await expect(valor(ausente, 'Unidades da Escola Sabatina').locator('strong')).toHaveText('Sem informação neste trimestre')
+  await expect(valor(ausente, 'Pequenos Grupos').locator('strong')).toHaveText('Sem informação neste trimestre')
+  await expect(ausente.getByText('Relatório Integrado')).toHaveCount(0)
+
+  await ausente.getByRole('link', { name: 'Abrir' }).click()
+  await expect(page).toHaveURL(/\/app\/metas\/uapg\?trimestre=2026-2/u)
+  const metas = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Metas por igreja' }) })
+  await expect(metas.getByText('Dados do 2º trimestre de 2026')).toBeVisible()
+  const linha = (nome: string) => metas.getByRole('row').filter({ has: page.getByRole('rowheader', { name: nome, exact: true }) })
+  await expect(linha(NORTE.nome).locator('td strong')).toHaveText(['4/0', '5/0', 'Sem informação'])
+  await expect(linha(ZERO.nome).locator('td strong')).toHaveText(['0/0', '0/0', 'Sem informação'])
+  await expect(linha(AUSENTE).locator('td strong')).toHaveText(['Sem informação neste trimestre', 'Sem informação neste trimestre', 'Sem informação'])
+  // O distrito soma só quem informou no trimestre: 4 + 3 + 0 e 5 + 2 + 0.
+  await expect(linha('Distrito').locator('td strong')).toHaveText(['7/0', '7/0', 'Sem informação'])
+  await expect(linha('Distrito').getByText('1 sem informação')).toHaveCount(2)
+})
+
 test('os cartões de Metas ficam limpos, e o arquivo que não é PDF pede conversão', async ({ page }) => {
   test.setTimeout(240_000)
   await entrar(page)

@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { EvangelismCampaignEntity } from '../evangelism/types'
 import type { GoalEntryEntity } from '../goals/types'
-import { quadroDeGrupos } from '../missionary/metasDeGrupos'
-import { vigenteDoRelatorio } from '../missionary/useQuadroDeGrupos'
+import { quadroDeGrupos, trimestreDoQuadro } from '../missionary/metasDeGrupos'
 import { campanhasSemNome, nomeDaCampanhaDoRelatorio } from './campanhas'
 import {
   acoesPorIgreja, cadastrosParaCompletar, campanhasParaRegistrar, DUPLAS_MISSIONARIAS, PEQUENOS_GRUPOS, trimestresDesatualizados, UNIDADES_DE_ACAO,
@@ -45,10 +44,12 @@ describe('Escola Sabatina e Pequenos Grupos: fotografia do trimestre', () => {
     relatorio('norte', '2026-2', { [PEQUENOS_GRUPOS]: n(6), [DUPLAS_MISSIONARIAS]: n(3) }),
   ]
 
-  it('o alcançado é o último trimestre informado, sem somar trimestres nem somar com o cadastro', () => {
-    const quadro = quadroDeGrupos([{ id: 'norte', name: 'Norte' }, { id: 'sul', name: 'Sul' }], [], [{ churchId: 'norte' }], [{ churchId: 'sul', active: true }], [], vigenteDoRelatorio(relatorios, 2026))
-    expect(quadro.igrejas[0]).toMatchObject({ pequenosGrupos: 6, trimestrePequenosGrupos: '2026-2', escolaSabatina: 7, trimestreEscolaSabatina: '2026-1', cadastroEscolaSabatina: 1, cadastroPequenosGrupos: 0 })
-    expect(quadro.igrejas[1]).toMatchObject({ pequenosGrupos: 1, trimestrePequenosGrupos: null })
+  it('o alcançado é o trimestre do quadro, sem somar trimestres nem somar com o cadastro', () => {
+    const igrejas = [{ id: 'norte', name: 'Norte' }, { id: 'sul', name: 'Sul' }]
+    const quadro = quadroDeGrupos(igrejas, [], [{ churchId: 'norte' }], [{ churchId: 'sul', active: true }], [], relatorios, trimestreDoQuadro(relatorios, ['norte', 'sul']))
+    expect(quadro.trimestre).toBe('2026-2')
+    expect(quadro.igrejas[0]).toMatchObject({ pequenosGrupos: { numero: 6, origem: 'relatorio', cadastro: 0 }, escolaSabatina: { numero: null, origem: 'sem_informacao', cadastro: 1 } })
+    expect(quadro.igrejas[1]).toMatchObject({ pequenosGrupos: { numero: null, origem: 'sem_informacao', cadastro: 1 } })
   })
 
   it('só o que o relatório informa a mais vira cadastro para completar, com a igreja já escolhida', () => {

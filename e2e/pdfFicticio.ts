@@ -11,7 +11,7 @@
  * ele contém abrindo em qualquer editor.
  */
 
-export interface CelulaDoPdf { texto: string; x: number; y: number }
+export interface CelulaDoPdf { texto: string; x: number; y: number; tamanho?: number }
 
 function paraWinAnsi(texto: string): Buffer {
   const escapado = texto.replace(/([\\()])/gu, '\\$1')
@@ -21,7 +21,7 @@ function paraWinAnsi(texto: string): Buffer {
 function fluxoDaPagina(celulas: readonly CelulaDoPdf[]): Buffer {
   const partes = celulas.map((celula) =>
     Buffer.concat([
-      Buffer.from(`BT /F1 9 Tf 1 0 0 1 ${celula.x} ${celula.y} Tm (`, 'latin1'),
+      Buffer.from(`BT /F1 ${celula.tamanho ?? 9} Tf 1 0 0 1 ${celula.x} ${celula.y} Tm (`, 'latin1'),
       paraWinAnsi(celula.texto),
       Buffer.from(') Tj ET\n', 'latin1'),
     ]))
@@ -81,6 +81,8 @@ const CLASSES = ['Bebês', 'Iniciantes', 'Infantis', 'Primários', 'Pré-Adolesc
 
 interface DadosDaIgreja {
   nome: string; pequenosGrupos: string; campanhas: string; alunos: readonly string[]; estudos?: string; estudosAsa?: string; semanaSanta?: string
+  /** Unidades de Ação por classe, com o total no fim: só entram no PDF quando informadas. */
+  unidades?: readonly string[]
   /** Perguntas do Planejamento Estratégico: só entram no PDF quando informadas. */
   membrosEmIdentidade?: string
   ministrandoEstudos?: string
@@ -94,7 +96,11 @@ export function relatorioIntegradoFicticio(trimestre: number, igrejas: readonly 
     const celulas: CelulaDoPdf[] = []
     let y = 800
     for (const linha of linhas) {
-      linha.forEach((texto, coluna) => celulas.push({ texto, x: coluna === 0 ? 20 : 300 + coluna * 24, y }))
+      // O cabeçalho das classes tem nomes longos: a 9 pontos e 24 de distância
+      // eles se encostam, e o leitor de PDF junta "Filiais" e "Total" numa
+      // célula só — o que fazia toda linha por classe ser ignorada.
+      if (linha[0] === CLASSES[0]) linha.forEach((texto, coluna) => celulas.push({ texto, x: 20 + coluna * 52, y, tamanho: 5 }))
+      else linha.forEach((texto, coluna) => celulas.push({ texto, x: coluna === 0 ? 20 : 300 + coluna * 24, y }))
       y -= 16
     }
     celulas.push({ texto: `PAGE: ${numero} of ${igrejas.length * 3}`, x: 460, y: 40 })
@@ -113,6 +119,7 @@ export function relatorioIntegradoFicticio(trimestre: number, igrejas: readonly 
       ['Número de Pequenos Grupos da igreja.', igreja.pequenosGrupos],
       CLASSES,
       ['Número de alunos da Escola Sabatina.', ...igreja.alunos],
+      ...(igreja.unidades ? [['Número de Unidades de Ação. (Classes)', ...igreja.unidades]] : []),
       ['Número de pessoas levadas ao batismo por influência da Unidade de ação/PG', '0', '0', '0', '0', '0', '1', '0', '1', '1', '1', '4'],
     ], indice * 3 + 1)
 

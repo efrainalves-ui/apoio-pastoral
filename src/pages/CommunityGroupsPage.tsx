@@ -11,8 +11,8 @@ import { Field } from '../components/ui/Field'
 import { DistrictService } from '../district/service'
 import type { ChurchEntity } from '../district/types'
 import { MissionaryService } from '../missionary/service'
-import { MEMBROS_POR_GRUPO, quadroDeGrupos } from '../missionary/metasDeGrupos'
-import { vigenteDoRelatorio } from '../missionary/useQuadroDeGrupos'
+import { MEMBROS_POR_GRUPO, quadroDeGrupos, trimestreDoQuadro, trimestresComRelatorio } from '../missionary/metasDeGrupos'
+import { NumeroDoQuadro, PeriodoDoQuadro, TotalDoQuadro } from '../components/quadro/NumeroDeGrupos'
 import { useRelatorioIntegrado } from '../integrated-report/useRelatorioIntegrado'
 import { AGE_GROUP_LABELS, type AgeGroup, type SabbathClassData, type SabbathClassEntity, type SmallGroupData, type SmallGroupEntity, type UapgData, type UapgEntity } from '../missionary/types'
 import { extractPdfText, validatePdfFile } from '../imports/pdf'
@@ -47,7 +47,7 @@ export function CommunityGroupsPage({ embutida = false }: { embutida?: boolean }
   const [groups, setGroups] = useState<SmallGroupEntity[]>([])
   const [uapgs, setUapgs] = useState<UapgEntity[]>([])
   // Vindo das ações de cadastro do Relatório Integrado, a igreja já chega escolhida.
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const igrejaPedida = searchParams.get('igreja') ?? ''
   const [classDraft, setClassDraft] = useState<ClassDraft>(() => ({ ...emptyClass(), churchId: igrejaPedida }))
   const [groupDraft, setGroupDraft] = useState<GroupDraft>(() => ({ ...emptyGroup(), churchId: igrejaPedida }))
@@ -197,21 +197,26 @@ export function CommunityGroupsPage({ embutida = false }: { embutida?: boolean }
     return <div className="entity-row missionary-record" key={id}><span className="avatar" aria-hidden="true">{icon}</span><span><strong>{title}</strong>{marca}<small>{detail}</small></span><Button variant="secondary" icon={<Edit3 />} onClick={edit}>Editar</Button><Button variant="danger" icon={<Trash2 />} onClick={() => void remove(id, title)}>Remover</Button></div>
   }
 
-  // Escola Sabatina e Pequenos Grupos: vale o último trimestre confirmado do Relatório Integrado; o cadastro aparece ao lado quando difere.
-  const quadro = quadroDeGrupos(churches, people, classes, groups, uapgs, vigenteDoRelatorio(relatoriosIntegrados, new Date().getFullYear()))
-  const celula = (alcancado: number, meta: number, cadastro?: number) => <td className={alcancado >= meta ? 'quadro--alcancado' : 'quadro--falta'}>{alcancado}<small>/{meta}</small>{cadastro !== undefined && cadastro !== alcancado && <small className="quadro-origem">cadastro {cadastro}</small>}</td>
+  // Escola Sabatina e Pequenos Grupos: vale o Relatório Integrado do trimestre, o mesmo para todas as igrejas; o cadastro aparece ao lado quando difere.
+  const idsDasIgrejas = churches.map(({ id }) => id)
+  const trimestres = trimestresComRelatorio(relatoriosIntegrados, idsDasIgrejas)
+  const quadro = quadroDeGrupos(churches, people, classes, groups, uapgs, relatoriosIntegrados, trimestreDoQuadro(relatoriosIntegrados, idsDasIgrejas, searchParams.get('trimestre')))
+  const comTrimestre = quadro.trimestre !== null
+  const origemDoRelatorio = comTrimestre ? 'Relatório Integrado' : 'Cadastro'
+  const escolherTrimestre = (trimestre: string) => setSearchParams((atual) => { const proximos = new URLSearchParams(atual); proximos.set('trimestre', trimestre); return proximos }, { replace: true })
 
   const editorTitle = editor?.type === 'class' ? 'Editar classe da Escola Sabatina' : editor?.type === 'group' ? 'Editar Pequeno Grupo' : 'Editar integração Unidade de Ação e PG'
 
   return <div className="page-stack">{!embutida && <><Link className="text-link back-link" to="/app/metas"><ArrowLeft />Voltar às metas</Link><header className="page-hero"><div><p className="eyebrow">Missão e discipulado</p><h1>Escola Sabatina e Pequenos Grupos</h1></div></header></>}{error && <div className="alert alert--error" role="alert">{error}</div>}{notice && <div className="alert alert--success" role="status">{notice}</div>}<DadosDoRelatorioNaEscolaSabatina cadastro={{ classes: classes.length, pequenosGrupos: groups.filter(({ active }) => active).length }} /><Card title="Metas por igreja" eyebrow={`Um grupo para cada ${MEMBROS_POR_GRUPO} membros`}>
+    <PeriodoDoQuadro trimestre={quadro.trimestre} trimestres={trimestres} aoEscolher={escolherTrimestre} />
     <div className="tabela-rolavel"><table className="quadro-grupos">
-      <thead><tr><th scope="col">Igreja</th><th scope="col">Membros</th><th scope="col">Meta</th><th scope="col">Escola Sabatina {discipulado}</th><th scope="col">Pequenos Grupos {discipulado}</th><th scope="col">Integração {discipulado}</th></tr></thead>
+      <thead><tr><th scope="col">Igreja</th><th scope="col">Membros</th><th scope="col">Meta</th><th scope="col">Escola Sabatina {discipulado}<small className="quadro-origem">{origemDoRelatorio}</small></th><th scope="col">Pequenos Grupos {discipulado}<small className="quadro-origem">{origemDoRelatorio}</small></th><th scope="col">Integração {discipulado}<small className="quadro-origem">Cadastro</small></th></tr></thead>
       <tbody>{quadro.igrejas.map((linha) => <tr key={linha.churchId}>
         <th scope="row">{linha.nome}</th><td>{linha.membros}</td><td>{linha.meta}</td>
-        {celula(linha.escolaSabatina, linha.meta, linha.cadastroEscolaSabatina)}{celula(linha.pequenosGrupos, linha.meta, linha.cadastroPequenosGrupos)}{celula(linha.integracoes, linha.meta)}
+        <td><NumeroDoQuadro item={linha.escolaSabatina} meta={linha.meta} comTrimestre={comTrimestre} mostrarOrigem={false} /></td><td><NumeroDoQuadro item={linha.pequenosGrupos} meta={linha.meta} comTrimestre={comTrimestre} mostrarOrigem={false} /></td><td><NumeroDoQuadro item={linha.integracoes} meta={linha.meta} comTrimestre={false} mostrarOrigem={false} /></td>
       </tr>)}</tbody>
       <tfoot><tr><th scope="row">Distrito</th><td>{quadro.distrito.membros}</td><td>{quadro.distrito.meta}</td>
-        {celula(quadro.distrito.escolaSabatina, quadro.distrito.meta, quadro.distrito.cadastroEscolaSabatina)}{celula(quadro.distrito.pequenosGrupos, quadro.distrito.meta, quadro.distrito.cadastroPequenosGrupos)}{celula(quadro.distrito.integracoes, quadro.distrito.meta)}
+        <td><TotalDoQuadro total={quadro.distrito.escolaSabatina} meta={quadro.distrito.meta} comTrimestre={comTrimestre} /></td><td><TotalDoQuadro total={quadro.distrito.pequenosGrupos} meta={quadro.distrito.meta} comTrimestre={comTrimestre} /></td><td><TotalDoQuadro total={quadro.distrito.integracoes} meta={quadro.distrito.meta} comTrimestre={false} /></td>
       </tr></tfoot>
     </table></div>
   </Card><Card title="Importar classes do ACMS" eyebrow="Relatório de Classes ES, uma igreja por vez">
