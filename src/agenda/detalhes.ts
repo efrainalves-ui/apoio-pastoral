@@ -39,7 +39,7 @@ export const comissaoVazia = (): DetalhesDaComissao => ({ tipo: null, outraNome:
 export const ceiaVazia = (): DetalhesDaCeia => ({ responsaveis: [], materiaisCompletos: null, precisaProvidenciar: null, materiais: [] })
 export const casamentoVazio = (): DetalhesDoCasamento => ({ noivo: '', noiva: '', cursoDeNoivos: null, passouPelaComissao: null, dataCivil: '', dataReligiosa: '' })
 export const dedicacaoVazia = (): DetalhesDaDedicacao => ({ crianca: '', responsaveis: [] })
-export const pessoalVazio = (): DetalhesDoPessoal => ({ categoria: '', subcategoria: '', outro: '', oQue: '', onde: '', como: null, comoOutro: '' })
+export const pessoalVazio = (): DetalhesDoPessoal => ({ categoria: '', subcategoria: '', outro: '', oQue: '', onde: '' })
 
 /**
  * Trocar o tipo apaga o que só fazia sentido no tipo anterior.
@@ -272,7 +272,6 @@ export function validarDetalhes(input: AgendaEventInput): void {
     if (categoria?.subcategorias.length && vazio(input.pessoal.subcategoria)) throw new Error('Escolha a subcategoria.')
     if (pedeOutro && vazio(input.pessoal.outro)) throw new Error('Descreva a categoria.')
     if (vazio(input.pessoal.oQue)) throw new Error('Informe o que precisa ser feito.')
-    if (input.pessoal.como === 'outra' && vazio(input.pessoal.comoOutro)) throw new Error('Descreva como será.')
   }
 }
 

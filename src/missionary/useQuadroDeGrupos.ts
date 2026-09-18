@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { DistrictService } from '../district/service'
-import { PEQUENOS_GRUPOS, UNIDADES_DE_ACAO, valorVigente } from '../integrated-report/ligacoes'
 import { RelatorioIntegradoService } from '../integrated-report/service'
-import type { RelatorioIntegradoEntity } from '../integrated-report/types'
 import { PeopleService } from '../people/service'
 import { MissionaryService } from './service'
-import { quadroDeGrupos, type QuadroDeGrupos, type VigenteDoRelatorio } from './metasDeGrupos'
+import { quadroDeGrupos, trimestreDoQuadro, type QuadroDeGrupos } from './metasDeGrupos'
 import { useReloadOnSync } from '../sync/useReloadOnSync'
 
 const districtService = new DistrictService()
@@ -14,15 +12,7 @@ const peopleService = new PeopleService()
 const missionary = new MissionaryService()
 const relatorioIntegrado = new RelatorioIntegradoService()
 
-const VAZIO: QuadroDeGrupos = { igrejas: [], distrito: { membros: 0, meta: 0, escolaSabatina: 0, pequenosGrupos: 0, integracoes: 0, cadastroEscolaSabatina: 0, cadastroPequenosGrupos: 0 } }
-
-/** Escola Sabatina e Pequenos Grupos do Relatório Integrado: o último trimestre confirmado do ano. */
-export function vigenteDoRelatorio(relatorios: readonly RelatorioIntegradoEntity[], ano: number): VigenteDoRelatorio {
-  return (churchId) => ({
-    escolaSabatina: valorVigente(relatorios, churchId, UNIDADES_DE_ACAO, ano),
-    pequenosGrupos: valorVigente(relatorios, churchId, PEQUENOS_GRUPOS, ano),
-  })
-}
+const VAZIO: QuadroDeGrupos = quadroDeGrupos([], [], [], [], [])
 
 /**
  * A meta de grupos, pronta para quem só quer mostrá-la.
@@ -50,7 +40,7 @@ export function useQuadroDeGrupos(): { quadro: QuadroDeGrupos; pronto: boolean }
         missionary.listUapgs(account.id, masterKey),
         relatorioIntegrado.listar(account.id, masterKey),
       ])
-      setQuadro(quadroDeGrupos(igrejas, pessoas, classes, grupos, integracoes, vigenteDoRelatorio(relatorios, new Date().getFullYear())))
+      setQuadro(quadroDeGrupos(igrejas, pessoas, classes, grupos, integracoes, relatorios, trimestreDoQuadro(relatorios, igrejas.map(({ id }) => id))))
     } catch { setQuadro(VAZIO) }
     setPronto(true)
   }, [account, masterKey])

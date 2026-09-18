@@ -6,6 +6,7 @@ import { CountUp } from '../components/ui/CountUp'
 import { ProgressRing } from '../components/ui/ProgressRing'
 import { GOAL_AREAS, GOAL_AREA_LABELS, PERCENT_TARGET_AREAS, areaComparison, crescimentoDaMeta } from '../goals/areas'
 import { useQuadroDeGrupos } from '../missionary/useQuadroDeGrupos'
+import { rotuloDoPeriodo, TotalDoQuadro } from '../components/quadro/NumeroDeGrupos'
 import { useGoalSources } from '../goals/useGoalSources'
 import { useAuthVault } from '../auth/AuthVaultContext'
 import { MissionaryService } from '../missionary/service'
@@ -64,11 +65,10 @@ export function GoalsPage() {
           <div className="goal-card">
             <div className="goal-card__numbers">
               <div><small>Meta</small><strong>{quadro.distrito.meta}</strong></div>
-              <div><small>Escola Sabatina</small><strong className={quadro.distrito.escolaSabatina >= quadro.distrito.meta ? 'quadro--alcancado' : 'quadro--falta'}>{quadro.distrito.escolaSabatina}</strong></div>
-              <div><small>Pequenos Grupos</small><strong className={quadro.distrito.pequenosGrupos >= quadro.distrito.meta ? 'quadro--alcancado' : 'quadro--falta'}>{quadro.distrito.pequenosGrupos}</strong></div>
-              <div><small>Integração</small><strong className={quadro.distrito.integracoes >= quadro.distrito.meta ? 'quadro--alcancado' : 'quadro--falta'}>{quadro.distrito.integracoes}</strong></div>
+              {([['Escola Sabatina', quadro.distrito.escolaSabatina, true], ['Pequenos Grupos', quadro.distrito.pequenosGrupos, true], ['Integração', quadro.distrito.integracoes, false]] as const).map(([rotulo, total, doTrimestre]) => <div key={rotulo}><small>{rotulo}</small><TotalDoQuadro total={total} meta={quadro.distrito.meta} comTrimestre={doTrimestre && quadro.trimestre !== null} /></div>)}
             </div>
             <p className="goal-card__percent">Um de cada para cada 12 membros · {quadro.distrito.membros} no distrito</p>
+            {quadro.trimestre && <p className="quadro-periodo">{rotuloDoPeriodo(quadro.trimestre)}</p>}
             <Link className="button button--secondary" to="/app/metas/uapg">Acompanhar</Link>
           </div>
         </Card>

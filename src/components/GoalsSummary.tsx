@@ -64,17 +64,19 @@ export function GoalsSummary() {
     }
   })
 
-  const percentEscola = quadro.distrito.meta > 0
-    ? Math.min(100, Math.round((quadro.distrito.escolaSabatina / quadro.distrito.meta) * 100))
+  // Sem informação no trimestre não é zero por cento: o anel fica vazio e diz isso.
+  const unidades = quadro.distrito.escolaSabatina.numero
+  const percentEscola = quadro.distrito.meta > 0 && unidades !== null
+    ? Math.min(100, Math.round((unidades / quadro.distrito.meta) * 100))
     : 0
   alvos.push({
     chave: 'uapg',
     nome: 'Escola Sabatina',
     percent: percentEscola,
-    centro: quadro.distrito.meta > 0 ? `${percentEscola}%` : '—',
-    detalhe: quadro.distrito.meta > 0 ? `${quadro.distrito.escolaSabatina} de ${quadro.distrito.meta}` : 'sem membros ainda',
-    para: '/app/metas/uapg',
-    atrasada: quadro.distrito.meta > 0 && percentEscola < 100,
+    centro: quadro.distrito.meta > 0 && unidades !== null ? `${percentEscola}%` : '—',
+    detalhe: quadro.distrito.meta === 0 ? 'sem membros ainda' : unidades === null ? 'sem informação' : `${unidades} de ${quadro.distrito.meta}`,
+    para: quadro.trimestre ? `/app/metas/uapg?trimestre=${quadro.trimestre}` : '/app/metas/uapg',
+    atrasada: quadro.distrito.meta > 0 && unidades !== null && percentEscola < 100,
   })
 
   return (
