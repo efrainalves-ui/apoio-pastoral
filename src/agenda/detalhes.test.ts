@@ -254,13 +254,14 @@ describe('cerimônias e pessoal', () => {
     expect(() => validarDetalhes(base({ category: 'communion', ceia: { ...ceia, precisaProvidenciar: true, materiais: [{ item: 'pao', quantidade: 2, outro: '' }, { item: 'vinho', quantidade: null, outro: '' }] } }))).not.toThrow()
   })
 
-  it('pessoal: categoria, subcategoria, o que fazer e "outra" forma pedem texto', () => {
-    const pessoal = { categoria: 'saude', subcategoria: '', outro: '', oQue: '', onde: '', como: null, comoOutro: '' }
+  it('pessoal: categoria, subcategoria e o que fazer são obrigatórios; a forma saiu e não é exigida', () => {
+    const pessoal = { categoria: 'saude', subcategoria: '', outro: '', oQue: '', onde: '' }
     expect(() => validarDetalhes(base({ category: 'personal', pessoal }))).toThrow('subcategoria')
     expect(() => validarDetalhes(base({ category: 'personal', pessoal: { ...pessoal, subcategoria: 'Outro' } }))).toThrow('Descreva a categoria')
     expect(() => validarDetalhes(base({ category: 'personal', pessoal: { ...pessoal, subcategoria: 'Dentista' } }))).toThrow('o que precisa')
-    expect(() => validarDetalhes(base({ category: 'personal', pessoal: { ...pessoal, subcategoria: 'Dentista', oQue: 'Limpeza', como: 'outra' } }))).toThrow('como será')
-    expect(() => validarDetalhes(base({ category: 'personal', pessoal: { ...pessoal, categoria: 'casa', oQue: 'Consertar pia', como: 'presencial' } }))).not.toThrow()
+    // Registro antigo, gravado quando a forma existia, continua válido.
+    expect(() => validarDetalhes(base({ category: 'personal', pessoal: { ...pessoal, subcategoria: 'Dentista', oQue: 'Limpeza', como: 'outra', comoOutro: '' } }))).not.toThrow()
+    expect(() => validarDetalhes(base({ category: 'personal', pessoal: { ...pessoal, categoria: 'casa', oQue: 'Consertar pia' } }))).not.toThrow()
   })
 })
 

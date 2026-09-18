@@ -13,7 +13,7 @@ import {
   AGENDA_CATEGORY_LABELS, CATEGORIAS_PESSOAIS, CEREMONY_CHECKLISTS, ITEM_DA_CEIA_LABELS, NEW_EVENT_CATEGORIES,
   categoryDefaults, emptyCeremonyDetails, endFollowingStart, isCeremonyCategory, isEncontroCategory, localDateTime,
   type AgendaCategory, type AgendaEventEntity, type AgendaEventInput, type AndamentoDaPauta, type CeremonyDetails,
-  type ComoDoPessoal, type DetalhesDaCeia, type DetalhesDaComissao, type DetalhesDaDedicacao,
+  type DetalhesDaCeia, type DetalhesDaComissao, type DetalhesDaDedicacao,
   type DetalhesDoPessoal, type EscolhaDeIgreja, type ItemDaCeia, type PapelNaCeia, type PrioridadeEstrategica, type TipoDeComissao, type TipoDeConcilio,
 } from '../agenda/types'
 import { usaPrioridadeEscolhida } from '../agenda/prioridade'
@@ -76,9 +76,6 @@ const TIPOS_DE_COMISSAO: ReadonlyArray<{ valor: TipoDeComissao; rotulo: string }
   { valor: 'diretiva', rotulo: 'Diretiva' }, { valor: 'administrativa', rotulo: 'Administrativa' }, { valor: 'nomeacoes', rotulo: 'Nomeações' }, { valor: 'outra', rotulo: 'Outra' },
 ]
 const TIPOS_DE_CONCILIO: ReadonlyArray<{ valor: TipoDeConcilio; rotulo: string }> = [{ valor: 'concilio', rotulo: 'Concílio' }, { valor: 'pgp', rotulo: 'PGP' }]
-const COMO_PESSOAL: ReadonlyArray<{ valor: ComoDoPessoal; rotulo: string }> = [
-  { valor: 'presencial', rotulo: 'Presencial' }, { valor: 'online', rotulo: 'Online' }, { valor: 'telefone', rotulo: 'Telefone' }, { valor: 'outra', rotulo: 'Outra forma' },
-]
 const ANDAMENTOS: Record<AndamentoDaPauta, string> = { pendente: 'Pendente', em_andamento: 'Em andamento', concluida: 'Concluída' }
 const PAPEIS_DA_CEIA: Record<PapelNaCeia, string> = { primeiro_diacono: 'Primeiro diácono', primeira_diaconisa: 'Primeira diaconisa', outro: 'Responsável' }
 const ITENS_DA_CEIA = Object.keys(ITEM_DA_CEIA_LABELS) as ItemDaCeia[]
@@ -352,6 +349,7 @@ export function AgendaFormPage() {
   }
 
   const category = input.category
+  const ehPessoal = category === 'personal'
   const ceremonyCategory = isCeremonyCategory(category) ? category : null
   const ceremony = ceremonyCategory ? input.ceremonyDetails ?? emptyCeremonyDetails(ceremonyCategory) : null
   // Um compromisso antigo de Viagem continua abrindo com a sua categoria; só não se cria mais.
@@ -442,14 +440,19 @@ export function AgendaFormPage() {
           {(pessoal.categoria === 'outro' || pessoal.subcategoria === 'Outro') && <Field label="Qual?" name="pessoal-outro" value={pessoal.outro} onChange={(changeEvent) => mudarPessoal({ outro: changeEvent.target.value })} maxLength={120} required />}
           <Field label="O que precisa ser feito" name="pessoal-o-que" value={pessoal.oQue} onChange={(changeEvent) => mudarPessoal({ oQue: changeEvent.target.value })} maxLength={160} required />
           <Field label="Onde" name="pessoal-onde" value={pessoal.onde} onChange={(changeEvent) => mudarPessoal({ onde: changeEvent.target.value })} maxLength={160} />
-          <Escolha rotulo="Como" nome="pessoal-como" opcoes={COMO_PESSOAL} valor={pessoal.como} onChange={(como) => mudarPessoal({ como, comoOutro: como === 'outra' ? pessoal.comoOutro : '' })} />
-          {pessoal.como === 'outra' && <Field label="Como será?" name="pessoal-como-outro" value={pessoal.comoOutro} onChange={(changeEvent) => mudarPessoal({ comoOutro: changeEvent.target.value })} maxLength={120} required />}
         </>}
 
-        <Field label="Data" name="agenda-date" type="date" value={data} required onChange={(changeEvent) => { if (changeEvent.target.value) mudarInicioPara(`${changeEvent.target.value}T${inicio}`) }} />
+        {/*
+          No compromisso pessoal as duas datas ficam à vista, uma ao lado da sua
+          hora: o que ele marca aqui — uma viagem, um curso, um tratamento —
+          atravessa dias, e a data de término não podia depender de já haver
+          diferença entre elas para aparecer.
+        */}
+        <Field label={ehPessoal ? 'Data de início' : 'Data'} name="agenda-date" type="date" value={data} required onChange={(changeEvent) => { if (changeEvent.target.value) mudarInicioPara(`${changeEvent.target.value}T${inicio}`) }} />
         <Field label="Início" name="agenda-start" type="time" value={inicio} required onChange={(changeEvent) => { if (changeEvent.target.value) mudarInicioPara(`${data}T${changeEvent.target.value}`) }} />
+        {ehPessoal && <Field label="Data de término" name="agenda-end-date" type="date" value={dataFim} required onChange={(changeEvent) => { if (changeEvent.target.value) patch({ endAt: `${changeEvent.target.value}T${fim}` }) }} />}
         <Field label="Término" name="agenda-end" type="time" value={fim} required onChange={(changeEvent) => { if (changeEvent.target.value) patch({ endAt: `${dataFim}T${changeEvent.target.value}` }) }} />
-        {dataFim !== data && <Field label="Data de término" name="agenda-end-date" type="date" value={dataFim} required onChange={(changeEvent) => { if (changeEvent.target.value) patch({ endAt: `${changeEvent.target.value}T${fim}` }) }} />}
+        {!ehPessoal && dataFim !== data && <Field label="Data de término" name="agenda-end-date" type="date" value={dataFim} required onChange={(changeEvent) => { if (changeEvent.target.value) patch({ endAt: `${changeEvent.target.value}T${fim}` }) }} />}
         <Field label="Lembrete em minutos" name="agenda-reminder" type="number" min={0} value={input.reminderMinutes ?? ''} onChange={(changeEvent) => patch({ reminderMinutes: changeEvent.target.value === '' ? null : Number(changeEvent.target.value) })} />
       </div>
       {usaObservacoes(category) && <label className="field"><span className="field__label">Observações</span><textarea className="field__input" rows={4} value={input.notes} onChange={(changeEvent) => patch({ notes: changeEvent.target.value })} maxLength={2000} /></label>}

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -638,10 +638,24 @@ describe('pessoal', () => {
     await user.selectOptions(screen.getByLabelText('Subcategoria'), 'Dentista')
     expect(screen.queryByLabelText('Qual?')).not.toBeInTheDocument()
     await user.type(screen.getByLabelText('O que precisa ser feito'), 'Limpeza fictícia')
-    await user.click(screen.getByRole('radio', { name: 'Outra forma' }))
-    await user.type(screen.getByLabelText('Como será?'), 'Por mensagem')
+    // A forma do compromisso saiu da tela.
+    for (const rotulo of ['Presencial', 'Online', 'Telefone', 'Outra forma']) expect(screen.queryByRole('radio', { name: rotulo })).not.toBeInTheDocument()
     await salvar(user)
-    expect(estado.criados[0]).toMatchObject({ category: 'personal', title: 'Limpeza fictícia', pessoal: { categoria: 'saude', subcategoria: 'Dentista', outro: '', como: 'outra', comoOutro: 'Por mensagem' } })
+    expect(estado.criados[0]).toMatchObject({ category: 'personal', title: 'Limpeza fictícia', pessoal: { categoria: 'saude', subcategoria: 'Dentista', outro: '' } })
+  })
+
+  it('as duas datas aparecem sempre, e o compromisso pode atravessar dias', async () => {
+    const user = userEvent.setup()
+    abrir(); await aguardarCarregar()
+    await escolherCategoria(user, 'Pessoal')
+    await user.selectOptions(screen.getByLabelText('Categoria pessoal'), 'Casa')
+    await user.type(screen.getByLabelText('O que precisa ser feito'), 'Mudança fictícia')
+    expect(screen.queryByLabelText('Data')).not.toBeInTheDocument()
+    const inicio = screen.getByLabelText('Data de início')
+    const dia = (inicio as HTMLInputElement).value
+    fireEvent.change(screen.getByLabelText('Data de término'), { target: { value: '2026-10-07' } })
+    await salvar(user)
+    expect(estado.criados[0]).toMatchObject({ category: 'personal', startAt: `${dia}T08:00`, endAt: '2026-10-07T09:00' })
   })
 })
 

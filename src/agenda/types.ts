@@ -99,15 +99,23 @@ export interface InstrutorDoEstudo { personId: string | null; nome: string }
 export interface ResponsavelPelaCrianca { personId: string | null; nome: string }
 export interface DetalhesDaDedicacao { crianca: string; responsaveis: ResponsavelPelaCrianca[] }
 
+/** Legado: a forma do compromisso pessoal, que saiu da tela. */
 export type ComoDoPessoal = 'presencial' | 'online' | 'telefone' | 'outra'
+
 export interface DetalhesDoPessoal {
   categoria: string
   subcategoria: string
   outro: string
   oQue: string
   onde: string
-  como: ComoDoPessoal | null
-  comoOutro: string
+  /**
+   * Legado: presencial, online, telefone ou outra forma.
+   *
+   * Saiu do formulário — o que o pastor precisa marcar é quando começa e quando
+   * termina. O que já foi gravado continua onde está, e não é apagado ao editar.
+   */
+  como?: ComoDoPessoal | null
+  comoOutro?: string
 }
 
 export const CATEGORIAS_PESSOAIS: ReadonlyArray<{ id: string; label: string; subcategorias: readonly string[] }> = [
