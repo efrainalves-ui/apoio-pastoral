@@ -440,6 +440,8 @@ button.entity-row { width: 100%; background: none; border-top: 0; border-inline:
 .device-row > div { display: grid; gap: 3px; }
 .device-row small { color: var(--muted); font-size: .74rem; }
 .device-row .button { min-height: 37px; padding-inline: 12px; font-size: .76rem; }
+.device-row__confirmacao { grid-column: 3 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.device-row__confirmacao p { margin: 0; font-size: .8rem; font-weight: 600; }
 .inline-form { max-width: 520px; }
 .text-link { min-height: 40px; width: max-content; display: inline-flex; align-items: center; gap: 7px; color: var(--green-700); font-weight: 750; text-underline-offset: 4px; }
 .text-link svg { width: 18px; }
@@ -3950,6 +3952,8 @@ html .agenda-page .ponto-categoria.categoria-visual { width: 7px; height: 7px; b
 .lembretes-notificacoes__aviso { margin: 0; color: var(--muted); font-size: .88rem; }
 .lembretes-notificacoes .confirmation-check { margin: 0; }
 .lembretes-notificacoes__acoes { display: flex; flex-wrap: wrap; gap: 10px; }
+.lembretes-notificacoes__falha { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--ambar-fraca); border: 1px solid var(--ambar); }
+.lembretes-notificacoes__falha p { margin: 0; font-size: .9rem; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-tema='claro']) .lembrete-form__prioridade .segmented { background: rgb(255 255 255 / 8%); }
   :root:not([data-tema='claro']) .lembrete-form__prioridade label.active { background: #2d3a35; color: #eef5f1; }

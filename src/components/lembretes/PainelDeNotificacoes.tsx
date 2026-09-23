@@ -1,11 +1,12 @@
-import { Bell, BellOff, BellRing, Smartphone } from 'lucide-react'
+import { Bell, BellOff, BellRing, RefreshCw, Smartphone } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuthVault } from '../../auth/AuthVaultContext'
 import {
-  ativarNotificacoes, definirMostrarTitulo, enviarNotificacaoDeTeste, estadoDasNotificacoes, mostrarTituloNaNotificacao,
-  removerInscricaoDoAparelho, type EstadoDasNotificacoes,
+  ativarNotificacoes, AVISO_DO_AGENDAMENTO, definirMostrarTitulo, enviarNotificacaoDeTeste, estadoDasNotificacoes,
+  mostrarTituloNaNotificacao, observarAgendamento, removerInscricaoDoAparelho, sincronizarAgendamentos, ultimoAgendamento,
+  type EstadoDasNotificacoes, type ResultadoDoAgendamento,
 } from '../../lembretes/push'
-import { avisarAlteracaoDeLembretes } from '../../lembretes/useCentral'
+import { avisarAlteracaoDeLembretes, servicoDeLembretes } from '../../lembretes/useCentral'
 
 const ROTULOS: Record<Exclude<EstadoDasNotificacoes, 'carregando'>, string> = {
   ativada: 'Notificações ativadas',
@@ -17,11 +18,16 @@ const ROTULOS: Record<Exclude<EstadoDasNotificacoes, 'carregando'>, string> = {
 }
 
 export function PainelDeNotificacoes() {
-  const { account } = useAuthVault()
+  const { account, masterKey } = useAuthVault()
   const [estado, setEstado] = useState<EstadoDasNotificacoes>('carregando')
   const [mostrarTitulo, setMostrarTitulo] = useState(false)
   const [aviso, setAviso] = useState('')
   const [ocupado, setOcupado] = useState(false)
+  const [agendamento, setAgendamento] = useState<ResultadoDoAgendamento | null>(ultimoAgendamento)
+
+  // O agendamento roda junto com a contagem do menu; sem este aviso, a falha
+  // só apareceria no silêncio de não receber nada no horário marcado.
+  useEffect(() => observarAgendamento(setAgendamento), [])
 
   useEffect(() => {
     if (!account) return
@@ -50,6 +56,18 @@ export function PainelDeNotificacoes() {
           <Icone aria-hidden="true" />{ROTULOS[estado]}
         </p>
         {aviso && <p className="lembretes-notificacoes__aviso" role="alert">{aviso}</p>}
+        {estado === 'ativada' && agendamento?.falha && (
+          <div className="lembretes-notificacoes__falha" role="alert">
+            <p id="falha-do-agendamento">{AVISO_DO_AGENDAMENTO[agendamento.falha]}</p>
+            <button type="button" className="button button--secondary" disabled={ocupado} aria-describedby="falha-do-agendamento"
+              onClick={() => { void agir(async () => {
+                if (!masterKey) return
+                await sincronizarAgendamentos(account.id, masterKey, await servicoDeLembretes.lembretes(account.id, masterKey))
+              }) }}>
+              <RefreshCw aria-hidden="true" /><span>Tentar de novo</span>
+            </button>
+          </div>
+        )}
         {estado === 'desativada' && (
           <button type="button" className="button button--primary" disabled={ocupado} onClick={() => { void agir(async () => { setEstado(await ativarNotificacoes(account.id)); avisarAlteracaoDeLembretes() }) }}>
             <Bell aria-hidden="true" /><span>Ativar notificações</span>

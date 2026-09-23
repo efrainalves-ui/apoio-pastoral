@@ -1,5 +1,7 @@
 import { currentDeviceId } from '../auth/device'
+import { db, type ApoioDatabase } from '../db/database'
 import { currentRemoteAccountId, getSupabaseClient, hasSupabaseConfiguration } from '../auth/supabase'
+import { liberarNotificacoesDoAparelho } from './bloqueioPush'
 import { ocorrenciasEntre } from './repeticao'
 import { dataNoFuso, instanteNoFuso, somarDias } from './tempo'
 import type { LembreteEntity } from './types'
@@ -40,6 +42,30 @@ export function diagnosticar(): Exclude<EstadoDasNotificacoes, 'carregando' | 'a
   return 'pronto'
 }
 
+/**
+ * Este banco tem as tabelas e funções das notificações?
+ *
+ * Uma build nova contra um banco sem as migrations de push oferecia "Ativar
+ * notificações", pedia a permissão e só falhava na hora de gravar a inscrição
+ * — sem dizer por quê. A ausência da própria função de conferência já é a
+ * resposta: sem ela, o recurso não existe neste ambiente.
+ *
+ * A resposta é lembrada enquanto o aplicativo estiver aberto: o banco não
+ * ganha migration no meio da sessão.
+ */
+let bancoTemPush: boolean | null = null
+
+export async function notificacoesDisponiveisNoBanco(): Promise<boolean> {
+  if (!hasSupabaseConfiguration) return false
+  if (bancoTemPush !== null) return bancoTemPush
+  const { data, error } = await getSupabaseClient().rpc('lembretes_push_disponivel') as { data: unknown; error: unknown }
+  bancoTemPush = !error && data === true
+  return bancoTemPush
+}
+
+/** Só para os testes: a próxima pergunta volta a bater no banco. */
+export function esquecerCapacidadeDoBanco(): void { bancoTemPush = null }
+
 async function registro(): Promise<ServiceWorkerRegistration | null> {
   return (await navigator.serviceWorker.getRegistration()) ?? null
 }
@@ -65,6 +91,9 @@ async function chavePublica(): Promise<string> {
 export async function estadoDasNotificacoes(accountId: string): Promise<EstadoDasNotificacoes> {
   const diagnostico = diagnosticar()
   if (diagnostico !== 'pronto') return diagnostico
+  // Banco sem as migrations de push: o recurso não existe aqui, e prometer
+  // que existe faria o pastor conceder a permissão para nada.
+  if (!(await notificacoesDisponiveisNoBanco())) return 'indisponivel'
   // Buscada ao abrir o painel: no toque em "Ativar", a permissão é pedida sem esperar a rede.
   await chavePublica().catch(() => undefined)
   const inscricao = await (await registro())?.pushManager.getSubscription()
@@ -81,6 +110,7 @@ function chaveVapid(base64: string): Uint8Array<ArrayBuffer> {
 export async function ativarNotificacoes(accountId: string): Promise<EstadoDasNotificacoes> {
   const diagnostico = diagnosticar()
   if (diagnostico !== 'pronto') return diagnostico
+  if (!(await notificacoesDisponiveisNoBanco())) return 'indisponivel'
   const permissao = await Notification.requestPermission()
   if (permissao !== 'granted') return permissao === 'denied' ? 'negada' : 'desativada'
   const reg = await registro()
@@ -94,6 +124,8 @@ export async function ativarNotificacoes(accountId: string): Promise<EstadoDasNo
     { onConflict: 'device_id' },
   )
   if (error) throw new Error('Não foi possível registrar este aparelho para notificações.')
+  // Aparelho que voltou a ser autorizado deixa de estar calado.
+  await liberarNotificacoesDoAparelho()
   marcar(accountId, true)
   return 'ativada'
 }
@@ -219,17 +251,108 @@ export async function localizarOcorrencia(masterKey: CryptoKey, lembretes: reado
   return null
 }
 
+/** O que a rodada fez, e o que ficou faltando. A tela precisa poder dizer isso. */
+export interface ResultadoDoAgendamento {
+  criados: number
+  removidos: number
+  /** Em que passo parou, ou `null` quando terminou inteiro. */
+  falha: 'leitura' | 'remocao' | 'gravacao' | null
+  /** Falha passageira: a próxima carga tenta de novo e costuma resolver. */
+  tentarDeNovo: boolean
+}
+
+const TENTATIVAS = 2
+const ESPERA_MS = 400
+
+/**
+ * O último resultado, para a tela poder mostrar a falha.
+ *
+ * O agendamento roda junto com a contagem do menu, longe do painel. Sem este
+ * aviso, uma falha só aparecia no silêncio de não receber nada no horário.
+ */
+let ultimo: ResultadoDoAgendamento | null = null
+const ouvintes = new Set<(resultado: ResultadoDoAgendamento) => void>()
+
+export function ultimoAgendamento(): ResultadoDoAgendamento | null { return ultimo }
+
+export function observarAgendamento(ouvinte: (resultado: ResultadoDoAgendamento) => void): () => void {
+  ouvintes.add(ouvinte)
+  return () => { ouvintes.delete(ouvinte) }
+}
+
+function publicar(resultado: ResultadoDoAgendamento): ResultadoDoAgendamento {
+  ultimo = resultado
+  for (const ouvinte of ouvintes) ouvinte(resultado)
+  return resultado
+}
+
+/** O que a tela diz quando o agendamento não terminou. */
+export const AVISO_DO_AGENDAMENTO: Record<Exclude<ResultadoDoAgendamento['falha'], null>, string> = {
+  leitura: 'Não foi possível conferir os horários de aviso no serviço.',
+  remocao: 'Não foi possível retirar um horário de aviso que não vale mais.',
+  gravacao: 'Não foi possível marcar os horários de aviso no serviço.',
+}
+
+/**
+ * Falha passageira é a que some sozinha: rede caída, serviço fora do ar,
+ * tempo esgotado. Permissão negada e violação de restrição não são — repetir
+ * só gasta bateria e esconde um defeito que precisa aparecer.
+ */
+function passageira(erro: unknown): boolean {
+  const { message, code, status } = (erro ?? {}) as { message?: string; code?: string; status?: number }
+  if (typeof status === 'number') return status === 408 || status === 429 || status >= 500
+  if (typeof code === 'string' && code) return code === '40001' || code === '40P01' || code === '57014'
+  return /fetch|network|timeout|abort|rede/iu.test(message ?? '')
+}
+
+const pausa = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms) })
+
+/** Repete o passo enquanto a falha for passageira, e desiste quando não for. */
+async function comNovaTentativa<T>(passo: () => PromiseLike<{ error: unknown } & T>, esperar: (ms: number) => Promise<void>): Promise<{ error: unknown } & T> {
+  let ultimo = await passo()
+  for (let tentativa = 1; tentativa < TENTATIVAS && ultimo.error && passageira(ultimo.error); tentativa += 1) {
+    await esperar(ESPERA_MS * tentativa)
+    ultimo = await passo()
+  }
+  return ultimo
+}
+
+export interface OpcoesDoAgendamento {
+  database?: ApoioDatabase
+  esperar?: (ms: number) => Promise<void>
+}
+
+interface LinhaPendente { occurrence_key: string; updated_at: string }
+
 /**
  * Deixa os horários do serviço iguais ao que o cofre pede.
  *
  * Só com notificações ativas neste aparelho e com internet. O que mudou de
  * horário ganha chave nova; o horário antigo, ainda pendente, é apagado. O que
  * já saiu não é tocado.
+ *
+ * **Apagar exige saber.** Dois aparelhos escrevem na mesma conta, e o cofre
+ * deste aqui pode estar atrasado: um horário que nasceu depois da última
+ * sincronização veio de um lembrete que este aparelho ainda não recebeu, e
+ * apagá-lo deixaria o pastor sem o aviso que o outro acabou de marcar. Por
+ * isso só sai da frente o que já existia antes do que este aparelho conhece —
+ * e um aparelho que nunca sincronizou não apaga nada.
+ *
+ * Repetir é seguro: o que já está lá não é gravado de novo nem apagado.
  */
-export async function sincronizarAgendamentos(accountId: string, masterKey: CryptoKey, lembretes: readonly LembreteEntity[], agora = new Date(), fuso = Intl.DateTimeFormat().resolvedOptions().timeZone): Promise<void> {
-  if (!hasSupabaseConfiguration || !pushAtivoNesteAparelho(accountId) || !navigator.onLine) return
+export async function sincronizarAgendamentos(
+  accountId: string,
+  masterKey: CryptoKey,
+  lembretes: readonly LembreteEntity[],
+  agora = new Date(),
+  fuso = Intl.DateTimeFormat().resolvedOptions().timeZone,
+  { database = db, esperar = pausa }: OpcoesDoAgendamento = {},
+): Promise<ResultadoDoAgendamento> {
+  const nada: ResultadoDoAgendamento = { criados: 0, removidos: 0, falha: null, tentarDeNovo: false }
+  if (!hasSupabaseConfiguration || !pushAtivoNesteAparelho(accountId) || !navigator.onLine) return publicar(nada)
+  if (!(await notificacoesDisponiveisNoBanco())) return publicar(nada)
   const dono = await currentRemoteAccountId()
-  if (!dono) return
+  if (!dono) return publicar(nada)
   const chave = await chaveDeAgendamento(masterKey)
   const desejadas = new Map<string, OcorrenciaParaAvisar>()
   for (const ocorrencia of ocorrenciasParaAvisar(lembretes, agora, fuso)) desejadas.set(await chaveDaOcorrencia(chave, ocorrencia), ocorrencia)
@@ -240,16 +363,39 @@ export async function sincronizarAgendamentos(accountId: string, masterKey: Cryp
   }).catch(() => undefined)
 
   const cliente = getSupabaseClient()
-  const { data: existentes, error } = await cliente.from('notification_schedule').select('occurrence_key').eq('state', 'pending')
-  if (error) return
-  const pendentes = new Set((existentes ?? []).map(({ occurrence_key }: { occurrence_key: string }) => occurrence_key))
-  const sobrando = [...pendentes].filter((chaveOpaca) => !desejadas.has(chaveOpaca))
-  if (sobrando.length) await cliente.from('notification_schedule').delete().eq('state', 'pending').in('occurrence_key', sobrando)
+  const leitura = await comNovaTentativa<{ data: LinhaPendente[] | null }>(
+    () => cliente.from('notification_schedule').select('occurrence_key, updated_at').eq('state', 'pending'),
+    esperar,
+  )
+  if (leitura.error) return publicar({ ...nada, falha: 'leitura', tentarDeNovo: passageira(leitura.error) })
+
+  const existentes = leitura.data ?? []
+  const pendentes = new Set(existentes.map(({ occurrence_key }) => occurrence_key))
+  const conhecidoAte = (await database.syncState.get(accountId))?.lastSyncedAt ?? null
+  const sobrando = conhecidoAte
+    ? existentes.filter(({ occurrence_key, updated_at }) => !desejadas.has(occurrence_key) && updated_at <= conhecidoAte).map(({ occurrence_key }) => occurrence_key)
+    : []
+
+  let removidos = 0
+  if (sobrando.length) {
+    const remocao = await comNovaTentativa(
+      () => cliente.from('notification_schedule').delete().eq('state', 'pending').in('occurrence_key', sobrando),
+      esperar,
+    )
+    if (remocao.error) return publicar({ ...nada, falha: 'remocao', tentarDeNovo: passageira(remocao.error) })
+    removidos = sobrando.length
+  }
+
   const novas = [...desejadas].filter(([chaveOpaca]) => !pendentes.has(chaveOpaca))
   if (novas.length) {
-    await cliente.from('notification_schedule').upsert(
-      novas.map(([chaveOpaca, { instante }]) => ({ owner_id: dono, occurrence_key: chaveOpaca, fire_at: instante.toISOString() })),
-      { onConflict: 'owner_id,occurrence_key', ignoreDuplicates: true },
+    const gravacao = await comNovaTentativa(
+      () => cliente.from('notification_schedule').upsert(
+        novas.map(([chaveOpaca, { instante }]) => ({ owner_id: dono, occurrence_key: chaveOpaca, fire_at: instante.toISOString() })),
+        { onConflict: 'owner_id,occurrence_key', ignoreDuplicates: true },
+      ),
+      esperar,
     )
+    if (gravacao.error) return publicar({ criados: 0, removidos, falha: 'gravacao', tentarDeNovo: passageira(gravacao.error) })
   }
+  return publicar({ criados: novas.length, removidos, falha: null, tentarDeNovo: false })
 }
