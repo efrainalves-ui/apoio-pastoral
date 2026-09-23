@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { decryptRecord, encryptPayload, generateMasterKey } from '../crypto/vault'
+import { encryptPayload, generateMasterKey } from '../crypto/vault'
+import { readPayload } from './corrupted'
 import { ApoioDatabase } from './database'
 import { ehUuid } from './identificadores'
 import { ReparoDeIdentificadores } from './repararIdentificadores'
@@ -66,7 +67,7 @@ describe('reparo dos identificadores que o serviço recusa', () => {
     await new ReparoDeIdentificadores(banco).reparar(CONTA, chave)
 
     const [guardado] = await banco.vaultRecords.where('accountId').equals(CONTA).toArray()
-    const payload = await decryptRecord(chave, guardado!)
+    const payload = await readPayload(chave, guardado!, banco)
     expect(payload?.type).toBe('work_config')
     expect(payload?.data).toMatchObject({ campo: 'Campo Fictício' })
   })

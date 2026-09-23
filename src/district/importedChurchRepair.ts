@@ -1,5 +1,6 @@
 import { currentDeviceId } from '../auth/device'
-import { decryptRecord, encryptPayload } from '../crypto/vault'
+import { encryptPayload } from '../crypto/vault'
+import { readPayload } from '../db/corrupted'
 import { VaultRepository, type EncryptedMutation } from '../db/repository'
 import { normalizePdfChurchName } from '../imports/parsers'
 import { normalizePersonName } from '../people/validation'
@@ -42,7 +43,7 @@ export class ImportedChurchRepairService {
     */
     let ilegiveis = 0
     for (const record of records) {
-      const payload = await decryptRecord(masterKey, record)
+      const payload = await readPayload(masterKey, record)
       if (!payload) { ilegiveis += 1; continue }
       if (payload.type === 'church') churches.push({ id: record.id, ...(payload.data as ChurchData) })
       if (payload.type === 'person') people.push({ id: record.id, ...(payload.data as PersonData) })
