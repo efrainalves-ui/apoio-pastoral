@@ -197,6 +197,51 @@ Nenhuma variável de E2E e nenhuma variável de produção. Variável antiga que
 sobrou de outra configuração é apagada: o que não está escrito hoje não pode
 continuar valendo por inércia.
 
+### Produção e Preview são dois conjuntos de variáveis
+
+Este é o detalhe que custou uma rodada inteira em 23/09/2026, e ele não é
+óbvio: no Cloudflare Pages, **cada projeto tem dois ambientes de build** —
+*Production*, que constrói a branch de produção do projeto, e *Preview*, que
+constrói qualquer outra branch. **Eles não compartilham variáveis.**
+
+Os dois projetos deste repositório (`apoio-pastoral-homologacao` e
+`apoio-pastoral-producao`) têm a `main` como branch de produção. Logo:
+
+- `apoio-pastoral.pages.dev` é a **produção do projeto de homologação**, e
+  segue a `main` — não a branch `homologacao`;
+- empurrar para a branch `homologacao` gera uma **prévia**, em
+  `https://homologacao.apoio-pastoral.pages.dev`.
+
+Essa prévia não abria. As seis variáveis estavam preenchidas só em
+*Production*, e a build de Preview saía sem `VITE_SUPABASE_PROJECT_REF`. O
+aplicativo então falhava fechado, com "Esta instalação não está configurada" —
+que é o comportamento correto, e foi ele que denunciou o problema em vez de
+deixar a prévia falar com projeto nenhum.
+
+**Para a branch abrir no endereço dela**, as mesmas seis variáveis precisam
+existir também em *Preview*, no projeto `apoio-pastoral-homologacao`:
+
+| Variável | Ambiente Preview |
+|---|---|
+| `VITE_APP_ENV` | `homologacao` |
+| `VITE_SUPABASE_URL` | o endereço do projeto Supabase **de homologação** |
+| `VITE_SUPABASE_ANON_KEY` | a chave pública (anon) do mesmo projeto |
+| `VITE_SUPABASE_PROJECT_REF` | a parte do endereço antes de `.supabase.co` |
+| `VITE_DISABLE_SYNC` | `false` |
+| `NODE_VERSION` | `24.20.0` |
+
+Nenhum desses valores é segredo de verdade — a chave anon e o identificador do
+projeto vão dentro do pacote que qualquer visitante baixa. Mesmo assim eles não
+entram em documento, mensagem nem log: quem os digita é quem tem o painel.
+
+**Não mexa no ambiente Preview do projeto `apoio-pastoral-producao`.** Ele
+constrói prévias com a configuração de produção, e não é ali que se testa.
+
+Depois de salvar, o Cloudflare **não** reconstrói sozinho: o Vite grava o valor
+dentro do pacote no momento da build, então é preciso uma build nova. Na branch,
+**Deployments → a última da branch `homologacao` → Retry deployment**, ou um
+envio novo qualquer para a branch.
+
 **As variáveis precisam existir antes da build que vai ser usada.** O Vite grava
 o valor delas dentro do arquivo compilado; publicar antes de configurá-las gera
 um aplicativo que abre na tela "Esta instalação não está configurada" e não
@@ -321,6 +366,103 @@ escrever direto nas tabelas é recusado, que uma conta não alcança o aparelho 
 outra, que o envio ignora conta e aparelho declarados no corpo da requisição,
 que o aparelho revogado para de receber e que a versão do esquema é a esperada.
 Use apenas contas e dados fictícios, e apenas no projeto de homologação.
+
+## 6.2 As notificações: compatibilidade, ordem e volta atrás
+
+As migrations `0010`–`0013` e a função de envio `lembretes-push` são a única
+parte deste sistema em que **três peças precisam combinar**: o aplicativo no
+navegador, o banco e a função que roda no servidor. O aplicativo é a peça
+folgada; a função é a apertada.
+
+### O que combina com o quê
+
+| | Banco **antes** da `0013` | Banco **depois** da `0013` |
+|---|---|---|
+| **Aplicativo antigo** | funciona (é o estado de hoje) | funciona: a `0013` não mexe em nenhum privilégio de `authenticated`, e `revoke_device` continua com a mesma assinatura — ela só passa a apagar também a inscrição |
+| **Aplicativo novo** | funciona, **sem** oferecer notificações: ele pergunta a `lembretes_push_disponivel`, não encontra a função e não oferece o recurso em vez de pedir a permissão e falhar ao gravar | funciona inteiro |
+| **Função de envio antiga** | funciona | **perde avisos.** Ela lê `push_subscriptions` direto, privilégio que a `0013` devolveu; o erro virava "nenhuma inscrição" e o aviso era marcado como `failed` sem nunca sair |
+| **Função de envio nova** | pausa, sem perder nada: a porta `lembretes_push_inscricoes_ativas` ainda não existe, o erro é tratado como passageiro e o aviso volta para a fila | funciona inteiro |
+
+As quatro combinações do aplicativo estão cobertas por teste
+(`src/lembretes/compatibilidadeDoBanco.test.ts`); a dos privilégios de
+`authenticated`, por `supabase/tests/06_push_do_aparelho_revogado.sql`.
+
+### A ordem segura
+
+A tabela decide sozinha: **a função vai antes do banco.** Função nova com banco
+antigo apenas adia; função antiga com banco novo perde aviso.
+
+O aplicativo é indiferente — as duas versões dele funcionam com as duas versões
+do banco —, então ele vai por último, que também é o que a PWA pede (abaixo).
+
+1. **Pausar o agendador**, para que a janela não gaste as tentativas:
+   `update cron.job set active = false where jobname = 'lembretes-push';`
+   Sem isso, o `cron` dispara a cada minuto e cinco falhas seguidas
+   (`MAX_TENTATIVAS`) marcam o aviso como perdido em cinco minutos.
+2. **Publicar a função de envio** `lembretes-push`.
+3. **Aplicar a `0013`** no projeto correspondente.
+4. **Religar o agendador**:
+   `update cron.job set active = true where jobname = 'lembretes-push';`
+5. **Publicar o aplicativo**.
+
+Entre 2 e 4 nada é enviado e nada é perdido: o que vencer fica `pending` e sai
+assim que o agendador voltar, dentro da validade de 12 horas do serviço de push.
+
+**Se a produção ainda não tiver nenhuma das migrations de push**, não há janela
+nenhuma: não existe função publicada nem inscrição para perder. Aplique
+`0010`→`0013` na ordem, depois publique a função, depois o aplicativo.
+
+### A PWA pode estar rodando a versão antiga
+
+O service worker usa `skipWaiting` e `clientsClaim`: a versão nova assume assim
+que chega. Mas **uma janela já aberta continua executando o pacote antigo até
+recarregar** — e no iPhone, com o aplicativo na Tela de Início, isso pode durar
+dias.
+
+Por isso o aplicativo é o último passo, e por isso ele pode ser o último com
+tranquilidade: aplicativo antigo com banco novo é uma combinação boa. O
+contrário — publicar o aplicativo primeiro e o banco depois — também não quebra,
+mas deixa o pastor com um botão de notificações que não faz nada até a migration
+chegar, e isso é pior de explicar do que esperar.
+
+### Voltar atrás
+
+O rollback **não apaga inscrição, lembrete nem dado pastoral**. Nenhuma das
+peças toca `encrypted_operations`, que é onde o conteúdo cifrado vive.
+
+Na ordem inversa, e com o agendador pausado do mesmo jeito:
+
+1. Pausar o agendador.
+2. **Aplicativo**: no Cloudflare, *Deployments* → a implantação anterior →
+   *Rollback*. Ou reverter o commit de merge na `main`, que reconstrói.
+3. **Banco**: aplicar `0013_push_do_aparelho_revogado_down.sql`. Ele devolve a
+   `revoke_device` e a `revoke_all_devices` às versões de `0003` e `0008`,
+   restitui os privilégios que a `0012` dava ao servidor e apaga as três funções
+   novas. Nenhuma linha de dado é removida.
+4. **Função de envio**: publicar de novo a versão anterior (o arquivo no commit
+   anterior). Neste ponto ela volta a ter o privilégio direto de que precisa.
+5. Religar o agendador.
+
+**O que o rollback não desfaz:** a `0013`, ao ser aplicada, apaga as inscrições
+que tinham ficado para trás de revogações anteriores — inscrições de aparelhos
+que já estavam revogados. Elas não voltam, e não devem voltar: eram justamente o
+defeito. O aparelho afetado só precisa ativar as notificações outra vez, e um
+aparelho revogado não consegue nem isso.
+
+### Critérios de interrupção
+
+Pare, e não siga para o passo seguinte, se qualquer um destes acontecer:
+
+- `select public.app_schema_version();` não responder **9** depois da `0013` —
+  ela não muda a versão, e mudança aqui significa que outra coisa foi aplicada;
+- `select public.lembretes_push_disponivel();` não responder **true** depois da
+  `0013`;
+- `has_table_privilege('service_role','public.push_subscriptions','select')`
+  continuar **true** depois da `0013` — a porta não fechou;
+- o painel de Notificações do aplicativo oferecer "Ativar" num ambiente onde
+  `lembretes_push_disponivel` não existe;
+- `cron.job_run_details` acumular `failed` depois de religar o agendador;
+- qualquer conferência da seção 1 reprovar.
 
 ## 7. Se a atualização mexer no banco
 
