@@ -18,9 +18,10 @@ let servicoFalha = false
 
 const revokeDevice = vi.fn<(id: string) => Promise<void>>(() => Promise.resolve())
 const approveDevice = vi.fn<(id: string) => Promise<void>>(() => Promise.resolve())
+const changePassword = vi.fn<(atual: string, nova: string) => Promise<void>>(() => Promise.resolve())
 
 vi.mock('../auth/AuthVaultContext', () => ({
-  useAuthVault: () => ({ account: { id: 'conta-ficticia' }, changePassword: vi.fn() }),
+  useAuthVault: () => ({ account: { id: 'conta-ficticia' }, changePassword }),
 }))
 vi.mock('../auth/accountGuard', () => ({
   remoteAccountGuard: () => guardaFalha ? Promise.reject(guardaFalha) : Promise.resolve(),
@@ -62,11 +63,50 @@ describe('revogar um aparelho pelo outro', () => {
     expect(screen.getAllByRole('button', { name: 'Revogar' })).toHaveLength(1)
   })
 
-  it('revoga o outro aparelho, e é esse o identificador que vai', async () => {
+  it('revoga o outro aparelho depois de confirmar, e é esse o identificador que vai', async () => {
     render(<SecurityPage />)
     await screen.findByText('Dispositivo móvel')
     await userEvent.click(screen.getByRole('button', { name: 'Revogar' }))
+    expect(revokeDevice).not.toHaveBeenCalled()
+
+    await screen.findByText('Revogar Dispositivo móvel?')
+    await userEvent.click(screen.getByRole('button', { name: 'Revogar' }))
+
     await waitFor(() => expect(revokeDevice).toHaveBeenCalledWith(OUTRO))
+  })
+
+  /*
+    Revogar é irreversível para o aparelho alvo, e a lista fica cheia de botões
+    pequenos: um toque sem querer não pode tirar do ar o aparelho errado.
+  */
+  it('desistir da confirmação não revoga nada', async () => {
+    render(<SecurityPage />)
+    await screen.findByText('Dispositivo móvel')
+    await userEvent.click(screen.getByRole('button', { name: 'Revogar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(revokeDevice).not.toHaveBeenCalled()
+    expect(screen.queryByText('Revogar Dispositivo móvel?')).toBeNull()
+  })
+
+  /*
+    Dois toques seguidos mandavam duas revogações. A segunda voltava como
+    "nenhum aparelho ativo com esse identificador" — um susto sem causa, logo
+    depois de a primeira ter dado certo.
+  */
+  it('dois toques seguidos revogam uma vez só', async () => {
+    let concluir = () => {}
+    revokeDevice.mockImplementationOnce(() => new Promise((resolve) => { concluir = () => resolve() }))
+    render(<SecurityPage />)
+    await screen.findByText('Dispositivo móvel')
+    await userEvent.click(screen.getByRole('button', { name: 'Revogar' }))
+    const confirmar = screen.getByRole('button', { name: 'Revogar' })
+
+    await userEvent.click(confirmar)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Revogar…' })).toBeDisabled())
+
+    concluir()
+    await waitFor(() => expect(revokeDevice).toHaveBeenCalledTimes(1))
   })
 
   /*
@@ -130,5 +170,25 @@ describe('revogar um aparelho pelo outro', () => {
     remotos = []
     render(<SecurityPage />)
     await screen.findByText(/Este dispositivo/u)
+  })
+
+  /*
+    Trocar a senha recifra os envelopes de chave. Dois envios ao mesmo tempo
+    disputavam a mesma troca, e o segundo voltava como erro depois de o
+    primeiro ter dado certo.
+  */
+  it('o botão de trocar a senha não aceita dois envios', async () => {
+    let concluir = () => {}
+    changePassword.mockImplementationOnce(() => new Promise((resolve) => { concluir = () => resolve() }))
+    render(<SecurityPage />)
+    await screen.findByText('Dispositivo móvel')
+    await userEvent.type(screen.getByLabelText('Senha atual'), 'senha-ficticia-atual')
+    await userEvent.type(screen.getByLabelText('Nova senha'), 'senha-ficticia-nova-12')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Alterar senha' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Alterando senha…' })).toBeDisabled())
+
+    concluir()
+    await waitFor(() => expect(changePassword).toHaveBeenCalledTimes(1))
   })
 })

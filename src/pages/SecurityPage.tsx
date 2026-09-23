@@ -22,6 +22,14 @@ export function SecurityPage() {
      senha, como se a senha tivesse algo a ver com ela. */
   const [error, setError] = useState('')
   const [erroDaSenha, setErroDaSenha] = useState('')
+  /* Revogar é irreversível para o aparelho alvo, e um toque sem querer na
+     lista tira do ar o aparelho errado. Por isso o botão passa a pedir
+     confirmação, e por isso cada ação fica desativada enquanto corre: dois
+     toques seguidos mandavam duas revogações, e a segunda voltava como erro
+     de "nenhum aparelho ativo com esse identificador" — um susto sem causa. */
+  const [confirmando, setConfirmando] = useState<string | null>(null)
+  const [emAndamento, setEmAndamento] = useState<string | null>(null)
+  const [trocandoSenha, setTrocandoSenha] = useState(false)
 
   const loadDevices = useCallback(async () => {
     if (!account) return
@@ -65,6 +73,8 @@ export function SecurityPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault()
+    if (trocandoSenha) return
+    setTrocandoSenha(true)
     setMessage('')
     setErroDaSenha('')
     try {
@@ -74,23 +84,30 @@ export function SecurityPage() {
       setMessage('Senha alterada. Seus dados continuam como estavam.')
     } catch (reason) {
       setErroDaSenha(reason instanceof Error ? reason.message : 'Não foi possível alterar a senha.')
+    } finally {
+      setTrocandoSenha(false)
     }
   }
 
   async function approve(id: string) {
-    if (!account) return
+    if (!account || emAndamento) return
+    setEmAndamento(id)
     setError('')
     try {
       await remoteAccountGuard(account.id)
       await approveDevice(id)
     } catch (motivo) {
       setError(motivo instanceof Error ? motivo.message : 'Não foi possível confirmar o aparelho.')
+    } finally {
+      setEmAndamento(null)
     }
     await loadDevices()
   }
 
   async function revoke(id: string) {
-    if (!account) return
+    if (!account || emAndamento) return
+    setEmAndamento(id)
+    setConfirmando(null)
     setError('')
     try {
       // Revogar é irreversível para o aparelho alvo. Conferir a conta da sessão
@@ -100,6 +117,8 @@ export function SecurityPage() {
       await revokeDevice(id)
     } catch (motivo) {
       setError(motivo instanceof Error ? motivo.message : 'Não foi possível revogar o aparelho.')
+    } finally {
+      setEmAndamento(null)
     }
     await loadDevices()
   }
@@ -114,7 +133,29 @@ export function SecurityPage() {
             const isCurrent = device.id === currentDeviceId(account?.id ?? '')
             const aguardando = device.status === 'pending'
             const situacao = device.status === 'active' ? 'Ativo' : aguardando ? 'Aguardando confirmação' : 'Revogado'
-            return <div className="device-row" key={device.id}><span className="device-row__icon">{device.label.includes('móvel') ? <Smartphone /> : <Laptop />}</span><div><strong>{device.label}</strong><small>{isCurrent ? 'Este dispositivo' : aguardando ? <>Confira o código <span className="device-row__code">{deviceConfirmationCode(device.id)}</span> nesse aparelho</> : 'Dispositivo autorizado'} · visto {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date(device.lastSeenAt))}</small></div><StatusPill tone={device.status === 'active' ? 'success' : 'warning'}>{situacao}</StatusPill>{!isCurrent && aguardando && <Button onClick={() => void approve(device.id)}>Confirmar</Button>}{!isCurrent && device.status !== 'revoked' && <Button variant="danger" onClick={() => void revoke(device.id)}>{aguardando ? 'Recusar' : 'Revogar'}</Button>}</div>
+            const acao = aguardando ? 'Recusar' : 'Revogar'
+            const correndo = emAndamento === device.id
+            return (
+              <div className="device-row" key={device.id}>
+                <span className="device-row__icon">{device.label.includes('móvel') ? <Smartphone /> : <Laptop />}</span>
+                <div>
+                  <strong>{device.label}</strong>
+                  <small>{isCurrent ? 'Este dispositivo' : aguardando ? <>Confira o código <span className="device-row__code">{deviceConfirmationCode(device.id)}</span> nesse aparelho</> : 'Dispositivo autorizado'} · visto {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date(device.lastSeenAt))}</small>
+                </div>
+                <StatusPill tone={device.status === 'active' ? 'success' : 'warning'}>{situacao}</StatusPill>
+                {!isCurrent && aguardando && confirmando !== device.id && <Button disabled={Boolean(emAndamento)} onClick={() => void approve(device.id)}>Confirmar</Button>}
+                {!isCurrent && device.status !== 'revoked' && confirmando !== device.id && (
+                  <Button variant="danger" disabled={Boolean(emAndamento)} onClick={() => setConfirmando(device.id)}>{correndo ? `${acao}…` : acao}</Button>
+                )}
+                {confirmando === device.id && (
+                  <div className="device-row__confirmacao" role="group" aria-labelledby={`confirmar-${device.id}`}>
+                    <p id={`confirmar-${device.id}`}>{acao} {device.label}?</p>
+                    <Button variant="danger" disabled={Boolean(emAndamento)} aria-describedby={`confirmar-${device.id}`} onClick={() => void revoke(device.id)}>{correndo ? `${acao}…` : acao}</Button>
+                    <Button variant="secondary" disabled={Boolean(emAndamento)} onClick={() => setConfirmando(null)}>Cancelar</Button>
+                  </div>
+                )}
+              </div>
+            )
           })}
         </div>
       </Card>
@@ -133,7 +174,7 @@ export function SecurityPage() {
           <Field label="Nova senha" name="new-password" type="password" autoComplete="new-password" minLength={12} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required />
           {message && <div className="alert alert--success" role="status"><ShieldCheck size={18} />{message}</div>}
           {erroDaSenha && <div className="alert alert--error" role="alert">{erroDaSenha}</div>}
-          <Button type="submit" icon={<LockKeyhole size={18} />}>Alterar senha</Button>
+          <Button type="submit" icon={<LockKeyhole size={18} />} disabled={trocandoSenha}>{trocandoSenha ? 'Alterando senha…' : 'Alterar senha'}</Button>
         </form>
       </Card>
     </div>
