@@ -256,5 +256,11 @@ para trás e a reaplicação funciona. A prova `06` cobre a revogação das
 notificações com duas contas e dois aparelhos fictícios, inclusive a recusa do
 servidor a ler a tabela de inscrições direto.
 
-Pendente de ambiente externo: `pnpm test:api`, que prova as mesmas barreiras
-falando HTTP com um projeto de homologação no ar, com duas contas fictícias.
+Contra o projeto de homologação no ar, com contas fictícias criadas e apagadas
+na mesma rodada: `pnpm test:api` (barreiras de aparelho, sessão revogada,
+envelopes, expurgo, ambiente e versão) e `pnpm test:api:push`, que prova que
+revogar apaga a inscrição de notificação do aparelho revogado e só dele, que o
+revogado não se inscreve de novo nem enxerga as inscrições da conta, que
+revogar todos não deixa nenhuma de pé e que o navegador não alcança a porta do
+servidor. As duas exigem endereço, chave e contas pelo ambiente de quem
+executa; nada disso fica no repositório.
