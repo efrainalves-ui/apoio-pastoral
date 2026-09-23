@@ -108,7 +108,22 @@ async function enviarVencidos(admin: SupabaseClient) {
     }
     // Só aparelho ativo: a inscrição de um aparelho revogado não chega aqui,
     // e esta função é a única porta do servidor para essa tabela.
-    const { data: inscricoes } = await admin.rpc('lembretes_push_inscricoes_ativas', { p_owner_id: linha.owner_id })
+    const { data: inscricoes, error: erroDasInscricoes } = await admin.rpc('lembretes_push_inscricoes_ativas', { p_owner_id: linha.owner_id })
+    /*
+      Não conseguir LER as inscrições não é o mesmo que não haver nenhuma.
+
+      Antes o erro era ignorado e a lista virava vazia; o aviso era marcado
+      como `failed` e nunca mais saía. É exatamente o que acontece com uma
+      função antiga contra um banco já migrado — ela perde o privilégio direto
+      na tabela e passa a marcar como perdido tudo o que vencesse na janela
+      entre aplicar a migration e publicar esta função. Aqui isso volta para a
+      fila e é tentado de novo.
+    */
+    if (erroDasInscricoes) {
+      const tentativas = linha.attempts + 1
+      await admin.from('notification_schedule').update({ state: tentativas >= MAX_TENTATIVAS ? 'failed' : 'pending', attempts: tentativas, updated_at: agoraIso }).eq('id', linha.id)
+      continue
+    }
     const { entregues, transitorias } = await enviar(admin, inscricoes ?? [], { tag: linha.occurrence_key, chave: linha.occurrence_key, url: `/app/lembretes/aviso/${linha.occurrence_key}` })
     if (entregues > 0 || !transitorias) {
       await admin.from('notification_schedule').update({ state: entregues > 0 ? 'sent' : 'failed', sent_at: entregues > 0 ? agoraIso : null, updated_at: agoraIso }).eq('id', linha.id)
@@ -145,7 +160,10 @@ Deno.serve(async (pedido) => {
     // A chave pública do ambiente, para o navegador se inscrever. Pública por natureza; só a privada fica no servidor.
     if (corpo.acao === 'chave-publica') return resposta({ chave: await prepararVapid(admin, configuracao) })
     if (corpo.acao !== 'teste' || !corpo.deviceId) return resposta({ erro: 'pedido inválido' }, 400)
-    const { data: inscricoes } = await admin.rpc('lembretes_push_inscricoes_ativas', { p_owner_id: user.id, p_device_id: corpo.deviceId })
+    const { data: inscricoes, error: erroDasInscricoes } = await admin.rpc('lembretes_push_inscricoes_ativas', { p_owner_id: user.id, p_device_id: corpo.deviceId })
+    // Não conseguir ler não é "não existe": dizer 404 aqui mandaria o pastor
+    // procurar defeito no aparelho dele quando o problema é do serviço.
+    if (erroDasInscricoes) return resposta({ erro: 'não foi possível conferir a inscrição deste aparelho agora' }, 503)
     // Aparelho revogado não recebe nem o teste que ele mesmo pediu.
     if (!inscricoes?.length) return resposta({ erro: 'aparelho sem inscrição ativa' }, 404)
     await prepararVapid(admin, configuracao)
