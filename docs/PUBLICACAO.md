@@ -218,8 +218,16 @@ aplicativo então falhava fechado, com "Esta instalação não está configurada
 que é o comportamento correto, e foi ele que denunciou o problema em vez de
 deixar a prévia falar com projeto nenhum.
 
-**Para a branch abrir no endereço dela**, as mesmas seis variáveis precisam
-existir também em *Preview*, no projeto `apoio-pastoral-homologacao`:
+**Na prática faltava uma só.** A ordem das conferências em
+`src/sync/config.ts` diz qual: a build de prévia chegou até a checagem do
+projeto, e essa checagem só é alcançada depois de `VITE_APP_ENV`,
+`VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` já terem passado. Logo, em
+*Preview* faltava apenas **`VITE_SUPABASE_PROJECT_REF`** — que não é segredo:
+é a parte do endereço antes de `.supabase.co`, já visível dentro do pacote que
+qualquer visitante baixa.
+
+Antes de acrescentar qualquer outra, **olhe a lista de Preview no painel**. Estas
+são as seis que precisam existir lá, no projeto `apoio-pastoral-homologacao`:
 
 | Variável | Ambiente Preview |
 |---|---|
@@ -383,9 +391,19 @@ folgada; a função é a apertada.
 | **Função de envio antiga** | funciona | **perde avisos.** Ela lê `push_subscriptions` direto, privilégio que a `0013` devolveu; o erro virava "nenhuma inscrição" e o aviso era marcado como `failed` sem nunca sair |
 | **Função de envio nova** | pausa, sem perder nada: a porta `lembretes_push_inscricoes_ativas` ainda não existe, o erro é tratado como passageiro e o aviso volta para a fila | funciona inteiro |
 
-As quatro combinações do aplicativo estão cobertas por teste
-(`src/lembretes/compatibilidadeDoBanco.test.ts`); a dos privilégios de
-`authenticated`, por `supabase/tests/06_push_do_aparelho_revogado.sql`.
+Como cada linha é sustentada:
+
+- **aplicativo novo, banco antigo**: `src/lembretes/compatibilidadeDoBanco.test.ts`,
+  e confirmado ao vivo em 23/09/2026 — com a `0013` revertida na homologação, a
+  API respondeu `PGRST202` para `lembretes_push_disponivel`, que é exatamente o
+  código que o teste afirma;
+- **aplicativo antigo, banco novo**: conferido no banco pelos privilégios, que a
+  `0013` não toca (`has_table_privilege` de `authenticated` em
+  `push_subscriptions` e `notification_schedule`, e `has_function_privilege` em
+  `revoke_device`), e por `supabase/tests/06_push_do_aparelho_revogado.sql`;
+- **as duas linhas da função de envio**: pelo código da própria função, e o ciclo
+  reverter → conferir → reaplicar foi ensaiado no banco de homologação **com
+  dados dentro**, sem perder aparelho, conta nem operação cifrada.
 
 ### A ordem segura
 
@@ -396,13 +414,17 @@ O aplicativo é indiferente — as duas versões dele funcionam com as duas vers
 do banco —, então ele vai por último, que também é o que a PWA pede (abaixo).
 
 1. **Pausar o agendador**, para que a janela não gaste as tentativas:
-   `update cron.job set active = false where jobname = 'lembretes-push';`
-   Sem isso, o `cron` dispara a cada minuto e cinco falhas seguidas
-   (`MAX_TENTATIVAS`) marcam o aviso como perdido em cinco minutos.
+   `select cron.alter_job(job_id := <id>, active := false);`
+   O `<id>` sai de `select jobid, jobname from cron.job;`.
+   **Use `cron.alter_job`, não `update cron.job`**: o `update` direto na tabela
+   é recusado com "permission denied for table job" fora do papel dono — foi
+   testado em 23/09/2026. Sem esta pausa, o `cron` dispara a cada minuto e cinco
+   falhas seguidas (`MAX_TENTATIVAS`) marcam o aviso como perdido em cinco
+   minutos.
 2. **Publicar a função de envio** `lembretes-push`.
 3. **Aplicar a `0013`** no projeto correspondente.
 4. **Religar o agendador**:
-   `update cron.job set active = true where jobname = 'lembretes-push';`
+   `select cron.alter_job(job_id := <id>, active := true);`
 5. **Publicar o aplicativo**.
 
 Entre 2 e 4 nada é enviado e nada é perdido: o que vencer fica `pending` e sai
