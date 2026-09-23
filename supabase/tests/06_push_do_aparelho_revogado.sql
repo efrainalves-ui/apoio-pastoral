@@ -27,14 +27,10 @@ select homologacao_testes.exigir(public.claim_device(:disp_g1, 'Celular Fictíci
 insert into public.push_subscriptions (owner_id, device_id, endpoint, p256dh, auth_secret)
 values (:conta_g, :disp_g1, 'https://push.example.invalid/g1', repeat('1', 87), repeat('1', 22));
 
--- O segundo aparelho da mesma conta nasce pendente e é confirmado pelo primeiro.
+-- O segundo aparelho da mesma conta, em sessão própria.
 set request.jwt.claims = '{"sub":"73737373-0000-4000-8000-000000000073","session_id":"73a20000-0000-4000-8000-000000000073"}';
-select homologacao_testes.exigir(public.claim_device(:disp_g2, 'Celular Fictício G2') = 'pending', 'G2: aparelho pendente');
+select homologacao_testes.exigir(public.claim_device(:disp_g2, 'Celular Fictício G2') = 'active', 'G2: aparelho ativo');
 
-set request.jwt.claims = '{"sub":"73737373-0000-4000-8000-000000000073","session_id":"73a10000-0000-4000-8000-000000000073"}';
-select public.approve_device(:disp_g2);
-
-set request.jwt.claims = '{"sub":"73737373-0000-4000-8000-000000000073","session_id":"73a20000-0000-4000-8000-000000000073"}';
 insert into public.push_subscriptions (owner_id, device_id, endpoint, p256dh, auth_secret)
 values (:conta_g, :disp_g2, 'https://push.example.invalid/g2', repeat('2', 87), repeat('2', 22));
 
