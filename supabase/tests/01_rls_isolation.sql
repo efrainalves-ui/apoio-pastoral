@@ -377,15 +377,15 @@ select homologacao_testes.exigir(
   = array[
       'active_device_id', 'app_environment', 'approve_device', 'claim_device',
       'current_device_id', 'download_operations', 'funcoes_publicas_abertas',
-      -- Configuração das notificações (0011): só o servidor executa; prova 05.
-      'lembretes_push_config', 'lembretes_push_guardar_vapid',
-      -- Notificações, 0013; prova 06. `disponivel` é a única que
-      -- `authenticated` executa, e ela não lê dado de conta nenhuma: responde
-      -- se este banco tem as tabelas e funções do push. As outras duas são só
-      -- do servidor e existem para que o privilégio direto em
-      -- `push_subscriptions` possa ser devolvido — aparelho revogado não é
-      -- avisado nem por engano.
-      'lembretes_push_disponivel', 'lembretes_push_esquecer_inscricao',
+      -- Notificações. A lista é comparada em ordem alfabética, então estas
+      -- cinco ficam juntas e nesta ordem. Configuração do envio (0011) e, da
+      -- 0013: `disponivel` é a única que `authenticated` executa, e ela não lê
+      -- dado de conta nenhuma — responde se este banco tem as tabelas e
+      -- funções do push. As outras duas são só do servidor e existem para que
+      -- o privilégio direto em `push_subscriptions` pudesse ser devolvido:
+      -- aparelho revogado não é avisado nem por engano. Provas 05 e 06.
+      'lembretes_push_config', 'lembretes_push_disponivel',
+      'lembretes_push_esquecer_inscricao', 'lembretes_push_guardar_vapid',
       'lembretes_push_inscricoes_ativas',
       'protecao_de_funcao_nova', 'purge_record_history',
       'revoke_all_devices', 'revoke_device', 'session_is_authorized',
