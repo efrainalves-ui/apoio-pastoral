@@ -79,7 +79,7 @@ async function enviar(admin: SupabaseClient, inscricoes: Inscricao[], dados: Rec
     } catch (falha) {
       const status = (falha as { statusCode?: number }).statusCode
       // Inscrição que o serviço de push não reconhece mais: some daqui.
-      if (status === 404 || status === 410) await admin.from('push_subscriptions').delete().eq('id', inscricao.id)
+      if (status === 404 || status === 410) await admin.rpc('lembretes_push_esquecer_inscricao', { p_id: inscricao.id })
       else transitorias += 1
     }
   }
@@ -106,7 +106,9 @@ async function enviarVencidos(admin: SupabaseClient) {
       await admin.from('notification_schedule').update({ state: 'failed', updated_at: agoraIso }).eq('id', linha.id)
       continue
     }
-    const { data: inscricoes } = await admin.from('push_subscriptions').select('id, endpoint, p256dh, auth_secret').eq('owner_id', linha.owner_id)
+    // Só aparelho ativo: a inscrição de um aparelho revogado não chega aqui,
+    // e esta função é a única porta do servidor para essa tabela.
+    const { data: inscricoes } = await admin.rpc('lembretes_push_inscricoes_ativas', { p_owner_id: linha.owner_id })
     const { entregues, transitorias } = await enviar(admin, inscricoes ?? [], { tag: linha.occurrence_key, chave: linha.occurrence_key, url: `/app/lembretes/aviso/${linha.occurrence_key}` })
     if (entregues > 0 || !transitorias) {
       await admin.from('notification_schedule').update({ state: entregues > 0 ? 'sent' : 'failed', sent_at: entregues > 0 ? agoraIso : null, updated_at: agoraIso }).eq('id', linha.id)
@@ -143,8 +145,9 @@ Deno.serve(async (pedido) => {
     // A chave pública do ambiente, para o navegador se inscrever. Pública por natureza; só a privada fica no servidor.
     if (corpo.acao === 'chave-publica') return resposta({ chave: await prepararVapid(admin, configuracao) })
     if (corpo.acao !== 'teste' || !corpo.deviceId) return resposta({ erro: 'pedido inválido' }, 400)
-    const { data: inscricoes } = await admin.from('push_subscriptions').select('id, endpoint, p256dh, auth_secret').eq('owner_id', user.id).eq('device_id', corpo.deviceId)
-    if (!inscricoes?.length) return resposta({ erro: 'aparelho sem inscrição' }, 404)
+    const { data: inscricoes } = await admin.rpc('lembretes_push_inscricoes_ativas', { p_owner_id: user.id, p_device_id: corpo.deviceId })
+    // Aparelho revogado não recebe nem o teste que ele mesmo pediu.
+    if (!inscricoes?.length) return resposta({ erro: 'aparelho sem inscrição ativa' }, 404)
     await prepararVapid(admin, configuracao)
     const { entregues } = await enviar(admin, inscricoes, { tag: 'apoio-pastoral-teste', url: '/app/lembretes' })
     return resposta({ entregues })
