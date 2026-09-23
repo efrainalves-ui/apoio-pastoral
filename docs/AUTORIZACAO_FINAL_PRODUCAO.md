@@ -1,6 +1,7 @@
 # AUTORIZAÇÃO FINAL DE PRODUÇÃO
 
-Commit candidato: **`99364b6`** · PR **#14** · Migration **`0013`** · Função Edge **`lembretes-push` v3**
+Candidato: **o commit no topo da PR #14** (branch `homologacao`)
+Migration: **`0013`** · Função Edge: **`lembretes-push`**, o arquivo desse mesmo commit
 
 ## Antes de autorizar
 
