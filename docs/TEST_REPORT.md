@@ -233,7 +233,28 @@ Testes novos que fixam os achados corrigidos:
 - backup recusa arquivo estranho, truncado, de outra versão e grande demais, e
   leva Leitura e Orçamento Familiar;
 - encerrar distrito revoga tudo, inclusive o próprio aparelho, e segue com
-  autorização nova.
+  autorização nova;
+- registro ilegível de Agenda, Pessoas, Famílias, Visitas, Tarefas, Comissão,
+  Nomeações, Casamentos, Escola Sabatina, Distrito, Lembretes e Orçamento
+  Familiar vai para a quarentena gravada, e sai dela quando chega uma versão
+  que abre;
+- agendamento das notificações: falha de leitura, de remoção e de gravação são
+  distinguidas e informadas; falha passageira é repetida e erro permanente
+  para na hora;
+- aparelho com o cofre atrasado não apaga o horário que o outro acabou de
+  criar, e quem nunca sincronizou não apaga nada; repetir não grava nem apaga
+  de novo;
+- aparelho revogado se cala: a marca é gravada onde o service worker lê, a
+  inscrição é cancelada e a preferência da conta é esquecida, com ou sem
+  service worker;
+- revogar pede confirmação, desistir não revoga, e dois toques seguidos em
+  revogar ou em trocar a senha valem por um.
+
+No workflow `Banco`, num Postgres descartável: as migrations `0000`–`0013`
+aplicam, as provas `01`–`06` passam, a reversão não deixa tabela nem função
+para trás e a reaplicação funciona. A prova `06` cobre a revogação das
+notificações com duas contas e dois aparelhos fictícios, inclusive a recusa do
+servidor a ler a tabela de inscrições direto.
 
 Pendente de ambiente externo: `pnpm test:api`, que prova as mesmas barreiras
 falando HTTP com um projeto de homologação no ar, com duas contas fictícias.

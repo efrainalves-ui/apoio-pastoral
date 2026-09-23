@@ -38,6 +38,7 @@ Inserir os valores somente no computador privado do avaliador. Não versionar `.
 2. Criar um projeto Supabase vazio e identificado claramente como homologação; conferir que não é produção.
 3. Em Auth, permitir somente as contas fictícias da rodada. Se necessário, desabilitar confirmação de e-mail apenas nesse projeto temporário.
 4. Aplicar, **nesta ordem e uma de cada vez**, `0000_plataforma_fechada_up.sql`, `0001_marco_zero_up.sql`, `0002_password_key_envelopes_up.sql`, `0003_device_sessions_up.sql`, `0004_sessao_revogada_e_ambiente_up.sql`, `0005_ambiente_antes_da_senha_up.sql`, `0006_expurgo_de_historico_up.sql`, `0007_funcao_nova_fechada_up.sql`, `0008_revogacao_idempotente_up.sql` e `0009_sessoes_fora_de_alcance_up.sql`. Não aplicar os arquivos `*_down.sql` na validação normal. Depois de aplicar todas, `select public.app_schema_version();` precisa responder **9**.
+5. Para as **notificações dos lembretes**, aplicar também `0010_lembretes_push_up.sql`, `0011_lembretes_push_config_up.sql`, `0012_lembretes_push_servidor_up.sql` e `0013_push_do_aparelho_revogado_up.sql`. Nenhuma delas muda a versão do esquema, que continua **9**. Conferir com `select public.lembretes_push_disponivel();`, que precisa responder **true** — é o que o aplicativo pergunta antes de oferecer o recurso. O restante da configuração (chaves, função de envio, agendamento) está em `docs/LEMBRETES_NOTIFICACOES.md`.
 5. Declarar o ambiente no próprio banco, uma única vez, pelo editor SQL do projeto:
 
    ```sql

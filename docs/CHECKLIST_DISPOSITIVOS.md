@@ -73,6 +73,20 @@ No iPhone, repita 3.1 a 3.6 no Safari e no aplicativo aberto pelo ícone da Tela
 | 5.1 | Pelo computador, revogar o dispositivo do celular | O celular passa a `revoked` na lista | A revogação não chega ao serviço |
 | 5.2 | Tentar sincronizar pelo celular revogado | A sincronização é recusada | O celular continua enviando dados |
 | 5.3 | No celular revogado, tentar usar o aplicativo já instalado | Ele não sincroniza nem se reativa sozinho | O aparelho volta a enviar ou receber dados |
+| 5.4 | Antes de revogar, ativar as notificações no celular e receber o aviso de teste | O aviso chega | O aviso não chega (conferir a configuração antes de seguir) |
+| 5.5 | Revogar o celular pelo computador e criar um lembrete para daqui a 3 minutos | Nada aparece no celular revogado — nem o aviso genérico | O celular revogado mostra qualquer aviso |
+| 5.6 | No celular revogado, pedir "Enviar notificação de teste" | Recusado, com o aviso de aparelho sem inscrição ativa | O teste é entregue |
+| 5.7 | Revogar com o botão e conferir a pergunta | O botão pede confirmação nomeando o aparelho, e Cancelar não revoga | Um toque só já revoga |
+| 5.8 | Tocar duas vezes seguidas em revogar, e depois em alterar senha | Cada ação vale por uma e o botão fica desativado enquanto corre | Aparece erro logo depois de a primeira ter dado certo |
+
+## 5b. Notificações entre dois aparelhos
+
+| # | O que fazer | Aprova se | Reprova se |
+|---|---|---|---|
+| 5b.1 | Com os dois aparelhos ativos e notificando, criar um lembrete em um deles | O aviso chega nos dois, uma vez em cada | Chega duas vezes no mesmo, ou não chega |
+| 5b.2 | Deixar o segundo aparelho sem internet, criar um lembrete no primeiro e só então reconectar o segundo | O horário criado pelo primeiro continua de pé | O segundo apaga o horário ao reconectar |
+| 5b.3 | Desligar a internet do aparelho e abrir os Lembretes | O painel diz em que passo o agendamento parou e oferece "Tentar de novo" | Falha em silêncio |
+| 5b.4 | Reconectar e tocar em "Tentar de novo" | O aviso some e os horários voltam a ser marcados | O aviso permanece sem explicação |
 
 ## 6. Backup e restauração
 

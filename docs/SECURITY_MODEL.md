@@ -196,10 +196,59 @@ essa lista vivia na memória: a contagem sumia a cada recarregamento e, pior, um
 de uma pessoa, o encerramento do distrito e as listagens inteiras — o que, para
 quem usa, é indistinguível de ter perdido tudo.
 
+A quarentena gravada vale para **todos** os módulos. Por um tempo ela cobriu só
+backup, exportação e encerramento: Agenda, Pessoas, Famílias, Visitas, Comissão,
+Nomeações, Casamentos, Escola Sabatina, Distrito, Lembretes e Orçamento
+Familiar ainda abriam os registros por um caminho que anotava o identificador
+num conjunto na memória, e nada disso chegava à tela de Sincronização. Hoje
+existe uma porta só — `readPayload`, em `src/db/corrupted.ts` — e a antiga foi
+removida do código para não voltar a ser escolhida por engano. O Orçamento
+Familiar guarda em banco próprio e aponta a quarentena para o banco principal,
+que é o que a tela lê.
+
 O registro em quarentena continua guardado e não é apagado às cegas: apagar o
 que não se conseguiu ler seria apagar sem saber o quê. Se a versão dele mudar —
 uma sincronização trouxe outra, um backup foi restaurado — ele sai da quarentena
 sozinho na leitura seguinte.
+
+## Notificações e revogação
+
+A revogação derrubava a sessão e o recebimento das operações cifradas, mas
+deixava a inscrição de push de pé: `push_subscriptions` só some em cascata
+quando a linha de `devices` some, e revogar não apaga a linha — marca
+`status = 'revoked'`. O aparelho revogado continuava recebendo o aviso
+genérico e, com o cofre ainda aberto na memória do service worker, o título.
+
+O agravante é a RLS não alcançar o servidor: a função de envio roda como
+`service_role`, que passa por cima das políticas. As políticas de 0010 exigem
+aparelho ativo para **inscrever** e não têm voz sobre o que o servidor lê na
+hora de **entregar**.
+
+A migration `0013` fecha isso em três camadas, e cada uma sozinha basta:
+
+- `revoke_device` e `revoke_all_devices` apagam a inscrição do aparelho
+  revogado, junto com o envelope de chave e as sessões. As sobras de revogações
+  anteriores são limpas na aplicação da migration;
+- `lembretes_push_inscricoes_ativas` passa a ser a única porta do servidor para
+  a tabela — o privilégio direto de `service_role` é devolvido —, e ela devolve
+  só inscrição de aparelho `active`;
+- o próprio aparelho grava a revogação onde o service worker lê e se cala,
+  inclusive sem internet, cancelando a inscrição no navegador.
+
+`supabase/tests/06_push_do_aparelho_revogado.sql` prova cada uma delas, com
+duas contas e dois aparelhos fictícios, no Postgres descartável do CI.
+
+Compatibilidade: `lembretes_push_disponivel` diz se o banco tem as tabelas e
+funções das notificações. Sem elas, o aplicativo não oferece o recurso, em vez
+de pedir a permissão e falhar ao gravar a inscrição.
+
+## Confirmação nas ações de segurança
+
+Revogar é irreversível para o aparelho alvo, e a lista é feita de botões
+pequenos: o toque passa por uma confirmação que nomeia o aparelho. Revogar e
+trocar a senha ficam desativados enquanto correm — dois toques seguidos
+mandavam duas operações, e a segunda voltava como erro logo depois de a
+primeira ter dado certo.
 
 ## Importação de planilha ACMS
 
@@ -241,6 +290,21 @@ ou na documentação.
   familiar, a lista de compras, a leitura e a agenda pessoal ficam.
 - A quilometragem é digitada. Não há GPS, rastreamento nem localização
   automática em nenhum ponto do aplicativo.
+- **O que a exclusão não alcança.** Revogar bloqueia o aparelho no serviço, mas
+  o que já foi baixado continua gravado nele: nenhum aplicativo apaga à
+  distância o que já está lá. O expurgo de histórico apaga as versões
+  anteriores no serviço, não as cópias que outros aparelhos já receberam. Um
+  registro em quarentena não é apagado às cegas — apagar o que não se conseguiu
+  ler seria apagar sem saber o quê. Os segredos do Vault sobrevivem à reversão
+  das migrations, e uma inscrição de notificação apagada não volta: quem foi
+  revogado ativa de novo. Backups que você já exportou estão fora do alcance do
+  aplicativo, onde quer que estejam guardados.
+- As notificações são opcionais e por aparelho. O serviço recebe conta,
+  aparelho, endereço de entrega, horário, chave opaca e estado do envio — nunca
+  título, observação, pessoa, igreja ou área. O título na tela bloqueada exige
+  a opção ligada **e** o cofre daquele aparelho aberto, e é decifrado no
+  próprio aparelho; a chave que permite isso é a da sessão mantida, com no
+  máximo oito horas, apagada ao bloquear ou sair.
 - Encerrar o distrito é durável e retomável por etapas: a intenção é gravada
   **antes** da primeira exclusão local, e o fluxo só termina depois de publicar
   as lápides, confirmar que elas subiram, expurgar o histórico distrital no

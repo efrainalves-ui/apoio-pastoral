@@ -78,15 +78,22 @@ esses arquivos.
 Crianças e adolescentes podem ser cadastrados normalmente. Nos campos de visita,
 pedido de oração e anotações, o aplicativo orienta em uma linha a registrar o
 essencial pastoral e evitar detalhes íntimos desnecessários, sem bloquear o uso.
-Esse conteúdo não aparece em relatórios padrão, buscas globais, mensagens de
-erro nem notificações — o aplicativo não envia notificações.
+Esse conteúdo não aparece em relatórios padrão, buscas globais nem mensagens de
+erro. Também não aparece nas notificações dos lembretes: o servidor não tem o
+conteúdo para mandar. Veja "Notificações dos lembretes", abaixo.
 
 ## Orçamento, materiais e relatório ACMS
 
 - O **orçamento do trabalho** — auxílios, despesas do ministério e quilometragem
   — é dado do distrito: fica no cofre cifrado, sincroniza entre os seus
-  aparelhos e sai no encerramento de distrito. O **orçamento familiar** e a
-  **lista de compras** ficam no banco pessoal e não saem.
+  aparelhos e sai no encerramento de distrito. O **orçamento familiar**, a
+  **Leitura** e a **lista de compras** também ficam no cofre cifrado e
+  sincronizam entre os seus aparelhos — antes viviam em bancos próprios que
+  sincronização nenhuma olhava, e o que você anotava no celular não existia no
+  computador, sem aviso nenhum. A separação continua inteira, agora pelo tipo
+  do registro: o encerramento de distrito preserva esses três quando tudo o
+  mais é apagado. O que viaja é envelope cifrado; a tabela de operações do
+  serviço não tem sequer coluna de tipo.
 - A quilometragem é **digitada por você**. O aplicativo não usa GPS, não
   registra localização e não acompanha deslocamento.
 - **Materiais e necessidades** são do distrito e saem no encerramento.
@@ -96,3 +103,32 @@ erro nem notificações — o aplicativo não envia notificações.
   nome de membro é extraído.
 - **Links úteis** abre endereços em uma aba nova do navegador; nada do seu
   distrito é enviado a eles.
+- O **WhatsApp** entra de duas formas, as duas dentro do aparelho. O número
+  fica no cofre cifrado, como qualquer outro dado da pessoa, e a busca por ele
+  é local. Ao enviar uma mensagem de aniversário, o aplicativo monta um
+  endereço `wa.me` com o número e o texto e **abre o WhatsApp**: daí em diante
+  a conversa é sua com ele, e o que você mandar passa a seguir as regras do
+  WhatsApp, não as deste aplicativo. Nada é enviado sem você tocar, e o
+  aplicativo não tem acesso às suas conversas.
+
+## Notificações dos lembretes
+
+São opcionais e desligadas até você ativar, aparelho por aparelho.
+
+O que o serviço guarda para entregar um aviso: a conta, o aparelho, o endereço
+de entrega do navegador, o horário e uma chave opaca da ocorrência, calculada
+no seu aparelho. Nenhuma coluna guarda título, observação, pessoa, igreja ou
+área — o servidor não tem esse conteúdo.
+
+O aviso enviado é sempre genérico: "Apoio Pastoral / Você tem um lembrete".
+O **título na tela bloqueada** só aparece se você ligar a opção **e** o cofre
+daquele aparelho estiver aberto; nesse caso o título é decifrado no próprio
+aparelho, pelo service worker, e não sai dele. A chave que permite isso é a da
+sessão mantida, que dura no máximo oito horas e some ao bloquear ou sair.
+
+Um aparelho revogado para de receber notificação: a inscrição dele é apagada no
+serviço, a função de envio só entrega a aparelho ativo, e o próprio aparelho se
+cala — nem o aviso genérico aparece.
+
+Desativar as notificações no painel apaga a inscrição daquele aparelho. Sair da
+conta também.

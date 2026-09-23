@@ -590,3 +590,42 @@ Próximo passo recomendado: executar a suíte Playwright completa no CI Linux e 
 9. iniciar o uso real de forma gradual e com backup.
 
 **Dados reais continuam bloqueados até que toda essa lista seja concluída e documentada.**
+
+## Rodada das notificações e da quarentena (23/09/2026)
+
+Seis frentes, todas reproduzidas por teste antes de corrigidas.
+
+**1. Quarentena em memória.** Agenda, Pessoas, Famílias, Visitas, Comissão,
+Nomeações, Casamentos, Escola Sabatina, Distrito, Lembretes e Orçamento
+Familiar abriam os registros por `decryptRecord`, que anotava o identificador
+num conjunto na memória. A contagem sumia a cada recarregamento e a tela de
+Sincronização nunca ficava sabendo — a documentação já descrevia a quarentena
+gravada como se fosse completa, e não era. Todos passaram a `readPayload`, e
+`decryptRecord` foi removido do código.
+
+**2. Agendamento das notificações.** `sincronizarAgendamentos` olhava só o erro
+do `select`, e mesmo nele apenas desistia em silêncio. Os três passos passam a
+ser conferidos, falha passageira é repetida, erro permanente para na hora, e o
+painel mostra em que passo parou com "Tentar de novo".
+
+**3. Concorrência entre dois aparelhos.** Um aparelho com o cofre atrasado
+apagava os horários que o outro tinha acabado de criar. Só sai da frente o que
+já existia antes da última sincronização daquele aparelho; quem nunca
+sincronizou não apaga nada.
+
+**4. Aparelho revogado continuava sendo avisado.** `push_subscriptions` só some
+em cascata quando a linha de `devices` some, e revogar não apaga a linha. Três
+travas na `0013` e no aparelho, cada uma bastando sozinha.
+
+**5. Confirmação nas ações de segurança.** Revogar passou a pedir confirmação
+nomeando o aparelho; revogar e trocar a senha ficam desativados enquanto
+correm.
+
+**6. Compatibilidade.** `lembretes_push_disponivel` diz se o banco tem as
+notificações; sem elas o aplicativo não oferece o recurso.
+
+Migration nova: `0013_push_do_aparelho_revogado`. **Não** muda a versão de
+esquema, que continua 9. Prova SQL nova: `06_push_do_aparelho_revogado.sql`.
+
+**Pendente**: as migrations e as provas SQL não rodaram nesta máquina (sem
+Postgres nem Docker) — elas rodam no workflow `Banco`.

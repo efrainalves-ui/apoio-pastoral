@@ -263,6 +263,13 @@ O aplicativo espera a versão de esquema **9** (`app_schema_version()`) e recusa
 sincronizar com um serviço em versão diferente. Aplicar as nove migrations é
 obrigatório antes da primeira entrada.
 
+As migrations `0010` a `0013` são das notificações dos lembretes e **não** mudam
+`app_schema_version()`: uma build sem elas continua falando com o banco, e uma
+build com elas pergunta a `lembretes_push_disponivel()` antes de oferecer o
+recurso. São opcionais para sincronizar e obrigatórias para notificar.
+A `0013` fecha a revogação: aparelho revogado deixa de ser avisado. O passo a
+passo de cada uma está em `docs/LEMBRETES_NOTIFICACOES.md`.
+
 As nove são aplicáveis em Supabase gerenciado, e isso deixou de ser suposição.
 A `0007` chegou a depender de `create event trigger`, que exige superusuário: a
 primeira tentativa de homologação provou que o papel que aplica migrations não é
