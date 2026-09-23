@@ -51,16 +51,22 @@ export function diagnosticar(): Exclude<EstadoDasNotificacoes, 'carregando' | 'a
  * resposta: sem ela, o recurso não existe neste ambiente.
  *
  * A resposta é lembrada enquanto o aplicativo estiver aberto: o banco não
- * ganha migration no meio da sessão.
+ * ganha migration no meio da sessão. Só a resposta **definitiva** é lembrada —
+ * uma queda de rede na conferência não pode desligar as notificações pelo
+ * resto do dia; ela apenas adia a resposta para a próxima vez.
  */
 let bancoTemPush: boolean | null = null
 
 export async function notificacoesDisponiveisNoBanco(): Promise<boolean> {
   if (!hasSupabaseConfiguration) return false
   if (bancoTemPush !== null) return bancoTemPush
-  const { data, error } = await getSupabaseClient().rpc('lembretes_push_disponivel') as { data: unknown; error: unknown }
-  bancoTemPush = !error && data === true
-  return bancoTemPush
+  const { data, error } = await getSupabaseClient().rpc('lembretes_push_disponivel') as { data: unknown; error: { code?: string } | null }
+  if (data === true && !error) { bancoTemPush = true; return true }
+  // Função que não existe é resposta: este banco não tem as migrations de push.
+  // Qualquer outro erro é "ainda não sei", e não fica gravado.
+  const naoExiste = error?.code === 'PGRST202' || error?.code === '42883'
+  if (naoExiste || (!error && data !== true)) bancoTemPush = false
+  return false
 }
 
 /** Só para os testes: a próxima pergunta volta a bater no banco. */
