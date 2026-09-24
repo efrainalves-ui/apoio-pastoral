@@ -10,7 +10,7 @@
   },
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "node scripts/verify-env.mjs && tsc -b && vite build",
+    "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc -b",

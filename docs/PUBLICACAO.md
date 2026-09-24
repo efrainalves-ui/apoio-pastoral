@@ -250,11 +250,22 @@ dentro do pacote no momento da build, então é preciso uma build nova. Na branc
 **Deployments → a última da branch `homologacao` → Retry deployment**, ou um
 envio novo qualquer para a branch.
 
-**A build agora recusa ambiente mal configurado.** `pnpm build` começa por
-`scripts/verify-env.mjs`. Uma build sem ambiente declarado, sem endereço, sem
-chave ou sem projeto **falha no Cloudflare** em vez de publicar um site que só
-quebra no navegador de quem abrir. Foi assim que este bloqueio apareceu tarde
-demais em 23/09/2026: a build passou verde e o erro só surgiu na tela.
+**Pendente, e vale a pena: fazer a build recusar ambiente mal configurado.**
+Em 23/09/2026 a prévia de homologação subiu verde e só quebrou na tela de quem
+abriu — "Esta instalação não está configurada". A conferência que pegaria isso
+já existe (`scripts/verify-env.mjs`), mas roda no CI e à mão, nunca na build que
+o Cloudflare executa.
+
+Pôr `node scripts/verify-env.mjs &&` na frente do script `build` resolve, e foi
+provado nos dois sentidos. **Mas não pode ser ligado ainda:** o projeto
+`apoio-pastoral-producao` também constrói prévias desta branch, e o ambiente
+*Preview* **dele** não tem as variáveis. Com a trava ligada, essa prévia falha e
+deixa um check vermelho em toda PR.
+
+Ordem certa: primeiro preencher as seis variáveis no *Preview* de
+`apoio-pastoral-producao` (apontando para o projeto Supabase de **produção**, ou
+declarando `VITE_APP_ENV=desenvolvimento` com `VITE_DISABLE_SYNC=true` se
+prévias de produção não devem falar com serviço nenhum), depois ligar a trava.
 
 **As variáveis precisam existir antes da build que vai ser usada.** O Vite grava
 o valor delas dentro do arquivo compilado; publicar antes de configurá-las gera
