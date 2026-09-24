@@ -26,7 +26,8 @@
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm verify:pwa && pnpm verify:headers && pnpm verify:repo",
     "verify:headers": "node scripts/verify-headers.mjs",
     "verify:env": "node scripts/verify-env.mjs",
-    "test:api": "node scripts/api-barreiras.mjs"
+    "test:api": "node scripts/api-barreiras.mjs",
+    "test:api:push": "node scripts/api-push-revogacao.mjs"
   },
   "dependencies": {
     "@fontsource/instrument-serif": "^5.3.0",

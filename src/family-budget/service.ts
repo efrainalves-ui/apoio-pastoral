@@ -1,4 +1,6 @@
-import { decryptRecord, encryptPayload } from '../crypto/vault'
+import { encryptPayload } from '../crypto/vault'
+import { db, type ApoioDatabase } from '../db/database'
+import { readPayload } from '../db/corrupted'
 import { familyBudgetDb, type FamilyBudgetDatabase } from './database'
 import { monthKey } from './core'
 import type { BudgetBillData, BudgetDataByType, BudgetEntity, BudgetExpenseData, BudgetGoalData, BudgetIncomeData, BudgetPayloadType, BudgetPlanData, BudgetSkipData, BudgetSnapshot, FamilyBudgetStoredRecord } from './types'
@@ -7,10 +9,15 @@ const now = () => new Date().toISOString()
 const dayInMonth = (date: string, month: string) => `${month}-${String(Math.min(Number(date.slice(8, 10)) || 1, new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate())).padStart(2, '0')}`
 
 export class FamilyBudgetService {
-  constructor(private readonly database: FamilyBudgetDatabase = familyBudgetDb) {}
+  /**
+   * O Orçamento Familiar guarda em banco próprio, mas a quarentena é uma só:
+   * um lançamento ilegível precisa aparecer na mesma tela de Sincronização que
+   * os outros, senão ele some sem deixar rastro.
+   */
+  constructor(private readonly database: FamilyBudgetDatabase = familyBudgetDb, private readonly quarentena: ApoioDatabase = db) {}
 
   private async decode<T extends BudgetPayloadType>(record: FamilyBudgetStoredRecord, masterKey: CryptoKey, type: T): Promise<BudgetEntity<BudgetDataByType[T]> | null> {
-    const payload = await decryptRecord(masterKey, record)
+    const payload = await readPayload(masterKey, { ...record, recordType: `family_budget_${record.recordType}` }, this.quarentena)
     return payload?.type === `family_budget_${type}` ? { id: record.id, ...(payload.data as BudgetDataByType[T]) } : null
   }
 

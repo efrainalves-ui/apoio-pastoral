@@ -4,7 +4,8 @@ import { currentDeviceId } from '../auth/device'
 import { CareService } from '../care/service'
 import type { VisitEntity } from '../care/types'
 import { CommissionService } from '../commissions/service'
-import { decryptRecord, encryptPayload } from '../crypto/vault'
+import { encryptPayload } from '../crypto/vault'
+import { readPayload } from '../db/corrupted'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { VaultRecord } from '../db/types'
@@ -41,7 +42,7 @@ export class CasamentoService {
   }
 
   private async decode(record: VaultRecord, masterKey: CryptoKey): Promise<CasamentoEntity | null> {
-    const payload = await decryptRecord(masterKey, record)
+    const payload = await readPayload(masterKey, record, this.database)
     if (payload?.type !== 'wedding') return null
     return { id: record.id, ...normalizarCasamento(payload.data as Partial<CasamentoData>) }
   }
@@ -183,7 +184,7 @@ export class CasamentoService {
   async migrarCompromissosAntigos(accountId: string, masterKey: CryptoKey): Promise<ResultadoDaMigracaoDeCasamentos> {
     const resultado: ResultadoDaMigracaoDeCasamentos = { criados: 0, vinculados: 0, ilegiveis: 0, ambiguidades: [] }
     for (const record of await this.repository.list(accountId, 'agenda_event')) {
-      const payload = await decryptRecord(masterKey, record)
+      const payload = await readPayload(masterKey, record, this.database)
       if (!payload) { resultado.ilegiveis += 1; continue }
       if (payload.type !== 'agenda_event') continue
       const event = payload.data as AgendaEventData

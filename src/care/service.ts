@@ -1,5 +1,6 @@
 import { currentDeviceId } from '../auth/device'
-import { decryptRecord, encryptPayload } from '../crypto/vault'
+import { encryptPayload } from '../crypto/vault'
+import { readPayload } from '../db/corrupted'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository, type EncryptedMutation } from '../db/repository'
 import type { VaultRecord } from '../db/types'
@@ -27,7 +28,7 @@ export class CareService {
 
   private async list<T extends CareEntity>(accountId: string, masterKey: CryptoKey, recordType: VaultRecord['recordType'], payloadType: string): Promise<T[]> {
     const values: T[] = []
-    for (const record of await this.repository.list(accountId, recordType)) { const payload = await decryptRecord(masterKey, record); if (payload?.type === payloadType) { const value = decodeData<T>(record, payload.data); if (value) values.push(value) } }
+    for (const record of await this.repository.list(accountId, recordType)) { const payload = await readPayload(masterKey, record, this.database); if (payload?.type === payloadType) { const value = decodeData<T>(record, payload.data); if (value) values.push(value) } }
     return values
   }
 

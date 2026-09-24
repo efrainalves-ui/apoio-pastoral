@@ -72,6 +72,7 @@ psql_migracao -f "$migrations/0009_sessoes_fora_de_alcance_up.sql"
 psql_migracao -f "$migrations/0010_lembretes_push_up.sql"
 psql_migracao -f "$migrations/0011_lembretes_push_config_up.sql"
 psql_migracao -f "$migrations/0012_lembretes_push_servidor_up.sql"
+psql_migracao -f "$migrations/0013_push_do_aparelho_revogado_up.sql"
 
 tabelas="$(contar_tabelas)"
 if [ "$tabelas" -ne 10 ]; then
@@ -86,8 +87,10 @@ psql_migracao -f "$testes/02_device_barriers.sql"
 psql_migracao -f "$testes/03_sessao_revogada.sql"
 psql_migracao -f "$testes/04_lembretes_push.sql"
 psql_migracao -f "$testes/05_lembretes_push_config.sql"
+psql_migracao -f "$testes/06_push_do_aparelho_revogado.sql"
 
 echo "==> 5/7 Revertendo as migrations"
+psql_migracao -f "$migrations/0013_push_do_aparelho_revogado_down.sql"
 psql_migracao -f "$migrations/0012_lembretes_push_servidor_down.sql"
 psql_migracao -f "$migrations/0011_lembretes_push_config_down.sql"
 psql_migracao -f "$migrations/0010_lembretes_push_down.sql"
@@ -120,7 +123,9 @@ restos="$(psql_run --tuples-only --no-align -c \
                        'funcoes_publicas_abertas',
                        'revoke_all_devices',
                        'app_environment',
-                       'lembretes_push_config', 'lembretes_push_guardar_vapid');")"
+                       'lembretes_push_config', 'lembretes_push_guardar_vapid',
+                       'lembretes_push_inscricoes_ativas', 'lembretes_push_esquecer_inscricao',
+                       'lembretes_push_disponivel');")"
 if [ "$restos" -ne 0 ]; then
   echo "FALHOU: a reversão deixou $restos função(ões) das migrations para trás" >&2
   exit 1
@@ -141,6 +146,7 @@ psql_migracao -f "$migrations/0009_sessoes_fora_de_alcance_up.sql"
 psql_migracao -f "$migrations/0010_lembretes_push_up.sql"
 psql_migracao -f "$migrations/0011_lembretes_push_config_up.sql"
 psql_migracao -f "$migrations/0012_lembretes_push_servidor_up.sql"
+psql_migracao -f "$migrations/0013_push_do_aparelho_revogado_up.sql"
 
 tabelas="$(contar_tabelas)"
 if [ "$tabelas" -ne 10 ]; then
@@ -154,6 +160,7 @@ psql_migracao -f "$testes/02_device_barriers.sql"
 psql_migracao -f "$testes/03_sessao_revogada.sql"
 psql_migracao -f "$testes/04_lembretes_push.sql"
 psql_migracao -f "$testes/05_lembretes_push_config.sql"
+psql_migracao -f "$testes/06_push_do_aparelho_revogado.sql"
 
 echo
 echo "Migration aplicável, reversível e reaplicável; isolamento entre contas comprovado."

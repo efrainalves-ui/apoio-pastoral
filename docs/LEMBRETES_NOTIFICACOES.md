@@ -11,10 +11,20 @@ Aplicar, nesta ordem:
 - `supabase/migrations/0010_lembretes_push_up.sql` — inscrições e horários, com
   RLS por conta;
 - `supabase/migrations/0011_lembretes_push_config_up.sql` — funções que leem e
-  gravam a configuração do envio no Vault, executáveis só pelo servidor.
+  gravam a configuração do envio no Vault, executáveis só pelo servidor;
+- `supabase/migrations/0012_lembretes_push_servidor_up.sql` — o alcance do
+  papel do servidor nas tabelas de notificação. O projeto nasce fechado: nem
+  `service_role` tem privilégio em `public` sem concessão escrita;
+- `supabase/migrations/0013_push_do_aparelho_revogado_up.sql` — revogar apaga a
+  inscrição, o servidor passa a ler só inscrição de aparelho ativo e o banco
+  declara se tem notificações.
 
-Nenhuma das duas muda `app_schema_version`. Reverter: os `_down.sql`, na ordem
-inversa (os segredos do Vault ficam).
+Nenhuma delas muda `app_schema_version`. Reverter: os `_down.sql`, na ordem
+inversa (os segredos do Vault ficam; as inscrições apagadas não voltam, e quem
+foi revogado ativa de novo).
+
+A prova `supabase/tests/06_push_do_aparelho_revogado.sql` roda no workflow
+`Banco`, num Postgres descartável, junto com a reversão e a reaplicação.
 
 ## 2. Segredos no Vault (gerados, nunca digitados)
 
@@ -55,6 +65,57 @@ prioridade.
 3. "Enviar notificação de teste".
 4. Criar um lembrete para daqui a 3 minutos com "Notificar no horário".
 5. Bloquear o aparelho, esperar o aviso, tocar nele e entrar: abre o lembrete.
+
+## Aparelho revogado
+
+Revogar um aparelho cala também as notificações dele. São três travas, e cada
+uma sozinha basta:
+
+1. `revoke_device` e `revoke_all_devices` apagam a inscrição daquele aparelho,
+   junto com o envelope de chave e as sessões;
+2. a função de envio lê as inscrições por
+   `lembretes_push_inscricoes_ativas`, que devolve só aparelho com
+   `status = 'active'`. O privilégio direto do servidor em
+   `push_subscriptions` foi devolvido: a função é a única porta. Isso importa
+   porque `service_role` passa por cima da RLS — as políticas de 0010 exigem
+   aparelho ativo para **inscrever**, e não têm voz sobre o que o servidor lê
+   na hora de **entregar**;
+3. o próprio aparelho se cala assim que descobre que foi revogado, marcando
+   isso no banco local que o service worker lê. Vale sem internet, e nem o
+   aviso genérico aparece — o service worker ainda cancela a inscrição para o
+   serviço de push parar de procurá-lo.
+
+Um aparelho revogado também não recebe a notificação de teste que ele mesmo
+pedir: a função responde "aparelho sem inscrição ativa".
+
+## Quando o agendamento falha
+
+Os horários de aviso são conferidos em três passos — ler o que já está lá,
+tirar o que não vale mais, gravar o que falta. Falha em qualquer um deles
+aparece no painel de Notificações, dizendo em que passo parou, com o botão
+"Tentar de novo".
+
+Falha passageira (rede caída, serviço fora do ar, tempo esgotado) é repetida
+sozinha. Erro permanente — permissão negada, violação de restrição — para na
+hora: repetir só gastaria bateria e esconderia o defeito.
+
+## Dois aparelhos na mesma conta
+
+A chave da ocorrência é igual em todos os aparelhos da conta, então dois
+aparelhos agendam a mesma ocorrência numa linha só.
+
+Apagar exige saber. O cofre de um aparelho pode estar atrasado, e um horário
+que nasceu depois da última sincronização dele veio de um lembrete que ele
+ainda não recebeu. Só sai da frente o que já existia antes do que aquele
+aparelho conhece; um aparelho que nunca sincronizou não apaga nada. Repetir a
+sincronização com os mesmos dados não grava nem apaga de novo.
+
+## Banco sem as migrations
+
+O aplicativo pergunta a `lembretes_push_disponivel` antes de oferecer as
+notificações. Sem as tabelas e funções, o painel diz "Notificações
+indisponíveis nesta instalação" em vez de pedir a permissão e falhar na hora de
+gravar a inscrição. A ausência da própria função já é a resposta.
 
 ## O que o servidor guarda
 

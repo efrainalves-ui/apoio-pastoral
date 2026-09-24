@@ -1,8 +1,3 @@
-import { decryptPayload } from '../crypto/vault'
-import type { VaultPayload } from '../crypto/types'
-import { db, type ApoioDatabase } from './database'
-import { corruptedRecordId, type CorruptedRecordRecord, type VaultRecord } from './types'
-
 /**
  * Quarentena dos registros cifrados que não abrem neste aparelho.
  *
@@ -17,8 +12,26 @@ import { corruptedRecordId, type CorruptedRecordRecord, type VaultRecord } from 
  * a versão mudar — uma sincronização trouxe outra, um backup foi restaurado —
  * a linha sai da quarentena sozinha na leitura seguinte.
  */
+
+import { decryptPayload } from '../crypto/vault'
+import type { CipherEnvelope, VaultPayload } from '../crypto/types'
+import { db, type ApoioDatabase } from './database'
+import { corruptedRecordId, type CorruptedRecordRecord, type VaultRecord } from './types'
+
+/**
+ * O que a quarentena precisa saber de um registro.
+ *
+ * `version` é opcional porque o Orçamento Familiar e a Leitura guardam em
+ * bancos próprios, sem coluna de versão. Ali a saída da quarentena acontece
+ * pela leitura seguinte dar certo, não pela versão ter mudado.
+ */
+export type RegistroParaQuarentena = Pick<VaultRecord, 'id' | 'accountId'> & { recordType: string; version?: number }
+
+/** Um registro cifrado que a quarentena sabe identificar e abrir. */
+export type RegistroCifrado = RegistroParaQuarentena & CipherEnvelope
+
 export async function quarantineCorruptedRecord(
-  record: Pick<VaultRecord, 'id' | 'accountId' | 'recordType' | 'version'>,
+  record: RegistroParaQuarentena,
   reason: CorruptedRecordRecord['reason'],
   database: ApoioDatabase = db,
 ): Promise<void> {
@@ -27,7 +40,7 @@ export async function quarantineCorruptedRecord(
     accountId: record.accountId,
     recordId: record.id,
     recordType: record.recordType,
-    version: record.version,
+    version: record.version ?? 0,
     detectedAt: new Date().toISOString(),
     reason,
   })
@@ -63,12 +76,16 @@ export async function countCorruptedRecords(accountId: string, database: ApoioDa
  */
 export async function readPayload(
   key: CryptoKey,
-  record: VaultRecord,
+  record: RegistroCifrado,
   database: ApoioDatabase = db,
 ): Promise<VaultPayload | null> {
   try {
     const payload = await decryptPayload(key, record)
-    await forgetCorruptedRecord(record.accountId, record.id, database)
+    // Só apaga quando havia o que apagar: a leitura de lista passa por aqui
+    // registro a registro, e uma gravação por linha íntegra custaria caro.
+    if (await database.corruptedRecords.get(corruptedRecordId(record.accountId, record.id))) {
+      await forgetCorruptedRecord(record.accountId, record.id, database)
+    }
     return payload
   } catch (motivo) {
     const vinculo = motivo instanceof Error && motivo.message.startsWith('Registro não confere')
@@ -82,13 +99,13 @@ export async function readPayload(
  * ficaram de fora, para quem chama poder dizer isso na tela em vez de
  * apresentar uma lista curta sem explicação.
  */
-export async function readPayloads(
+export async function readPayloads<T extends RegistroCifrado>(
   key: CryptoKey,
-  records: VaultRecord[],
+  records: readonly T[],
   database: ApoioDatabase = db,
-): Promise<{ opened: Array<{ record: VaultRecord; payload: VaultPayload }>; skipped: VaultRecord[] }> {
-  const opened: Array<{ record: VaultRecord; payload: VaultPayload }> = []
-  const skipped: VaultRecord[] = []
+): Promise<{ opened: Array<{ record: T; payload: VaultPayload }>; skipped: T[] }> {
+  const opened: Array<{ record: T; payload: VaultPayload }> = []
+  const skipped: T[] = []
   for (const record of records) {
     const payload = await readPayload(key, record, database)
     if (payload) opened.push({ record, payload })

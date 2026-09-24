@@ -1,6 +1,7 @@
 import { AgendaService } from '../agenda/service'
 import { currentDeviceId } from '../auth/device'
-import { decryptRecord, encryptPayload } from '../crypto/vault'
+import { encryptPayload } from '../crypto/vault'
+import { readPayload } from '../db/corrupted'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { EncryptedMutation } from '../db/repository'
@@ -25,7 +26,7 @@ export class CommissionService {
   }
 
   private async decode<T extends object>(record: VaultRecord, masterKey: CryptoKey, type: string): Promise<CommissionEntity<T> | null> {
-    const payload = await decryptRecord(masterKey, record)
+    const payload = await readPayload(masterKey, record, this.database)
     return payload?.type === type ? { id: record.id, ...(payload.data as T) } : null
   }
 

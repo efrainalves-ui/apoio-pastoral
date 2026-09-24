@@ -1,5 +1,6 @@
 import { currentDeviceId } from '../auth/device'
-import { decryptRecord, encryptPayload } from '../crypto/vault'
+import { encryptPayload } from '../crypto/vault'
+import { readPayload } from './corrupted'
 import { familyBudgetDb, type FamilyBudgetDatabase } from '../family-budget/database'
 import { readingDb, type ReadingDatabase } from '../reading/database'
 import { db, type ApoioDatabase } from './database'
@@ -88,7 +89,7 @@ export class MigracaoDosPessoais {
     const mutations: EncryptedMutation[] = []
 
     for (const registro of pendentes) {
-      const payload = await decryptRecord(masterKey, registro).catch(() => null)
+      const payload = await readPayload(masterKey, registro, this.database).catch(() => null)
       const recordType = payload && TIPO_DO_COFRE[payload.type]
       /*
         Sem tipo conhecido, o registro fica onde está. É o caso das entradas,

@@ -58,10 +58,26 @@ async function tituloDecifrado(chave) {
   return (alteracao && alteracao.titulo) || data.titulo || null
 }
 
+/*
+  Aparelho revogado não mostra nada — nem o aviso genérico.
+
+  A inscrição já é apagada no serviço quando a revogação acontece, e a função
+  de envio só entrega a aparelho ativo. Esta é a terceira trava, a que funciona
+  mesmo sem internet: a marca fica gravada no próprio aparelho. Além de não
+  mostrar, ele cancela a inscrição, para o serviço de push parar de procurá-lo.
+*/
+async function aparelhoRevogado() {
+  try { return (await ler(BANCO_DO_PUSH, 'preferencias', 'revogado')) === true } catch { return false }
+}
+
 self.addEventListener('push', (evento) => {
   let dados = {}
   try { dados = evento.data ? evento.data.json() : {} } catch { dados = {} }
   evento.waitUntil((async () => {
+    if (await aparelhoRevogado()) {
+      try { const inscricao = await self.registration.pushManager.getSubscription(); if (inscricao) await inscricao.unsubscribe() } catch { /* já cancelada */ }
+      return
+    }
     let corpo = AVISO_GENERICO
     try { corpo = (await tituloDecifrado(dados.chave)) || AVISO_GENERICO } catch { corpo = AVISO_GENERICO }
     await self.registration.showNotification('Apoio Pastoral', {

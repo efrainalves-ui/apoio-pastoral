@@ -1,5 +1,6 @@
 import { currentDeviceId } from '../auth/device'
-import { decryptRecord, encryptPayload } from '../crypto/vault'
+import { encryptPayload } from '../crypto/vault'
+import { readPayload } from '../db/corrupted'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { VaultRecord } from '../db/types'
@@ -63,7 +64,7 @@ export class AgendaService {
   constructor(private readonly database: ApoioDatabase = db) { this.repository = new VaultRepository(database) }
 
   private async decode(record: VaultRecord, masterKey: CryptoKey): Promise<AgendaEventEntity | null> {
-    const payload = await decryptRecord(masterKey, record)
+    const payload = await readPayload(masterKey, record, this.database)
     if (payload?.type !== 'agenda_event') return null
     /* PGP antigo, deste aparelho ou de outro ainda não migrado, abre como Concílio. */
     const data = normalizarLegado(payload.data as Partial<AgendaEventData> & Pick<AgendaEventData, 'category'>)

@@ -1,5 +1,6 @@
 import { db, type ApoioDatabase } from '../db/database'
 import type { DeviceRecord } from '../db/types'
+import { bloquearNotificacoesDoAparelho } from '../lembretes/bloqueioPush'
 import { approveRemoteDevice, ensureRemoteDevice, fetchRemoteDeviceStatus, revokeRemoteDevice, type RemoteDeviceStatus } from './supabase'
 
 const DEVICE_ID_KEY = 'apoio-pastoral:device-id'
@@ -108,6 +109,7 @@ export async function reauthorizeRevokedDevice(
   const antigo = currentDeviceId(accountId)
   const local = await database.devices.get(antigo)
   if (local) await database.devices.put({ ...local, status: 'revoked' })
+  await bloquearNotificacoesDoAparelho(accountId)
   rotateDeviceId(accountId)
   return authorizeCurrentDevice(accountId, database)
 }
@@ -135,6 +137,8 @@ export async function refreshCurrentDeviceStatus(
   if (local && local.accountId === accountId && local.status !== remoto) {
     await database.devices.put({ ...local, status: remoto, ...(remoto === 'revoked' ? { revokedAt: new Date().toISOString() } : {}) })
   }
+  // Revogado é revogado também para as notificações: nem aviso genérico, nem título.
+  if (remoto === 'revoked') await bloquearNotificacoesDoAparelho(accountId)
   return remoto
 }
 
@@ -169,6 +173,7 @@ export async function assertRemoteDeviceStillActive(
   if (device && device.accountId === accountId) {
     await database.devices.put({ ...device, status: 'revoked', revokedAt: new Date().toISOString() })
   }
+  await bloquearNotificacoesDoAparelho(accountId)
   throw new Error('Este dispositivo foi removido e não sincroniza mais. Autorize-o novamente por outro dispositivo.')
 }
 

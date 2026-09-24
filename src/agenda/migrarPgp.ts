@@ -1,5 +1,6 @@
 import { currentDeviceId } from '../auth/device'
-import { decryptRecord, encryptPayload } from '../crypto/vault'
+import { encryptPayload } from '../crypto/vault'
+import { readPayload } from '../db/corrupted'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import { normalizarLegado } from './detalhes'
@@ -31,7 +32,7 @@ export class MigracaoPgpParaConcilio {
     let migrados = 0
     let ilegiveis = 0
     for (const record of await this.repository.list(accountId, 'agenda_event')) {
-      const payload = await decryptRecord(masterKey, record)
+      const payload = await readPayload(masterKey, record, this.database)
       if (!payload) { ilegiveis += 1; continue }
       if (payload.type !== 'agenda_event') continue
       const data = payload.data as AgendaEventData

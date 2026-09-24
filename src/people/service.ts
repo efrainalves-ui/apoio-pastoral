@@ -1,5 +1,6 @@
 import { currentDeviceId } from '../auth/device'
-import { decryptRecord, encryptPayload } from '../crypto/vault'
+import { encryptPayload } from '../crypto/vault'
+import { readPayload } from '../db/corrupted'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { VaultRecord } from '../db/types'
@@ -15,7 +16,7 @@ export class PeopleService {
   constructor(private readonly database: ApoioDatabase = db) { this.repository = new VaultRepository(database) }
 
   private async decode(record: VaultRecord, masterKey: CryptoKey): Promise<PersonEntity | null> {
-    const payload = await decryptRecord(masterKey, record)
+    const payload = await readPayload(masterKey, record, this.database)
     if (payload?.type !== 'person') return null
     const data = payload.data as PersonData
     // `nameVariants` nasce vazio nos cadastros antigos: quem lê não precisa saber disso.

@@ -103,9 +103,18 @@ O que fazer se houver suspeita de acesso indevido:
    sozinha nesta versão; o caminho é encerrar o distrito, criar a conta de novo
    e restaurar de um backup. Registre a data e o motivo.
 4. **Alterações recebidas em quarentena**: a tela de Sincronização avisa. Isso
-   significa que chegou algo que não confere com a conta. Pare de sincronizar
-   naquele aparelho e procure ajuda técnica antes de continuar.
-5. **Anotar sempre**: data, o que aconteceu, o que foi feito. Se dados de
+   significa que chegou algo que não confere com a conta, ou que um registro
+   não abre neste aparelho. A contagem é gravada e sobrevive ao
+   recarregamento — vale para todos os módulos, inclusive Agenda, Pessoas,
+   Visitas, Comissão, Nomeações, Casamentos, Lembretes e Orçamento Familiar. O
+   registro não é apagado, e sai da quarentena sozinho quando chegar uma versão
+   que abra. Pare de sincronizar naquele aparelho e procure ajuda técnica antes
+   de continuar.
+5. **Aparelho perdido com notificações ligadas**: revogar já cala as
+   notificações daquele aparelho — a inscrição é apagada no serviço e ele para
+   de mostrar qualquer aviso, mesmo sem internet. Se a senha também puder ser
+   conhecida, troque a senha: é ela que abre a conta em qualquer lugar.
+6. **Anotar sempre**: data, o que aconteceu, o que foi feito. Se dados de
    terceiros puderem ter sido expostos, avise as pessoas afetadas.
 
 ## Backups

@@ -10,10 +10,21 @@
 
 reset role;
 
--- 0012: o servidor alcança só as duas tabelas das notificações, e só o que o envio usa.
-select homologacao_testes.exigir(has_table_privilege('service_role', 'public.push_subscriptions', 'select'), 'o servidor lê as inscrições');
-select homologacao_testes.exigir(has_table_privilege('service_role', 'public.push_subscriptions', 'delete'), 'o servidor apaga a inscrição recusada');
+-- 0012, corrigida pela 0013: o servidor alcança só o que o envio usa, e as
+-- inscrições deixaram de ser alcançáveis pela tabela.
+--
+-- `service_role` passa por cima da RLS, então um `select` direto enxergaria
+-- também a inscrição de um aparelho revogado — as políticas de 0010 exigem
+-- aparelho ativo para inscrever e não têm voz sobre o que o servidor lê na
+-- hora de entregar. A 0013 devolveu o privilégio e pôs uma porta no lugar.
+select homologacao_testes.exigir(not has_table_privilege('service_role', 'public.push_subscriptions', 'select'), 'o servidor não lê a tabela de inscrições direto');
+select homologacao_testes.exigir(not has_table_privilege('service_role', 'public.push_subscriptions', 'delete'), 'o servidor não apaga na tabela de inscrições direto');
 select homologacao_testes.exigir(not has_table_privilege('service_role', 'public.push_subscriptions', 'insert'), 'o servidor não cria inscrição');
+select homologacao_testes.exigir(has_function_privilege('service_role', 'public.lembretes_push_inscricoes_ativas(uuid, uuid)', 'execute'), 'o servidor lê as inscrições pela porta que só devolve aparelho ativo');
+select homologacao_testes.exigir(has_function_privilege('service_role', 'public.lembretes_push_esquecer_inscricao(uuid)', 'execute'), 'o servidor apaga a inscrição recusada pela função');
+select homologacao_testes.exigir(not has_function_privilege('authenticated', 'public.lembretes_push_inscricoes_ativas(uuid, uuid)', 'execute'), 'conta autenticada não lê as inscrições pela porta do servidor');
+select homologacao_testes.exigir(not has_function_privilege('anon', 'public.lembretes_push_disponivel()', 'execute'), 'anon não pergunta se o banco tem notificações');
+select homologacao_testes.exigir(has_function_privilege('authenticated', 'public.lembretes_push_disponivel()', 'execute'), 'a conta autenticada pergunta se o banco tem notificações');
 select homologacao_testes.exigir(has_column_privilege('service_role', 'public.notification_schedule', 'state', 'update'), 'o servidor marca o envio');
 select homologacao_testes.exigir(not has_column_privilege('service_role', 'public.notification_schedule', 'occurrence_key', 'update'), 'o servidor não troca a chave da ocorrência');
 select homologacao_testes.exigir(not has_column_privilege('service_role', 'public.notification_schedule', 'owner_id', 'update'), 'o servidor não troca o dono do horário');

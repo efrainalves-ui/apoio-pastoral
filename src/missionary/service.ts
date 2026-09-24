@@ -1,5 +1,6 @@
 import { currentDeviceId } from '../auth/device'
-import { decryptRecord, encryptPayload } from '../crypto/vault'
+import { encryptPayload } from '../crypto/vault'
+import { readPayload } from '../db/corrupted'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { BibleStudyData, BibleStudyEntity, InterestData, InterestEntity, InterestStatus, MissionaryPairData, MissionaryPairEntity, SabbathClassData, SabbathClassEntity, SmallGroupData, SmallGroupEntity, UapgData, UapgEntity } from './types'
@@ -7,10 +8,10 @@ import type { BibleStudyData, BibleStudyEntity, InterestData, InterestEntity, In
 type MissionaryType = 'interest' | 'bible_study' | 'missionary_pair' | 'sabbath_class' | 'small_group' | 'uapg'
 export class MissionaryService {
   private readonly repo: VaultRepository
-  constructor(database: ApoioDatabase = db) { this.repo = new VaultRepository(database) }
+  constructor(private readonly database: ApoioDatabase = db) { this.repo = new VaultRepository(database) }
   private async list<T>(accountId: string, key: CryptoKey, type: MissionaryType): Promise<T[]> {
     const records = await this.repo.list(accountId, type)
-    const items = await Promise.all(records.map(async record => { const payload = await decryptRecord(key, record); return payload?.type === type ? { id: record.id, ...(payload.data as object) } as T : null }))
+    const items = await Promise.all(records.map(async record => { const payload = await readPayload(key, record, this.database); return payload?.type === type ? { id: record.id, ...(payload.data as object) } as T : null }))
     return items.filter(Boolean) as T[]
   }
   listInterests(accountId: string, key: CryptoKey) { return this.list<InterestEntity>(accountId, key, 'interest') }

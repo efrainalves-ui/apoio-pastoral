@@ -63,6 +63,20 @@ Para usar Supabase, copie `.env.example` para `.env.local`, preencha URL, chave 
 0009_sessoes_fora_de_alcance_up.sql
 ```
 
+As quatro seguintes são das notificações dos lembretes. São opcionais para
+sincronizar e obrigatórias para notificar; nenhuma delas muda a versão de
+esquema, e sem elas o aplicativo simplesmente não oferece o recurso:
+
+```
+0010_lembretes_push_up.sql
+0011_lembretes_push_config_up.sql
+0012_lembretes_push_servidor_up.sql
+0013_push_do_aparelho_revogado_up.sql
+```
+
+O passo a passo de chaves, função de envio e agendamento está em
+`docs/LEMBRETES_NOTIFICACOES.md`.
+
 Depois, declare uma única vez o que aquele banco é — sem esta linha o aplicativo se recusa a sincronizar, de propósito:
 
 ```sql

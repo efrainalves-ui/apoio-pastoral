@@ -3,7 +3,8 @@ import { hasSupabaseConfiguration } from '../auth/supabase'
 import { currentDeviceId } from '../auth/device'
 import { CareService } from '../care/service'
 import { CommissionService } from '../commissions/service'
-import { decryptRecord, encryptPayload } from '../crypto/vault'
+import { encryptPayload } from '../crypto/vault'
+import { readPayload } from '../db/corrupted'
 import { db, type ApoioDatabase } from '../db/database'
 import { VaultRepository } from '../db/repository'
 import type { VaultRecord } from '../db/types'
@@ -81,7 +82,7 @@ export class LembreteService {
   private async ler<T>(accountId: string, masterKey: CryptoKey, tipo: TipoDaCentral): Promise<Array<T & { id: string }>> {
     const registros = await this.repository.list(accountId, tipo)
     const lidos: Array<(T & { id: string }) | null> = await Promise.all(registros.map(async (registro: VaultRecord) => {
-      const payload = await decryptRecord(masterKey, registro)
+      const payload = await readPayload(masterKey, registro, this.database)
       return payload?.type === tipo ? { ...(payload.data as T), id: registro.id } : null
     }))
     return lidos.filter((item): item is T & { id: string } => item !== null)

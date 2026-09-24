@@ -232,24 +232,13 @@ export async function decryptPayload(masterKey: CryptoKey, envelope: CipherEnvel
   }
 }
 
-/**
- * Registros que não abriram neste aparelho, guardados de lado.
+/*
+ * A quarentena não mora mais aqui.
  *
- * Um único registro corrompido não pode derrubar a lista inteira: antes, uma
- * falha ao decifrar interrompia a leitura e a tela ficava vazia, o que para o
- * pastor é indistinguível de perda de todos os dados. Aqui o registro ruim é
- * pulado, contado e mostrado como aviso, e o resto continua acessível.
+ * Havia um conjunto na memória: a contagem sumia a cada recarregamento e a
+ * tela de Sincronização nunca ficava sabendo. Quem precisa pular um registro
+ * ilegível sem derrubar a lista usa `readPayload` de `src/db/corrupted.ts`,
+ * que grava a linha de lado e a remove quando uma versão legível chega.
+ * `decryptPayload` continua aqui para quem precisa da exceção — a gravação,
+ * em que abrir errado é motivo para parar.
  */
-const corrompidos = new Set<string>()
-
-export function corruptedRecordIds(): string[] { return [...corrompidos] }
-export function forgetCorruptedRecords(): void { corrompidos.clear() }
-
-export async function decryptRecord(masterKey: CryptoKey, envelope: CipherEnvelope & { id?: string }): Promise<VaultPayload | null> {
-  try {
-    return await decryptPayload(masterKey, envelope)
-  } catch {
-    if (envelope.id) corrompidos.add(envelope.id)
-    return null
-  }
-}
