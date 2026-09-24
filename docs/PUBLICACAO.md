@@ -250,6 +250,12 @@ dentro do pacote no momento da build, então é preciso uma build nova. Na branc
 **Deployments → a última da branch `homologacao` → Retry deployment**, ou um
 envio novo qualquer para a branch.
 
+**A build agora recusa ambiente mal configurado.** `pnpm build` começa por
+`scripts/verify-env.mjs`. Uma build sem ambiente declarado, sem endereço, sem
+chave ou sem projeto **falha no Cloudflare** em vez de publicar um site que só
+quebra no navegador de quem abrir. Foi assim que este bloqueio apareceu tarde
+demais em 23/09/2026: a build passou verde e o erro só surgiu na tela.
+
 **As variáveis precisam existir antes da build que vai ser usada.** O Vite grava
 o valor delas dentro do arquivo compilado; publicar antes de configurá-las gera
 um aplicativo que abre na tela "Esta instalação não está configurada" e não
